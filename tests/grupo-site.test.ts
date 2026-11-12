@@ -7,7 +7,7 @@ import { syncResultado, visaoPublica, type EnvReservas, type Pedido } from '../w
 
 const HOJE = new Date('2026-10-01T15:00:00Z'); // 12:00 em Brasília
 const agenda: Agenda = {
-  atualizadoEm: HOJE.toISOString(), precoCentavos: 14500, maxPilotos: 10, prazoMin: 15, antecedenciaMin: 120,
+  atualizadoEm: HOJE.toISOString(), precoCentavos: 14500, maxPilotos: 10, prazoMin: 15, antecedenciaMin: 120, grupoSite: true,
   horarios: [
     { id: 101, inicio: '2026-10-03T09:15', nome: 'BATERIA 09:15', livres: 10 }, // daqui a ~45h
     { id: 103, inicio: '2026-10-01T20:00', nome: 'BATERIA 20:00', livres: 10 }, // daqui a 8h
@@ -42,6 +42,10 @@ describe('validarReserva no modo cada um paga o seu', () => {
   it('sem o modo, continua exigindo o cadastro de cada piloto', () => {
     const { modo: _m, ...normal } = organizador;
     expect(validarReserva(normal, agenda, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/Cadastre os outros 3 pilotos/) });
+  });
+
+  it('SRVKART antigo (agenda sem grupoSite): recusa, para não cobrar todas as vagas do organizador', () => {
+    expect(validarReserva(organizador, { ...agenda, grupoSite: undefined }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/ainda não está disponível/) });
   });
 
   it('grupoSitePermitido: limite exato de 24h', () => {

@@ -103,6 +103,9 @@ export async function agendaOnline() {
     maxPilotos: c.maxPilotos,
     prazoMin: c.prazoMin,
     antecedenciaMin: c.antecedenciaMin,
+    // este SRVKART sabe criar o grupo "cada um paga o seu" do site: sem isto o site não oferece a opção
+    // (site novo com SRVKART antigo cobraria todas as vagas do organizador)
+    grupoSite: true,
     horarios,
   };
 }

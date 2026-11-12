@@ -19,7 +19,7 @@ const GRUPO_MIN = 2, GRUPO_MAX = 10, GRUPO_ANTECEDENCIA_H = 24;
 const cadaPodeNoHorario = (h: Horario) => Date.parse(h.inicio.slice(0, 16) + ':00-03:00') - Date.now() >= GRUPO_ANTECEDENCIA_H * 3_600_000;
 const cadaPode = (h: Horario, q: number) => q >= GRUPO_MIN && q <= GRUPO_MAX && cadaPodeNoHorario(h);
 /** Modo valendo de fato: a escolha "cada" só vale se o horário e a quantidade permitem. */
-const ehCada = (r: Rascunho, h: Horario | null) => r.modo === 'cada' && !!h && cadaPode(h, r.quantidade);
+const ehCada = (r: Rascunho, h: Horario | null, a: Agenda | null) => !!a?.grupoSite && r.modo === 'cada' && !!h && cadaPode(h, r.quantidade);
 
 const ler = <T,>(k: string, padrao: T): T => { try { const v = sessionStorage.getItem(k); return v ? { ...padrao, ...JSON.parse(v) } : padrao; } catch { return padrao; } };
 const gravar = (k: string, v: unknown) => { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch { /* sem armazenamento */ } };
@@ -125,14 +125,14 @@ function Reserva({ onCriado }: { onCriado: (id: string) => void }) {
         <section className="cartao principal">
           {passo === 0 && <EtapaCorrida agenda={agenda} carregando={carregando} erro={erroAgenda} recarregar={carregar} selecionado={r.bateriaId}
             onEscolher={(h) => { setR((x) => ({ ...x, bateriaId: h.id, quantidade: Math.min(x.quantidade, Math.max(1, Math.min(agenda?.maxPilotos ?? 10, h.livres))) })); ir(1); }} />}
-          {passo === 1 && horario && <EtapaPilotos r={r} setR={setR} max={maxQtd} horario={horario} voltar={() => ir(0)} avancar={() => ir(2)} />}
-          {passo === 2 && horario && <EtapaCadastro r={r} setR={setR} cada={ehCada(r, horario)} voltar={() => ir(1)} avancar={() => ir(3)} />}
-          {passo === 3 && horario && agenda && <EtapaPagamento r={r} setR={setR} cada={ehCada(r, horario)} horario={horario} agenda={agenda} abertoEm={abertoEm.current} voltar={() => ir(2)}
+          {passo === 1 && horario && <EtapaPilotos r={r} setR={setR} max={maxQtd} horario={horario} grupoSite={!!agenda?.grupoSite} voltar={() => ir(0)} avancar={() => ir(2)} />}
+          {passo === 2 && horario && <EtapaCadastro r={r} setR={setR} cada={ehCada(r, horario, agenda)} voltar={() => ir(1)} avancar={() => ir(3)} />}
+          {passo === 3 && horario && agenda && <EtapaPagamento r={r} setR={setR} cada={ehCada(r, horario, agenda)} horario={horario} agenda={agenda} abertoEm={abertoEm.current} voltar={() => ir(2)}
             onCriado={(id) => { try { sessionStorage.removeItem('kib-rascunho'); } catch { /* ok */ } onCriado(id); }}
             onIndisponivel={() => { setR((x) => ({ ...x, bateriaId: null })); carregar(); ir(0); }} />}
           {passo > 0 && !horario && <div className="vazio"><p>Esse horário não está mais disponível.</p><button className="btn" onClick={() => ir(0)}>Escolher outro horário</button></div>}
         </section>
-        <Resumo horario={horario} r={r} agenda={agenda} cada={ehCada(r, horario)} />
+        <Resumo horario={horario} r={r} agenda={agenda} cada={ehCada(r, horario, agenda)} />
       </div>
     </div>
   );
@@ -254,7 +254,7 @@ function Requisitos() {
 }
 
 // ------------------------------------------------------------------ 2. pilotos
-function EtapaPilotos({ r, setR, max, horario, voltar, avancar }: { r: Rascunho; setR: React.Dispatch<React.SetStateAction<Rascunho>>; max: number; horario: Horario; voltar: () => void; avancar: () => void }) {
+function EtapaPilotos({ r, setR, max, horario, grupoSite, voltar, avancar }: { r: Rascunho; setR: React.Dispatch<React.SetStateAction<Rascunho>>; max: number; horario: Horario; grupoSite: boolean; voltar: () => void; avancar: () => void }) {
   const q = Math.min(r.quantidade, max);
   const mudar = (n: number) => setR((x) => ({ ...x, quantidade: Math.max(1, Math.min(max, n)) }));
   return (
@@ -275,7 +275,7 @@ function EtapaPilotos({ r, setR, max, horario, voltar, avancar }: { r: Rascunho;
         <label className={r.euPiloto ? 'on' : ''}><input type="radio" name="eu" checked={r.euPiloto} onChange={() => setR((x) => ({ ...x, euPiloto: true }))} /><span><strong>Sim, vou correr</strong><small>Uma das vagas é minha.</small></span></label>
         <label className={!r.euPiloto ? 'on' : ''}><input type="radio" name="eu" checked={!r.euPiloto} onChange={() => setR((x) => ({ ...x, euPiloto: false }))} /><span><strong>Não, só vou reservar</strong><small>Reservo e pago para outras pessoas.</small></span></label>
       </fieldset>
-      {q >= GRUPO_MIN && (() => {
+      {grupoSite && q >= GRUPO_MIN && (() => {
         const pode = cadaPode(horario, q);
         const cada = r.modo === 'cada' && pode;
         return (
@@ -288,7 +288,7 @@ function EtapaPilotos({ r, setR, max, horario, voltar, avancar }: { r: Rascunho;
           </fieldset>
         );
       })()}
-      <p className="dica-mini">{r.modo === 'cada' && cadaPode(horario, q)
+      <p className="dica-mini">{grupoSite && r.modo === 'cada' && cadaPode(horario, q)
         ? `Cada amigo abre o link, faz o próprio cadastro e paga a vaga dele. Quem não pagar até ${GRUPO_ANTECEDENCIA_H}h antes da bateria perde a vaga.`
         : 'Cada vaga é de uma pessoa diferente. Na próxima etapa você informa nome, CPF e nascimento de cada piloto.'}</p>
       <div className="acoes"><button className="btn sec" onClick={voltar}>Voltar</button><button className="btn" onClick={() => { setR((x) => ({ ...x, quantidade: q })); avancar(); }}>Continuar</button></div>

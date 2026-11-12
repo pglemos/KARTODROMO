@@ -1,7 +1,7 @@
 // Contrato com o worker kartodromo-cadastro (rotas /api/agenda, /api/reservas, /api/reservas/:id, /api/reservas/politica, /api/aviso).
 
 export type Horario = { id: number; inicio: string; nome: string; livres: number; precoCentavos: number; precoPrimeiraVezCentavos?: number };
-export type Agenda = { atualizadoEm: string; precoCentavos: number; maxPilotos: number; prazoMin: number; antecedenciaMin: number; horarios: Horario[]; pagamentoOnline: boolean };
+export type Agenda = { atualizadoEm: string; precoCentavos: number; maxPilotos: number; prazoMin: number; antecedenciaMin: number; horarios: Horario[]; pagamentoOnline: boolean; grupoSite?: boolean };
 export type Politica = { versao: string; titulo: string; aceite: string; secoes: { titulo: string; paragrafos?: string[]; subsecoes?: { titulo: string; paragrafos: string[] }[] }[] };
 export type Aviso = { texto: string; tom?: 'info' | 'alerta' } | null;
 export type StatusPedido = 'novo' | 'aguardando_pagamento' | 'pago' | 'confirmado' | 'recusado' | 'expirado' | 'pago_sem_vaga' | 'erro_pagamento' | 'nao_encontrada';

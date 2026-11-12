@@ -139,7 +139,7 @@ export function validar(
 // ---------------------------------------------------------------- reserva online
 
 export type Horario = { id: number; inicio: string; nome: string; livres: number; vagasTotais?: number };
-export type Agenda = { atualizadoEm: string; precoCentavos: number; maxPilotos: number; prazoMin: number; antecedenciaMin: number; horarios: Horario[] };
+export type Agenda = { atualizadoEm: string; precoCentavos: number; maxPilotos: number; prazoMin: number; antecedenciaMin: number; horarios: Horario[]; grupoSite?: boolean };
 /** Cada vaga é de uma pessoa: com 3 vagas, quem compra é o piloto 1 e os outros 2 vêm cadastrados aqui. */
 export type Acompanhante = {
   nome: string; documento: string; nascimento: string; instagram: string; email: string; telefone: string; peso: string;
@@ -187,6 +187,7 @@ export function validarReserva(entrada: Record<string, unknown>, agenda: Agenda 
   if (idade(v.dados.nascimento, hoje) < 18) return { ok: false, erro: 'A reserva precisa ser feita por um adulto (18 anos ou mais), que é o responsável pelo pagamento.' };
   const compradorPilota0 = entrada.compradorPilota !== false;
   if (entrada.modo === 'individual') {
+    if (!agenda.grupoSite) return { ok: false, erro: '"Cada um paga o seu" ainda não está disponível pelo site. Escolha "eu pago tudo" ou fale com a recepção.' };
     // cada amigo faz o próprio cadastro e paga a própria vaga pelo link do grupo; aqui só os dados de quem organiza
     if (quantidade < GRUPO_SITE_MIN || quantidade > GRUPO_SITE_MAX) return { ok: false, erro: `Para cada um pagar o seu, o grupo precisa ter de ${GRUPO_SITE_MIN} a ${GRUPO_SITE_MAX} pilotos.` };
     if (!grupoSitePermitido(horario.inicio, hoje.getTime())) return { ok: false, erro: `"Cada um paga o seu" só vale para baterias com ${GRUPO_SITE_ANTECEDENCIA_H}h ou mais de antecedência. Escolha "eu pago tudo" ou outro horário.` };

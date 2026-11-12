@@ -91,7 +91,7 @@ FEITO 12/11/2026: reskin publicado (aaec9d9). `reservas.…/?r=TOKEN`, `/cadastr
 - Expiração das vagas de amigos não pagas + aviso ao organizador.
 
 **Fase 2 — CÓDIGO PRONTO 12/11/2026, NÃO PUBLICADO.** Site (escolha "Como vocês vão pagar?", só o organizador preenche, cobra 1 vaga, tela "Agora chame o grupo" com WhatsApp/copiar/painel), worker (`modo: 'individual'`, links do grupo no pedido) e SRVKART (`grupoDaReservaOnline`, `soltarVagasNaoPagasDoSite` a cada minuto). Testes: `tests/grupo-site.test.ts`.
-Ordem obrigatória de publicação: **1) SRVKART** (`lib/ops/grupos.ts`, `lib/ops/reserva-online.ts`, `services/ops-server.ts`, roteiro §8.2 do HANDOFF) → **2) worker** `kartodromo-cadastro` → **3) site** (`vite build` + `kartodromo-reservas-2026`). Site antes do SRVKART = SRVKART antigo cobra as N vagas do organizador.
+Ordem obrigatória de publicação: **1) SRVKART** (`lib/ops/grupos.ts`, `lib/ops/reserva-online.ts`, `services/ops-server.ts`, roteiro §8.2 do HANDOFF) → **2) worker** `kartodromo-cadastro` → **3) site** (`vite build` + `kartodromo-reservas-2026`). Site antes do SRVKART = SRVKART antigo cobra as N vagas do organizador. Trava: a opção só aparece e o worker só aceita quando a agenda publicada pelo SRVKART traz `grupoSite: true` (só o SRVKART novo manda).
 Pendências conhecidas: aviso ativo ao organizador quando uma vaga é solta (hoje só aparece no painel); primeira vez/cupom do AMIGO no link do grupo (o link cobra o preço cheio do grupo); testes de banco do SRVKART (só lógica pura testada).
 
 **Fase 3 — Acabamento (~2–3 dias)**
