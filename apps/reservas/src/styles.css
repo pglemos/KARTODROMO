@@ -244,3 +244,6 @@ main { outline: none; }
 .cor-info strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cor-info small, .cor-volta small { color: var(--muted); font-size: 12px; }
 .cor-volta { display: grid; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.idioma { appearance: none; background: none; border: 1px solid rgba(255,255,255,.25); color: #fff; border-radius: 8px; padding: 7px 9px; font-size: 12px; font-weight: 700; letter-spacing: .06em; cursor: pointer; }
+.idioma:hover { background: rgba(255,255,255,.08); }

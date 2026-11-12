@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { idiomaInicial, trocarIdioma } from './i18n';
 import { api, ErroApi, FINAIS, ID_PEDIDO, type Agenda, type Aviso, type Horario, type Corrida, type MinhaReserva, type Pedido, type Politica } from './api';
 import {
   cpfValido, dataIso, deIso, diaChave, diaCurto, diaLongo, digitos, emailValido, erroInstagram, hora, ics, idade,
@@ -52,6 +53,7 @@ export default function App() {
       <header className="barra">
         <a href="https://kartodromodebetim.com.br" className="marca" aria-label="Kartódromo Internacional de Betim, site principal"><img src="/booking-media/logo.png" alt="Kartódromo Internacional de Betim" width="160" height="44" /></a>
         <nav className="barra-acoes">
+          <button type="button" className="idioma" data-sem-traducao onClick={() => trocarIdioma(idiomaInicial() === 'en' ? 'pt' : 'en')} aria-label={idiomaInicial() === 'en' ? 'Ver em português' : 'View in English'}>{idiomaInicial() === 'en' ? 'PT' : 'EN'}</button>
           <a href="#minhas" onClick={abrirMinhas} className="lnk-claro sempre"><Ico d={I.cal} s={16} /><span>Minhas<span className="so-largo"> reservas</span></span></a>
           <a href="https://kartodromodebetim.com.br" className="lnk-claro"><Ico d={I.voltar} s={16} />Voltar ao site</a>
           <a href={`https://wa.me/${WHATS}`} target="_blank" rel="noopener" className="btn-claro"><Ico d={I.ajuda} s={16} /><span className="so-largo">Precisa de ajuda?</span><span className="so-celular">Ajuda</span></a>
@@ -259,9 +261,9 @@ function EtapaPilotos({ r, setR, max, horario, voltar, avancar }: { r: Rascunho;
           <output aria-live="polite">{q}</output>
           <button className="ico-btn" onClick={() => mudar(q + 1)} disabled={q >= max} aria-label="Mais um piloto"><Ico d={I.mais} /></button>
         </div>
-        <span className="muted">máx. {max} {max === 1 ? 'vaga' : 'vagas'} neste horário</span>
+        <span className="muted">{`máx. ${max} ${max === 1 ? 'vaga' : 'vagas'} neste horário`}</span>
       </div>
-      {horario.precoPrimeiraVezCentavos ? <p className="dica-mini">Primeira vez no Kartódromo de Betim? Nesse horário, cada piloto estreante paga {reais(horario.precoPrimeiraVezCentavos)}. O desconto é conferido pelo CPF e aparece no total da próxima tela.</p> : null}
+      {horario.precoPrimeiraVezCentavos ? <p className="dica-mini">{`Primeira vez no Kartódromo de Betim? Nesse horário, cada piloto estreante paga ${reais(horario.precoPrimeiraVezCentavos)}. O desconto é conferido pelo CPF e aparece no total da próxima tela.`}</p> : null}
       <fieldset className="escolha">
         <legend>Você também vai pilotar?</legend>
         <label className={r.euPiloto ? 'on' : ''}><input type="radio" name="eu" checked={r.euPiloto} onChange={() => setR((x) => ({ ...x, euPiloto: true }))} /><span><strong>Sim, vou correr</strong><small>Uma das vagas é minha.</small></span></label>
@@ -382,7 +384,7 @@ function EtapaCadastro({ r, setR, voltar, avancar }: { r: Rascunho; setR: React.
         </section>
       ))}
       <p className="dica-mini">Seus dados são usados só para a reserva, o cadastro no totem e o resultado da bateria (LGPD). Menores de 18 anos assinam o termo com o responsável no dia.</p>
-      {tentou && faltam > 0 && <p className="msg-erro geral" role="alert">Faltam {faltam} {faltam === 1 ? 'campo' : 'campos'}. Confira os destacados.</p>}
+      {tentou && faltam > 0 && <p className="msg-erro geral" role="alert">{faltam === 1 ? 'Falta 1 campo. Confira os destacados.' : `Faltam ${faltam} campos. Confira os destacados.`}</p>}
       <div className="acoes"><button className="btn sec" onClick={voltar}>Voltar</button><button className="btn" onClick={continuar}>Continuar</button></div>
     </>
   );
@@ -455,7 +457,7 @@ function EtapaPagamento({ r, setR, horario, agenda, abertoEm, voltar, onCriado, 
   };
   return (
     <>
-      <div className="etapa-topo"><span className="num">04</span><div><h2>Pagamento</h2><p className="muted">As vagas ficam separadas por {agenda.prazoMin} minutos enquanto você paga.</p></div></div>
+      <div className="etapa-topo"><span className="num">04</span><div><h2>Pagamento</h2><p className="muted">{`As vagas ficam separadas por ${agenda.prazoMin} minutos enquanto você paga.`}</p></div></div>
       <dl className="conferir">
         <div><dt>Bateria</dt><dd>{diaLongo(dt)} · {hora(dt)}</dd></div>
         <div><dt>Chegada</dt><dd>{menosUmaHora(dt)} (1 hora antes)</dd></div>
@@ -476,7 +478,7 @@ function EtapaPagamento({ r, setR, horario, agenda, abertoEm, voltar, onCriado, 
         <p id="cupom-msg" className={erroCupom ? 'msg-erro' : 'dica-campo'} role={erroCupom ? 'alert' : undefined}>{erroCupom || (aplicado ? `Cupom ${aplicado.codigo}: desconto de ${reais(aplicado.descontoCentavos)}.` : '')}</p>
       </div>
       <div className="total"><span>{aplicado ? <><s>{reais(aplicado.brutoCentavos)}</s> com cupom</> : `${r.quantidade} × ${reais(horario.precoCentavos)}`}</span><strong>{reais(total)}</strong></div>
-      {horario.precoPrimeiraVezCentavos ? <p className="dica-mini">Estreantes pagam {reais(horario.precoPrimeiraVezCentavos)} neste horário: o desconto é conferido pelo CPF e já vem no valor do Pix/cartão.</p> : null}
+      {horario.precoPrimeiraVezCentavos ? <p className="dica-mini">{`Estreantes pagam ${reais(horario.precoPrimeiraVezCentavos)} neste horário: o desconto é conferido pelo CPF e já vem no valor do Pix/cartão.`}</p> : null}
       <label className="aceite">
         <input type="checkbox" checked={aceite} onChange={(e) => setAceite(e.target.checked)} />
         <span>{politica?.aceite ?? 'Li e aceito a Política de Cancelamento, Reagendamento e Reembolso.'} <button type="button" className="lnk inline" onClick={() => setVerPolitica(true)}>Ler a política</button></span>
@@ -557,7 +559,7 @@ function Acompanhar({ id, onNovo }: { id: string; onNovo: () => void }) {
   const dt = p.inicio ? deIso(p.inicio) : null;
   const restante = p.expiraEm ? Math.max(0, Date.parse(p.expiraEm) - agora) : 0;
   const mm = Math.floor(restante / 60000), ss = Math.floor((restante % 60000) / 1000);
-  const info = dt && <p className="ped-info"><Ico d={I.cal} s={16} />{diaLongo(dt)} · largada {hora(dt)} · {p.quantidade} {p.quantidade === 1 ? 'piloto' : 'pilotos'}{p.valorCentavos ? ` · ${reais(p.valorCentavos)}` : ''}</p>;
+  const info = dt && <p className="ped-info"><Ico d={I.cal} s={16} />{diaLongo(dt)}{` · largada ${hora(dt)} · ${p.quantidade} ${p.quantidade === 1 ? 'piloto' : 'pilotos'}${p.valorCentavos ? ` · ${reais(p.valorCentavos)}` : ''}`}</p>;
   const ajuda = <a className="btn sec" href={`https://wa.me/${WHATS}?text=${encodeURIComponent('Reserva ' + (p.codigo || p.id))}`} target="_blank" rel="noopener">Falar com a recepção</a>;
 
   let corpo: React.ReactNode;
@@ -574,7 +576,7 @@ function Acompanhar({ id, onNovo }: { id: string; onNovo: () => void }) {
     </>;
   } else if (p.status === 'aguardando_pagamento' && p.pix) {
     corpo = <>
-      <p className="sobre">Vagas separadas por {mm}:{String(ss).padStart(2, '0')}</p><h1>Pague com Pix</h1>{info}
+      <p className="sobre">{`Vagas separadas por ${mm}:${String(ss).padStart(2, '0')}`}</p><h1>Pague com Pix</h1>{info}
       <img className="qr" src={`data:image/png;base64,${p.pix.imagem}`} alt="QR code do Pix desta reserva" width="240" height="240" />
       <label className="campo"><span>Pix copia e cola</span><textarea readOnly value={p.pix.payload} rows={3} onFocus={(e) => e.target.select()} /></label>
       <div className="acoes centro"><button className="btn grande" onClick={async () => { try { await navigator.clipboard.writeText(p.pix!.payload); avisar('Código Pix copiado'); } catch { avisar('Selecione e copie o código no campo acima.'); } }}>Copiar código Pix</button></div>
@@ -582,7 +584,7 @@ function Acompanhar({ id, onNovo }: { id: string; onNovo: () => void }) {
     </>;
   } else if (p.status === 'aguardando_pagamento' && p.invoiceUrl) {
     corpo = <>
-      <p className="sobre">Vagas separadas por {mm}:{String(ss).padStart(2, '0')}</p><h1>Pague com cartão</h1>{info}
+      <p className="sobre">{`Vagas separadas por ${mm}:${String(ss).padStart(2, '0')}`}</p><h1>Pague com cartão</h1>{info}
       <div className="acoes centro"><a className="btn grande" href={p.invoiceUrl} target="_blank" rel="noopener">Abrir pagamento seguro</a></div>
       <p className="dica-mini centro">Pagamento processado pela Asaas. Volte para esta página: a confirmação aparece aqui.</p>
     </>;
@@ -656,7 +658,7 @@ function MinhasReservas({ onVoltar, onAbrir }: { onVoltar: () => void; onAbrir: 
         </form>
       ) : (
         <>
-          <p className="muted">Olá, {res.nome}! {res.reservas.length === 1 ? 'Esta é a sua reserva online.' : `Estas são as suas ${res.reservas.length} reservas online.`}</p>
+          <p className="muted">{res.reservas.length === 1 ? `Olá, ${res.nome}! Esta é a sua reserva online.` : `Olá, ${res.nome}! Estas são as suas ${res.reservas.length} reservas online.`}</p>
           <ul className="minhas">
             {res.reservas.map((rv) => {
               const dt = rv.inicio ? deIso(rv.inicio) : null;
@@ -664,7 +666,7 @@ function MinhasReservas({ onVoltar, onAbrir }: { onVoltar: () => void; onAbrir: 
               const regra = dt && (rv.status === 'confirmado' || rv.status === 'pago') ? regraDaPolitica(dt, rv.valorCentavos) : null;
               return (
                 <li key={rv.id} className="cartao minha">
-                  <div className="minha-topo"><div><strong>{dt ? `${diaLongo(dt)} · ${hora(dt)}` : 'Data a confirmar'}</strong><span className="muted pequeno">Reserva {rv.codigo} · {rv.quantidade} {rv.quantidade === 1 ? 'piloto' : 'pilotos'}{rv.valorCentavos ? ` · ${reais(rv.valorCentavos)}` : ''}</span></div><span className={`selo-st ${tom}`}>{rot}</span></div>
+                  <div className="minha-topo"><div><strong>{dt ? `${diaLongo(dt)} · ${hora(dt)}` : 'Data a confirmar'}</strong><span className="muted pequeno">{`Reserva ${rv.codigo} · ${rv.quantidade} ${rv.quantidade === 1 ? 'piloto' : 'pilotos'}${rv.valorCentavos ? ` · ${reais(rv.valorCentavos)}` : ''}`}</span></div><span className={`selo-st ${tom}`}>{rot}</span></div>
                   {regra && !regra.passou && <p className="dica-mini">{regra.texto}</p>}
                   <div className="acoes esq">
                     <button className="btn sec" onClick={() => onAbrir(rv.id)}>{rv.status === 'aguardando_pagamento' ? 'Pagar agora' : 'Ver detalhes'}</button>
@@ -683,7 +685,7 @@ function MinhasReservas({ onVoltar, onAbrir }: { onVoltar: () => void; onAbrir: 
                   {corridas.corridas.slice(0, 30).map((c) => (
                     <li key={c.sessionId}>
                       <span className={`pos${c.position <= 3 ? ' podio' : ''}`}>{c.position}º</span>
-                      <span className="cor-info"><strong>{c.eventName}</strong><small>{c.eventDate.split('-').reverse().join('/')} · kart {c.kart} · {c.laps} voltas</small></span>
+                      <span className="cor-info"><strong>{c.eventName}</strong><small>{`${c.eventDate.split('-').reverse().join('/')} · kart ${c.kart} · ${c.laps} voltas`}</small></span>
                       <span className="cor-volta"><small>melhor volta</small>{c.bestLapMs ? tempoVolta(c.bestLapMs) : '—'}</span>
                     </li>
                   ))}
