@@ -130,3 +130,40 @@ describe('painel do organizador', () => {
     expect(r.status).toBe(409);
   });
 });
+
+describe('pagamentos de grupo avisados pelo webhook (cota da Asaas estourada, 12/11/2026)', () => {
+  it('SRVKART lê e limpa os avisos em /api/sync/grupos/pagos', async () => {
+    env.PRE.mem.set('grupos/pagos/pay_abc123.json', JSON.stringify({ asaasId: 'pay_abc123', externalReference: 'grupo-G1A2B3C4-52998224725', value: 145 }));
+    const lista = await chamar('/api/sync/grupos/pagos', { headers: { 'x-sync-key': SYNC } });
+    expect(lista.status).toBe(200);
+    expect(await lista.json()).toEqual([expect.objectContaining({ asaasId: 'pay_abc123' })]);
+    const limpar = await chamar('/api/sync/grupos/pagos/limpar', { method: 'POST', headers: { 'x-sync-key': SYNC }, body: JSON.stringify({ ids: ['pay_abc123', '../x'] }) });
+    expect(await limpar.json()).toMatchObject({ removidos: 1 });
+    expect(env.PRE.mem.has('grupos/pagos/pay_abc123.json')).toBe(false);
+  });
+
+  it('a página de pagamento vê o pago pelo aviso, sem chamar a Asaas', async () => {
+    env.PRE.mem.set('grupos/pagos/pay_abc123.json', JSON.stringify({ asaasId: 'pay_abc123', billingType: 'PIX' }));
+    const f = vi.spyOn(globalThis, 'fetch');
+    const r = await chamar('/api/grupo/pagamento?id=pay_abc123');
+    expect(await r.json()).toMatchObject({ pago: true });
+    expect(f).not.toHaveBeenCalled();
+    f.mockRestore();
+  });
+
+  it('Asaas fora do ar: o cadastro pelo link do grupo é salvo mesmo sem cobrança', async () => {
+    await publicar([grupo()]);
+    env.ASAAS_API_KEY = 'x';
+    const f = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ errors: [{ description: 'Cota de requisições das últimas 12 horas excedida.' }] }), { status: 429 }));
+    const corpo = {
+      tipoDocumento: 'CPF', documento: '529.982.247-25', nome: 'Maria da Silva', email: 'maria@exemplo.com', instagram: '@maria.silva', telefone: '(31) 98888-7777',
+      nascimento: '1990-05-20', peso: '62', cep: '32600000', endereco: 'Rua A', numero: '10', bairro: 'Centro', cidade: 'Betim', estado: 'MG', lgpd: true, t: Date.now() - 10_000, reserva: 'TOKENAMIGO01',
+    };
+    const r = await chamar('/api/pre-cadastro', { method: 'POST', body: JSON.stringify(corpo) });
+    const b = await r.json() as Record<string, unknown>;
+    expect(r.status).toBe(201);
+    expect(b.aviso).toMatch(/Cadastro salvo/);
+    expect(env.PRE.mem.has('pendentes/52998224725.json')).toBe(true);
+    f.mockRestore();
+  });
+});

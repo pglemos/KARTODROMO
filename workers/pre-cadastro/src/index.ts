@@ -66,9 +66,12 @@ async function receber(req: Request, env: Env) {
   const reserva = /^[A-Za-z0-9]{10,24}$/.test(String(corpo.reserva ?? '')) ? String(corpo.reserva) : undefined;
   const grupo = reserva ? await grupoDoLink(env, reserva) : null;
   let pagamento: CobrancaDoLink | null = null;
+  let pagamentoFalhou = false;
   if (grupo && grupo.modo === 'individual' && grupo.precoCentavos > 0 && grupo.livres > 0) {
     if (v.dados.tipoDocumento !== 'CPF') return json(400, { erro: 'Para pagar a vaga pelo link do grupo, use o CPF.' });
-    pagamento = await cobrancaDoLink(env, reserva!, chave, v.dados, grupo);
+    // sem o Asaas (fora do ar ou cota estourada, 12/11/2026) o cadastro não pode se perder: salva e a vaga é paga depois
+    try { pagamento = await cobrancaDoLink(env, reserva!, chave, v.dados, grupo); }
+    catch (e) { console.error('cobrança do link', (e as Error).message); pagamentoFalhou = true; }
   }
   // termo de responsabilidade aceito no cadastro (texto publicado pelo SRVKART)
   const aceite = await aceiteDoCadastro(env, corpo as Record<string, unknown>, req.headers.get('cf-connecting-ip'));
@@ -78,7 +81,8 @@ async function receber(req: Request, env: Env) {
   // um cadastro por documento: se a pessoa enviar de novo, vale o último
   await env.PRE.put(`pendentes/${chave}.json`, JSON.stringify(registro), { httpMetadata: { contentType: 'application/json' } });
   return json(201, { ok: true, nome: v.dados.nome.split(' ')[0],
-    ...(grupo ? { grupo: { responsavel: grupo.responsavel, bateria: grupo.bateria, inicio: grupo.inicio } } : {}), ...(pagamento ? { pagamento } : {}) });
+    ...(grupo ? { grupo: { responsavel: grupo.responsavel, bateria: grupo.bateria, inicio: grupo.inicio } } : {}), ...(pagamento ? { pagamento } : {}),
+    ...(pagamentoFalhou ? { aviso: 'Cadastro salvo! O pagamento online está fora do ar agora. Pague a sua vaga na recepção ou abra este link de novo mais tarde.' } : {}) });
 }
 
 // todos os campos do totem são obrigatórios (só CEP e complemento ficam opcionais)
@@ -109,6 +113,24 @@ async function grupoDoLink(env: Env, token: string) {
   return g;
 }
 
+/**
+ * Situação de uma cobrança de grupo, gastando o mínimo da cota da Asaas (12/11/2026: a cota de 12h estourou e
+ * travou cadastro e pagamento): o aviso do webhook (grupos/pagos/) responde sem chamar a Asaas; senão a resposta da
+ * Asaas fica guardada 60 s no cache, porque a página de pagamento e o SRVKART perguntam a mesma coisa várias vezes.
+ */
+async function situacaoCobranca(env: Env, id: string): Promise<{ pago: boolean; status: string; forma: string | null }> {
+  const aviso = await env.PRE.get(`grupos/pagos/${id}.json`);
+  if (aviso) { const a = await aviso.json<{ billingType?: string }>(); return { pago: true, status: 'RECEIVED', forma: a.billingType ?? null }; }
+  const chaveCache = new Request(`https://cache.kartodromo/cobranca/${id}`);
+  const cache = (globalThis as { caches?: { default?: Cache } }).caches?.default;
+  const guardado = cache ? await cache.match(chaveCache) : undefined;
+  if (guardado) return await guardado.json();
+  const c = await consultar(env, id);
+  const r = { pago: PAGO.has(c.status), status: c.status, forma: c.billingType ?? null };
+  if (cache) await cache.put(chaveCache, new Response(JSON.stringify(r), { headers: { 'cache-control': `max-age=${r.pago ? 3600 : 60}` } }));
+  return r;
+}
+
 /** Uma cobrança por pessoa no grupo (o mesmo CPF reenviando reaproveita a que está aberta). */
 async function cobrancaDoLink(env: Env, token: string, chave: string, d: PreCadastro, g: NonNullable<Awaited<ReturnType<typeof grupoDoLink>>>): Promise<CobrancaDoLink> {
   const k = `grupo-pag/${token}/${chave}.json`;
@@ -116,8 +138,8 @@ async function cobrancaDoLink(env: Env, token: string, chave: string, d: PreCada
   if (antiga) {
     const a = await antiga.json<CobrancaDoLink>();
     try {
-      const s = await consultar(env, a.id);
-      if (PAGO.has(s.status)) return { ...a, pago: true };
+      const s = await situacaoCobranca(env, a.id);
+      if (s.pago) return { ...a, pago: true };
       if (s.status === 'PENDING' && Number(a.valorCentavos) === Number(g.precoCentavos)) return { ...a, pago: false };
     } catch { /* cobrança antiga sumiu: cria outra */ }
   }
@@ -187,8 +209,7 @@ export default {
       if (p === '/api/grupo/pagamento' && req.method === 'GET') {
         const id = String(url.searchParams.get('id') ?? '');
         if (!/^pay_[A-Za-z0-9]{6,40}$/.test(id)) return json(400, { erro: 'Pagamento inválido.' });
-        const c = await consultar(env, id);
-        return json(200, { pago: PAGO.has(c.status), status: c.status });
+        return json(200, await situacaoCobranca(env, id));
       }
       if (p === '/api/mobile/v1/internal/account-email') return await handleMobileAccountEmail(req, env);
       if (p === '/api/mobile/v1/internal/conta-admin') return await handleMobileContaAdmin(req, env);
@@ -347,11 +368,25 @@ export default {
         }
         const mGrupo = p.match(/^\/api\/sync\/cobranca\/([A-Za-z0-9_]{6,40})$/);
         if (mGrupo && req.method === 'GET') {
-          const c = await consultar(env, mGrupo[1]);
-          return json(200, { id: c.id, status: c.status, pago: PAGO.has(c.status), forma: c.billingType });
+          const c = await situacaoCobranca(env, mGrupo[1]);
+          return json(200, { id: mGrupo[1], status: c.status, pago: c.pago, forma: c.forma });
         }
         if (mGrupo && req.method === 'DELETE') {
           return json(200, await cancelar(env, mGrupo[1]));
+        }
+        // pagamentos de grupo avisados pelo webhook da Asaas (gravados em grupos/pagos/): o SRVKART lê e limpa.
+        // Existiam só no bundle remendado e sumiram no deploy do fonte; sem elas o pagamento só chegava consultando a Asaas.
+        if (p === '/api/sync/grupos/pagos' && req.method === 'GET') {
+          const lista = await env.PRE.list({ prefix: 'grupos/pagos/', limit: 200 });
+          const itens: unknown[] = [];
+          for (const o of lista.objects) { const d = await env.PRE.get(o.key); if (d) itens.push(await d.json()); }
+          return json(200, itens);
+        }
+        if (p === '/api/sync/grupos/pagos/limpar' && req.method === 'POST') {
+          const { ids } = (await req.json().catch(() => ({}))) as { ids?: unknown[] };
+          const validos = (Array.isArray(ids) ? ids : []).map(String).filter((id) => /^pay_[A-Za-z0-9_]+$/.test(id)).slice(0, 200);
+          for (const id of validos) await env.PRE.delete(`grupos/pagos/${id}.json`);
+          return json(200, { ok: true, removidos: validos.length });
         }
         if (p === '/api/sync/mobile/coupons' || p.startsWith('/api/sync/mobile/coupons/')) return await handleMobileCouponsSync(req, env);
         if (p === '/api/sync/pedidos' && req.method === 'GET') return await syncPedidos(env);

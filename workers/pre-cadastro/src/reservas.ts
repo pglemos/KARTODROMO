@@ -257,6 +257,10 @@ let proximaConciliacao = 0;
 export async function conciliarPagamentos(env: EnvReservas, agora = Date.now()) {
   if (!asaasLigado(env) || agora < proximaConciliacao) return 0;
   proximaConciliacao = agora + 60_000;
+  // uma vez a cada 5 min no total (não por instância do worker): a cota de 12h da Asaas estourou em 12/11/2026
+  const marca = await env.PRE.get('reservas/conciliacao.json').then((o) => (o ? o.json<{ em: number }>() : null)).catch(() => null);
+  if (marca && agora - Number(marca.em) < 300_000) return 0;
+  await env.PRE.put('reservas/conciliacao.json', JSON.stringify({ em: agora }));
   let n = 0;
   try {
     for (const c of await pagasDesde(env, hojeBrasilia(new Date(agora - 2 * 86_400_000)))) {

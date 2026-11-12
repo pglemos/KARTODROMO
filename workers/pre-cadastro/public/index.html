@@ -825,6 +825,7 @@
         $('prontoSub').textContent = 'Seu cadastro já foi recebido. Pague para garantir a vaga.';
         $('prontoInstrucao').innerHTML = '1. Pague acima por Pix ou cartão.<br>2. No kartódromo, digite seu <b>' + (tipo === 'Passaporte' ? 'passaporte' : tipo) + '</b> no totem.<br>3. Você assina o termo na recepção.';
       }
+      if (j.aviso) $('prontoSub').textContent = j.aviso;
       $('pronto').style.display = 'block';
       if (j.pagamento && !j.pagamento.pago) $('pagarCaixa').scrollIntoView({ behavior: 'smooth', block: 'center' }); else window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e) {
