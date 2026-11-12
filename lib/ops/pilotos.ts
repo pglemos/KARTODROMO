@@ -11,6 +11,8 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { CLIENTE_COLS, one, onlyDigits, query } from './db';
 import { HttpError } from './office';
+import { mobileApiEndpoint } from '../mobile-api-url';
+import { publicarHistoricoDoCliente } from './app-mobile';
 import type { Sessao } from './auth';
 
 type Req = { method: string; url: URL; body: () => Promise<Record<string, unknown>>; sessao: Sessao };
@@ -542,6 +544,49 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
     const melhorPos = validos.reduce((min, y) => Math.min(min, y.pos), Infinity);
     const laptimeResumo = validos.length ? { meses: porMes.size, melhorPos: Number.isFinite(melhorPos) ? melhorPos : null, vitorias: new Set(validos.filter((y) => y.pos === 1).map((y) => y.tipo + y.periodo + y.tracado)).size } : null;
     send(200, { cliente: c, hoje, resumo, tracados, principal, evolucao, laptime, semanasTop, laptimeResumo, duplicado, corridas: corridas.slice(0, 200), totalCorridas: corridas.length, dependentes, financeiro, desde: Object.values(indice).reduce((a, b) => (!a || b.dia < a ? b.dia : a), '' as string) || null });
+    return true;
+  }
+
+  // conta do app do piloto (painel > Pilotos): consulta, cria, troca e-mail/CPF/senha e gera o convite (e-mail ou WhatsApp).
+  // Quem fala com o app é este servidor (chave de administração); o painel só manda a ação.
+  if ((m = path.match(/^\/pilotos\/(\d+)\/app$/)) && (method === 'GET' || method === 'POST')) {
+    const id = Number(m[1]);
+    const c = await one<{ nome: string; doc: string | null; email: string | null; fone: string | null }>(
+      `SELECT Nome nome, DocumentoNum doc, Email email, TelefoneNum fone FROM dbo.Cliente WHERE Id = @id`, { id });
+    if (!c) throw new HttpError(404, 'Cliente não encontrado.');
+    const base = process.env.MOBILE_IDENTITY_LINK_URL && process.env.MOBILE_ADMIN_TOKEN
+      ? mobileApiEndpoint(process.env.MOBILE_IDENTITY_LINK_URL, '/api/mobile/v1/internal/identity-links') : null;
+    if (!base) throw new HttpError(503, 'Integração com o app não configurada neste servidor.');
+    const b = method === 'POST' ? await req.body() : {};
+    const acao = method === 'GET' ? 'consultar' : String(b.acao ?? '');
+    if (!['consultar', 'criar', 'editar', 'senha', 'convite'].includes(acao)) throw new HttpError(400, 'Ação desconhecida.');
+    const cpf = onlyDigits(String(c.doc ?? ''));
+    if (cpf.length !== 11) { send(200, { semCpf: true, conta: null, cliente: { email: c.email, telefone: c.fone } }); return true; }
+    const corpo = {
+      acao, cpf, clienteId: String(id),
+      nome: c.nome, telefone: onlyDigits(String(c.fone ?? '')),
+      email: String(b.email ?? c.email ?? '').trim(),
+      novoEmail: String(b.novoEmail ?? '').trim(), novoCpf: onlyDigits(String(b.novoCpf ?? '')),
+      senha: String(b.senha ?? ''), enviarEmail: b.enviarEmail === true,
+    };
+    const r = await fetch(new URL('/api/mobile/v1/internal/conta-admin', base), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-mobile-admin-token': process.env.MOBILE_ADMIN_TOKEN! },
+      body: JSON.stringify(corpo), redirect: 'error', signal: AbortSignal.timeout(20_000),
+    }).catch(() => null);
+    if (!r) throw new HttpError(502, 'O app não respondeu. Tente de novo.');
+    const j = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!r.ok) throw new HttpError(r.status === 401 || r.status === 503 ? 502 : r.status, String(j.erro ?? 'Falha na conta do app.'));
+    if (acao !== 'consultar') {
+      console.log(`app: ${acao} da conta do cliente ${id} por ${req.sessao.nome}`);
+      // CPF trocado na conta: a ficha acompanha, senão a conta e o cadastro se desencontram
+      if (acao === 'editar' && corpo.novoCpf && corpo.novoCpf !== cpf) await query(`UPDATE dbo.Cliente SET DocumentoNum = @d, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { d: corpo.novoCpf, id });
+      if (acao === 'editar' && corpo.novoEmail) await query(`UPDATE dbo.Cliente SET Email = @e, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { e: corpo.novoEmail.toLowerCase(), id });
+      if (acao === 'criar' && corpo.email && !c.email) await query(`UPDATE dbo.Cliente SET Email = @e, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { e: corpo.email.toLowerCase(), id });
+      // histórico no app na hora (sem esperar a rodada automática)
+      await publicarHistoricoDoCliente(String(id)).catch(() => 0);
+    }
+    send(200, { ...j, cliente: { email: c.email, telefone: c.fone } });
     return true;
   }
 

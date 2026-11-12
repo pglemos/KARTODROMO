@@ -45,6 +45,7 @@ export function mobileEmailLink(env: MobileEmailEnv, purpose: MobileEmailPurpose
   return `${base}/conta?acao=${purpose === 'verify' ? 'verificar' : 'senha'}&token=${encodeURIComponent(token)}`;
 }
 
+const ACESSO_ANDROID = 'https://acesso.kartodromodebetim.com.br';
 const LOGO = 'https://reservas.kartodromodebetim.com.br/kib-logo-escuro.png';
 const KART = 'https://reservas.kartodromodebetim.com.br/email-kart.gif?v=2';
 const xadrez = (inverte: boolean) => Array.from({ length: 45 }, (_, i) => `<td height="10" style="background:${(i + (inverte ? 1 : 0)) % 2 ? '#ffffff' : '#0b0b0d'};font-size:0;line-height:0">&nbsp;</td>`).join('');
@@ -125,6 +126,19 @@ export async function sendMobileAuthEmail(
   return entregar(env, to, subject, text, html);
 }
 
+/** Convite feito pela equipe (painel > Pilotos): a conta já existe e já traz o histórico; o piloto só cria a senha e baixa o app. */
+export async function sendMobileInviteEmail(env: MobileEmailEnv, to: string, nome: string, token: string) {
+  if (!mobileEmailConfigured(env)) return false;
+  const base = conteudo('reset', mobileEmailLink(env, 'reset', token));
+  const primeiro = nome.trim().split(/\s+/)[0] || 'piloto';
+  const intro = 'Recebemos um pedido para trocar a senha da sua conta. É rapidinho: toque no botão, escolha uma senha nova e volte para a pista em segundos.';
+  const convite = `${primeiro}, sua conta no app do Kartódromo de Betim está pronta, com todas as suas corridas aqui. Toque no botão, crie sua senha e entre no app com seu CPF e essa senha. O link vale por 7 dias. Baixe o app: iPhone na App Store (Kartódromo de Betim) e Android em ${ACESSO_ANDROID}.`;
+  const subject = '🏁 Sua conta no app do Kartódromo de Betim está pronta';
+  const troca = (t: string) => t.split(intro).join(convite).split('Pit stop rápido').join('Sua vaga no grid').split('Criar nova senha').join('Criar minha senha').split('O link vale por 30 minutos.').join('O link vale por 7 dias.')
+    .split('Se não foi você, ignore este e-mail: sua senha continua a mesma.').join('Dúvidas? Responda este e-mail ou fale com a recepção.');
+  return entregar(env, to, subject, troca(base.text), troca(base.html));
+}
+
 /** Aviso ao dono: uma exclusão que ele não pediu não pode passar despercebida. */
 export async function sendMobileAccountDeletionEmail(env: MobileEmailEnv, to: string, limite: Date) {
   if (!mobileEmailConfigured(env)) return false;
@@ -135,7 +149,29 @@ export async function sendMobileAccountDeletionEmail(env: MobileEmailEnv, to: st
   return entregar(env, to, subject, text, html);
 }
 
+/**
+ * Ordem de entrega (11/11/2026): Resend primeiro (API HTTP, chega em segundos). Se falhar, binding do Cloudflare
+ * (quando liberado) e, por último, a fila durável que o servidor da cronometragem envia pela HostGator.
+ * MOBILE_EMAIL_FILA="1" só desliga o binding; não bloqueia mais o Resend.
+ */
 async function entregar(env: MobileEmailEnv, to: string, subject: string, text: string, html: string) {
+  if (env.RESEND_API_KEY?.trim() && env.RESEND_FROM_EMAIL?.trim()) {
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${env.RESEND_API_KEY.trim()}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ from: env.RESEND_FROM_EMAIL.trim(), to: [to], subject, text, html }),
+      });
+      if (response.ok) return true;
+      console.error('mobile email resend', response.status, (await response.text().catch(() => '')).slice(0, 200));
+    } catch (e) {
+      // Falha do provedor não pode descartar a mensagem antes de tentar as outras saídas.
+      console.error('mobile email resend', (e as Error).message);
+    }
+  }
   if (env.EMAIL && env.MOBILE_EMAIL_FILA !== '1' && await cotaDoMes(env).catch(() => false)) {
     try {
       await env.EMAIL.send({
@@ -151,24 +187,6 @@ async function entregar(env: MobileEmailEnv, to: string, subject: string, text: 
       console.error('mobile email binding', (e as { code?: string }).code ?? '', (e as Error).message);
     }
   }
-  if (env.MOBILE_EMAIL_FILA === '1' || !(env.RESEND_API_KEY?.trim() && env.RESEND_FROM_EMAIL?.trim())) {
-    try { return await enfileirar(env, to, subject, text, html); }
-    catch (e) { console.error('mobile email outbox', (e as Error).message); return false; }
-  }
-
-  try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${env.RESEND_API_KEY}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ from: env.RESEND_FROM_EMAIL, to: [to], subject, text, html }),
-    });
-    if (response.ok) return true;
-  } catch {
-    // Falha do provedor não pode descartar a mensagem antes de tentar a fila durável.
-  }
   try { return await enfileirar(env, to, subject, text, html); }
-  catch { console.error('mobile email outbox unavailable'); return false; }
+  catch (e) { console.error('mobile email outbox', (e as Error).message); return false; }
 }

@@ -3,8 +3,8 @@ import { scryptSync } from 'node:crypto';
 import { cpfValido, digitos } from '../validar';
 import { clienteExistente, type MobileClientesEnv } from './clientes';
 import {
-  mobileEmailConfigured,
-  sendMobileAccountDeletionEmail, sendMobileAuthEmail,
+  mobileEmailConfigured, mobileEmailLink,
+  sendMobileAccountDeletionEmail, sendMobileAuthEmail, sendMobileInviteEmail,
   type MobileEmailEnv,
   type MobileEmailPurpose,
 } from './email';
@@ -663,10 +663,11 @@ async function resetPassword(input: Record<string, unknown>, context: CryptoCont
   await context.db
     .prepare(
       `UPDATE mobile_accounts
-       SET password_salt = ?, password_hash = ?, password_iterations = ?, password_scheme = ?
+       SET password_salt = ?, password_hash = ?, password_iterations = ?, password_scheme = ?,
+           email_verified_at = COALESCE(email_verified_at, ?)
        WHERE id = ?`,
     )
-    .bind(encodeBase64Url(salt), await passwordHash(password, salt), ITERATIONS, PASSWORD_SCHEME, tokenRow.account_id)
+    .bind(encodeBase64Url(salt), await passwordHash(password, salt), ITERATIONS, PASSWORD_SCHEME, now, tokenRow.account_id)
     .run();
   await context.db
     .prepare('UPDATE mobile_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL')
@@ -941,4 +942,193 @@ export async function handleMobileAuth(request: Request, env: MobileAuthEnv) {
       ? 'PBKDF2 iteration limit' : message.startsWith('D1_ERROR:') ? 'D1 operation failed' : 'Authentication operation failed');
     return json(503, { erro: 'Serviço temporariamente indisponível.' });
   }
+}
+
+// ---------------------------------------------------------------- conta do app pelo painel (Pilotos)
+// A equipe atende o piloto no balcão: cria a conta com o CPF da ficha, troca e-mail/CPF/senha e gera o convite
+// (link "criar senha" de 7 dias) para mandar por e-mail ou WhatsApp. Só com a chave de administração (servidor de operações).
+const CONVITE_TTL = 7 * 24 * 3_600_000;
+const emailOk = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
+
+async function contaPorCpf(context: CryptoContext, cpf: string) {
+  return context.db.prepare(
+    `SELECT id, name_cipher, email_lookup, email_cipher, cpf_lookup, cpf_cipher, phone_cipher, password_salt, password_hash,
+            password_iterations, password_scheme, email_verified_at, deleted_at, created_at
+       FROM mobile_accounts WHERE cpf_lookup = ? LIMIT 1`,
+  ).bind(await hmac(context, `cpf:${cpf}`)).first<AccountRow & { created_at: number }>();
+}
+
+async function resumoConta(context: CryptoContext, conta: (AccountRow & { created_at: number }) | null) {
+  if (!conta) return { conta: null };
+  const [email, link, sessao] = await Promise.all([
+    decrypt(context, conta.email_cipher),
+    context.db.prepare('SELECT customer_id, nivel FROM mobile_identity_links WHERE account_id = ? LIMIT 1').bind(conta.id).first<{ customer_id: string; nivel: string }>(),
+    context.db.prepare('SELECT MAX(created_at) ultimo FROM mobile_sessions WHERE account_id = ?').bind(conta.id).first<{ ultimo: number | null }>(),
+  ]);
+  return {
+    conta: {
+      id: conta.id,
+      email,
+      emailConfirmado: conta.email_verified_at !== null,
+      criadaEm: conta.created_at,
+      emExclusao: conta.deleted_at !== null,
+      clienteVinculado: link?.customer_id ?? null,
+      ultimoAcesso: sessao?.ultimo ?? null,
+    },
+  };
+}
+
+async function gravarSenha(context: CryptoContext, accountId: string, senha: string) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const now = Date.now();
+  await context.db.batch([
+    context.db.prepare(
+      'UPDATE mobile_accounts SET password_salt = ?, password_hash = ?, password_iterations = ?, password_scheme = ? WHERE id = ?',
+    ).bind(encodeBase64Url(salt), await passwordHash(senha, salt), ITERATIONS, PASSWORD_SCHEME, accountId),
+    context.db.prepare('UPDATE mobile_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL').bind(now, accountId),
+  ]);
+}
+
+async function linkConvite(env: MobileAuthEnv, context: CryptoContext, accountId: string) {
+  const now = Date.now();
+  const token = randomToken();
+  await context.db.prepare(
+    `INSERT INTO mobile_email_tokens(token_hash, account_id, purpose, expires_at, used_at, created_at) VALUES (?, ?, 'reset', ?, NULL, ?)`,
+  ).bind(await sha256(token), accountId, now + CONVITE_TTL, now).run();
+  return mobileEmailLink(env, 'reset', token);
+}
+
+async function vincularCliente(context: CryptoContext, accountId: string, customerId: string) {
+  if (!/^\d{1,20}$/.test(customerId)) return;
+  const now = Date.now();
+  await context.db.batch([
+    // a equipe conferiu a pessoa no balcão: o vínculo vale como completo (histórico + perfil)
+    context.db.prepare('DELETE FROM mobile_identity_links WHERE account_id = ? AND customer_id <> ?').bind(accountId, customerId),
+    context.db.prepare(
+      `INSERT INTO mobile_identity_links(customer_id, account_id, linked_at, nivel) VALUES (?, ?, ?, 'completo')
+       ON CONFLICT(customer_id) DO UPDATE SET account_id = excluded.account_id, linked_at = excluded.linked_at, nivel = 'completo'`,
+    ).bind(customerId, accountId, now),
+    context.db.prepare(
+      `INSERT OR IGNORE INTO mobile_identity_link_audit(customer_id, account_id, action, changed_at) VALUES (?, ?, 'linked', ?)`,
+    ).bind(customerId, accountId, now),
+  ]);
+}
+
+export async function handleMobileContaAdmin(request: Request, env: MobileAccountAdminEnv) {
+  if (request.method !== 'POST') return json(405, { erro: 'Método não permitido.' });
+  if (!env.MOBILE_DB || !env.MOBILE_ADMIN_TOKEN || env.MOBILE_ADMIN_TOKEN === env.MOBILE_PUBLISH_TOKEN) {
+    return json(503, { erro: 'Serviço temporariamente indisponível.' });
+  }
+  if (!constantTimeEqual(request.headers.get('x-mobile-admin-token') ?? '', env.MOBILE_ADMIN_TOKEN)) {
+    return json(401, { erro: 'Não autorizado.' });
+  }
+  const context = await createContext(env);
+  if (!context) return json(503, { erro: 'Serviço temporariamente indisponível.' });
+  const input = await requestBody(request);
+  if (!input) return json(400, { erro: 'Envio inválido.' });
+
+  const acao = value(input, 'acao');
+  const cpf = digitos(value(input, 'cpf'));
+  const customerId = value(input, 'clienteId');
+  if (!cpfValido(cpf)) return json(400, { erro: 'O piloto precisa ter um CPF válido na ficha.' });
+  const conta = await contaPorCpf(context, cpf);
+
+  if (acao === 'consultar') return json(200, await resumoConta(context, conta));
+
+  if (acao === 'criar') {
+    if (conta) return json(409, { codigo: 'CONTA_EXISTENTE', erro: 'Este CPF já tem conta no app.', ...(await resumoConta(context, conta)) });
+    const email = normalizeEmail(value(input, 'email'));
+    const nome = value(input, 'nome').replace(/\s+/g, ' ').trim();
+    const telefone = digitos(value(input, 'telefone'));
+    const senha = value(input, 'senha').trim();
+    if (!emailOk(email)) return json(400, { erro: 'Informe um e-mail válido.' });
+    if (nome.length < 3) return json(400, { erro: 'O piloto precisa ter nome na ficha.' });
+    if (senha && (senha.length < PASSWORD_MIN || senha.length > PASSWORD_MAX)) return json(400, { erro: 'A senha deve ter de 8 a 128 caracteres.' });
+    const emailLookup = await hmac(context, `email:${email}`);
+    if (await context.db.prepare('SELECT 1 FROM mobile_accounts WHERE email_lookup = ? LIMIT 1').bind(emailLookup).first()) {
+      return json(409, { codigo: 'EMAIL_EM_USO', erro: 'Este e-mail já está na conta de outro CPF. Escolha outro e-mail.' });
+    }
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const id = crypto.randomUUID();
+    const now = Date.now();
+    const [nameCipher, emailCipher, cpfCipher, phoneCipher] = await Promise.all([
+      encrypt(context, nome), encrypt(context, email), encrypt(context, cpf), encrypt(context, telefone),
+    ]);
+    try {
+      await context.db.prepare(
+        `INSERT INTO mobile_accounts(id, name_cipher, email_lookup, email_cipher, cpf_lookup, cpf_cipher, phone_cipher,
+          password_salt, password_hash, password_iterations, password_scheme, email_verified_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(id, nameCipher, emailLookup, emailCipher, await hmac(context, `cpf:${cpf}`), cpfCipher, phoneCipher,
+        // sem senha escolhida: senha aleatória que ninguém sabe; o piloto cria a dele pelo convite
+        encodeBase64Url(salt), await passwordHash(senha || randomToken(), salt), ITERATIONS, PASSWORD_SCHEME, now, now).run();
+    } catch (error) {
+      if (String(error).includes('UNIQUE constraint failed')) return json(409, { erro: 'CPF ou e-mail já está em outra conta.' });
+      throw error;
+    }
+    await vincularCliente(context, id, customerId);
+    const nova = await contaPorCpf(context, cpf);
+    return json(201, { ...(await resumoConta(context, nova)), convite: await linkConvite(env, context, id) });
+  }
+
+  if (!conta) return json(404, { codigo: 'SEM_CONTA', erro: 'Este piloto ainda não tem conta no app.' });
+
+  if (acao === 'editar') {
+    const novoEmail = normalizeEmail(value(input, 'novoEmail'));
+    const novoCpf = digitos(value(input, 'novoCpf'));
+    const sets: string[] = [];
+    const binds: unknown[] = [];
+    if (novoEmail) {
+      if (!emailOk(novoEmail)) return json(400, { erro: 'Informe um e-mail válido.' });
+      const lookup = await hmac(context, `email:${novoEmail}`);
+      if (await context.db.prepare('SELECT 1 FROM mobile_accounts WHERE email_lookup = ? AND id <> ? LIMIT 1').bind(lookup, conta.id).first()) {
+        return json(409, { codigo: 'EMAIL_EM_USO', erro: 'Este e-mail já está na conta de outro CPF.' });
+      }
+      sets.push('email_lookup = ?', 'email_cipher = ?', 'email_verified_at = COALESCE(email_verified_at, ?)');
+      binds.push(lookup, await encrypt(context, novoEmail), Date.now());
+    }
+    if (novoCpf && novoCpf !== cpf) {
+      if (!cpfValido(novoCpf)) return json(400, { erro: 'CPF novo inválido.' });
+      const lookup = await hmac(context, `cpf:${novoCpf}`);
+      if (await context.db.prepare('SELECT 1 FROM mobile_accounts WHERE cpf_lookup = ? LIMIT 1').bind(lookup).first()) {
+        return json(409, { codigo: 'CPF_EM_USO', erro: 'O CPF novo já tem outra conta no app.' });
+      }
+      sets.push('cpf_lookup = ?', 'cpf_cipher = ?');
+      binds.push(lookup, await encrypt(context, novoCpf));
+    }
+    if (!sets.length) return json(400, { erro: 'Nada para alterar.' });
+    try {
+      await context.db.prepare(`UPDATE mobile_accounts SET ${sets.join(', ')} WHERE id = ?`).bind(...binds, conta.id).run();
+    } catch (error) {
+      if (String(error).includes('UNIQUE constraint failed')) return json(409, { erro: 'CPF ou e-mail já está em outra conta.' });
+      throw error;
+    }
+    await vincularCliente(context, conta.id, customerId);
+    return json(200, await resumoConta(context, await contaPorCpf(context, novoCpf && novoCpf !== cpf ? novoCpf : cpf)));
+  }
+
+  if (acao === 'senha') {
+    const senha = value(input, 'senha').trim();
+    if (senha.length < PASSWORD_MIN || senha.length > PASSWORD_MAX) return json(400, { erro: 'A senha deve ter de 8 a 128 caracteres.' });
+    await gravarSenha(context, conta.id, senha);
+    // senha definida no balcão: a equipe conferiu a pessoa, então a conta já entra (sem esperar confirmação de e-mail)
+    await context.db.prepare('UPDATE mobile_accounts SET email_verified_at = COALESCE(email_verified_at, ?), deleted_at = NULL WHERE id = ?').bind(Date.now(), conta.id).run();
+    await vincularCliente(context, conta.id, customerId);
+    return json(200, await resumoConta(context, await contaPorCpf(context, cpf)));
+  }
+
+  if (acao === 'convite') {
+    await context.db.prepare('UPDATE mobile_accounts SET email_verified_at = COALESCE(email_verified_at, ?), deleted_at = NULL WHERE id = ?').bind(Date.now(), conta.id).run();
+    await vincularCliente(context, conta.id, customerId);
+    const convite = await linkConvite(env, context, conta.id);
+    let emailEnviado = false;
+    if (input.enviarEmail === true && mobileEmailConfigured(env)) {
+      const token = new URL(convite).searchParams.get('token') ?? '';
+      const [para, nome] = await Promise.all([decrypt(context, conta.email_cipher), decrypt(context, conta.name_cipher)]);
+      emailEnviado = await sendMobileInviteEmail(env, para, nome, token).catch(() => false);
+    }
+    return json(200, { ...(await resumoConta(context, await contaPorCpf(context, cpf))), convite, emailEnviado });
+  }
+
+  return json(400, { erro: 'Ação desconhecida.' });
 }

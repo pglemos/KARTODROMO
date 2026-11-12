@@ -513,3 +513,71 @@ describe('autenticação móvel', () => {
     expect(responses.map((response) => response.status).sort()).toEqual([401, 401, 401, 401, 401, 401, 429]);
   }, 30_000);
 });
+
+describe('conta do app pelo painel (Pilotos)', () => {
+  const cpf = cpfForTest('987654321');
+  beforeEach(() => {
+    database.database.exec(readFileSync(new URL('../../workers/pre-cadastro/migrations/0004_mobile_results.sql', import.meta.url), 'utf8')
+      + readFileSync(new URL('../../workers/pre-cadastro/migrations/0009_mobile_identity_link_nivel.sql', import.meta.url), 'utf8'));
+  });
+  async function admin(input: Record<string, unknown>, token = 'admin-token-for-tests') {
+    const corpo = JSON.stringify({ cpf, clienteId: '115408', ...input });
+    return worker.fetch(
+      new Request('https://reservas.kartodromodebetim.com.br/api/mobile/v1/internal/conta-admin', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'content-length': String(corpo.length), 'x-mobile-admin-token': token },
+        body: corpo,
+      }),
+      environment as never,
+      { waitUntil: () => undefined } as any,
+    );
+  }
+  const login = (identifier: string, password: string) => call('login', { identifier, password });
+
+  it('recusa sem a chave de administração', async () => {
+    expect((await admin({ acao: 'consultar' }, 'errada')).status).toBe(401);
+  });
+
+  it('cria a conta já confirmada e vinculada, com convite que cria a senha e entra', async () => {
+    expect(await body(await admin({ acao: 'consultar' }))).toEqual({ conta: null });
+    const criada = await admin({ acao: 'criar', nome: 'Arthur Ferreira', email: 'Arthur@Example.com', telefone: '31999998888' });
+    expect(criada.status).toBe(201);
+    const r = await body(criada) as { conta: Row; convite: string };
+    expect(r.conta).toMatchObject({ email: 'arthur@example.com', emailConfirmado: true, clienteVinculado: '115408' });
+    const token = new URL(r.convite).searchParams.get('token');
+    expect((await call('password/reset', { token, password: 'MinhaSenha#1' })).status).toBe(200);
+    expect((await login(cpf, 'MinhaSenha#1')).status).toBe(200);
+    expect((await admin({ acao: 'criar', nome: 'Outro Nome', email: 'x@example.com' })).status).toBe(409);
+  });
+
+  it('não deixa usar e-mail de outra conta', async () => {
+    await register();
+    const r = await admin({ acao: 'criar', nome: 'Arthur Ferreira', email: validRegistration.email });
+    expect(r.status).toBe(409);
+    expect((await body(r)).codigo).toBe('EMAIL_EM_USO');
+  });
+
+  it('troca e-mail, CPF e senha; senha do balcão confirma conta pendente', async () => {
+    await admin({ acao: 'criar', nome: 'Arthur Ferreira', email: 'a@example.com' });
+    expect((await admin({ acao: 'senha', senha: 'curta' })).status).toBe(400);
+    expect((await admin({ acao: 'senha', senha: 'Balcao#2026' })).status).toBe(200);
+    expect((await login('a@example.com', 'Balcao#2026')).status).toBe(200);
+    const ed = await admin({ acao: 'editar', novoEmail: 'b@example.com' });
+    expect((await body(ed) as { conta: Row }).conta.email).toBe('b@example.com');
+    const novoCpf = cpfForTest('111444777');
+    expect((await admin({ acao: 'editar', novoCpf })).status).toBe(200);
+    expect((await login(novoCpf, 'Balcao#2026')).status).toBe(200);
+    expect((await login(cpf, 'Balcao#2026')).status).toBe(401);
+  });
+
+  it('convite de conta pendente confirma, manda o e-mail e devolve o link', async () => {
+    await register({ cpf });
+    const r = await admin({ acao: 'convite', enviarEmail: true });
+    expect(r.status).toBe(200);
+    const j = await body(r) as { conta: Row; convite: string; emailEnviado: boolean };
+    expect(j.conta.emailConfirmado).toBe(true);
+    expect(j.emailEnviado).toBe(true);
+    expect(j.convite).toContain('/conta?acao=senha&token=');
+    expect(JSON.stringify(sentEmails.at(-1))).toContain('7 dias');
+  });
+});

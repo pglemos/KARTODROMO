@@ -345,10 +345,82 @@ TELAS.piloto = async (tela) => {
         ${novo ? '' : `<div class="numerosHero">${[[r.baterias, 'baterias'], [r.voltas, 'voltas'], [r.vitorias, 'vitórias'], [r.podios, 'pódios']].map(([v, t]) => `<span><b>${(+v || 0).toLocaleString('pt-BR')}</b><span>${t}</span></span>`).join('')}</div>`}
       </section>
       ${avisos}
-      ${novo ? '' : `<div class="seg" role="tablist" aria-label="Seções do perfil" style="align-self: flex-start">${['Carreira', 'Dados e cadastro'].map((t, i) => `<button role="tab" aria-selected="${V.aba === i}" data-aba="${i}" class="${V.aba === i ? 'sel' : ''}" style="height: 36px">${t}</button>`).join('')}</div>`}
+      ${novo ? '' : `<div class="seg" role="tablist" aria-label="Seções do perfil" style="align-self: flex-start">${['Carreira', 'Dados e cadastro', 'App'].map((t, i) => `<button role="tab" aria-selected="${V.aba === i}" data-aba="${i}" class="${V.aba === i ? 'sel' : ''}" style="height: 36px">${t}</button>`).join('')}</div>`}
       <div id="corpoPiloto" style="display: flex; flex-direction: column; gap: var(--kib-espaco-2)"></div>
     </main>`;
+    if (V.aba === 2 && !novo) { $('#corpoPiloto').innerHTML = htmlApp(); if (!appInfo) carregarApp(); return; }
     $('#corpoPiloto').innerHTML = V.aba === 0 && !novo ? htmlCarreira() : htmlDados();
+  };
+  // ---- conta do app: criar, trocar e-mail/CPF/senha e mandar o convite (e-mail ou WhatsApp)
+  let appInfo = null, appErro = '', appConvite = null;
+  const IOS_APP = 'https://apps.apple.com/br/app/id6824677679', ANDROID_APP = 'https://acesso.kartodromodebetim.com.br';
+  const carregarApp = async () => {
+    appErro = '';
+    try { appInfo = await office(`/pilotos/${id}/app`); } catch (er) { appInfo = { falhou: true }; appErro = er.message; }
+    if (V.aba === 2) $('#corpoPiloto').innerHTML = htmlApp();
+  };
+  const msgConvite = (link) => {
+    const primeiro = nomeBonitoPiloto(d.cliente.nome).split(' ')[0] || 'piloto';
+    return `Olá, ${primeiro}! Aqui é do Kartódromo de Betim 🏁\n\nSua conta no nosso app está pronta, com todas as suas corridas aqui.\n\n1️⃣ Crie sua senha (link vale 7 dias):\n${link}\n\n2️⃣ Baixe o app:\n📱 iPhone: ${IOS_APP}\n🤖 Android: ${ANDROID_APP}\n\n3️⃣ Entre com seu CPF e a senha que você criou.`;
+  };
+  const htmlApp = () => {
+    const c = d.cliente, a = appInfo;
+    const cab = '<div class="cartaoCab"><h2>Conta no app</h2><span class="sub">o piloto entra no app com CPF (ou e-mail) e senha · as corridas daqui aparecem sozinhas</span></div>';
+    if (!a) return `<section class="cartao">${cab}<p class="peq cartao-corpo">Consultando o app…</p></section>`;
+    if (a.falhou) return `<section class="cartao">${cab}<p class="erroMsg cartao-corpo" role="alert">${esc(appErro)}</p><div class="modalRodape"><button class="btn sec" data-app="recarregar">Tentar de novo</button></div></section>`;
+    if (a.semCpf) return `<section class="cartao">${cab}<div class="vazio"><b>Falta o CPF na ficha</b><span>A conta do app é pelo CPF. Preencha em “Dados e cadastro” e volte aqui.</span></div></section>`;
+    const erro = `<p class="erroMsg" id="erroApp" role="alert" style="margin: 0; padding: 0 var(--kib-espaco-2) var(--kib-espaco-1)">${esc(appErro)}</p>`;
+    const convite = appConvite ? `<div class="avisoPerfil" style="margin: 0 var(--kib-espaco-2) var(--kib-espaco-1)"><b>Convite pronto</b> · o link cria a senha e vale 7 dias.<br><span class="mono peq" style="word-break: break-all">${esc(appConvite)}</span></div>` : '';
+    if (!a.conta) return `<section class="cartao">${cab}
+      <p class="peq cartao-corpo" style="margin: 0">Sem conta no app. Crie aqui com o CPF da ficha (${esc(c.documento || '')}): a conta já sai confirmada e ligada a este cadastro, com o histórico.</p>
+      <form id="fApp" class="formPiloto" novalidate>
+        <label class="campo"><span>E-mail de acesso</span><input class="entrada" name="email" type="email" autocomplete="off" value="${esc(c.email || '')}"></label>
+        <label class="campo"><span>Senha (opcional)</span><input class="entrada" name="senha" type="text" autocomplete="off" placeholder="em branco: o piloto cria pelo convite"></label>
+      </form>${erro}
+      <div class="modalRodape" style="border-top: 1px solid var(--linha)"><button class="btn prim empurra" data-app="criar">Criar conta no app</button></div></section>`;
+    const k = a.conta, chip = (ok, sim, nao) => `<span class="chip ${ok ? 'verde' : 'laranja'}">${ok ? sim : nao}</span>`;
+    return `<section class="cartao">${cab}
+      <div class="cartao-corpo" style="display: flex; flex-wrap: wrap; gap: var(--kib-espaco-1); align-items: center">
+        <b>${esc(k.email)}</b>${chip(k.emailConfirmado, 'e-mail confirmado', 'e-mail não confirmado')}${chip(String(k.clienteVinculado) === String(id), 'histórico ligado', k.clienteVinculado ? 'ligado a outro cadastro (' + esc(k.clienteVinculado) + ')' : 'histórico não ligado')}${k.emExclusao ? '<span class="chip vermelho">marcada para exclusão</span>' : ''}
+        <span class="peq">criada em ${dataBr(new Date(k.criadaEm).toISOString())} · ${k.ultimoAcesso ? 'último acesso ' + dataBr(new Date(k.ultimoAcesso).toISOString()) : 'nunca entrou'}</span>
+      </div>
+      ${convite}
+      <div class="modalRodape" style="border-top: 1px solid var(--linha); flex-wrap: wrap; gap: var(--kib-espaco-1)">
+        <button class="btn prim" data-app="zap" ${c.telefone ? '' : 'disabled title="Sem celular na ficha"'}>${svg(IC.zap, 14, 'currentColor')}Mandar convite no WhatsApp</button>
+        <button class="btn sec" data-app="email">Mandar convite por e-mail</button>
+        ${appConvite ? '<button class="btn sec" data-app="copiar">Copiar mensagem</button>' : ''}
+      </div>
+      <form id="fApp" class="formPiloto" novalidate style="border-top: 1px solid var(--linha)">
+        <label class="campo"><span>Trocar e-mail de acesso</span><input class="entrada" name="novoEmail" type="email" autocomplete="off" placeholder="${esc(k.email)}"></label>
+        <label class="campo"><span>Trocar CPF da conta (e da ficha)</span><input class="entrada" name="novoCpf" inputmode="numeric" autocomplete="off" placeholder="${esc(c.documento || '')}"></label>
+        <label class="campo"><span>Definir nova senha</span><input class="entrada" name="senha" type="text" autocomplete="off" placeholder="mínimo 8 caracteres"></label>
+      </form>${erro}
+      <div class="modalRodape"><button class="btn sec" data-app="senha">Salvar senha</button><button class="btn prim empurra" data-app="editar">Salvar e-mail/CPF</button></div></section>`;
+  };
+  const acaoApp = async (botao) => {
+    const qual = botao.dataset.app, f = $('#fApp') ? new FormData($('#fApp')) : new FormData();
+    const v = (k) => String(f.get(k) ?? '').trim();
+    if (qual === 'recarregar') { appInfo = null; $('#corpoPiloto').innerHTML = htmlApp(); return carregarApp(); }
+    if (qual === 'copiar') { try { await navigator.clipboard.writeText(msgConvite(appConvite)); toast('Mensagem copiada'); } catch { toast('Não deu para copiar', true); } return; }
+    let corpo;
+    if (qual === 'criar') { if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v('email'))) { $('#erroApp').textContent = 'Digite um e-mail válido.'; return; } corpo = { acao: 'criar', email: v('email'), senha: v('senha') }; }
+    if (qual === 'editar') { if (!v('novoEmail') && !v('novoCpf')) { $('#erroApp').textContent = 'Preencha o e-mail ou o CPF novo.'; return; } corpo = { acao: 'editar', novoEmail: v('novoEmail'), novoCpf: v('novoCpf') }; }
+    if (qual === 'senha') { if (v('senha').length < 8) { $('#erroApp').textContent = 'A senha precisa ter pelo menos 8 caracteres.'; return; } corpo = { acao: 'senha', senha: v('senha') }; }
+    if (qual === 'email') corpo = { acao: 'convite', enviarEmail: true };
+    if (qual === 'zap') corpo = { acao: 'convite' };
+    if (!corpo) return;
+    const janela = qual === 'zap' ? window.open('', '_blank') : null; // abre já no clique (senão o navegador bloqueia)
+    const txt = botao.textContent; botao.disabled = true; botao.textContent = 'Aguarde…'; appErro = '';
+    try {
+      const r = await office(`/pilotos/${id}/app`, { method: 'POST', body: corpo });
+      appInfo = { ...appInfo, ...r, semCpf: false, falhou: false };
+      if (r.convite) appConvite = r.convite;
+      if (qual === 'zap') { const u = zap(d.cliente.telefone, msgConvite(r.convite)); if (janela) janela.location.href = u; else window.open(u, '_blank'); }
+      toast({ criar: 'Conta criada no app · histórico ligado', editar: 'Conta do app atualizada', senha: 'Senha salva · o piloto já pode entrar', email: r.emailEnviado ? 'Convite enviado para ' + r.conta.email : 'Convite gerado, mas o e-mail não saiu: use o WhatsApp', zap: 'Convite aberto no WhatsApp' }[qual], qual === 'email' && !r.emailEnviado);
+      if (qual === 'editar' && corpo.novoCpf) { await carregar(); pintar(); return; }
+    } catch (er) { if (janela) janela.close(); appErro = er.message; }
+    $('#corpoPiloto').innerHTML = htmlApp();
+    if (!appErro) return; botao.disabled = false; botao.textContent = txt;
   };
   const htmlCarreira = () => {
     const posChip = (p) => (p ? `<span class="chip ${p.pos === 1 ? 'ouro' : 'cinza'}" title="${p.pos}º de ${p.de} pilotos">${p.pos}º de ${p.de}</span>` : '<span class="peq">—</span>');
@@ -459,6 +531,7 @@ TELAS.piloto = async (tela) => {
     if (e.target.closest('[data-foto]')) return abrirFoto();
     const mm = e.target.closest('[data-mais]'); if (mm) { mostrar[mm.dataset.mais] = !mostrar[mm.dataset.mais]; $('#corpoPiloto').innerHTML = htmlCarreira(); return; }
     const s = e.target.closest('[data-salvar]'); if (s) return salvar(s);
+    const ap = e.target.closest('[data-app]'); if (ap && !ap.disabled) return acaoApp(ap);
     if (e.target.closest('[data-desfazer]')) { pintar(); toast('Alterações desfeitas'); return; }
   });
   await carregar();

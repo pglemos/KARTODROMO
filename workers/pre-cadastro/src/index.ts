@@ -7,7 +7,7 @@
 import { chaveDocumento, digitos, validar, type PreCadastro } from './validar';
 import { cancelar, chamar, consultar, diagnostico, garantirCliente, hojeBrasilia, PAGO } from './asaas';
 import { agendaPublica, criarPedido, politicaPublica, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
-import { handleMobileAccountEmail, handleMobileAuth, type MobileAccountAdminEnv } from './mobile/auth';
+import { handleMobileAccountEmail, handleMobileAuth, handleMobileContaAdmin, type MobileAccountAdminEnv } from './mobile/auth';
 import { handleMobileReservations } from './mobile/reservations';
 import { handleMobileCoupons, handleMobileCouponsSync } from './mobile/coupons';
 import { handleMobileResults, type MobileResultsEnv } from './mobile/results';
@@ -181,6 +181,7 @@ export default {
         return json(200, { pago: PAGO.has(c.status), status: c.status });
       }
       if (p === '/api/mobile/v1/internal/account-email') return await handleMobileAccountEmail(req, env);
+      if (p === '/api/mobile/v1/internal/conta-admin') return await handleMobileContaAdmin(req, env);
       if (p.startsWith('/api/mobile/v1/auth/')) {
         const resposta = await handleMobileAuth(req, env);
         // e-mail confirmado: a conta vira candidata ao vínculo agora, não no próximo ciclo
