@@ -31,6 +31,7 @@ import { relatorio } from '../lib/ops/relatorios';
 import { renderTermoResponsabilidade, type TermoParticipante } from '../lib/ops/termo';
 import { buscarPreCadastroAgora, preCadastroLigado, sincronizarPreCadastros } from '../lib/ops/pre-cadastro';
 import { publicarTermoNoSite } from '../lib/ops/termo-online';
+import { aplicarCheckins } from '../lib/ops/checkin';
 import { aplicarAcoesDoPainel, conferirCobrancas, entrarNoGrupoPeloTotem, gruposDoDiaNoTotem, gruposRoutes, publicarGruposNoSite, puxarPagamentosDiretoDoAsaas, vincularPorDados } from '../lib/ops/grupos';
 import { campeonatoOfficeRoutes, campeonatoSiteRoutes, conferirCobrancasCampeonato } from '../lib/ops/campeonato-inscricoes';
 import { painelRoutes, registrarSinal } from '../lib/ops/painel';
@@ -961,6 +962,15 @@ if (preCadastroLigado()) {
   };
   setTimeout(sincronizar, 5_000);
   setInterval(sincronizar, 30_000).unref();
+  // check-in pelo celular: marca a chegada e manda o termo de cada piloto para a fila da Recepção
+  let checando = false;
+  setInterval(async () => {
+    if (checando) return;
+    checando = true;
+    try { await aplicarCheckins(log, (id) => enfileirarImpressao(termoLink([id]), 'Termo de responsabilidade', 'celular')); }
+    catch (e) { log(`check-in: sincronização falhou (${(e as Error).message})`); }
+    finally { checando = false; }
+  }, 20_000).unref();
   log('pré-cadastro online ligado');
   // reserva em grupo (painel web): confere no Asaas os links de pagamento em aberto
   let conferindo = false;

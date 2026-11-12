@@ -131,6 +131,10 @@ export async function rotasPublicas(req: Request, env: EnvExtras, p: string, url
     if (!clienteId) return json(200, { corridas: [], aviso: 'Não foi possível consultar o histórico agora. Tente de novo em instantes.' });
     return json(200, { corridas: await resultadosDoCliente(env as never, clienteId) });
   }
+  if (p === '/api/reservas/checkin' && req.method === 'POST') {
+    if (await limite(req.headers.get('cf-connecting-ip') ?? 'x', 'checkin')) return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos ou faça o check-in no totem.' });
+    return await fazerCheckin(env, (await req.json().catch(() => ({}))) as Record<string, unknown>);
+  }
   if (p === '/api/aviso' && req.method === 'GET') {
     const a = await lerJson<{ texto?: string; tom?: string; ate?: string | null }>(env, 'config/aviso.json');
     const vale = a?.texto && (!a.ate || Date.parse(a.ate) > Date.now());
@@ -234,11 +238,48 @@ async function minhasReservas(env: EnvExtras, cpf: string, codigo: string) {
   for (const i of ids) {
     const p = await lerJson<PedidoGuardado>(env, `reservas/pedidos/${i}.json`);
     if (!p) continue;
-    lista.push({ id: p.id, codigo: p.codigo, status: p.status, criadoEm: p.criadoEm, quantidade: p.quantidade, forma: p.forma,
+    const ck = await lerJson<{ em: string }>(env, `checkins/${p.id}.json`);
+    lista.push({ id: p.id, codigo: p.codigo, status: p.status, criadoEm: p.criadoEm, quantidade: p.quantidade, forma: p.forma, checkinEm: ck?.em ?? null,
       inicio: p.servidor?.inicio ?? null, descricao: p.servidor?.descricao ?? null, valorCentavos: p.pagamento?.valorCentavos || p.servidor?.valorCentavos || null });
   }
   lista.sort((a, b) => String(b.inicio ?? b.criadoEm).localeCompare(String(a.inicio ?? a.criadoEm)));
   return { nome: String(dono.cliente?.nome ?? '').split(' ')[0], reservas: lista };
+}
+
+// ---------------------------------------------------------------- check-in pelo celular
+
+/** Kartódromo Internacional de Betim (OpenStreetMap, nº 477). */
+const PISTA = { lat: -19.92032, lng: -44.17568 };
+const RAIO_M = 1000;
+function distanciaM(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const R = 6371000, rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/** Regras: reserva do CPF, paga e confirmada, de 2 h antes até 15 min depois da largada, a até 1 km da pista. */
+async function fazerCheckin(env: EnvExtras, b: Record<string, unknown>) {
+  const cpf = digitos(b.cpf), codigo = String(b.codigo ?? '').trim().toUpperCase(), id = String(b.pedidoId ?? '');
+  if (cpf.length !== 11 || !/^[A-Z0-9]{6}$/.test(codigo) || !UUID.test(id)) return json(400, { erro: 'Dados do check-in inválidos.' });
+  const minhas = await minhasReservas(env, cpf, codigo);
+  const r = minhas?.reservas.find((x) => x.id === id);
+  if (!r) return json(404, { erro: 'Reserva não encontrada para este CPF.' });
+  if (r.checkinEm) return json(200, { ok: true, checkinEm: r.checkinEm, repetido: true });
+  if (r.status !== 'confirmado') return json(409, { erro: r.status === 'aguardando_pagamento' ? 'Pague a reserva antes do check-in.' : 'Esta reserva ainda não está confirmada. Fale com a recepção.' });
+  const inicio = r.inicio ? Date.parse(String(r.inicio).slice(0, 16) + ':00-03:00') : NaN;
+  if (!Number.isFinite(inicio)) return json(409, { erro: 'Horário da bateria não encontrado. Faça o check-in no totem.' });
+  const agora = Date.now();
+  if (agora < inicio - 2 * 3_600_000) return json(409, { erro: 'O check-in abre 2 horas antes da largada.' });
+  if (agora > inicio + 15 * 60_000) return json(409, { erro: 'O horário de check-in desta bateria terminou. Fale com a recepção.' });
+  const lat = Number(b.lat), lng = Number(b.lng), precisao = Number(b.precisao);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return json(400, { erro: 'Permita a localização para fazer o check-in.' });
+  if (Number.isFinite(precisao) && precisao > 300) return json(409, { erro: 'A localização está imprecisa. Tente de novo em um lugar aberto.' });
+  const dist = Math.round(distanciaM({ lat, lng }, PISTA));
+  if (dist > RAIO_M) return json(409, { erro: `Você está a ${(dist / 1000).toFixed(1).replace('.', ',')} km do kartódromo. O check-in libera quando você chegar.` });
+  const ck = { pedidoId: id, codigo: r.codigo, em: new Date().toISOString(), distancia: dist, state: 'pending' };
+  await env.PRE.put(`checkins/${id}.json`, JSON.stringify(ck), JSON_R2);
+  return json(202, { ok: true, checkinEm: ck.em });
 }
 
 // ---------------------------------------------------------------- rotas do SRVKART (/api/sync, já autenticadas)
@@ -292,6 +333,24 @@ export async function rotasSync(req: Request, env: EnvExtras, p: string): Promis
     let n = 0;
     for (const o of lista.objects ?? []) { const ped = await lerJson<PedidoGuardado>(env, o.key); if (ped) { await indexarPedido(env, ped); n++; } }
     return json(200, { indexados: n, cursor: lista.truncated ? lista.cursor : null });
+  }
+  if (p === '/api/sync/checkins' && req.method === 'GET') {
+    const out = [];
+    for (const o of ((await env.PRE.list({ prefix: 'checkins/' })).objects ?? []).slice(0, 100)) {
+      const c = await lerJson<Record<string, unknown> & { state?: string }>(env, o.key);
+      if (c?.state === 'pending') out.push({ key: o.key, ...c });
+    }
+    return json(200, { checkins: out });
+  }
+  if (p === '/api/sync/checkins' && req.method === 'POST') {
+    const { feitos } = (await req.json().catch(() => ({}))) as { feitos?: { key?: unknown; erro?: unknown }[] };
+    for (const f of Array.isArray(feitos) ? feitos.slice(0, 100) : []) {
+      const key = String(f.key ?? '');
+      if (!/^checkins\/[0-9a-f-]{36}\.json$/.test(key)) continue;
+      const c = await lerJson<Record<string, unknown>>(env, key);
+      if (c) await env.PRE.put(key, JSON.stringify({ ...c, state: f.erro ? 'erro' : 'feito', erro: f.erro ? String(f.erro).slice(0, 200) : undefined, feitoEm: new Date().toISOString() }), JSON_R2);
+    }
+    return json(200, { ok: true });
   }
   if (p === '/api/sync/cupons-site' && req.method === 'GET') {
     const jobs = [];

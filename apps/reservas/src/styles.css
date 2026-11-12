@@ -247,3 +247,8 @@ main { outline: none; }
 
 .idioma { appearance: none; background: none; border: 1px solid rgba(255,255,255,.25); color: #fff; border-radius: 8px; padding: 7px 9px; font-size: 12px; font-weight: 700; letter-spacing: .06em; cursor: pointer; }
 .idioma:hover { background: rgba(255,255,255,.08); }
+
+.checkin { margin: 10px 0 0; padding: 10px 12px; border-radius: 8px; font-size: 14px; font-weight: 500; }
+.checkin.ok { background: var(--light); color: var(--green-2); }
+.checkin.erro { background: var(--red-bg); color: var(--red); }
+.checkin-btn { width: 100%; margin-top: 12px; }

@@ -252,7 +252,7 @@ const RESERVA_SELECT = `SELECT TOP 5000 i.Id id, i.Pago pago, CONVERT(varchar(16
   r.Nome responsavel, p.Id produtoId, p.Nome produto, p.Categoria categoria, ISNULL(i.PrecoCentavos, p.PrecoCentavos) preco, i.DescontoCentavos desconto,
   CASE WHEN i.Pago = 1 THEN i.ValorCentavos ELSE ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos END total,
   i.Observacao observacao, i.Aprovada aprovada, CASE WHEN i.TermoImpressoEm IS NULL THEN 0 ELSE 1 END termo, i.Status status, i.Origem origem, i.Kart kart, i.VendaId vendaId,
-  CONVERT(varchar(16), i.TermoImpressoEm, 126) termoImpressoEm, CONVERT(varchar(16), i.CriadoEm, 126) criadoEm,
+  CONVERT(varchar(16), i.TermoImpressoEm, 126) termoImpressoEm, CONVERT(varchar(16), i.CriadoEm, 126) criadoEm, CONVERT(varchar(16), i.CheckinEm, 126) checkinEm, i.CheckinOrigem checkinOrigem,
   CASE WHEN i.Pago = 1 THEN ISNULL(onl.forma, cx.formas) END formaPagamento
   FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId JOIN dbo.Cliente c ON c.Id = i.ClienteId
   ${ENDURANCE_VINCULO_SQL}

@@ -631,6 +631,23 @@ function MinhasReservas({ onVoltar, onAbrir }: { onVoltar: () => void; onAbrir: 
   const [buscando, setBuscando] = useState(false);
   const [res, setRes] = useState<{ nome: string; reservas: MinhaReserva[] } | null>(null);
   const [corridas, setCorridas] = useState<{ corridas: Corrida[]; aviso?: string } | null>(null);
+  const [checando, setChecando] = useState<string | null>(null);
+  const [msgCheckin, setMsgCheckin] = useState<Record<string, { ok: boolean; texto: string }>>({});
+  const fazerCheckin = (rv: MinhaReserva) => {
+    if (!navigator.geolocation) { setMsgCheckin((m) => ({ ...m, [rv.id]: { ok: false, texto: 'Este aparelho não informa a localização. Faça o check-in no totem.' } })); return; }
+    setChecando(rv.id);
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const x = await api.checkin({ cpf: digitos(cpf), codigo, pedidoId: rv.id, lat: pos.coords.latitude, lng: pos.coords.longitude, precisao: pos.coords.accuracy });
+        setRes((r0) => r0 && { ...r0, reservas: r0.reservas.map((y) => (y.id === rv.id ? { ...y, checkinEm: x.checkinEm } : y)) });
+        setMsgCheckin((m) => ({ ...m, [rv.id]: { ok: true, texto: 'Check-in feito! O termo de cada piloto já está indo para a impressora da recepção: no balcão, é só conferir e assinar.' } }));
+      } catch (e) { setMsgCheckin((m) => ({ ...m, [rv.id]: { ok: false, texto: (e as Error).message } })); }
+      finally { setChecando(null); }
+    }, (err) => {
+      setChecando(null);
+      setMsgCheckin((m) => ({ ...m, [rv.id]: { ok: false, texto: err.code === err.PERMISSION_DENIED ? 'Permita o acesso à localização para fazer o check-in (ou use o totem).' : 'Não foi possível obter sua localização. Tente de novo em um lugar aberto.' } }));
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  };
   const buscar = async (e: React.FormEvent) => {
     e.preventDefault(); setErro('');
     if (!cpfValido(cpf)) { setErro('Confira os 11 números do CPF de quem reservou.'); return; }
@@ -668,6 +685,14 @@ function MinhasReservas({ onVoltar, onAbrir }: { onVoltar: () => void; onAbrir: 
                 <li key={rv.id} className="cartao minha">
                   <div className="minha-topo"><div><strong>{dt ? `${diaLongo(dt)} · ${hora(dt)}` : 'Data a confirmar'}</strong><span className="muted pequeno">{`Reserva ${rv.codigo} · ${rv.quantidade} ${rv.quantidade === 1 ? 'piloto' : 'pilotos'}${rv.valorCentavos ? ` · ${reais(rv.valorCentavos)}` : ''}`}</span></div><span className={`selo-st ${tom}`}>{rot}</span></div>
                   {regra && !regra.passou && <p className="dica-mini">{regra.texto}</p>}
+                  {(() => {
+                    if (rv.checkinEm) return <p className="checkin ok">{`Check-in feito às ${hora(new Date(rv.checkinEm))}. Seu termo está na recepção para assinar.`}</p>;
+                    if (!dt || rv.status !== 'confirmado') return null;
+                    const falta = dt.getTime() - Date.now();
+                    if (falta > 2 * 3600e3 || falta < -15 * 60e3) return null;
+                    return <button className="btn grande checkin-btn" onClick={() => fazerCheckin(rv)} disabled={checando === rv.id} aria-busy={checando === rv.id}>{checando === rv.id ? 'Conferindo sua localização…' : 'Cheguei! Fazer check-in'}</button>;
+                  })()}
+                  {msgCheckin[rv.id] && <p className={`checkin ${msgCheckin[rv.id].ok ? 'ok' : 'erro'}`} role="status">{msgCheckin[rv.id].texto}</p>}
                   <div className="acoes esq">
                     <button className="btn sec" onClick={() => onAbrir(rv.id)}>{rv.status === 'aguardando_pagamento' ? 'Pagar agora' : 'Ver detalhes'}</button>
                     {regra && !regra.passou && <a className="btn sec" href={zapMsg(rv, 'remarcar', regra.texto)} target="_blank" rel="noopener">{regra.noPrazo ? 'Remarcar' : 'Falar sobre remarcar'}</a>}

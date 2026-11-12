@@ -17,7 +17,12 @@ export function trocarIdioma(i: Idioma) {
 }
 
 const D: Record<string, string> = {
-  'Pular para a reserva': 'Skip to booking', '(1 hora antes)': '(1 hour before)', '1 hora antes': '1 hour before', 'Minhas': 'Bookings', 'reservas': '', 'Voltar ao site': 'Back to website', 'Precisa de ajuda?': 'Need help?', 'Ajuda': 'Help',
+  'Pular para a reserva': 'Skip to booking', 'Cheguei! Fazer check-in': 'I am here! Check in', 'Conferindo sua localização…': 'Checking your location…',
+  'Check-in feito! O termo de cada piloto já está indo para a impressora da recepção: no balcão, é só conferir e assinar.': 'Checked in! Each driver’s waiver is being printed at the front desk: just review and sign it there.',
+  'Este aparelho não informa a localização. Faça o check-in no totem.': 'This device does not share location. Check in at the kiosk.', 'Permita o acesso à localização para fazer o check-in (ou use o totem).': 'Allow location access to check in (or use the kiosk).',
+  'Não foi possível obter sua localização. Tente de novo em um lugar aberto.': 'We could not get your location. Try again outdoors.', 'O check-in abre 2 horas antes da largada.': 'Check-in opens 2 hours before the start.',
+  'Pague a reserva antes do check-in.': 'Pay for the booking before checking in.', 'A localização está imprecisa. Tente de novo em um lugar aberto.': 'Your location is imprecise. Try again outdoors.',
+  'O horário de check-in desta bateria terminou. Fale com a recepção.': 'Check-in for this session has closed. Contact the front desk.', '(1 hora antes)': '(1 hour before)', '1 hora antes': '1 hour before', 'Minhas': 'Bookings', 'reservas': '', 'Voltar ao site': 'Back to website', 'Precisa de ajuda?': 'Need help?', 'Ajuda': 'Help',
   'Como chegar': 'Directions', 'WhatsApp da recepção': 'Front desk WhatsApp', 'Conexão segura': 'Secure connection',
   'Kartódromo de Betim · Reserva online': 'Betim Kart Track · Online booking', 'Betim, MG': 'Betim, Brazil',
   'Esse horário não está mais disponível.': 'This time slot is no longer available.', 'Escolher outro horário': 'Choose another time',
@@ -120,6 +125,8 @@ const REGRAS: [RegExp, (...m: string[]) => string][] = [
   [/^Idade mínima de (\d+) anos e altura mín\. 1,50 m\.$/, (_, n) => `Minimum age ${n} and minimum height 1.50 m.`],
   [/^Esse horário tem só (\d+) (vaga|vagas)\.(.*)$/, (_, n, _v, r) => `This session has only ${n} spot(s) left.${traduzir(r)}`],
   [/^(.+), (\d+) vagas, (.+) por piloto$/, (_, h, n, v) => `${h}, ${n} spots, ${v} per driver`],
+  [/^Check-in feito às (\d\d:\d\d)\. Seu termo está na recepção para assinar\.$/, (_, h) => `Checked in at ${h}. Your waiver is at the front desk to sign.`],
+  [/^Você está a (.+) km do kartódromo\. O check-in libera quando você chegar\.$/, (_, d) => `You are ${d.replace(',', '.')} km from the track. Check-in opens when you arrive.`],
   [/^(\d+) × (.+)$/, (_, n, v) => `${n} × ${v}`],
 ];
 
