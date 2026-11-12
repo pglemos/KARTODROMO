@@ -1,3 +1,5 @@
+> **Histórico (12/11/2026):** tudo isto já está em `workers/pre-cadastro` e o worker no ar é igual ao fonte. Não use estes scripts para publicar.
+
 # Worker kartodromo-cadastro: link do grupo com pagamento (10/11/2026)
 
 Problema: o deploy de 08/11 (wrangler, a partir do fonte) tirou do worker no ar as rotas `/api/grupo`, `/api/grupo/pagamento`,

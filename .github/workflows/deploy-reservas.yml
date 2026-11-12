@@ -1,8 +1,9 @@
 name: Deploy reserva online (worker kartodromo-cadastro)
 
 # Servidor da reserva online e do pré-cadastro (workers/pre-cadastro): pedidos, Asaas, política de cancelamento.
-# So manual: o worker no ar tem remendos que nao saem de workers/pre-cadastro (docs/operacao/patches-producao/cadastro-20261105).
-# Um push publicava a versao antiga por cima (05/11/2026) e tirava o link do grupo e os campos obrigatorios.
+# Desde 12/11/2026 o worker no ar é igual ao fonte (bundle conferido byte a byte); os remendos de docs/operacao/patches-producao são só histórico.
+# Continua manual: várias sessões publicam este worker; publique só a partir do main atualizado.
+# tests/grupo-link.test.ts trava o link do grupo e o painel do organizador (sumiram em deploys de 05/11 e 08/11).
 on:
   workflow_dispatch:
 
@@ -26,7 +27,7 @@ jobs:
       - run: npm ci
 
       - name: Testes da reserva e da política
-        run: npx vitest run tests/reserva-online.test.ts tests/politica-cancelamento.test.ts tests/pre-cadastro-validar.test.ts
+        run: npx vitest run tests/reserva-online.test.ts tests/politica-cancelamento.test.ts tests/pre-cadastro-validar.test.ts tests/grupo-link.test.ts
 
       - name: Publicar worker
         working-directory: workers/pre-cadastro

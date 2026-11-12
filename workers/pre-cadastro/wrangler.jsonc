@@ -1,6 +1,6 @@
 {
-  // 23/10: este src agora carrega as mudanças de produção (template novo de e-mail, clientes/perfil/ranking).
-  // Confira o diff com o bundle publicado antes de qualquer deploy: workers/pre-cadastro/referencia-producao/.
+  // 12/11/2026: o bundle no ar foi conferido byte a byte com `wrangler deploy --dry-run` deste fonte (e as páginas de public/).
+  // Este fonte é a única origem do worker: nada de remendo no bundle publicado. Publique só do main atualizado.
 
   // Pré-cadastro online dos clientes (QR code no kartódromo). Worker separado do site para não mexer nele.
   "$schema": "../../node_modules/wrangler/config-schema.json",

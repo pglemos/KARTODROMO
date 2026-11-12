@@ -1,3 +1,5 @@
+> **Histórico (12/11/2026):** tudo isto já está em `workers/pre-cadastro` e o worker no ar é igual ao fonte. Não use estes scripts para publicar.
+
 # Painel do organizador do grupo (10/11/2026)
 
 Link só do responsável: `cadastro.kartodromodebetim.com.br/painel?g=CODIGO&k=CHAVE`. Mostra:

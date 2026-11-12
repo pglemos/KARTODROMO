@@ -1,3 +1,5 @@
+> **Histórico (12/11/2026):** tudo isto já está em `workers/pre-cadastro` e o worker no ar é igual ao fonte. Não use estes scripts para publicar.
+
 ﻿# Worker kartodromo-cadastro no ar (05/11/2026)
 
 O código no ar NÃO é gerado de `workers/pre-cadastro`: é o bundle que estava publicado (outra sessão), baixado pela API
