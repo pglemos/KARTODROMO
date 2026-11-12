@@ -1490,13 +1490,33 @@ export async function soltarVagasNaoPagasDoSite(log: Log) {
         AND b.Inicio > SYSDATETIME() AND b.Inicio <= DATEADD(hour, 24, SYSDATETIME())
         AND i.Status <> 'cancelada' AND i.Pago = 0 AND i.VendaId IS NULL AND i.TermoImpressoEm IS NULL AND i.Kart IS NULL`,
   );
+  const soltasPorGrupo = new Map<number, number>();
   for (const v of vagas) {
     const feito = await one<{ Id: number }>(
       `UPDATE dbo.Inscricao SET Status = 'cancelada', AtualizadoEm = SYSDATETIME() OUTPUT inserted.Id
         WHERE Id = @i AND Pago = 0 AND Status <> 'cancelada' AND VendaId IS NULL`, { i: v.inscricaoId });
-    if (feito) log(`grupo ${v.grupoId} (${v.codigo}): vaga ${v.ordem} sem pagamento a 24h da bateria voltou para venda`);
+    if (feito) {
+      log(`grupo ${v.grupoId} (${v.codigo}): vaga ${v.ordem} sem pagamento a 24h da bateria voltou para venda`);
+      soltasPorGrupo.set(v.grupoId, (soltasPorGrupo.get(v.grupoId) ?? 0) + 1);
+    }
   }
   if (vagas.length) ultimoResumoSite = '';
+  // avisa quem organiza por e-mail (uma vez por grupo e bateria; o site guarda a chave)
+  if (soltasPorGrupo.size && siteUrl() && siteChave()) {
+    const ids = [...soltasPorGrupo.keys()].join(',');
+    const orgs = await query<{ grupoId: number; codigo: string; nome: string; email: string | null; bateria: string; inicio: string }>(
+      `SELECT g.Id grupoId, g.Codigo codigo, r.Nome nome, r.Email email, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio
+         FROM dbo.ReservaGrupo g JOIN dbo.Cliente r ON r.Id = g.ResponsavelId JOIN dbo.Bateria b ON b.Id = g.BateriaId WHERE g.Id IN (${ids})`,
+    );
+    const lembretes = orgs.filter((o) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(o.email ?? ''))).map((o) => ({
+      chave: `soltas-${o.grupoId}-${o.inicio.replace(/\D/g, '')}`, tipo: 'soltas', para: o.email, nome: o.nome, bateria: o.bateria, inicio: o.inicio,
+      link: 'https://reservas.kartodromodebetim.com.br/', painel: linkPainel(o.codigo), faltam: soltasPorGrupo.get(o.grupoId) ?? 0,
+    }));
+    for (let i = 0; i < lembretes.length; i += 5) {
+      await site('/api/sync/lembretes', { method: 'POST', body: JSON.stringify({ lembretes: lembretes.slice(i, i + 5) }) })
+        .catch((e) => log(`grupos: aviso de vagas soltas falhou (${(e as Error).message})`));
+    }
+  }
   return vagas.length;
 }
 

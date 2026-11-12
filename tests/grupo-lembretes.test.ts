@@ -19,6 +19,14 @@ describe('texto dos lembretes', () => {
     expect(c.html).toContain('wa.me/?text=');
     expect(c.text).toContain('Veja quem já entrou');
   });
+  it('vagas soltas: avisa quem organiza, com link para reservar e o painel', () => {
+    const c = conteudoLembrete({ ...base, tipo: 'soltas', faltam: 2, link: 'https://reservas.kartodromodebetim.com.br/', painel: 'https://cadastro.kartodromodebetim.com.br/painel?g=G1&k=x' });
+    expect(c.subject).toBe('2 vagas do seu grupo voltaram para venda · sexta-feira, 20/11 às 19:00');
+    expect(c.text).toContain('Quem já pagou continua garantido');
+    expect(c.text).toContain('\nReservar: https://reservas.kartodromodebetim.com.br');
+    expect(c.html).toContain('Reservar mais vagas');
+    expect(conteudoLembrete({ ...base, tipo: 'soltas', faltam: 1, link: 'https://reservas.kartodromodebetim.com.br/' }).subject).toMatch(/^1 vaga do seu grupo voltou/);
+  });
   it('escapa HTML do nome', () => {
     expect(conteudoLembrete({ ...base, nome: '<b>Ana</b>' }).html).not.toContain('<b>Ana');
   });

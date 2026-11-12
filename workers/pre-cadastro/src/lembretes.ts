@@ -3,7 +3,8 @@
  * (tem e-mail, cadastro e pagamento de cada vaga) e manda em POST /api/sync/lembretes; aqui o texto é montado e o
  * envio sai pelo mesmo caminho dos e-mails do app. Cada lembrete tem uma chave e sai UMA vez (marca no R2).
  *  - 'pagar':     quem fez o cadastro num grupo "cada um paga o seu" e ainda não pagou a vaga;
- *  - 'cadastros': quem organiza, quando ainda há vagas sem cadastro.
+ *  - 'cadastros': quem organiza, quando ainda há vagas sem cadastro;
+ *  - 'soltas':    quem organiza, quando vagas sem pagamento voltaram para venda 24 h antes (grupos do site).
  */
 import { enviarEmail, type MobileEmailEnv } from './mobile/email';
 
@@ -11,7 +12,7 @@ type R2 = { get(k: string): Promise<unknown | null>; put(k: string, v: string): 
 export type EnvLembretes = MobileEmailEnv & { PRE: R2 };
 
 export type Lembrete = {
-  chave: string; tipo: 'pagar' | 'cadastros'; para: string; nome: string; bateria: string; inicio: string;
+  chave: string; tipo: 'pagar' | 'cadastros' | 'soltas'; para: string; nome: string; bateria: string; inicio: string;
   link: string; painel?: string | null; responsavel?: string; valorCentavos?: number; faltam?: number; soltaEm24h?: boolean;
 };
 
@@ -48,6 +49,16 @@ export function conteudoLembrete(l: Lembrete) {
       + botao('Pagar minha vaga', l.link) + `<p style="color:#a8b2aa">Já pagou? Pode ignorar este e-mail: a confirmação chega em alguns minutos.</p>`);
     return { subject, text, html };
   }
+  if (l.tipo === 'soltas') {
+    const n = Number(l.faltam) || 0;
+    const qtd = n === 1 ? '1 vaga' : `${n} vagas`;
+    const subject = `${n === 1 ? '1 vaga do seu grupo voltou' : `${n} vagas do seu grupo voltaram`} para venda · ${dia}`;
+    const texto = `Oi, ${nome}! Faltando 24 horas para ${l.bateria}, ${dia}, ${qtd} do seu grupo ainda não tinha${n === 1 ? '' : 'm'} pagamento e voltou${n === 1 ? '' : 'aram'} para venda, como avisado na reserva. Quem já pagou continua garantido. Se alguém ainda quiser correr, pode reservar no site enquanto houver vaga ou falar com a recepção.`;
+    const text = `${texto}\n\nReservar: https://reservas.kartodromodebetim.com.br${l.painel ? `\nSeu grupo: ${l.painel}` : ''}`;
+    const html = moldura(n === 1 ? '1 vaga voltou para venda' : `${n} vagas voltaram para venda`, `<p>${esc(texto)}</p>` + botao('Reservar mais vagas', 'https://reservas.kartodromodebetim.com.br')
+      + (l.painel ? `<p><a href="${esc(l.painel)}" style="color:#00e676">Ver como ficou o seu grupo</a></p>` : ''));
+    return { subject, text, html };
+  }
   const n = Number(l.faltam) || 0;
   const faltam = n === 1 ? 'falta 1 pessoa fazer o cadastro' : `faltam ${n} pessoas fazerem o cadastro`;
   const subject = `${n === 1 ? 'Falta 1 cadastro' : `Faltam ${n} cadastros`} no seu grupo · ${dia}`;
@@ -67,7 +78,7 @@ export async function lembretesSync(req: Request, env: EnvLembretes) {
   const res = { enviados: 0, jaEnviados: 0, invalidos: 0, falhas: 0 };
   for (const l of lista) {
     const link = linkSeguro(l?.link);
-    const ok = l && (l.tipo === 'pagar' || l.tipo === 'cadastros') && /^[\w:.-]{3,80}$/.test(String(l.chave)) && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(l.para)) && link;
+    const ok = l && (l.tipo === 'pagar' || l.tipo === 'cadastros' || l.tipo === 'soltas') && /^[\w:.-]{3,80}$/.test(String(l.chave)) && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(l.para)) && link;
     if (!ok) { res.invalidos++; continue; }
     const marca = `lembretes/${l.chave}`;
     if (await env.PRE.get(marca)) { res.jaEnviados++; continue; }
