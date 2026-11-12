@@ -222,3 +222,13 @@ main { outline: none; }
 .selo-st.neutro { background: #f0f2ef; color: var(--muted); }
 .selo-st.erro { background: var(--red-bg); color: var(--red); }
 .acoes.esq { justify-content: flex-start; align-items: center; margin-top: 12px; }
+
+.so-celular { display: none; }
+.lnk-claro, .btn-claro { white-space: nowrap; }
+@media (max-width: 640px) {
+  .so-largo { display: none; }
+  .so-celular { display: inline; }
+  .barra { padding-top: 8px; padding-bottom: 8px; }
+  .barra-acoes { gap: 4px; }
+  .lnk-claro, .btn-claro { padding: 8px 10px; font-size: 13px; }
+}

@@ -52,9 +52,9 @@ export default function App() {
       <header className="barra">
         <a href="https://kartodromodebetim.com.br" className="marca" aria-label="Kartódromo Internacional de Betim, site principal"><img src="/booking-media/logo.png" alt="Kartódromo Internacional de Betim" width="160" height="44" /></a>
         <nav className="barra-acoes">
-          <a href="#minhas" onClick={abrirMinhas} className="lnk-claro sempre"><Ico d={I.cal} s={16} />Minhas reservas</a>
+          <a href="#minhas" onClick={abrirMinhas} className="lnk-claro sempre"><Ico d={I.cal} s={16} /><span>Minhas<span className="so-largo"> reservas</span></span></a>
           <a href="https://kartodromodebetim.com.br" className="lnk-claro"><Ico d={I.voltar} s={16} />Voltar ao site</a>
-          <a href={`https://wa.me/${WHATS}`} target="_blank" rel="noopener" className="btn-claro"><Ico d={I.ajuda} s={16} />Precisa de ajuda?</a>
+          <a href={`https://wa.me/${WHATS}`} target="_blank" rel="noopener" className="btn-claro"><Ico d={I.ajuda} s={16} /><span className="so-largo">Precisa de ajuda?</span><span className="so-celular">Ajuda</span></a>
         </nav>
       </header>
       {aviso && <div className={`aviso ${aviso.tom === 'alerta' ? 'alerta' : ''}`} role="status"><Ico d={I.alerta} s={18} /><p>{aviso.texto}</p></div>}
