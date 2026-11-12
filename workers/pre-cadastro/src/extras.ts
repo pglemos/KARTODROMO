@@ -11,7 +11,7 @@ type R2 = {
   get(key: string): Promise<{ json<T = unknown>(): Promise<T> } | null>;
   put(key: string, value: string, opts?: unknown): Promise<unknown>;
   delete(key: string | string[]): Promise<unknown>;
-  list(opts: { prefix: string }): Promise<{ objects: { key: string }[] }>;
+  list(opts: { prefix: string; cursor?: string }): Promise<{ objects: { key: string }[]; truncated?: boolean; cursor?: string }>;
 };
 type EnvExtras = { PRE: R2 };
 
@@ -105,6 +105,14 @@ export async function rotasPublicas(req: Request, env: EnvExtras, p: string, url
     await env.PRE.delete(`grupos/acoes-erro/${d.codigo}-${vaga.ordem}.json`);
     return json(202, { ok: true });
   }
+  if (p === '/api/reservas/minhas' && req.method === 'POST') {
+    if (await limite(req.headers.get('cf-connecting-ip') ?? 'x', 'minhas')) return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
+    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const cpf = digitos(b.cpf), codigo = String(b.codigo ?? '').trim().toUpperCase();
+    if (cpf.length !== 11 || !/^[A-Z0-9]{6}$/.test(codigo)) return json(400, { erro: 'Informe o CPF de quem reservou e o código da reserva (6 letras e números).' });
+    const r = await minhasReservas(env, cpf, codigo);
+    return json(r ? 200 : 404, r ?? { erro: 'Não achamos reserva com esse CPF e código. Confira os dados ou fale com a recepção.' });
+  }
   if (p === '/api/aviso' && req.method === 'GET') {
     const a = await lerJson<{ texto?: string; tom?: string; ate?: string | null }>(env, 'config/aviso.json');
     const vale = a?.texto && (!a.ate || Date.parse(a.ate) > Date.now());
@@ -186,6 +194,35 @@ export async function identificarCliente(req: Request, env: EnvExtras & { OPS_UR
   return json(200, { ok: true, cliente: null });
 }
 
+// ---------------------------------------------------------------- minhas reservas (CPF + código de uma reserva)
+
+type PedidoGuardado = { id: string; codigo: string; status: string; criadoEm: string; quantidade: number; forma: string; cliente?: { documento?: string; nome?: string };
+  servidor?: { inicio?: string; valorCentavos?: number; descricao?: string }; pagamento?: { valorCentavos?: number } };
+
+/** Índices para achar os pedidos de um CPF (chamado sempre que um pedido é gravado). */
+export async function indexarPedido(env: EnvExtras, p: PedidoGuardado) {
+  const cpf = digitos(p.cliente?.documento);
+  if (cpf.length === 11) await env.PRE.put(`reservas/por-cpf/${cpf}/${p.id}`, '1');
+  if (p.codigo) await env.PRE.put(`reservas/por-codigo/${p.codigo}`, p.id);
+}
+
+async function minhasReservas(env: EnvExtras, cpf: string, codigo: string) {
+  const id = await (await env.PRE.get(`reservas/por-codigo/${codigo}`) as unknown as { text(): Promise<string> } | null)?.text();
+  if (!id) return null;
+  const dono = await lerJson<PedidoGuardado>(env, `reservas/pedidos/${id}.json`);
+  if (!dono || digitos(dono.cliente?.documento) !== cpf) return null;
+  const ids = ((await env.PRE.list({ prefix: `reservas/por-cpf/${cpf}/` })).objects ?? []).map((o) => o.key.split('/').pop()!).slice(-30);
+  const lista = [];
+  for (const i of ids) {
+    const p = await lerJson<PedidoGuardado>(env, `reservas/pedidos/${i}.json`);
+    if (!p) continue;
+    lista.push({ id: p.id, codigo: p.codigo, status: p.status, criadoEm: p.criadoEm, quantidade: p.quantidade, forma: p.forma,
+      inicio: p.servidor?.inicio ?? null, descricao: p.servidor?.descricao ?? null, valorCentavos: p.pagamento?.valorCentavos || p.servidor?.valorCentavos || null });
+  }
+  lista.sort((a, b) => String(b.inicio ?? b.criadoEm).localeCompare(String(a.inicio ?? a.criadoEm)));
+  return { nome: String(dono.cliente?.nome ?? '').split(' ')[0], reservas: lista };
+}
+
 // ---------------------------------------------------------------- rotas do SRVKART (/api/sync, já autenticadas)
 
 export async function rotasSync(req: Request, env: EnvExtras, p: string): Promise<Response | null> {
@@ -229,6 +266,14 @@ export async function rotasSync(req: Request, env: EnvExtras, p: string): Promis
     }
     cache = null;
     return json(200, { ok: true });
+  }
+  // índice dos pedidos antigos (rodar uma vez): POST /api/sync/reservas/indexar { cursor? }
+  if (p === '/api/sync/reservas/indexar' && req.method === 'POST') {
+    const b = (await req.json().catch(() => ({}))) as { cursor?: string };
+    const lista = await env.PRE.list({ prefix: 'reservas/pedidos/', cursor: b.cursor });
+    let n = 0;
+    for (const o of lista.objects ?? []) { const ped = await lerJson<PedidoGuardado>(env, o.key); if (ped) { await indexarPedido(env, ped); n++; } }
+    return json(200, { indexados: n, cursor: lista.truncated ? lista.cursor : null });
   }
   if (p === '/api/sync/cupons-site' && req.method === 'GET') {
     const jobs = [];

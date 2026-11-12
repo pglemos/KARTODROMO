@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, ErroApi, FINAIS, ID_PEDIDO, type Agenda, type Aviso, type Horario, type Pedido, type Politica } from './api';
+import { api, ErroApi, FINAIS, ID_PEDIDO, type Agenda, type Aviso, type Horario, type MinhaReserva, type Pedido, type Politica } from './api';
 import {
   cpfValido, dataIso, deIso, diaChave, diaCurto, diaLongo, digitos, emailValido, erroInstagram, hora, ics, idade,
   mascaraCep, mascaraCpf, mascaraData, mascaraFone, menosUmaHora, nomeMes, reais,
@@ -39,6 +39,10 @@ const I = {
 // ------------------------------------------------------------------ app
 export default function App() {
   const [pedidoId, setPedidoId] = useState<string | null>(pedidoSalvo);
+  const [minhas, setMinhas] = useState(() => location.hash === '#minhas');
+  useEffect(() => { const f = () => setMinhas(location.hash === '#minhas'); window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f); }, []);
+  const abrirMinhas = (e: React.MouseEvent) => { e.preventDefault(); history.pushState(null, '', location.pathname + '#minhas'); setMinhas(true); window.scrollTo({ top: 0 }); };
+  const sairMinhas = () => { history.pushState(null, '', location.pathname); setMinhas(false); };
   const [aviso, setAviso] = useState<Aviso>(null);
   useEffect(() => { api.aviso().then(setAviso); }, []);
   const novo = () => { guardarPedido(null); setPedidoId(null); window.scrollTo({ top: 0 }); };
@@ -48,13 +52,15 @@ export default function App() {
       <header className="barra">
         <a href="https://kartodromodebetim.com.br" className="marca" aria-label="Kartódromo Internacional de Betim, site principal"><img src="/booking-media/logo.png" alt="Kartódromo Internacional de Betim" width="160" height="44" /></a>
         <nav className="barra-acoes">
+          <a href="#minhas" onClick={abrirMinhas} className="lnk-claro sempre"><Ico d={I.cal} s={16} />Minhas reservas</a>
           <a href="https://kartodromodebetim.com.br" className="lnk-claro"><Ico d={I.voltar} s={16} />Voltar ao site</a>
           <a href={`https://wa.me/${WHATS}`} target="_blank" rel="noopener" className="btn-claro"><Ico d={I.ajuda} s={16} />Precisa de ajuda?</a>
         </nav>
       </header>
       {aviso && <div className={`aviso ${aviso.tom === 'alerta' ? 'alerta' : ''}`} role="status"><Ico d={I.alerta} s={18} /><p>{aviso.texto}</p></div>}
       <main id="conteudo" tabIndex={-1}>
-        {pedidoId ? <Acompanhar id={pedidoId} onNovo={novo} /> : <Reserva onCriado={(id) => { guardarPedido(id); setPedidoId(id); window.scrollTo({ top: 0 }); }} />}
+        {minhas ? <MinhasReservas onVoltar={sairMinhas} onAbrir={(id) => { sairMinhas(); guardarPedido(id); setPedidoId(id); window.scrollTo({ top: 0 }); }} />
+          : pedidoId ? <Acompanhar id={pedidoId} onNovo={novo} /> : <Reserva onCriado={(id) => { guardarPedido(id); setPedidoId(id); window.scrollTo({ top: 0 }); }} />}
       </main>
       <footer className="rodape">
         <p>Kartódromo Internacional de Betim · Av. Adutora Várzea das Flores, 477 · Itacolomi · Betim/MG</p>
@@ -561,6 +567,7 @@ function Acompanhar({ id, onNovo }: { id: string; onNovo: () => void }) {
       <div className="selo ok"><Ico d={I.ok} s={28} /></div>
       <p className="sobre">Tudo certo para a corrida</p><h1>Reserva confirmada</h1>{info}
       <div className="codigo"><span>Código da reserva</span><strong>{p.codigo}</strong><button className="ico-btn" onClick={() => { navigator.clipboard?.writeText(p.codigo); avisar('Código copiado'); }} aria-label="Copiar código"><Ico d={I.copiar} /></button></div>
+      <p className="dica-mini centro">Guarde o código: com ele e o CPF você acessa <a href="#minhas">Minhas reservas</a> para remarcar ou cancelar.</p>
       <ol className="no-dia"><li>Chegue às <strong>{dt && menosUmaHora(dt)}</strong>, uma hora antes da largada.</li><li>No totem, informe o <strong>CPF de quem reservou</strong> e confira os dados.</li><li>O termo de responsabilidade é assinado na recepção.</li></ol>
       <div className="acoes centro">{dt && <button className="btn" onClick={baixar}>Salvar na agenda</button>}<a className="btn sec" href="https://maps.google.com/?q=Kart%C3%B3dromo+Internacional+de+Betim" target="_blank" rel="noopener">Como chegar</a></div>
       <button className="lnk centro" onClick={onNovo}>Fazer outra reserva</button>
@@ -596,6 +603,75 @@ function Acompanhar({ id, onNovo }: { id: string; onNovo: () => void }) {
     <div className="pagina estreita">
       <div className="cartao pedido" aria-live="polite">{corpo}{falhas >= 3 && !FINAIS.has(p.status) && <p className="msg-erro geral">Atualização interrompida. Confira a conexão: a página tenta de novo sozinha.</p>}</div>
       <p className="dica-mini centro">Você pode voltar a esta página pelo mesmo link.</p>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ minhas reservas
+const ROTULO: Record<string, [string, string]> = {
+  confirmado: ['ok', 'Confirmada'], pago: ['pend', 'Pagamento recebido'], aguardando_pagamento: ['pend', 'Aguardando pagamento'], novo: ['pend', 'Em processamento'],
+  expirado: ['neutro', 'Prazo de pagamento encerrado'], recusado: ['neutro', 'Não confirmada'], pago_sem_vaga: ['erro', 'Precisa de atendimento'], erro_pagamento: ['erro', 'Erro no pagamento'],
+};
+/** Política (src/config/politica-cancelamento.ts): 48 h antes ou mais = reembolso de 95% e remarcação sem custo; menos de 48 h = sem reembolso. */
+function regraDaPolitica(inicio: Date, valor: number | null) {
+  const horas = (inicio.getTime() - Date.now()) / 3600e3;
+  if (horas <= 0) return { passou: true, noPrazo: false, texto: 'Bateria já realizada.' };
+  if (horas >= 48) return { passou: false, noPrazo: true, texto: `Dentro do prazo: cancelando agora, o reembolso é de ${valor ? reais(Math.round(valor * 0.95)) : '95% do valor pago'} (5% de taxa administrativa). Remarcar não tem custo.` };
+  return { passou: false, noPrazo: false, texto: 'Faltam menos de 48 horas: pela política não há reembolso. A recepção pode avaliar um voucher para outra data em casos excepcionais.' };
+}
+
+function MinhasReservas({ onVoltar, onAbrir }: { onVoltar: () => void; onAbrir: (id: string) => void }) {
+  const [cpf, setCpf] = useState('');
+  const [codigo, setCodigo] = useState('');
+  const [erro, setErro] = useState('');
+  const [buscando, setBuscando] = useState(false);
+  const [res, setRes] = useState<{ nome: string; reservas: MinhaReserva[] } | null>(null);
+  const buscar = async (e: React.FormEvent) => {
+    e.preventDefault(); setErro('');
+    if (!cpfValido(cpf)) { setErro('Confira os 11 números do CPF de quem reservou.'); return; }
+    if (!/^[A-Z0-9]{6}$/.test(codigo)) { setErro('O código da reserva tem 6 letras e números (está na confirmação e no WhatsApp).'); return; }
+    setBuscando(true);
+    try { setRes(await api.minhas(digitos(cpf), codigo)); } catch (x) { setErro((x as Error).message); } finally { setBuscando(false); }
+  };
+  const zapMsg = (rv: MinhaReserva, acao: 'cancelar' | 'remarcar', regra: string) =>
+    `https://wa.me/${WHATS}?text=${encodeURIComponent(`Olá! Quero ${acao} a reserva ${rv.codigo}${rv.inicio ? ` (${diaLongo(deIso(rv.inicio))}, ${hora(deIso(rv.inicio))})` : ''}, no CPF de quem reservou. ${acao === 'cancelar' ? regra : 'Quais horários estão livres?'}`)}`;
+  return (
+    <div className="pagina estreita">
+      <div className="cabeca"><div><p className="sobre">Kartódromo de Betim · Reserva online</p><h1 tabIndex={-1}>Minhas reservas</h1><p className="sub">Veja suas reservas, pague o que ficou pendente e peça remarcação ou cancelamento.</p></div></div>
+      {!res ? (
+        <form className="cartao principal" onSubmit={buscar} noValidate>
+          <div className="form-grade">
+            <Campo id="m-cpf" rotulo="CPF de quem reservou" valor={cpf} onChange={(v) => setCpf(mascaraCpf(v))} modo="numeric" auto="off" />
+            <Campo id="m-cod" rotulo="Código de uma reserva" valor={codigo} onChange={(v) => setCodigo(v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))} auto="off" dica="Está na tela de confirmação e na mensagem do WhatsApp." />
+          </div>
+          {erro && <p className="msg-erro geral" role="alert">{erro}</p>}
+          <div className="acoes"><button type="button" className="btn sec" onClick={onVoltar}>Voltar</button><button className="btn" disabled={buscando} aria-busy={buscando}>{buscando ? 'Buscando…' : 'Ver minhas reservas'}</button></div>
+        </form>
+      ) : (
+        <>
+          <p className="muted">Olá, {res.nome}! {res.reservas.length === 1 ? 'Esta é a sua reserva online.' : `Estas são as suas ${res.reservas.length} reservas online.`}</p>
+          <ul className="minhas">
+            {res.reservas.map((rv) => {
+              const dt = rv.inicio ? deIso(rv.inicio) : null;
+              const [tom, rot] = ROTULO[rv.status] ?? ['neutro', rv.status];
+              const regra = dt && (rv.status === 'confirmado' || rv.status === 'pago') ? regraDaPolitica(dt, rv.valorCentavos) : null;
+              return (
+                <li key={rv.id} className="cartao minha">
+                  <div className="minha-topo"><div><strong>{dt ? `${diaLongo(dt)} · ${hora(dt)}` : 'Data a confirmar'}</strong><span className="muted pequeno">Reserva {rv.codigo} · {rv.quantidade} {rv.quantidade === 1 ? 'piloto' : 'pilotos'}{rv.valorCentavos ? ` · ${reais(rv.valorCentavos)}` : ''}</span></div><span className={`selo-st ${tom}`}>{rot}</span></div>
+                  {regra && !regra.passou && <p className="dica-mini">{regra.texto}</p>}
+                  <div className="acoes esq">
+                    <button className="btn sec" onClick={() => onAbrir(rv.id)}>{rv.status === 'aguardando_pagamento' ? 'Pagar agora' : 'Ver detalhes'}</button>
+                    {regra && !regra.passou && <a className="btn sec" href={zapMsg(rv, 'remarcar', regra.texto)} target="_blank" rel="noopener">{regra.noPrazo ? 'Remarcar' : 'Falar sobre remarcar'}</a>}
+                    {regra && !regra.passou && <a className="lnk" href={zapMsg(rv, 'cancelar', regra.texto)} target="_blank" rel="noopener">Pedir cancelamento</a>}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="dica-mini">Cancelamentos e remarcações são confirmados pela recepção no WhatsApp, como prevê a política. Reservas feitas no balcão ou por grupo não aparecem aqui.</p>
+          <div className="acoes"><button className="btn sec" onClick={() => setRes(null)}>Buscar outro CPF</button><button className="btn" onClick={onVoltar}>Fazer uma reserva</button></div>
+        </>
+      )}
     </div>
   );
 }

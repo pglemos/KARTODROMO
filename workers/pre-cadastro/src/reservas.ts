@@ -5,7 +5,7 @@
  *   e os desvios: recusado (sem vaga), expirado (15 min sem pagar), pago_sem_vaga (pagou depois e o horário lotou).
  */
 import { asaasLigado, buscarCobrancaPorReferencia, cancelar, consultar, criarCobranca, EVENTOS_PAGO, garantirCliente, hojeBrasilia, PAGO, pagasDesde, qrPix, type AsaasEnv } from './asaas';
-import { cupomDoPedido } from './extras';
+import { cupomDoPedido, indexarPedido } from './extras';
 import { chaveDocumento, codigoReserva, digitos, validarReserva, type Acompanhante, type Agenda, type PreCadastro } from './validar';
 import { POLITICA_ACEITE, POLITICA_SECOES, POLITICA_TITULO, POLITICA_VERSAO } from '../../../src/config/politica-cancelamento';
 
@@ -57,6 +57,7 @@ async function lerPedido(env: EnvReservas, id: string) {
 async function gravarPedido(env: EnvReservas, p: Pedido, naFila: boolean) {
   p.atualizadoEm = new Date().toISOString();
   await env.PRE.put(chavePedido(p.id), JSON.stringify(p), { httpMetadata: { contentType: 'application/json' } });
+  await indexarPedido(env as never, p as never).catch(() => undefined);
   if (naFila) await env.PRE.put(chaveFila(p.id), p.status);
   else await env.PRE.delete(chaveFila(p.id));
 }

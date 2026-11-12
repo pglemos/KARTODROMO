@@ -10,6 +10,7 @@ export type Pedido = {
   descricao: string | null; inicio: string | null; valorCentavos: number | null; expiraEm: string | null;
   pix: { payload: string; imagem: string } | null; invoiceUrl: string | null; preparandoPagamento: boolean; erro: string | null;
 };
+export type MinhaReserva = { id: string; codigo: string; status: StatusPedido; criadoEm: string; quantidade: number; forma: string; inicio: string | null; descricao: string | null; valorCentavos: number | null };
 export const FINAIS = new Set<StatusPedido>(['confirmado', 'recusado', 'expirado', 'pago_sem_vaga', 'erro_pagamento', 'nao_encontrada']);
 export const ID_PEDIDO = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 
@@ -41,6 +42,7 @@ export const api = {
   aviso: async (): Promise<Aviso> => { try { const a = await chamar<Aviso>('/api/aviso', undefined, 5000); return a && a.texto ? a : null; } catch { return null; } },
   criar: (corpo: unknown) => chamar<{ id: string; codigo: string }>('/api/reservas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) }, 30000),
   pedido: (id: string) => chamar<Pedido>(`/api/reservas/${id}`),
+  minhas: (cpf: string, codigo: string) => chamar<{ nome: string; reservas: MinhaReserva[] }>('/api/reservas/minhas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cpf, codigo }) }),
   cupom: (corpo: { codigo: string; bateriaId: number; quantidade: number; documento: string; documentos: string[] }) =>
     chamar<{ requestId: string }>('/api/reservas/cupom', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) }),
   cupomResultado: (id: string) => chamar<{ status: 'pending' | 'completed'; erro?: string; brutoCentavos?: number; descontoCentavos?: number; totalCentavos?: number }>(`/api/reservas/cupom/${id}`),
