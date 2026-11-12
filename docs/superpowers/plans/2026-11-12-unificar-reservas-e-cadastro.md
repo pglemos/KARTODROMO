@@ -49,14 +49,14 @@ Bônus fáceis depois de unificado:
 - Link do grupo também abre no app (deep link) quando instalado.
 - Recepção cria grupo no painel e o link gerado já é o novo (mesma tela).
 
-## 3. Decisões que precisam do dono (antes de codar)
+## 3. Decisões do dono (12/11/2026)
 
-1. **Segurar vagas no modo "cada um paga o seu"**: quanto tempo as vagas ficam presas sem pagamento? Sugestão: organizador paga a própria vaga para criar o grupo; vagas dos amigos ficam seguras até X horas antes da bateria (ex.: 24h ou 6h), depois voltam para venda e o organizador é avisado.
-2. **Organizador que não pilota** no modo individual: exige sinal mínimo? Sugestão: sim, paga 1 vaga como garantia (abatida de quem faltar) — ou só libera esse caso pela recepção.
-3. Liberar **sinal** online ou deixar só no painel interno?
-4. Mínimo/máximo de pilotos por grupo online (hoje `maxPilotos` da agenda).
-5. Preço de primeira vez / cupom em grupo individual: vale por piloto (cada CPF) — confirmar.
-6. Política de cancelamento por vaga individual (reembolso parcial?).
+1. **Vagas dos amigos (cada um paga o seu)**: ficam guardadas até **24h antes da bateria**. Sem pagamento até lá, a vaga volta para venda e o organizador é avisado. Grupo criado com menos de 24h para a bateria: só o fluxo "eu pago tudo".
+2. **Organizador que não pilota**: paga **1 vaga de garantia** para criar o grupo; abatida se alguém faltar ou devolvida conforme a política.
+3. **Sinal**: só no painel interno da recepção. No site: "eu pago tudo" e "cada um paga o seu".
+4. **Tamanho do grupo pelo site**: **2 a 10 pilotos** (acima disso, recepção).
+5. **Primeira vez e cupom**: valem **por piloto** (cada CPF) também no "cada um paga o seu".
+6. **Desistência de quem já pagou**: vale a política de cancelamento atual, aplicada só à vaga dele, pedida pela recepção no WhatsApp.
 
 ## 4. Arquitetura proposta
 
