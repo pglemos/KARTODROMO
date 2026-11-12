@@ -193,7 +193,9 @@ describe('consumo atômico e estados do voucher', () => {
     }));
 
     expect(await online.sincronizarCuponsOnline(() => undefined)).toBe(1);
-    expect(calls).toHaveLength(2);
+    // 3ª chamada: fila de cupons digitados na reserva do site (vazia aqui)
+    expect(calls).toHaveLength(3);
+    expect(calls[2].url).toBe('https://cadastro.example/api/sync/cupons-site');
     expect(new Headers(calls[0].init?.headers).get('x-sync-key')).toBe('sync-test-key');
     expect(calls[1].init?.method).toBe('POST');
     expect(JSON.parse(String(calls[1].init?.body))).toEqual({ brutoCentavos: 29000, descontoCentavos: 5000, totalCentavos: 24000 });

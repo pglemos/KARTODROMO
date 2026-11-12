@@ -1,47 +1,56 @@
 import { createServer } from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { expect, it } from 'vitest';
 
-it('revalida traçado corrigido em bateria antiga mesmo sem mudança de finishedAt', async () => {
+type Linha = { kart: string; piloto: string; ms: number | null; tracado: string; categoria: string | null };
+
+// O publicador lê o índice que o servidor já produziu (.runtime/pilotos-cronometragem.json) e manda um item
+// karts:<dia> por dia; não reenvia o que não mudou.
+it('publica os karts do dia pelo índice local, sem importadas do LapTime e sem reenviar o que não mudou', async () => {
   const now = Date.now();
-  const posts: { itens: { chave: string; dados: { linhas?: unknown[]; results?: unknown[] } }[] }[] = [];
+  const dia = new Date(now).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  const posts: { itens: { chave: string; dados: { linhas: Linha[] } }[] }[] = [];
+  const tokens: string[] = [];
   const server = createServer(async (req, res) => {
-    res.setHeader('content-type', 'application/json');
-    if (req.method === 'GET' && req.url === '/api/mobile/v1/internal/identity-links') return void res.end('{"customerIds":["123"]}');
-    if (req.url === '/api/sessions') return void res.end(JSON.stringify(['test-codex','recent-1','recent-2','recent-3'].map((id, i) => ({ id, state: 'encerrada', type: 'corrida', finishedAt: now + i }))));
-    if (req.url?.startsWith('/api/sessions/')) return void res.end(JSON.stringify({ id: req.url.split('/').pop(), name: 'TESTE CODEX', type: 'corrida', startedAt: now - 60000, finishedAt: now, track: { name: 'Traçado 11 Invertido Chicane' }, competitors: [{ kart: '100', name: 'TESTE CODEX', customerId: '123', category: 'cat-indoor' }], standings: [{ kart: '100', name: 'TESTE CODEX', position: 1, laps: 2, bestLapMs: 60000 }] }));
     let body = ''; for await (const chunk of req) body += chunk;
-    posts.push(JSON.parse(body)); res.end('{"ok":true}');
+    tokens.push(String(req.headers['x-mobile-admin-token']));
+    posts.push(JSON.parse(body)); res.setHeader('content-type', 'application/json'); res.end('{"ok":true}');
   });
-  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  await new Promise<void>((ok) => server.listen(0, '127.0.0.1', ok));
   const port = (server.address() as { port: number }).port;
-  const dir = mkdtempSync(join(tmpdir(), 'ranking-codex-'));
+  const dir = mkdtempSync(join(tmpdir(), 'ranking-'));
   try {
     mkdirSync(join(dir, '.runtime'));
-    writeFileSync(join(dir, '.runtime/pilotos-cronometragem.json'), JSON.stringify({ baterias: { 'test-codex': {
-      id: 'test-codex', fim: now, dia: new Date(now).toLocaleDateString('sv-SE', {timeZone:'America/Sao_Paulo'}), tracado: 'Traçado 1', tipo: 'corrida', pilotos: [{ cid:'123', nome:'TESTE CODEX', kart:'100', melhor:60000 }],
-    }, 'lt-2024-10-26': {
-      id: 'lt-2024-10-26', nome: 'Corrida 1', fim: now - 2 * 365 * 24 * 60 * 60 * 1000, dia: '2024-10-26', inicio: now - 2 * 365 * 24 * 60 * 60 * 1000,
-      tracado: 'Traçado 4', tipo: 'corrida', pilotos: [{ cid:'123', nome:'Ana Silva', kart:'14', pos:2, voltas:18, melhor:38652, dq:false }],
-    } } }));
-    writeFileSync(join(dir, '.env.local'), `OPS_TIMING_URL=http://127.0.0.1:${port}\nMOBILE_IDENTITY_LINK_URL=http://127.0.0.1:${port}/api/mobile/v1/internal/identity-links\nMOBILE_ADMIN_TOKEN=synthetic-test-token\n`);
-    await promisify(execFile)(process.execPath, [resolve('scripts/ops/publicar-karts-app.mjs')], { cwd: dir, env: { ...process.env, NODE_ENV: 'test' } });
-    const ranking = posts.flatMap(post => post.itens).find(item => item.chave.startsWith('karts:'));
-    expect(ranking?.dados.linhas).toHaveLength(4);
-    expect(ranking?.dados.linhas).toEqual(expect.arrayContaining([expect.objectContaining({ id: '123', kart: '100', categoria: 'Super Kart', tracado: 'Traçado 11 Invertido Chicane', ms: 60000 })]));
-    expect(ranking?.dados.linhas?.every((l: unknown) => (l as {tracado:string}).tracado === 'Traçado 11 Invertido Chicane')).toBe(true);
+    writeFileSync(join(dir, '.runtime/pilotos-cronometragem.json'), JSON.stringify({ baterias: {
+      b1: { id: 'b1', nome: 'Bateria 1', dia, inicio: now, tracado: 'Traçado 11 · Super Kart', tipo: 'corrida', pilotos: [
+        { cid: '1', nome: 'Ana', kart: '100', pos: 1, melhor: 60000, cat: 'Super Kart' },
+        { cid: '2', nome: 'Bia', kart: '101', pos: 2, melhor: 61000, cat: 'Super Kart' },
+        { cid: '3', nome: 'Caio', kart: '102', pos: 3, melhor: 1000, cat: 'Super Kart' }, // volta cortada: sem tempo
+        { cid: '4', nome: 'Davi', kart: '103', pos: 4, melhor: 62000, dq: true },
+      ] },
+      'lt-2024-10-26': { id: 'lt-2024-10-26', nome: 'Antiga', dia: '2024-10-26', tracado: 'Traçado 4', tipo: 'corrida', pilotos: [{ nome: 'X', kart: '14', melhor: 38652 }] },
+    } }));
+    writeFileSync(join(dir, '.env.local'), `MOBILE_IDENTITY_LINK_URL=http://127.0.0.1:${port}/api/mobile/v1/internal/identity-links\nMOBILE_ADMIN_TOKEN=synthetic-test-token\n`);
+    const rodar = () => promisify(execFile)(process.execPath, [resolve('scripts/ops/publicar-karts-app.mjs')], { cwd: dir, env: { ...process.env, NODE_ENV: 'test' } });
+    await rodar();
 
-    const historical = posts.flatMap(post => post.itens).find(item => item.chave === 'historico:123');
-    expect(historical?.dados.results).toEqual([expect.objectContaining({
-      sessionId: 'lt-2024-10-26', eventName: 'Corrida 1', eventDate: '2024-10-26', displayName: 'Ana Silva',
-      position: 2, kart: '14', laps: 18, bestLapMs: 38652,
-    })]);
+    const itens = posts.flatMap((p) => p.itens);
+    expect(itens.map((i) => i.chave)).toEqual([`karts:${dia}`]);
+    const linhas = itens[0].dados.linhas;
+    expect(linhas.map((l) => l.kart)).toEqual(['100', '101', '102']);
+    expect(linhas.every((l) => l.tracado === 'Traçado 11' && l.categoria === 'Super Kart')).toBe(true);
+    expect(linhas.find((l) => l.kart === '102')?.ms).toBeNull();
+    expect(tokens).toEqual(['synthetic-test-token']);
+    expect(Object.keys(JSON.parse(readFileSync(join(dir, '.runtime/karts-app-publicados.json'), 'utf8')))).toEqual([`karts:${dia}`]);
+
+    await rodar();
+    expect(posts).toHaveLength(1);
   } finally {
+    server.close();
     rmSync(dir, { recursive: true, force: true });
-    await new Promise<void>(resolve => server.close(() => resolve()));
   }
 });

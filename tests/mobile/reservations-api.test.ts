@@ -109,13 +109,15 @@ function cpfForTest(base: string) {
   return `${firstNine}${first}${digit(`${firstNine}${first}`, 11)}`;
 }
 
+// bateria sempre 3 dias à frente: data fixa vencia e a reserva passava a ser recusada (400)
+const diaDaBateria = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
 const agenda = {
-  atualizadoEm: '2026-10-12T12:00:00.000Z',
+  atualizadoEm: new Date().toISOString(),
   precoCentavos: 14500,
   maxPilotos: 10,
   prazoMin: 15,
   antecedenciaMin: 120,
-  horarios: [{ id: 101, inicio: '2026-10-15T09:15', nome: 'BATERIA 09:15', livres: 4 }],
+  horarios: [{ id: 101, inicio: `${diaDaBateria}T09:15`, nome: 'BATERIA 09:15', livres: 4 }],
 };
 
 let database: TestD1;
@@ -206,7 +208,7 @@ const requestBody: {
   nascimento: string;
   politica: boolean;
   instagram: string;
-  acompanhantes: { nome: string; documento: string; nascimento: string; instagram?: string }[];
+  acompanhantes: { nome: string; documento: string; nascimento: string; instagram?: string; email?: string; telefone?: string; peso?: string; endereco?: string; bairro?: string; cidade?: string }[];
   account_id: string;
   valorCentavos: number;
   cupom?: string;
@@ -219,7 +221,7 @@ const requestBody: {
   politica: true,
   instagram: '@ana.silva',
   // cada vaga é de uma pessoa: o dono da conta + o outro piloto (mesma regra do site)
-  acompanhantes: [{ nome: 'Bruno Souza', documento: '111.444.777-35', nascimento: '1995-06-15' }],
+  acompanhantes: [{ nome: 'Bruno Souza', documento: '111.444.777-35', nascimento: '1995-06-15', instagram: '@bruno.souza', email: 'bruno@example.com', telefone: '31988887777', peso: '80', endereco: 'Rua A, 10', bairro: 'Centro', cidade: 'Betim' }],
   // These untrusted values must never replace the authenticated profile or server price.
   account_id: 'attacker-account',
   valorCentavos: 1,

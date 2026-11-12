@@ -24,7 +24,7 @@ type ReservationInput = {
   instagram: string;
   /** false = quem reserva não pilota. Cada vaga é de uma pessoa: validarReserva confere como no site. */
   compradorPilota: boolean;
-  acompanhantes: { nome: string; documento: string; nascimento: string; instagram?: string }[];
+  acompanhantes: { nome: string; documento: string; nascimento: string; instagram?: string; email?: string; telefone?: string; peso?: string; cep?: string; endereco?: string; complemento?: string; bairro?: string; cidade?: string }[];
   cupom?: string;
 };
 
@@ -104,6 +104,10 @@ function reservationData(body: Record<string, unknown>): ReservationInput | null
     documento: texto(a.documento, 20),
     nascimento: texto(a.nascimento, 10),
     ...(texto(a.instagram, 80) ? { instagram: texto(a.instagram, 80) } : {}),
+    // mesmos campos obrigatórios do site (validarReserva); antes eram descartados aqui e a reserva com acompanhante dava 400
+    ...Object.fromEntries(([['email', 120], ['telefone', 20], ['peso', 6], ['cep', 9], ['endereco', 150], ['complemento', 80], ['bairro', 80], ['cidade', 80]] as const)
+      .map(([campo, max]) => [campo, texto(typeof a[campo] === 'number' ? String(a[campo]) : a[campo], max)] as const)
+      .filter(([, valor]) => valor)),
   }));
   const nascimento = typeof body.nascimento === 'string' ? body.nascimento.trim().slice(0, 10) : '';
   const pilotos = pilotosEntrada.map((nome) => (nome as string).replace(/\s+/g, ' ').trim().slice(0, 80)).filter(Boolean).slice(0, quantidade);
