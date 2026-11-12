@@ -494,8 +494,18 @@ async function criarCobranca(grupoId: number, pilotoId: number | null) {
 }
 
 /** A cada minuto: confere no Asaas as cobranças em aberto e lança o pagamento de quem pagou. */
+let proximaConferenciaGeral = 0;
+/**
+ * Confere na Asaas as cobranças abertas. O ciclo geral roda no máximo a cada 10 min (o webhook já traz os pagamentos
+ * na hora): conferir 50 cobranças por minuto estourou a cota de 12h da Asaas em 12/11/2026 e travou o link do grupo.
+ * O botão "Conferir no Asaas" (grupoId) continua imediato.
+ */
 export async function conferirCobrancas(log: Log, grupoId?: number): Promise<number> {
   if (!siteUrl() || !siteChave()) return 0;
+  if (!grupoId) {
+    if (Date.now() < proximaConferenciaGeral) return 0;
+    proximaConferenciaGeral = Date.now() + 10 * 60_000;
+  }
   const abertas = grupoId
     ? await query<{ id: number; grupoId: number; pilotoId: number | null; valor: number; asaasId: string; criadoEm: Date }>(
         `SELECT Id id, GrupoId grupoId, PilotoId pilotoId, ValorCentavos valor, AsaasId asaasId, CriadoEm criadoEm
@@ -541,6 +551,8 @@ export async function conferirCobrancas(log: Log, grupoId?: number): Promise<num
       }
     } catch (e) {
       log(`grupo ${c.grupoId}: conferência da cobrança falhou (${(e as Error).message})`);
+      // Asaas recusando (cota, fora do ar): insistir nas outras só gasta mais cota; tenta de novo no próximo ciclo
+      if (/cota|salvar agora|429|indispon/i.test((e as Error).message)) break;
     }
   }
 
