@@ -1530,7 +1530,12 @@ export async function enviarLembretesDosGrupos(log: Log) {
       link: linkCadastro(x.token), painel: linkPainel(x.codigo), faltam: Number(x.faltam) || 0, soltaEm24h: x.origem === 'site' && x.modo === 'individual' })),
   ];
   if (!lembretes.length) return 0;
-  const r = (await site('/api/sync/lembretes', { method: 'POST', body: JSON.stringify({ lembretes }) })) as { enviados?: number; falhas?: number };
-  if (r?.enviados || r?.falhas) log(`grupos: lembretes por e-mail ${r.enviados ?? 0} enviado(s)${r.falhas ? `, ${r.falhas} falha(s)` : ''}`);
-  return Number(r?.enviados) || 0;
+  // em lotes de 5: o site envia um por um e a chamada tem tempo limite (12/11: 27 de uma vez estourou o tempo)
+  let enviados = 0, falhas = 0;
+  for (let i = 0; i < lembretes.length; i += 5) {
+    const r = (await site('/api/sync/lembretes', { method: 'POST', body: JSON.stringify({ lembretes: lembretes.slice(i, i + 5) }) })) as { enviados?: number; falhas?: number };
+    enviados += Number(r?.enviados) || 0; falhas += Number(r?.falhas) || 0;
+  }
+  if (enviados || falhas) log(`grupos: lembretes por e-mail ${enviados} enviado(s)${falhas ? `, ${falhas} falha(s)` : ''}`);
+  return enviados;
 }
