@@ -418,8 +418,6 @@
     const isEmail = raw.includes('@');
     if (isEmail ? raw.length < 5 : (d.length < 5 && raw.length < 5)) return;
     if (!isEmail && tipo === 'CPF' && !cpfOk(raw)) return;
-    // a busca do cadastro por CPF/e-mail devolvia os dados pessoais de qualquer pessoa: desligada até ter confirmação (código por WhatsApp/e-mail)
-    return;
     const chaveCache = isEmail ? raw.toLowerCase() : (d || raw.toUpperCase());
     if (cacheClientes.has(chaveCache)) {
       aplicarCliente(cacheClientes.get(chaveCache));

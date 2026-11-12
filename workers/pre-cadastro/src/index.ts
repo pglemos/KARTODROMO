@@ -4,7 +4,7 @@
  * servidor da operação (SRVKART) buscar pelo /api/sync, gravar na tabela de clientes e apagar daqui.
  * No totem o cliente digita CPF, RG, passaporte ou e-mail e os dados já aparecem.
  */
-import { aceiteDoCadastro, esquecerGrupos, rotasPublicas, rotasSync } from './extras';
+import { aceiteDoCadastro, esquecerGrupos, identificarCliente, rotasPublicas, rotasSync } from './extras';
 import { chaveDocumento, digitos, validar, type PreCadastro } from './validar';
 import { cancelar, chamar, consultar, diagnostico, garantirCliente, hojeBrasilia, PAGO } from './asaas';
 import { agendaPublica, criarPedido, politicaPublica, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
@@ -173,6 +173,8 @@ export default {
     const url = new URL(req.url);
     const p = url.pathname;
     try {
+      if ((p === '/api/cliente/identificar' || p === '/api/pre-cadastro/identificar' || p === '/api/identificar') && (req.method === 'GET' || req.method === 'POST'))
+        return await identificarCliente(req, env, (q) => buscar(env, q) as Promise<Record<string, unknown> | null>, excedeuLimite);
       const extra = await rotasPublicas(req, env, p, url, excedeuLimite);
       if (extra) return extra;
       if (p === '/api/pre-cadastro' && req.method === 'POST') return await receber(req, env);

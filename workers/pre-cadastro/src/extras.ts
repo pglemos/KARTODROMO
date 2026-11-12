@@ -137,6 +137,55 @@ export async function rotasPublicas(req: Request, env: EnvExtras, p: string, url
   return null;
 }
 
+// ---------------------------------------------------------------- busca do cadastro pelo CPF/e-mail (preenche a página)
+
+type Pendente = Record<string, unknown> & { menores?: unknown };
+/** 30 buscas em 10 min por IP: cabe um grupo inteiro no Wi-Fi do kartódromo, mas não uma varredura de CPFs. */
+async function muitasBuscas(ip: string) {
+  const c = (caches as unknown as { default: Cache }).default;
+  const k = new Request(`https://limite.cadastro/identificar/${encodeURIComponent(ip)}`);
+  const n = Number(await (await c.match(k))?.text() ?? 0);
+  if (n >= 30) return true;
+  await c.put(k, new Response(String(n + 1), { headers: { 'cache-control': 'max-age=600' } }));
+  return false;
+}
+/** Igual ao que funcionava no bundle antigo: primeiro o cadastro do SRVKART (totem), depois o pré-cadastro ainda não importado. */
+export async function identificarCliente(req: Request, env: EnvExtras & { OPS_URL?: string }, buscarPendente: (q: string) => Promise<Pendente | null>, limite: (ip: string, tipo: string) => Promise<boolean>) {
+  const url = new URL(req.url);
+  let raw = '';
+  if (req.method === 'POST') {
+    const corpo = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    raw = String(corpo.identificador ?? corpo.documento ?? corpo.cpf ?? corpo.q ?? '').trim();
+  } else {
+    raw = String(url.searchParams.get('q') ?? url.searchParams.get('identificador') ?? url.searchParams.get('cpf') ?? url.searchParams.get('documento') ?? '').trim();
+  }
+  if (raw.length < 5) return json(200, { ok: true, cliente: null });
+  // limite por aparelho: uso normal são 1 ou 2 buscas; evita varrer CPFs em massa
+  if (await muitasBuscas(req.headers.get('cf-connecting-ip') ?? 'x')) return json(200, { ok: true, cliente: null });
+  const ops = (env.OPS_URL || 'https://ops.kartodromodebetim.com.br').replace(/\/+$/, '');
+  try {
+    const r = await fetch(`${ops}/api/totem/identificar`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ identificador: raw }), signal: AbortSignal.timeout(3500) });
+    if (r.ok) {
+      const d = (await r.json()) as { cliente?: unknown; dependentes?: unknown[] };
+      if (d?.cliente) return json(200, { ok: true, origem: 'servidor', cliente: d.cliente, dependentes: d.dependentes ?? [] });
+    }
+  } catch (e) { console.warn('identificarCliente ops-server:', (e as Error).message); }
+  try {
+    const p = await buscarPendente(raw);
+    if (p) {
+      const t = (v: unknown) => (v == null ? '' : String(v).trim());
+      return json(200, {
+        ok: true, origem: 'pendente',
+        cliente: { nome: t(p.nome), tipoDocumento: t(p.tipoDocumento) || 'CPF', documento: t(p.documento), email: t(p.email), instagram: t(p.instagram), telefone: t(p.telefone),
+          nascimento: t(p.nascimento), peso: t(p.peso), cep: t(p.cep), rua: t(p.endereco), endereco: t(p.endereco), numero: t(p.numero), complemento: t(p.complemento),
+          bairro: t(p.bairro), cidade: t(p.cidade), estado: t(p.estado) },
+        dependentes: Array.isArray(p.menores) ? p.menores : [],
+      });
+    }
+  } catch (e) { console.warn('identificarCliente pendentes:', (e as Error).message); }
+  return json(200, { ok: true, cliente: null });
+}
+
 // ---------------------------------------------------------------- rotas do SRVKART (/api/sync, já autenticadas)
 
 export async function rotasSync(req: Request, env: EnvExtras, p: string): Promise<Response | null> {
