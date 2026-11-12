@@ -104,6 +104,8 @@ FEITO: lembretes por e-mail (SRVKART `enviarLembretesDosGrupos` a cada 15 min, a
 
 **Fase 4 — App (opcional)**: deep link `/g/:codigo` abre o app; tela do grupo no app usando as mesmas rotas.
 
+**Regra do dono (12/11/2026): nunca boleto.** Todas as cobranças nascem Pix; cartão só por `/api/pagar?forma=cartao` (troca a forma da mesma cobrança). As 34 cobranças abertas antigas foram passadas para Pix. Teste em `tests/grupo-link.test.ts` impede `billingType: 'UNDEFINED'|'BOLETO'` no worker.
+
 ## 6. Riscos e cuidados
 
 - Deploy por cima de remendo de produção (já derrubou link do grupo em 05/11 e 08/11) → Fase 0 é obrigatória.
