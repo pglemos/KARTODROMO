@@ -45,7 +45,9 @@ export async function clienteDaConta(c: Candidata): Promise<{ id: number; nivel:
   if (cpf.length !== 11) return null;
   const linhas = await query<{ id: number; email: string | null; telefone: string | null }>(
     `SELECT TOP 10 Id id, Email email, Telefone telefone FROM dbo.Cliente
-      WHERE (DocumentoNum = @doc OR Documento = @doc) AND ResponsavelId IS NULL ORDER BY AtualizadoEm DESC`,
+      WHERE (DocumentoNum = @doc OR Documento = @doc)
+      -- ficha de dependente (menor) com o próprio CPF também é do piloto: quem fez 18 anos continua com ResponsavelId
+      ORDER BY CASE WHEN ResponsavelId IS NULL THEN 0 ELSE 1 END, AtualizadoEm DESC`,
     { doc: cpf },
   );
   if (!linhas.length) return null;
@@ -376,7 +378,9 @@ export async function publicarClientesDoApp(log: Log, agora = Date.now()) {
   const token = process.env.MOBILE_ADMIN_TOKEN!;
   const linhas = await query<{ doc: string; email: string | null }>(
     `SELECT DocumentoNum doc, Email email FROM dbo.Cliente
-      WHERE ResponsavelId IS NULL AND LEN(DocumentoNum) = 11 ORDER BY AtualizadoEm ASC`,
+      WHERE LEN(DocumentoNum) = 11
+      -- dependentes com CPF próprio entram (ex.: piloto cadastrado quando menor); a ficha própria (sem responsável) vem por último e vence
+      ORDER BY CASE WHEN ResponsavelId IS NULL THEN 1 ELSE 0 END, AtualizadoEm ASC`,
   );
   const mapa = new Map<string, string | null>();
   for (let i = 0; i < linhas.length; i++) {
