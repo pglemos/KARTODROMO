@@ -1,4 +1,6 @@
 // worker.js de kartodromo-reservas-2026
+// Marca o que vem por aqui: o kartodromo-cadastro redireciona cadastro.* para reservas.* e não pode redirecionar de volta o que já veio dele.
+const comMarca = (req) => { const r = new Request(req); r.headers.set('x-kib-via-reservas', '1'); return r; };
 const ASSET_PATHS = new Set(['/', '/reservar', '/reservar/', '/reservar.html', '/index.html']);
 
 export default {
@@ -13,7 +15,7 @@ export default {
       alvo.protocol = 'https:';
       alvo.port = '';
       alvo.pathname = '/';
-      return env.LEGACY.fetch(new Request(alvo, request));
+      return env.LEGACY.fetch(comMarca(new Request(alvo, request)));
     }
     const isDoc = ASSET_PATHS.has(url.pathname);
     const isAsset = url.pathname.startsWith('/booking-assets/') || url.pathname.startsWith('/booking-media/');
@@ -36,6 +38,6 @@ export default {
     url.hostname = 'reservas.kartodromodebetim.com.br';
     url.protocol = 'https:';
     url.port = '';
-    return env.LEGACY.fetch(new Request(url, request));
+    return env.LEGACY.fetch(comMarca(new Request(url, request)));
   },
 };

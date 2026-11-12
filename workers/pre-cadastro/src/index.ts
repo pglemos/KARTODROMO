@@ -393,6 +393,15 @@ export default {
         if (p === '/api/sync/pedido' && req.method === 'POST') return await syncResultado(req, env, ctx);
       }
       if (p.startsWith('/api/')) return json(404, { erro: 'Rota desconhecida.' });
+      // endereço único (12/11/2026): as páginas de cadastro.* abrem em reservas.* (link do grupo, pré-cadastro do QR e painel).
+      // /conta e /privacidade ficam (links do app e dos e-mails). O que já veio pelo site de reservas tem a marca e não volta.
+      if (url.hostname.startsWith('cadastro.') && !req.headers.get('x-kib-via-reservas') && (req.method === 'GET' || req.method === 'HEAD')
+          && ['/', '/index.html', '/painel', '/painel.html'].includes(p)) {
+        const alvo = new URL(url);
+        alvo.hostname = 'reservas.kartodromodebetim.com.br';
+        alvo.pathname = p.startsWith('/painel') ? '/painel' : url.searchParams.get('r') || url.searchParams.get('token') ? '/' : '/cadastro';
+        return Response.redirect(alvo.toString(), 302);
+      }
       // reservas.kartodromodebetim.com.br abre direto a página de reserva
       if (p === '/' && url.hostname.startsWith('reservas.')) return env.ASSETS.fetch(new Request(new URL('/reservar', url), req));
       return env.ASSETS.fetch(req);

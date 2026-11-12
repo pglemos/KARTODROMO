@@ -17,6 +17,7 @@ export function trocarIdioma(i: Idioma) {
 }
 
 const D: Record<string, string> = {
+  'Grupos que você organiza': 'Groups you organize', 'Mandar o link do grupo': 'Send the group link', 'Cada um paga': 'Everyone pays',
   'Como vocês vão pagar?': 'How will you pay?', 'Eu pago tudo agora': 'I pay for everyone now', 'Cada um paga o seu': 'Everyone pays their own',
   'Você paga só a sua vaga agora e manda o link do grupo para os amigos.': 'You pay only your spot now and send the group link to your friends.',
   'Você paga 1 vaga de garantia agora e manda o link do grupo para os amigos.': 'You pay 1 spot as a deposit now and send the group link to your friends.',

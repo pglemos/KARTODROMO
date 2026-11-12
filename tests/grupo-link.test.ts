@@ -110,7 +110,7 @@ describe('painel do organizador', () => {
     const r = await chamar(`/api/grupo/painel?g=G1A2B&k=${CHAVE}`);
     expect(r.status).toBe(200);
     const b = await r.json() as Record<string, unknown>;
-    expect(b).toMatchObject({ codigo: 'G1A2B', cadastrados: 2, linkGrupo: `${BASE}/?r=TOKENRESP123` });
+    expect(b).toMatchObject({ codigo: 'G1A2B', cadastrados: 2, linkGrupo: `https://reservas.kartodromodebetim.com.br/?r=TOKENRESP123` });
     expect(JSON.stringify(b)).not.toContain(CHAVE);
   });
 
@@ -165,5 +165,24 @@ describe('pagamentos de grupo avisados pelo webhook (cota da Asaas estourada, 12
     expect(b.aviso).toMatch(/Cadastro salvo/);
     expect(env.PRE.mem.has('pendentes/52998224725.json')).toBe(true);
     f.mockRestore();
+  });
+});
+
+describe('endereço único: cadastro.* abre em reservas.*', () => {
+  const pagina = (caminho: string, headers: Record<string, string> = {}) =>
+    worker.fetch(new Request(BASE + caminho, { headers }), { ...env, ASSETS: { fetch: async () => new Response('pagina') } } as never, ctx);
+  it('link do grupo, QR do balcão e painel redirecionam', async () => {
+    const g = await pagina('/?r=TOKENRESP123');
+    expect(g.status).toBe(302);
+    expect(g.headers.get('location')).toBe('https://reservas.kartodromodebetim.com.br/?r=TOKENRESP123');
+    expect((await pagina('/')).headers.get('location')).toBe('https://reservas.kartodromodebetim.com.br/cadastro');
+    expect((await pagina('/painel?g=G1A2B&k=x')).headers.get('location')).toBe('https://reservas.kartodromodebetim.com.br/painel?g=G1A2B&k=x');
+  });
+  it('o que veio pelo site de reservas não volta (sem loop)', async () => {
+    const r = await pagina('/?r=TOKENRESP123', { 'x-kib-via-reservas': '1' });
+    expect(r.status).toBe(200);
+  });
+  it('/conta (links do app) não redireciona', async () => {
+    expect((await pagina('/conta')).status).toBe(200);
   });
 });

@@ -10,7 +10,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "observability": { "enabled": true },
-  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/api/*", "/"] },
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/api/*", "/", "/index.html", "/painel", "/painel.html"] },
   "r2_buckets": [{ "binding": "PRE", "bucket_name": "kartodromo-precadastro" }],
   // IDs distintos para preview e produção; substituir o ID de produção pelo banco criado no Cloudflare antes do deploy.
   "d1_databases": [{

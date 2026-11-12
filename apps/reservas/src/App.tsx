@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { idiomaInicial, trocarIdioma } from './i18n';
-import { api, ErroApi, FINAIS, ID_PEDIDO, type Agenda, type Aviso, type Horario, type Corrida, type MinhaReserva, type Pedido, type Politica } from './api';
+import { api, ErroApi, FINAIS, ID_PEDIDO, type Agenda, type Aviso, type Horario, type Corrida, type MinhaReserva, type MeuGrupo, type Pedido, type Politica } from './api';
 import {
   cpfValido, dataIso, deIso, diaChave, diaCurto, diaLongo, digitos, emailValido, erroInstagram, hora, ics, idade,
   mascaraCep, mascaraCpf, mascaraData, mascaraFone, menosUmaHora, nomeMes, reais,
@@ -519,6 +519,17 @@ function EtapaPagamento({ r, setR, cada, horario, agenda, abertoEm, voltar, onCr
   );
 }
 
+/** Botões do grupo (Minhas reservas): mandar o link de novo e abrir o painel. */
+function LinksDoGrupo({ link, painel, quando }: { link: string; painel: string; quando: Date | null }) {
+  const texto = `Bora correr de kart no Kartódromo de Betim${quando ? `, ${diaLongo(quando)} às ${hora(quando)}` : ''}! Entra no grupo, faz teu cadastro e paga tua vaga: ${link}`;
+  return (
+    <div className="acoes esq">
+      <a className="btn sec" href={`https://wa.me/?text=${encodeURIComponent(texto)}`} target="_blank" rel="noopener"><Ico d={I.compartilhar} />Mandar o link do grupo</a>
+      <a className="lnk" href={painel} target="_blank" rel="noopener">Ver quem já entrou e pagou</a>
+    </div>
+  );
+}
+
 /** Depois de pago, no "cada um paga o seu": o link para mandar aos amigos e o painel de quem já entrou. */
 function ConvidarGrupo({ p, dt }: { p: Pedido; dt: Date | null }) {
   if (!p.grupo) return <div className="dica" role="status"><Ico d={I.relogio} /><p>Preparando o link do seu grupo. Ele aparece aqui em instantes.</p></div>;
@@ -675,7 +686,7 @@ function MinhasReservas({ onVoltar, onAbrir }: { onVoltar: () => void; onAbrir: 
   const [codigo, setCodigo] = useState('');
   const [erro, setErro] = useState('');
   const [buscando, setBuscando] = useState(false);
-  const [res, setRes] = useState<{ nome: string; reservas: MinhaReserva[] } | null>(null);
+  const [res, setRes] = useState<{ nome: string; reservas: MinhaReserva[]; grupos?: MeuGrupo[] } | null>(null);
   const [corridas, setCorridas] = useState<{ corridas: Corrida[]; aviso?: string } | null>(null);
   const [checando, setChecando] = useState<string | null>(null);
   const [msgCheckin, setMsgCheckin] = useState<Record<string, { ok: boolean; texto: string }>>({});
@@ -739,6 +750,7 @@ function MinhasReservas({ onVoltar, onAbrir }: { onVoltar: () => void; onAbrir: 
                     return <button className="btn grande checkin-btn" onClick={() => fazerCheckin(rv)} disabled={checando === rv.id} aria-busy={checando === rv.id}>{checando === rv.id ? 'Conferindo sua localização…' : 'Cheguei! Fazer check-in'}</button>;
                   })()}
                   {msgCheckin[rv.id] && <p className={`checkin ${msgCheckin[rv.id].ok ? 'ok' : 'erro'}`} role="status">{msgCheckin[rv.id].texto}</p>}
+                  {rv.grupo && <LinksDoGrupo link={rv.grupo.link} painel={rv.grupo.painel} quando={dt} />}
                   <div className="acoes esq">
                     <button className="btn sec" onClick={() => onAbrir(rv.id)}>{rv.status === 'aguardando_pagamento' ? 'Pagar agora' : 'Ver detalhes'}</button>
                     {regra && !regra.passou && <a className="btn sec" href={zapMsg(rv, 'remarcar', regra.texto)} target="_blank" rel="noopener">{regra.noPrazo ? 'Remarcar' : 'Falar sobre remarcar'}</a>}
@@ -748,6 +760,22 @@ function MinhasReservas({ onVoltar, onAbrir }: { onVoltar: () => void; onAbrir: 
               );
             })}
           </ul>
+          {!!res.grupos?.length && (
+            <section className="meus-grupos" aria-labelledby="t-grupos">
+              <h2 id="t-grupos">Grupos que você organiza</h2>
+              <ul className="minhas">
+                {res.grupos.map((g) => {
+                  const dt = deIso(g.inicio);
+                  return (
+                    <li key={g.codigo} className="cartao minha">
+                      <div className="minha-topo"><div><strong>{`${diaLongo(dt)} · ${hora(dt)}`}</strong><span className="muted pequeno">{`${g.bateria} · grupo ${g.codigo}${g.vagas != null ? ` · ${g.pagos ?? 0} de ${g.vagas} pagos · ${g.cadastrados ?? 0} cadastrados` : ''}`}</span></div><span className="selo-st ok">{g.modo === 'individual' ? 'Cada um paga' : 'Grupo'}</span></div>
+                      {g.link && g.painel && <LinksDoGrupo link={g.link} painel={g.painel} quando={dt} />}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
           <section className="corridas" aria-labelledby="t-corridas">
             <h2 id="t-corridas">Minhas corridas</h2>
             {!corridas ? <p className="muted">Carregando seu histórico…</p>

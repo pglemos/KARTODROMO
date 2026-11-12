@@ -120,3 +120,24 @@ describe('grupo do site: quem organiza sem pilotar não ocupa vaga', async () =>
     expect(m.pilotos[1].pago).toBe(false);
   });
 });
+
+describe('Minhas reservas: grupos que o CPF organiza', async () => {
+  const { gruposDoResponsavel, esquecerGrupos } = await import('../workers/pre-cadastro/src/extras');
+  const { createHash } = await import('node:crypto');
+  const hash = (cpf: string) => createHash('sha256').update(`cpf:${cpf}`).digest('hex');
+  const env = (lista: unknown[]) => ({ PRE: { get: async (k: string) => (k === 'grupos/todos.json' ? { json: async () => lista } : null) } }) as never;
+  const g = { codigo: 'G1A2B3C', status: 'ativa', responsavel: 'Ana', bateria: 'B', inicio: '2026-11-20T19:00', modo: 'individual', precoCentavos: 14500,
+    responsavelToken: 'TOKENRESP123', respDocHash: hash('52998224725'), painel: { chave: 'AbCdEfGh12345678', n: 4, pagos: 2, cadastrados: 3 } };
+
+  it('mostra só os grupos do CPF, com link e painel no endereço único', async () => {
+    esquecerGrupos();
+    const r = await gruposDoResponsavel(env([g, { ...g, codigo: 'GOUTRO1', respDocHash: hash('11144477735') }]), '52998224725');
+    expect(r).toEqual([expect.objectContaining({ codigo: 'G1A2B3C', link: 'https://reservas.kartodromodebetim.com.br/?r=TOKENRESP123',
+      painel: 'https://reservas.kartodromodebetim.com.br/painel?g=G1A2B3C&k=AbCdEfGh12345678', vagas: 4, pagos: 2 })]);
+  });
+
+  it('grupo cancelado não aparece', async () => {
+    esquecerGrupos();
+    expect(await gruposDoResponsavel(env([{ ...g, status: 'cancelada' }]), '52998224725')).toEqual([]);
+  });
+});

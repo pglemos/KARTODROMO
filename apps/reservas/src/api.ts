@@ -12,7 +12,8 @@ export type Pedido = {
   /** Cada um paga o seu: link do grupo e do painel, depois de pago. */
   modo?: 'individual' | null; grupo?: { codigo: string; link: string; painel: string } | null;
 };
-export type MinhaReserva = { id: string; codigo: string; status: StatusPedido; criadoEm: string; quantidade: number; forma: string; inicio: string | null; descricao: string | null; valorCentavos: number | null; checkinEm?: string | null };
+export type MinhaReserva = { id: string; codigo: string; status: StatusPedido; criadoEm: string; quantidade: number; forma: string; inicio: string | null; descricao: string | null; valorCentavos: number | null; checkinEm?: string | null; grupo?: { codigo: string; link: string; painel: string } | null };
+export type MeuGrupo = { codigo: string; bateria: string; inicio: string; modo: string; link: string | null; painel: string | null; vagas: number | null; pagos: number | null; cadastrados: number | null };
 export type Corrida = { sessionId: string; eventName: string; eventDate: string; position: number; kart: string; laps: number; bestLapMs: number | null };
 export const FINAIS = new Set<StatusPedido>(['confirmado', 'recusado', 'expirado', 'pago_sem_vaga', 'erro_pagamento', 'nao_encontrada']);
 export const ID_PEDIDO = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -48,7 +49,7 @@ export const api = {
   corridas: (cpf: string, codigo: string) => chamar<{ corridas: Corrida[]; aviso?: string }>('/api/reservas/corridas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cpf, codigo }) }),
   checkin: (corpo: { cpf: string; codigo: string; pedidoId: string; lat: number; lng: number; precisao: number }) =>
     chamar<{ ok: boolean; checkinEm: string }>('/api/reservas/checkin', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) }),
-  minhas: (cpf: string, codigo: string) => chamar<{ nome: string; reservas: MinhaReserva[] }>('/api/reservas/minhas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cpf, codigo }) }),
+  minhas: (cpf: string, codigo: string) => chamar<{ nome: string; reservas: MinhaReserva[]; grupos?: MeuGrupo[] }>('/api/reservas/minhas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cpf, codigo }) }),
   cupom: (corpo: { codigo: string; bateriaId: number; quantidade: number; documento: string; documentos: string[] }) =>
     chamar<{ requestId: string }>('/api/reservas/cupom', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) }),
   cupomResultado: (id: string) => chamar<{ status: 'pending' | 'completed'; erro?: string; brutoCentavos?: number; descontoCentavos?: number; totalCentavos?: number }>(`/api/reservas/cupom/${id}`),

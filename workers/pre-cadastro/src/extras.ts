@@ -26,8 +26,10 @@ const lerJson = async <T>(env: EnvExtras, key: string): Promise<T | null> => { t
 
 type Vaga = { ordem: number; nome: string | null; responsavel: boolean; menor: boolean; cadastro: string; falta: string[]; pago: boolean; termo: boolean; link: string; podeLiberar?: boolean };
 type Painel = { chave: string; n: number; termos?: number; total: number; pago: number; falta: number; pagos: number; cadastrados: number; prontos: number; vagas: Vaga[] };
-type GrupoResumo = { codigo: string; status: string; responsavel: string; bateria: string; inicio: string; modo: string; precoCentavos: number; responsavelToken?: string | null; painel?: Painel | null };
+type GrupoResumo = { codigo: string; status: string; responsavel: string; bateria: string; inicio: string; modo: string; precoCentavos: number; responsavelToken?: string | null; painel?: Painel | null; respDocHash?: string | null };
 
+/** Endereço único do site (12/11/2026): cadastro., reservas., grupo e painel abrem em reservas. */
+export const SITE = 'https://reservas.kartodromodebetim.com.br';
 let cache: { em: number; lista: GrupoResumo[] } | null = null;
 export function esquecerGrupos() { cache = null; }
 async function grupos(env: EnvExtras) {
@@ -59,7 +61,7 @@ async function painelDoGrupo(env: EnvExtras, codigo: string, chave: string) {
   }
   return {
     codigo: g.codigo, responsavel: g.responsavel, bateria: g.bateria, inicio: g.inicio, modo: g.modo, precoCentavos: g.precoCentavos, status: g.status,
-    linkGrupo: g.responsavelToken ? `https://cadastro.kartodromodebetim.com.br/?r=${g.responsavelToken}` : null,
+    linkGrupo: g.responsavelToken ? `${SITE}/?r=${g.responsavelToken}` : null,
     atualizadoEm: new Date(c.em).toISOString(), ...painel, pendentes, recusas,
   };
 }
@@ -239,11 +241,29 @@ async function minhasReservas(env: EnvExtras, cpf: string, codigo: string) {
     const p = await lerJson<PedidoGuardado>(env, `reservas/pedidos/${i}.json`);
     if (!p) continue;
     const ck = await lerJson<{ em: string }>(env, `checkins/${p.id}.json`);
+    const grupo = (p as { grupo?: { codigo: string; link: string; painel: string } }).grupo ?? null;
     lista.push({ id: p.id, codigo: p.codigo, status: p.status, criadoEm: p.criadoEm, quantidade: p.quantidade, forma: p.forma, checkinEm: ck?.em ?? null,
-      inicio: p.servidor?.inicio ?? null, descricao: p.servidor?.descricao ?? null, valorCentavos: p.pagamento?.valorCentavos || p.servidor?.valorCentavos || null });
+      inicio: p.servidor?.inicio ?? null, descricao: p.servidor?.descricao ?? null, valorCentavos: p.pagamento?.valorCentavos || p.servidor?.valorCentavos || null, grupo });
   }
   lista.sort((a, b) => String(b.inicio ?? b.criadoEm).localeCompare(String(a.inicio ?? a.criadoEm)));
-  return { nome: String(dono.cliente?.nome ?? '').split(' ')[0], reservas: lista };
+  return { nome: String(dono.cliente?.nome ?? '').split(' ')[0], reservas: lista, grupos: await gruposDoResponsavel(env, cpf) };
+}
+
+/**
+ * Grupos ativos em que este CPF é o responsável (criados pela recepção ou pelo site): o SRVKART publica só o hash do
+ * CPF (respDocHash = sha256("cpf:" + CPF)), então aqui só aparece para quem já provou o CPF com o código da reserva.
+ */
+export async function gruposDoResponsavel(env: EnvExtras, cpf: string) {
+  if (cpf.length !== 11) return [];
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`cpf:${cpf}`)));
+  const hash = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const { lista } = await grupos(env);
+  return lista.filter((g) => g.status === 'ativa' && g.respDocHash === hash).map((g) => ({
+    codigo: g.codigo, bateria: g.bateria, inicio: g.inicio, modo: g.modo,
+    link: g.responsavelToken ? `${SITE}/?r=${g.responsavelToken}` : null,
+    painel: g.painel?.chave ? `${SITE}/painel?g=${g.codigo}&k=${g.painel.chave}` : null,
+    vagas: g.painel?.n ?? null, pagos: g.painel?.pagos ?? null, cadastrados: g.painel?.cadastrados ?? null,
+  }));
 }
 
 // ---------------------------------------------------------------- check-in pelo celular
