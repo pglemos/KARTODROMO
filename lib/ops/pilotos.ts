@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- respostas dinâmicas da API do app (conta/convite) */
 /**
  * Página Pilotos do painel web: a cartela de clientes (dbo.Cliente) com a carreira de cada um na cronometragem,
  * o ranking dos melhores tempos por traçado (semana, mês e geral) e a foto do piloto (dbo.ClienteFoto).

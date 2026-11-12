@@ -585,6 +585,6 @@ describe('conta do app pelo painel (Pilotos)', () => {
     expect(j.conta.emailConfirmado).toBe(true);
     expect(j.emailEnviado).toBe(true);
     expect(j.convite).toContain('/conta?acao=senha&token=');
-    expect(JSON.stringify(sentEmails.at(-1))).toContain('7 dias');
+    expect(JSON.stringify(sentEmails[sentEmails.length - 1])).toContain('7 dias');
   });
 });
