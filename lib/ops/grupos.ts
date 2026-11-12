@@ -137,6 +137,14 @@ export async function carregarGrupos(where: string, params: Record<string, unkno
   });
 }
 
+/** Cobrança gerada pelo painel para um piloto (botão "Cobrar"): diz de quem é o pagamento que chegou do Asaas. */
+async function pilotoDaCobranca(asaasId: string | null | undefined) {
+  if (!asaasId) return null;
+  const c = await one<{ grupoId: number; pilotoId: number | null }>(
+    `SELECT TOP 1 GrupoId grupoId, PilotoId pilotoId FROM dbo.ReservaGrupoCobranca WHERE AsaasId = @a`, { a: asaasId });
+  return c ? { grupoId: Number(c.grupoId), pilotoId: c.pilotoId == null ? null : Number(c.pilotoId) } : null;
+}
+
 /** Mesmo cálculo da tela: quanto cada piloto já tem coberto e quem ainda falta. */
 export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobrancas: Linha[]) {
   const ativos = pilotos.filter((p) => p.inscricaoStatus !== 'cancelada');
@@ -597,6 +605,10 @@ export async function puxarPagamentosDiretoDoAsaas(log: Log, grupoId?: number, s
           }
         }
 
+        // a cobrança do piloto manda: o CPF da referência pode não bater (piloto ainda sem cadastro ligado)
+        // e o pagamento caía como "do grupo", dividido entre todos (12/11/2026: "pagou R$ 29 · falta R$ 116")
+        const cobDoPiloto = await pilotoDaCobranca(n.asaasId);
+        if (cobDoPiloto) { gid = cobDoPiloto.grupoId; pid = cobDoPiloto.pilotoId ?? pid; }
         if (gid) {
           const valorCentavos = Math.round(Number(n.value ?? 145) * 100);
           const forma = n.billingType === 'PIX' ? 'Pix (Asaas)' : n.billingType === 'CREDIT_CARD' ? 'Cartão (Asaas)' : 'Asaas';
@@ -682,6 +694,8 @@ export async function puxarPagamentosDiretoDoAsaas(log: Log, grupoId?: number, s
           }
         }
 
+        const cobDoPiloto = await pilotoDaCobranca(p.id);
+        if (cobDoPiloto) { gid = cobDoPiloto.grupoId; pid = cobDoPiloto.pilotoId ?? pid; }
         if (gid) {
           if (grupoId && gid !== grupoId) continue;
 
