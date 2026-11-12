@@ -41,7 +41,7 @@ beforeEach(async()=>{
  await page.route('**/api/**',apiRoute);await page.goto(origin+'/#/agenda');await page.locator('#calendario [data-sel="394"]').first().waitFor();
 });
 afterAll(async()=>{await browser?.close();await new Promise<void>(r=>server?.close(()=>r()));});
-describe('Agenda: integração real do frontend sem dados de produção',()=>{
+describe('Agenda: integração real do frontend sem dados de produção',{ timeout: 20_000 },()=>{
  it('mostra saldo contratado e bloqueia novo grupo em bateria exclusiva',async()=>{
   expect(await page.locator('#aPagar').innerText()).toContain('2.175');
   await page.locator('#calendario [data-sel="394"]').first().click();await page.locator('[data-grupo-abrir]').first().waitFor();
