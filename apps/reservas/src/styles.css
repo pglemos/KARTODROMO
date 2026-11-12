@@ -232,3 +232,15 @@ main { outline: none; }
   .barra-acoes { gap: 4px; }
   .lnk-claro, .btn-claro { padding: 8px 10px; font-size: 13px; }
 }
+
+.corridas { margin: 24px 0 8px; }
+.corridas h2 { font-size: 18px; font-weight: 600; margin-bottom: 10px; }
+.corridas ul { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--raio); background: var(--card); }
+.corridas li { display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; }
+.corridas li + li { border-top: 1px solid var(--border); }
+.pos { font-size: 20px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pos.podio { color: var(--green); }
+.cor-info { display: grid; min-width: 0; }
+.cor-info strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cor-info small, .cor-volta small { color: var(--muted); font-size: 12px; }
+.cor-volta { display: grid; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }

@@ -31,7 +31,7 @@ type ResultRow = {
   best_lap_ms: number | null;
   status: 'published' | 'withdrawn';
 };
-type PersonalResult = {
+export type PersonalResult = {
   sessionId: string;
   eventName: string;
   eventDate: string;
@@ -327,6 +327,16 @@ async function personalResults(request: Request, env: MobileResultsEnv) {
     mensagem: 'Seu histórico aparece sozinho assim que o CPF da sua conta for encontrado no cadastro do kartódromo. Se você ainda não correu aqui, ele aparece depois da sua primeira bateria.',
     results: [],
   });
+  return json(200, {
+    vinculo: 'validado',
+    results: await resultadosDoCliente(env, link.customer_id),
+  });
+}
+
+/** Resultados publicados + histórico salvo de um cliente do SRVKART (o mesmo do app; o site usa em Minhas corridas). */
+export async function resultadosDoCliente(env: MobileResultsEnv, customerId: string): Promise<PersonalResult[]> {
+  if (!env.MOBILE_DB) return [];
+  const link = { customer_id: customerId };
   const rows = await env.MOBILE_DB.prepare(
     `SELECT session_id, event_name, event_date, display_name, position, kart, laps, best_lap_ms
      FROM mobile_results WHERE customer_id = ? AND status = 'published'
@@ -365,10 +375,7 @@ async function personalResults(request: Request, env: MobileResultsEnv) {
   const results = [...bySession.values()]
     .sort((a, b) => b.eventDate.localeCompare(a.eventDate) || b.sessionId.localeCompare(a.sessionId) || a.position - b.position)
     .slice(0, 500);
-  return json(200, {
-    vinculo: 'validado',
-    results,
-  });
+  return results;
 }
 
 async function linkedCustomers(request: Request, env: MobileResultsEnv) {

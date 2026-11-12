@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, ErroApi, FINAIS, ID_PEDIDO, type Agenda, type Aviso, type Horario, type MinhaReserva, type Pedido, type Politica } from './api';
+import { api, ErroApi, FINAIS, ID_PEDIDO, type Agenda, type Aviso, type Horario, type Corrida, type MinhaReserva, type Pedido, type Politica } from './api';
 import {
   cpfValido, dataIso, deIso, diaChave, diaCurto, diaLongo, digitos, emailValido, erroInstagram, hora, ics, idade,
   mascaraCep, mascaraCpf, mascaraData, mascaraFone, menosUmaHora, nomeMes, reais,
@@ -607,6 +607,8 @@ function Acompanhar({ id, onNovo }: { id: string; onNovo: () => void }) {
   );
 }
 
+const tempoVolta = (ms: number) => { const m = Math.floor(ms / 60000), s = (ms % 60000) / 1000; return `${m ? m + ':' : ''}${s.toFixed(3).padStart(m ? 6 : 5, '0')}`; };
+
 // ------------------------------------------------------------------ minhas reservas
 const ROTULO: Record<string, [string, string]> = {
   confirmado: ['ok', 'Confirmada'], pago: ['pend', 'Pagamento recebido'], aguardando_pagamento: ['pend', 'Aguardando pagamento'], novo: ['pend', 'Em processamento'],
@@ -626,12 +628,17 @@ function MinhasReservas({ onVoltar, onAbrir }: { onVoltar: () => void; onAbrir: 
   const [erro, setErro] = useState('');
   const [buscando, setBuscando] = useState(false);
   const [res, setRes] = useState<{ nome: string; reservas: MinhaReserva[] } | null>(null);
+  const [corridas, setCorridas] = useState<{ corridas: Corrida[]; aviso?: string } | null>(null);
   const buscar = async (e: React.FormEvent) => {
     e.preventDefault(); setErro('');
     if (!cpfValido(cpf)) { setErro('Confira os 11 números do CPF de quem reservou.'); return; }
     if (!/^[A-Z0-9]{6}$/.test(codigo)) { setErro('O código da reserva tem 6 letras e números (está na confirmação e no WhatsApp).'); return; }
     setBuscando(true);
-    try { setRes(await api.minhas(digitos(cpf), codigo)); } catch (x) { setErro((x as Error).message); } finally { setBuscando(false); }
+    try {
+      setRes(await api.minhas(digitos(cpf), codigo));
+      setCorridas(null);
+      api.corridas(digitos(cpf), codigo).then(setCorridas).catch(() => setCorridas({ corridas: [], aviso: 'Não foi possível carregar o histórico agora.' }));
+    } catch (x) { setErro((x as Error).message); } finally { setBuscando(false); }
   };
   const zapMsg = (rv: MinhaReserva, acao: 'cancelar' | 'remarcar', regra: string) =>
     `https://wa.me/${WHATS}?text=${encodeURIComponent(`Olá! Quero ${acao} a reserva ${rv.codigo}${rv.inicio ? ` (${diaLongo(deIso(rv.inicio))}, ${hora(deIso(rv.inicio))})` : ''}, no CPF de quem reservou. ${acao === 'cancelar' ? regra : 'Quais horários estão livres?'}`)}`;
@@ -668,6 +675,21 @@ function MinhasReservas({ onVoltar, onAbrir }: { onVoltar: () => void; onAbrir: 
               );
             })}
           </ul>
+          <section className="corridas" aria-labelledby="t-corridas">
+            <h2 id="t-corridas">Minhas corridas</h2>
+            {!corridas ? <p className="muted">Carregando seu histórico…</p>
+              : corridas.corridas.length ? (
+                <ul>
+                  {corridas.corridas.slice(0, 30).map((c) => (
+                    <li key={c.sessionId}>
+                      <span className={`pos${c.position <= 3 ? ' podio' : ''}`}>{c.position}º</span>
+                      <span className="cor-info"><strong>{c.eventName}</strong><small>{c.eventDate.split('-').reverse().join('/')} · kart {c.kart} · {c.laps} voltas</small></span>
+                      <span className="cor-volta"><small>melhor volta</small>{c.bestLapMs ? tempoVolta(c.bestLapMs) : '—'}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="muted">{corridas.aviso || 'Ainda não há corridas no seu CPF. Depois da primeira bateria, seus tempos aparecem aqui e no app.'}</p>}
+          </section>
           <p className="dica-mini">Cancelamentos e remarcações são confirmados pela recepção no WhatsApp, como prevê a política. Reservas feitas no balcão ou por grupo não aparecem aqui.</p>
           <div className="acoes"><button className="btn sec" onClick={() => setRes(null)}>Buscar outro CPF</button><button className="btn" onClick={onVoltar}>Fazer uma reserva</button></div>
         </>

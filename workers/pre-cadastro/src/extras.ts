@@ -7,6 +7,8 @@
  * O SRVKART (lib/ops/grupos.ts, termo-online.ts, reserva-online.ts) escreve e lê pelas rotas /api/sync/*.
  */
 
+import { resultadosDoCliente } from './mobile/results';
+
 type R2 = {
   get(key: string): Promise<{ json<T = unknown>(): Promise<T> } | null>;
   put(key: string, value: string, opts?: unknown): Promise<unknown>;
@@ -112,6 +114,22 @@ export async function rotasPublicas(req: Request, env: EnvExtras, p: string, url
     if (cpf.length !== 11 || !/^[A-Z0-9]{6}$/.test(codigo)) return json(400, { erro: 'Informe o CPF de quem reservou e o código da reserva (6 letras e números).' });
     const r = await minhasReservas(env, cpf, codigo);
     return json(r ? 200 : 404, r ?? { erro: 'Não achamos reserva com esse CPF e código. Confira os dados ou fale com a recepção.' });
+  }
+  if (p === '/api/reservas/corridas' && req.method === 'POST') {
+    if (await limite(req.headers.get('cf-connecting-ip') ?? 'x', 'minhas')) return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
+    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const cpf = digitos(b.cpf), codigo = String(b.codigo ?? '').trim().toUpperCase();
+    if (cpf.length !== 11 || !/^[A-Z0-9]{6}$/.test(codigo)) return json(400, { erro: 'Informe o CPF e o código da reserva.' });
+    if (!(await minhasReservas(env, cpf, codigo))) return json(404, { erro: 'Não achamos reserva com esse CPF e código.' });
+    const ops = ((env as { OPS_URL?: string }).OPS_URL || 'https://ops.kartodromodebetim.com.br').replace(/\/+$/, '');
+    let clienteId: string | null = null;
+    try {
+      const r = await fetch(`${ops}/api/totem/identificar`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ identificador: cpf }), signal: AbortSignal.timeout(4000) });
+      const d = r.ok ? ((await r.json()) as { cliente?: { id?: unknown } }) : null;
+      if (d?.cliente?.id) clienteId = String(d.cliente.id);
+    } catch { /* servidor do kartódromo fora: sem histórico agora */ }
+    if (!clienteId) return json(200, { corridas: [], aviso: 'Não foi possível consultar o histórico agora. Tente de novo em instantes.' });
+    return json(200, { corridas: await resultadosDoCliente(env as never, clienteId) });
   }
   if (p === '/api/aviso' && req.method === 'GET') {
     const a = await lerJson<{ texto?: string; tom?: string; ate?: string | null }>(env, 'config/aviso.json');
