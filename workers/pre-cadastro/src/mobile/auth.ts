@@ -1028,6 +1028,16 @@ export async function handleMobileContaAdmin(request: Request, env: MobileAccoun
   if (!input) return json(400, { erro: 'Envio inválido.' });
 
   const acao = value(input, 'acao');
+  if (acao === 'status') {
+    // lista de Pilotos: situação no app de cada cadastro ligado (ativo = já entrou; convidado = conta pronta, nunca entrou)
+    const { results } = await context.db.prepare(
+      `SELECT l.customer_id c, MAX(s.created_at) u
+         FROM mobile_identity_links l JOIN mobile_accounts a ON a.id = l.account_id AND a.deleted_at IS NULL
+         LEFT JOIN mobile_sessions s ON s.account_id = a.id
+        GROUP BY l.customer_id`,
+    ).all<{ c: string; u: number | null }>();
+    return json(200, { status: Object.fromEntries(results.map((r) => [String(r.c), r.u ? { s: 'ativo', u: r.u } : { s: 'convidado' }])) });
+  }
   const cpf = digitos(value(input, 'cpf'));
   const customerId = value(input, 'clienteId');
   if (!cpfValido(cpf)) return json(400, { erro: 'O piloto precisa ter um CPF válido na ficha.' });

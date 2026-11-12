@@ -550,6 +550,13 @@ describe('conta do app pelo painel (Pilotos)', () => {
     expect((await admin({ acao: 'criar', nome: 'Outro Nome', email: 'x@example.com' })).status).toBe(409);
   });
 
+  it('status lista quem tem conta ligada e se já entrou', async () => {
+    await admin({ acao: 'criar', nome: 'Arthur Ferreira', email: 'a@example.com', senha: 'Balcao#2026' });
+    expect((await body(await admin({ acao: 'status' }))).status).toEqual({ '115408': { s: 'convidado' } });
+    await call('login', { identifier: cpf, password: 'Balcao#2026' });
+    expect(((await body(await admin({ acao: 'status' }))).status as Row)['115408']).toMatchObject({ s: 'ativo' });
+  });
+
   it('não deixa usar e-mail de outra conta', async () => {
     await register();
     const r = await admin({ acao: 'criar', nome: 'Arthur Ferreira', email: validRegistration.email });

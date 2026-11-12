@@ -695,3 +695,34 @@ input[type="checkbox"], input[type="radio"] {
 
 /* estado vazio com ação: o que fazer a seguir, no lugar de uma instrução solta */
 .vazio .acoesVazio { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--kib-espaco-1); margin-top: var(--kib-espaco-denso-12); }
+
+/* ficha do piloto > aba App: situação da conta, passos e convite */
+.appConta { display: flex; flex-direction: column; }
+.appEstado { display: flex; align-items: center; gap: var(--kib-espaco-denso-12); padding: var(--kib-espaco-2); }
+.appEstado > .col { gap: 2px; min-width: 0; }
+.appEstado b { font-size: var(--kib-fonte-tamanho-subtitulo); }
+.appIcone { flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: var(--kib-fonte-tamanho-corpo); background: var(--cinzaFundo); color: var(--mudo); }
+.appIcone.verde { background: color-mix(in srgb, var(--kib-cor-status-ok) 18%, transparent); color: var(--okTxt); }
+.appIcone.laranja { background: color-mix(in srgb, var(--kib-cor-estado-aviso-solido, orange) 16%, transparent); color: var(--kib-cor-estado-aviso-texto); }
+.appIcone.vermelho { background: color-mix(in srgb, var(--kib-cor-estado-perigo-solido) 14%, transparent); color: var(--erroTxt); }
+.appPassos { list-style: none; margin: 0; padding: 0 var(--kib-espaco-2) var(--kib-espaco-2); display: flex; flex-wrap: wrap; gap: var(--kib-espaco-1); }
+.appPassos li { display: flex; align-items: center; gap: 6px; padding: 6px 12px 6px 6px; border-radius: 999px; background: var(--cinzaFundo); color: var(--mudo); font-size: var(--kib-fonte-tamanho-legenda, 13px); font-weight: 600; }
+.appPassos li > span { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; border: 1.5px solid currentColor; }
+.appPassos li.ok { background: color-mix(in srgb, var(--kib-cor-status-ok) 14%, transparent); color: var(--okTxt); }
+.appPassos li.ok > span { background: var(--kib-cor-status-ok); border-color: var(--kib-cor-status-ok); color: #fff; }
+.appLinha { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); border-top: 1px solid var(--linha); }
+.appLinha .col { gap: 1px; }
+.appConvite { display: flex; flex-direction: column; gap: 4px; padding: var(--kib-espaco-2); border-top: 1px solid var(--linha); background: var(--sup2); }
+.appBotoes { display: flex; flex-wrap: wrap; gap: var(--kib-espaco-1); margin-top: var(--kib-espaco-1); }
+.appBotoes .btn { height: 42px; }
+.appPrevia { display: flex; flex-direction: column; gap: 6px; margin-top: var(--kib-espaco-denso-12); }
+.bolhaZap { max-width: 440px; padding: 10px 12px; border-radius: 4px 14px 14px 14px; background: #dcf8c6; color: #111b21; font-size: 14px; line-height: 1.45; word-break: break-word; box-shadow: 0 1px 1px rgba(0,0,0,.12); }
+.appAcoesPrevia { display: flex; gap: var(--kib-espaco-1); flex-wrap: wrap; }
+.appAjustes { border-top: 1px solid var(--linha); }
+.appAjustes > summary { cursor: pointer; padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); font-weight: 600; }
+.appForm { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--kib-espaco-denso-12); padding: 0 var(--kib-espaco-2) var(--kib-espaco-1); }
+.appErro { margin: 0; padding: 0 var(--kib-espaco-2) var(--kib-espaco-1); }
+.appErro:empty { display: none; }
+.qrConvite { display: flex; flex-direction: column; align-items: center; gap: var(--kib-espaco-denso-12); padding: var(--kib-espaco-2) var(--kib-espaco-denso-20) var(--kib-espaco-denso-20); }
+.qrConvite svg { width: min(300px, 70vw); height: auto; background: #fff; border-radius: 12px; padding: 6px; }
+.qrConvite ol { margin: 0; padding-left: 18px; }

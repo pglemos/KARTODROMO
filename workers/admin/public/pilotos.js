@@ -45,6 +45,8 @@ TELAS.pilotos = async (tela) => {
     ['novos', 'Novos na semana', 'novos', 'Cadastrados nos últimos 7 dias'],
     ['incompletos', 'Cadastro incompleto', 'incompletos', 'Falta CPF, peso, telefone ou e-mail'],
     ['aniversariantes', 'Aniversariantes do mês', 'aniversariantes', 'Fazem aniversário neste mês'],
+    ['app', 'Usam o app', 'app', 'Têm conta no app e já entraram'],
+    ['convidados', 'Convidados, não entraram', 'convidados', 'Conta no app pronta, mas o piloto ainda não entrou: reenvie o convite'],
   ];
   const ORDENS = [['recentes', 'Mais recentes', ''], ['nome', 'Nome (A–Z)', ''], ['baterias', 'Mais baterias', 'só em Ativos 30 dias'], ['melhor', 'Melhor volta', 'só em Ativos 30 dias']];
   const ordemValida = (o) => (o === 'baterias' || o === 'melhor' ? P.filtro === 'ativos' && !P.q : true);
@@ -78,6 +80,8 @@ TELAS.pilotos = async (tela) => {
 
   const atencao = (c) => {
     const ch = [];
+    if (c.app === 'ativo') ch.push(['verde', 'App', '', 'Tem conta no app e já entrou']);
+    else if (c.app === 'convidado') ch.push(['cinza', 'Convidado', '', 'Conta no app pronta, mas ainda não entrou: reenvie o convite na aba App']);
     if (c.bloqueado) ch.push(['vermelho', 'Bloqueado', '', 'Cliente bloqueado: não pode reservar nem correr']);
     if (c.duplicado) ch.push(['vermelho', 'Possível duplicado', `#/piloto/${c.duplicado.id}`, 'Outro cadastro com o mesmo CPF ou nome parecido. Clique para abrir o outro']);
     if (c.responsavelId && c.responsavelNome && nomeBonitoPiloto(c.responsavelNome) === nomeBonitoPiloto(c.nome)) ch.push(['laranja', 'Nome igual ao do responsável', '', 'O menor foi cadastrado com o nome do responsável: confira o cadastro']);
@@ -143,8 +147,25 @@ TELAS.pilotos = async (tela) => {
     el.innerHTML = P.selecionando
       ? `<div class="barraSel" role="region" aria-label="Seleção"><b>${P.sel.size ? `${n(P.sel.size)} ${P.sel.size === 1 ? 'selecionado' : 'selecionados'}` : 'Marque os clientes'}</b>
           <span class="peq">${P.sel.size ? '' : 'A seleção vale entre páginas e filtros.'}</span>
-          <span style="margin-left: auto; display: flex; gap: var(--kib-espaco-meio); flex-wrap: wrap"><button type="button" class="btn sec peq" data-copiar ${P.sel.size ? '' : 'disabled'}>Copiar telefones</button><button type="button" class="btn sec peq" data-csv ${P.sel.size ? '' : 'disabled'}>Baixar planilha (CSV)</button><button type="button" class="btn sec peq" data-sel-limpar ${P.sel.size ? '' : 'disabled'}>Limpar seleção</button></span></div>`
+          <span style="margin-left: auto; display: flex; gap: var(--kib-espaco-meio); flex-wrap: wrap"><button type="button" class="btn sec peq" data-copiar ${P.sel.size ? '' : 'disabled'}>Copiar telefones</button><button type="button" class="btn sec peq" data-csv ${P.sel.size ? '' : 'disabled'}>Baixar planilha (CSV)</button><button type="button" class="btn prim peq" data-lote-app ${P.sel.size ? '' : 'disabled'} title="Cria a conta no app de quem tem CPF e e-mail e manda o convite por e-mail (até 50 por vez)">Convidar para o app</button><button type="button" class="btn sec peq" data-sel-limpar ${P.sel.size ? '' : 'disabled'}>Limpar seleção</button></span></div>`
       : '';
+  };
+
+  // convite em massa: cria a conta de quem tem CPF + e-mail e manda o convite por e-mail (o servidor limita a 50)
+  const convidarLote = async (botao) => {
+    const ids = [...P.sel.keys()].slice(0, 50);
+    if (!ids.length) return;
+    const extra = P.sel.size > 50 ? ` (dos ${P.sel.size} selecionados, vão os 50 primeiros)` : '';
+    if (!confirm(`Convidar ${ids.length} ${ids.length === 1 ? 'piloto' : 'pilotos'} para o app${extra}?\n\nQuem não tem conta ganha uma com o CPF e o e-mail da ficha. Todos recebem por e-mail o link para criar a senha (vale 7 dias). Quem não tem CPF ou e-mail fica de fora.`)) return;
+    const txt = botao.textContent; botao.disabled = true; botao.textContent = `Convidando ${ids.length}…`;
+    try {
+      const { resultados } = await office('/pilotos/app-lote', { method: 'POST', body: { ids } });
+      const ok = resultados.filter((r) => r.ok).length, falhas = resultados.filter((r) => !r.ok);
+      const motivos = Object.entries(falhas.reduce((a, r) => ({ ...a, [r.msg]: (a[r.msg] || 0) + 1 }), {})).map(([m, q]) => `${q} ${m}`).join(', ');
+      toast(`${ok} ${ok === 1 ? 'convite enviado' : 'convites enviados'}${falhas.length ? ' · ficaram de fora: ' + motivos : ''}`, ok === 0);
+      resultados.filter((r) => r.ok).forEach((r) => P.sel.delete(r.id));
+      await carregar();
+    } catch (er) { toast(er.message, true); botao.disabled = false; botao.textContent = txt; }
   };
 
   const vazio = () => {
@@ -248,6 +269,7 @@ TELAS.pilotos = async (tela) => {
     if (t.closest('[data-ajuda]')) return ajuda();
     if (t.closest('[data-sel-modo]')) return alternarSelecao();
     if (t.closest('[data-copiar]')) return copiarTelefones();
+    const lote = t.closest('[data-lote-app]'); if (lote) return convidarLote(lote);
     if (t.closest('[data-csv]')) return baixarCsv();
     if (t.closest('[data-sel-limpar]')) { P.sel.clear(); pintarSelecao(); pintarLista(); return; }
     if (t.closest('a, select, input')) return;
@@ -364,38 +386,45 @@ TELAS.piloto = async (tela) => {
     return `Olá, ${primeiro}! Aqui é do Kartódromo de Betim 🏁\n\nSua conta no nosso app está pronta, com todas as suas corridas aqui.\n\n1️⃣ Crie sua senha (link vale 7 dias):\n${link}\n\n2️⃣ Baixe o app:\n📱 iPhone: ${IOS_APP}\n🤖 Android: ${ANDROID_APP}\n\n3️⃣ Entre com seu CPF e a senha que você criou.`;
   };
   const htmlApp = () => {
-    const c = d.cliente, a = appInfo;
-    const cab = '<div class="cartaoCab"><h2>Conta no app</h2><span class="sub">o piloto entra no app com CPF (ou e-mail) e senha · as corridas daqui aparecem sozinhas</span></div>';
-    if (!a) return `<section class="cartao">${cab}<p class="peq cartao-corpo">Consultando o app…</p></section>`;
-    if (a.falhou) return `<section class="cartao">${cab}<p class="erroMsg cartao-corpo" role="alert">${esc(appErro)}</p><div class="modalRodape"><button class="btn sec" data-app="recarregar">Tentar de novo</button></div></section>`;
-    if (a.semCpf) return `<section class="cartao">${cab}<div class="vazio"><b>Falta o CPF na ficha</b><span>A conta do app é pelo CPF. Preencha em “Dados e cadastro” e volte aqui.</span></div></section>`;
-    const erro = `<p class="erroMsg" id="erroApp" role="alert" style="margin: 0; padding: 0 var(--kib-espaco-2) var(--kib-espaco-1)">${esc(appErro)}</p>`;
-    const convite = appConvite ? `<div class="avisoPerfil" style="margin: 0 var(--kib-espaco-2) var(--kib-espaco-1)"><b>Convite pronto</b> · o link cria a senha e vale 7 dias.<br><span class="mono peq" style="word-break: break-all">${esc(appConvite)}</span></div>` : '';
-    if (!a.conta) return `<section class="cartao">${cab}
-      <p class="peq cartao-corpo" style="margin: 0">Sem conta no app. Crie aqui com o CPF da ficha (${esc(c.documento || '')}): a conta já sai confirmada e ligada a este cadastro, com o histórico.</p>
-      <form id="fApp" class="formPiloto" novalidate>
-        <label class="campo"><span>E-mail de acesso</span><input class="entrada" name="email" type="email" autocomplete="off" value="${esc(c.email || '')}"></label>
-        <label class="campo"><span>Senha (opcional)</span><input class="entrada" name="senha" type="text" autocomplete="off" placeholder="em branco: o piloto cria pelo convite"></label>
+    const c = d.cliente, a = appInfo, primeiro = nomeBonitoPiloto(c.nome).split(' ')[0] || 'O piloto';
+    const casca = (corpo) => `<section class="cartao appConta">${corpo}</section>`;
+    if (!a) return casca('<div class="appEstado"><span class="appIcone cinza">…</span><span class="col"><b>Consultando o app…</b></span></div>');
+    if (a.falhou) return casca(`<div class="appEstado"><span class="appIcone vermelho">!</span><span class="col"><b>Não deu para falar com o app</b><span class="peq">${esc(appErro)}</span></span><button class="btn sec empurra" data-app="recarregar">Tentar de novo</button></div>`);
+    if (a.semCpf) return casca('<div class="appEstado"><span class="appIcone laranja">CPF</span><span class="col"><b>Falta o CPF na ficha</b><span class="peq">A conta do app é pelo CPF. Preencha em “Dados e cadastro” e volte aqui.</span></span><button class="btn sec empurra" data-aba="1">Ir para os dados</button></div>');
+    const erro = appErro ? `<p class="erroMsg appErro" role="alert">${esc(appErro)}</p>` : '<p class="erroMsg appErro" id="erroApp" role="alert"></p>';
+    if (!a.conta) return casca(`<div class="appEstado"><span class="appIcone cinza">${svg(IC.mais, 18, 'currentColor', 2.4)}</span><span class="col"><b>${esc(primeiro)} ainda não tem conta no app</b><span class="peq">Crie agora com o CPF da ficha (${esc(c.documento || '')}). A conta já sai confirmada e com todas as corridas daqui.</span></span></div>
+      <form id="fApp" class="appForm" novalidate>
+        <label class="campo"><span>E-mail que ele vai usar</span><input class="entrada" name="email" type="email" autocomplete="off" value="${esc(c.email || '')}" placeholder="email@exemplo.com"></label>
+        <label class="campo"><span>Senha <span class="peq">(opcional)</span></span><input class="entrada" name="senha" type="text" autocomplete="off" placeholder="em branco: ele cria pelo convite"></label>
       </form>${erro}
-      <div class="modalRodape" style="border-top: 1px solid var(--linha)"><button class="btn prim empurra" data-app="criar">Criar conta no app</button></div></section>`;
-    const k = a.conta, chip = (ok, sim, nao) => `<span class="chip ${ok ? 'verde' : 'laranja'}">${ok ? sim : nao}</span>`;
-    return `<section class="cartao">${cab}
-      <div class="cartao-corpo" style="display: flex; flex-wrap: wrap; gap: var(--kib-espaco-1); align-items: center">
-        <b>${esc(k.email)}</b>${chip(k.emailConfirmado, 'e-mail confirmado', 'e-mail não confirmado')}${chip(String(k.clienteVinculado) === String(id), 'histórico ligado', k.clienteVinculado ? 'ligado a outro cadastro (' + esc(k.clienteVinculado) + ')' : 'histórico não ligado')}${k.emExclusao ? '<span class="chip vermelho">marcada para exclusão</span>' : ''}
-        <span class="peq">criada em ${dataBr(new Date(k.criadaEm).toISOString())} · ${k.ultimoAcesso ? 'último acesso ' + dataBr(new Date(k.ultimoAcesso).toISOString()) : 'nunca entrou'}</span>
-      </div>
-      ${convite}
-      <div class="modalRodape" style="border-top: 1px solid var(--linha); flex-wrap: wrap; gap: var(--kib-espaco-1)">
-        <button class="btn prim" data-app="zap" ${c.telefone ? '' : 'disabled title="Sem celular na ficha"'}>${svg(IC.zap, 14, 'currentColor')}Mandar convite no WhatsApp</button>
-        <button class="btn sec" data-app="email">Mandar convite por e-mail</button>
-        ${appConvite ? '<button class="btn sec" data-app="copiar">Copiar mensagem</button>' : ''}
-      </div>
-      <form id="fApp" class="formPiloto" novalidate style="border-top: 1px solid var(--linha)">
-        <label class="campo"><span>Trocar e-mail de acesso</span><input class="entrada" name="novoEmail" type="email" autocomplete="off" placeholder="${esc(k.email)}"></label>
-        <label class="campo"><span>Trocar CPF da conta (e da ficha)</span><input class="entrada" name="novoCpf" inputmode="numeric" autocomplete="off" placeholder="${esc(c.documento || '')}"></label>
-        <label class="campo"><span>Definir nova senha</span><input class="entrada" name="senha" type="text" autocomplete="off" placeholder="mínimo 8 caracteres"></label>
-      </form>${erro}
-      <div class="modalRodape"><button class="btn sec" data-app="senha">Salvar senha</button><button class="btn prim empurra" data-app="editar">Salvar e-mail/CPF</button></div></section>`;
+      <div class="modalRodape"><span class="peq">Depois de criar, mande o convite pelo WhatsApp, e-mail ou QR Code.</span><button class="btn prim empurra" data-app="criar">Criar conta no app</button></div>`);
+    const k = a.conta, ligado = String(k.clienteVinculado) === String(id), entrou = !!k.ultimoAcesso;
+    const estado = k.emExclusao ? ['vermelho', '!', 'Conta marcada para exclusão', 'Definir uma senha ou mandar o convite restaura a conta.']
+      : entrou ? ['verde', svg(IC.ok, 18, 'currentColor', 2.6), `${esc(primeiro)} usa o app`, `Último acesso em ${dataBr(new Date(k.ultimoAcesso).toISOString())}.`]
+        : ['laranja', '…', `Conta pronta · ${esc(primeiro)} ainda não entrou`, 'Mande o convite: ele cria a senha, baixa o app e já entra com o histórico.'];
+    const passo = (ok, t) => `<li class="${ok ? 'ok' : ''}"><span>${ok ? svg(IC.ok, 12, 'currentColor', 3) : ''}</span>${t}</li>`;
+    const previa = appConvite ? `<div class="appPrevia"><span class="peq peso-semibold">Mensagem do convite</span><div class="bolhaZap">${esc(msgConvite(appConvite)).replace(/\n/g, '<br>')}</div><span class="appAcoesPrevia"><button class="btn sec peq" data-app="copiar">Copiar mensagem</button><button class="btn sec peq" data-app="qr">Mostrar QR Code</button></span></div>` : '';
+    return casca(`<div class="appEstado"><span class="appIcone ${estado[0]}">${estado[1]}</span><span class="col"><b>${estado[2]}</b><span class="peq">${estado[3]}</span></span></div>
+      <ol class="appPassos">${passo(true, 'Conta criada')}${passo(k.emailConfirmado, 'E-mail confirmado')}${passo(ligado, ligado ? 'Histórico ligado' : k.clienteVinculado ? 'Histórico em outro cadastro (' + esc(k.clienteVinculado) + ')' : 'Histórico ligado')}${passo(entrou, 'Entrou no app')}</ol>
+      <div class="appLinha"><span class="col"><span class="peq">Entra com</span><b>${esc(k.email)}</b><span class="peq">ou o CPF ${esc(c.documento || '')}</span></span><span class="peq">conta criada em ${dataBr(new Date(k.criadaEm).toISOString())}</span></div>
+      <div class="appConvite"><b>${entrou ? 'Reenviar acesso' : 'Mandar o convite'}</b><span class="peq">O link cria a senha (vale 7 dias) e mostra onde baixar o app no iPhone e no Android.</span>
+        <span class="appBotoes"><button class="btn prim" data-app="zap" ${c.telefone ? '' : 'disabled title="Sem celular na ficha"'}>${svg(IC.zap, 15, 'currentColor')}WhatsApp</button><button class="btn sec" data-app="email">E-mail</button><button class="btn sec" data-app="qr">QR Code no balcão</button></span>
+        ${previa}</div>
+      <details class="appAjustes" ${appErro ? 'open' : ''}><summary>Trocar e-mail, CPF ou senha</summary>
+        <form id="fApp" class="appForm" novalidate>
+          <label class="campo"><span>Novo e-mail de acesso</span><input class="entrada" name="novoEmail" type="email" autocomplete="off" placeholder="${esc(k.email)}"></label>
+          <label class="campo"><span>Novo CPF <span class="peq">(muda na ficha também)</span></span><input class="entrada" name="novoCpf" inputmode="numeric" autocomplete="off" placeholder="${esc(c.documento || '')}"></label>
+          <label class="campo"><span>Nova senha</span><input class="entrada" name="senha" type="text" autocomplete="off" placeholder="mínimo 8 caracteres"></label>
+        </form>${erro}
+        <div class="modalRodape"><button class="btn sec" data-app="senha">Salvar senha</button><button class="btn prim empurra" data-app="editar">Salvar e-mail/CPF</button></div>
+      </details>`);
+  };
+  const mostrarQr = (link) => {
+    const q = qrcode(0, 'M'); q.addData(link); q.make();
+    const m = modal(`<div class="modalTopo"><span class="col" style="gap: 2px"><span class="t-titulo-grande peso-negrito">Convite de ${esc(nomeBonitoPiloto(d.cliente.nome).split(' ')[0])}</span><span class="peq">Peça para apontar a câmera do celular.</span></span><button class="fechar hov solto" data-acao="fechar" aria-label="Fechar">${svg(IC.fechar, 15, 'var(--kib-cor-texto-principal)', 2.4)}</button></div>
+      <div class="qrConvite">${q.createSvgTag({ cellSize: 6, margin: 2, scalable: true })}<ol class="peq"><li>Abre o link e cria a senha</li><li>Baixa o app (iPhone ou Android)</li><li>Entra com o CPF e a senha</li></ol></div>`, 'QR Code do convite');
+    m.style.maxWidth = '420px';
+    m.onclick = (e) => { if (e.target.closest('[data-acao="fechar"]')) fecharCamada(); };
   };
   const acaoApp = async (botao) => {
     const qual = botao.dataset.app, f = $('#fApp') ? new FormData($('#fApp')) : new FormData();
@@ -407,7 +436,7 @@ TELAS.piloto = async (tela) => {
     if (qual === 'editar') { if (!v('novoEmail') && !v('novoCpf')) { $('#erroApp').textContent = 'Preencha o e-mail ou o CPF novo.'; return; } corpo = { acao: 'editar', novoEmail: v('novoEmail'), novoCpf: v('novoCpf') }; }
     if (qual === 'senha') { if (v('senha').length < 8) { $('#erroApp').textContent = 'A senha precisa ter pelo menos 8 caracteres.'; return; } corpo = { acao: 'senha', senha: v('senha') }; }
     if (qual === 'email') corpo = { acao: 'convite', enviarEmail: true };
-    if (qual === 'zap') corpo = { acao: 'convite' };
+    if (qual === 'zap' || qual === 'qr') { if (qual === 'qr' && appConvite) return mostrarQr(appConvite); corpo = { acao: 'convite' }; }
     if (!corpo) return;
     const janela = qual === 'zap' ? window.open('', '_blank') : null; // abre já no clique (senão o navegador bloqueia)
     const txt = botao.textContent; botao.disabled = true; botao.textContent = 'Aguarde…'; appErro = '';
@@ -415,8 +444,9 @@ TELAS.piloto = async (tela) => {
       const r = await office(`/pilotos/${id}/app`, { method: 'POST', body: corpo });
       appInfo = { ...appInfo, ...r, semCpf: false, falhou: false };
       if (r.convite) appConvite = r.convite;
+      if (qual === 'qr') mostrarQr(r.convite);
       if (qual === 'zap') { const u = zap(d.cliente.telefone, msgConvite(r.convite)); if (janela) janela.location.href = u; else window.open(u, '_blank'); }
-      toast({ criar: 'Conta criada no app · histórico ligado', editar: 'Conta do app atualizada', senha: 'Senha salva · o piloto já pode entrar', email: r.emailEnviado ? 'Convite enviado para ' + r.conta.email : 'Convite gerado, mas o e-mail não saiu: use o WhatsApp', zap: 'Convite aberto no WhatsApp' }[qual], qual === 'email' && !r.emailEnviado);
+      toast({ criar: 'Conta criada no app · histórico ligado', editar: 'Conta do app atualizada', senha: 'Senha salva · o piloto já pode entrar', email: r.emailEnviado ? 'Convite enviado para ' + r.conta.email : 'Convite gerado, mas o e-mail não saiu: use o WhatsApp', zap: 'Convite aberto no WhatsApp', qr: 'QR Code pronto' }[qual], qual === 'email' && !r.emailEnviado);
       if (qual === 'editar' && corpo.novoCpf) { await carregar(); pintar(); return; }
     } catch (er) { if (janela) janela.close(); appErro = er.message; }
     $('#corpoPiloto').innerHTML = htmlApp();

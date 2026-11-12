@@ -446,6 +446,60 @@ async function completar(rows: Record<string, unknown>[], hoje: Map<number, stri
   });
 }
 
+// ---------------------------------------------------------------- conta do app (fala com o app pela chave de administração)
+function baseApp() {
+  const base = process.env.MOBILE_IDENTITY_LINK_URL && process.env.MOBILE_ADMIN_TOKEN
+    ? mobileApiEndpoint(process.env.MOBILE_IDENTITY_LINK_URL, '/api/mobile/v1/internal/identity-links') : null;
+  if (!base) throw new HttpError(503, 'Integração com o app não configurada neste servidor.');
+  return base;
+}
+async function chamarApp(corpo: Record<string, unknown>) {
+  const r = await fetch(new URL('/api/mobile/v1/internal/conta-admin', baseApp()), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-mobile-admin-token': process.env.MOBILE_ADMIN_TOKEN! },
+    body: JSON.stringify(corpo), redirect: 'error', signal: AbortSignal.timeout(20_000),
+  }).catch(() => null);
+  if (!r) throw new HttpError(502, 'O app não respondeu. Tente de novo.');
+  const j = (await r.json().catch(() => ({}))) as Record<string, any>;
+  if (!r.ok) throw new HttpError(r.status === 401 || r.status === 503 ? 502 : r.status, String(j.erro ?? 'Falha na conta do app.'));
+  return j;
+}
+type StatusApp = Record<string, { s: 'ativo' | 'convidado'; u?: number }>;
+let statusCache: { em: number; v: StatusApp } | null = null;
+export async function statusApp(fresco = false): Promise<StatusApp> {
+  if (!fresco && statusCache && Date.now() - statusCache.em < 60_000) return statusCache.v;
+  try { statusCache = { em: Date.now(), v: (await chamarApp({ acao: 'status' })).status ?? {} }; }
+  catch { if (!statusCache) return {}; }
+  return statusCache!.v;
+}
+async function contaApp(id: number, acao: string, b: Record<string, unknown>, quem: string) {
+  if (!['consultar', 'criar', 'editar', 'senha', 'convite'].includes(acao)) throw new HttpError(400, 'Ação desconhecida.');
+  const c = await one<{ nome: string; doc: string | null; email: string | null; fone: string | null }>(
+    `SELECT Nome nome, DocumentoNum doc, Email email, TelefoneNum fone FROM dbo.Cliente WHERE Id = @id`, { id });
+  if (!c) throw new HttpError(404, 'Cliente não encontrado.');
+  baseApp();
+  const cpf = onlyDigits(String(c.doc ?? ''));
+  const cliente = { email: c.email, telefone: c.fone };
+  if (cpf.length !== 11) return { semCpf: true, conta: null, cliente } as Record<string, any>;
+  const corpo = {
+    acao, cpf, clienteId: String(id), nome: c.nome, telefone: onlyDigits(String(c.fone ?? '')),
+    email: String(b.email ?? c.email ?? '').trim(),
+    novoEmail: String(b.novoEmail ?? '').trim(), novoCpf: onlyDigits(String(b.novoCpf ?? '')),
+    senha: String(b.senha ?? ''), enviarEmail: b.enviarEmail === true,
+  };
+  const j = await chamarApp(corpo);
+  if (acao !== 'consultar') {
+    console.log(`app: ${acao} da conta do cliente ${id} por ${quem}`);
+    statusCache = null;
+    // CPF/e-mail trocados na conta: a ficha acompanha, senão a conta e o cadastro se desencontram
+    if (acao === 'editar' && corpo.novoCpf && corpo.novoCpf !== cpf) await query(`UPDATE dbo.Cliente SET DocumentoNum = @d, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { d: corpo.novoCpf, id });
+    if (acao === 'editar' && corpo.novoEmail) await query(`UPDATE dbo.Cliente SET Email = @e, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { e: corpo.novoEmail.toLowerCase(), id });
+    if (acao === 'criar' && corpo.email && !c.email) await query(`UPDATE dbo.Cliente SET Email = @e, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { e: corpo.email.toLowerCase(), id });
+    await publicarHistoricoDoCliente(String(id)).catch(() => 0); // histórico no app na hora
+  }
+  return { ...j, cliente } as Record<string, any>;
+}
+
 export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
   const { method, url } = req;
   const path = url.pathname.replace(/^\/api\/office/, '');
@@ -484,9 +538,14 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
       const where = q.includes('@') ? 'c.Email LIKE @q' : d.length >= 4 && d.length === q.replace(/[\s.\-()/]/g, '').length ? '(c.DocumentoNum LIKE @d OR c.TelefoneNum LIKE @t)' : 'c.Nome COLLATE Latin1_General_CI_AI LIKE @n';
       rows = await query(`SELECT TOP 100 ${COLS_LISTA} ${DE_LISTA} WHERE ${where} ORDER BY c.Nome`, { q: q.toLowerCase() + '%', d: d + '%', t: '%' + d, n: '%' + q.replace(/\s+/g, '%') + '%' });
       total = rows.length;
-    } else if (filtro === 'hoje' || filtro === 'ativos') {
+    } else if (filtro === 'hoje' || filtro === 'ativos' || filtro === 'app' || filtro === 'convidados') {
       let ids: number[];
       if (filtro === 'hoje') ids = hojeLista.sort((a, b) => a.hora.localeCompare(b.hora)).map((h) => h.id);
+      else if (filtro === 'app' || filtro === 'convidados') {
+        const st = await statusApp();
+        ids = Object.entries(st).filter(([, v]) => (filtro === 'app' ? v.s === 'ativo' : v.s === 'convidado'))
+          .sort((a, b) => (b[1].u ?? 0) - (a[1].u ?? 0)).map(([k]) => Number(k)).filter((n) => n > 0);
+      }
       else {
         const lim = somaDias(hojeSp(), -30);
         const cmp = ordem === 'baterias' ? (a: [string, Resumo], b: [string, Resumo]) => b[1].baterias - a[1].baterias
@@ -505,7 +564,9 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
       total = (await one<{ n: number }>(`SELECT COUNT(*) n FROM dbo.Cliente c WHERE ${where}`))?.n ?? 0;
       rows = await query(`SELECT ${COLS_LISTA} ${DE_LISTA} WHERE ${where} ORDER BY ${ordemSql} OFFSET @ini ROWS FETCH NEXT ${porPag} ROWS ONLY`, { ini });
     }
-    send(200, { total, pagina, porPagina: porPag, ordem, linhas: await completar(rows, hoje, car), atualizadoEm });
+    const st = await statusApp();
+    const linhas = (await completar(rows, hoje, car)).map((l) => ({ ...l, app: st[String((l as { id?: unknown }).id)]?.s ?? null }));
+    send(200, { total, pagina, porPagina: porPag, ordem, linhas, atualizadoEm });
     return true;
   }
 
@@ -547,46 +608,35 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
     return true;
   }
 
-  // conta do app do piloto (painel > Pilotos): consulta, cria, troca e-mail/CPF/senha e gera o convite (e-mail ou WhatsApp).
-  // Quem fala com o app é este servidor (chave de administração); o painel só manda a ação.
-  if ((m = path.match(/^\/pilotos\/(\d+)\/app$/)) && (method === 'GET' || method === 'POST')) {
-    const id = Number(m[1]);
-    const c = await one<{ nome: string; doc: string | null; email: string | null; fone: string | null }>(
-      `SELECT Nome nome, DocumentoNum doc, Email email, TelefoneNum fone FROM dbo.Cliente WHERE Id = @id`, { id });
-    if (!c) throw new HttpError(404, 'Cliente não encontrado.');
-    const base = process.env.MOBILE_IDENTITY_LINK_URL && process.env.MOBILE_ADMIN_TOKEN
-      ? mobileApiEndpoint(process.env.MOBILE_IDENTITY_LINK_URL, '/api/mobile/v1/internal/identity-links') : null;
-    if (!base) throw new HttpError(503, 'Integração com o app não configurada neste servidor.');
-    const b = method === 'POST' ? await req.body() : {};
-    const acao = method === 'GET' ? 'consultar' : String(b.acao ?? '');
-    if (!['consultar', 'criar', 'editar', 'senha', 'convite'].includes(acao)) throw new HttpError(400, 'Ação desconhecida.');
-    const cpf = onlyDigits(String(c.doc ?? ''));
-    if (cpf.length !== 11) { send(200, { semCpf: true, conta: null, cliente: { email: c.email, telefone: c.fone } }); return true; }
-    const corpo = {
-      acao, cpf, clienteId: String(id),
-      nome: c.nome, telefone: onlyDigits(String(c.fone ?? '')),
-      email: String(b.email ?? c.email ?? '').trim(),
-      novoEmail: String(b.novoEmail ?? '').trim(), novoCpf: onlyDigits(String(b.novoCpf ?? '')),
-      senha: String(b.senha ?? ''), enviarEmail: b.enviarEmail === true,
-    };
-    const r = await fetch(new URL('/api/mobile/v1/internal/conta-admin', base), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-mobile-admin-token': process.env.MOBILE_ADMIN_TOKEN! },
-      body: JSON.stringify(corpo), redirect: 'error', signal: AbortSignal.timeout(20_000),
-    }).catch(() => null);
-    if (!r) throw new HttpError(502, 'O app não respondeu. Tente de novo.');
-    const j = (await r.json().catch(() => ({}))) as Record<string, unknown>;
-    if (!r.ok) throw new HttpError(r.status === 401 || r.status === 503 ? 502 : r.status, String(j.erro ?? 'Falha na conta do app.'));
-    if (acao !== 'consultar') {
-      console.log(`app: ${acao} da conta do cliente ${id} por ${req.sessao.nome}`);
-      // CPF trocado na conta: a ficha acompanha, senão a conta e o cadastro se desencontram
-      if (acao === 'editar' && corpo.novoCpf && corpo.novoCpf !== cpf) await query(`UPDATE dbo.Cliente SET DocumentoNum = @d, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { d: corpo.novoCpf, id });
-      if (acao === 'editar' && corpo.novoEmail) await query(`UPDATE dbo.Cliente SET Email = @e, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { e: corpo.novoEmail.toLowerCase(), id });
-      if (acao === 'criar' && corpo.email && !c.email) await query(`UPDATE dbo.Cliente SET Email = @e, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { e: corpo.email.toLowerCase(), id });
-      // histórico no app na hora (sem esperar a rodada automática)
-      await publicarHistoricoDoCliente(String(id)).catch(() => 0);
+  if (path === '/pilotos/app-status' && method === 'GET') { send(200, { status: await statusApp(url.searchParams.get('fresco') === '1') }); return true; }
+
+  // convite em lote (lista de Pilotos): cria a conta de quem tem CPF + e-mail e manda o convite por e-mail
+  if (path === '/pilotos/app-lote' && method === 'POST') {
+    const b = await req.body();
+    const ids = [...new Set((Array.isArray(b.ids) ? b.ids : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, 50);
+    if (!ids.length) throw new HttpError(400, 'Escolha os pilotos.');
+    const resultados: { id: number; ok: boolean; msg: string }[] = [];
+    for (const id of ids) {
+      try {
+        let r = await contaApp(id, 'consultar', {}, req.sessao.nome);
+        if (r.semCpf) { resultados.push({ id, ok: false, msg: 'sem CPF' }); continue; }
+        if (!r.conta) {
+          if (!r.cliente?.email) { resultados.push({ id, ok: false, msg: 'sem e-mail' }); continue; }
+          r = await contaApp(id, 'criar', {}, req.sessao.nome);
+        }
+        r = await contaApp(id, 'convite', { enviarEmail: true }, req.sessao.nome);
+        resultados.push({ id, ok: Boolean(r.emailEnviado), msg: r.emailEnviado ? 'convite enviado' : 'e-mail não saiu' });
+      } catch (er) { resultados.push({ id, ok: false, msg: er instanceof Error ? er.message : 'falhou' }); }
     }
-    send(200, { ...j, cliente: { email: c.email, telefone: c.fone } });
+    statusCache = null;
+    send(200, { resultados });
+    return true;
+  }
+
+  // conta do app do piloto (painel > Pilotos): consulta, cria, troca e-mail/CPF/senha e gera o convite (e-mail ou WhatsApp).
+  if ((m = path.match(/^\/pilotos\/(\d+)\/app$/)) && (method === 'GET' || method === 'POST')) {
+    const b = method === 'POST' ? await req.body() : {};
+    send(200, await contaApp(Number(m[1]), method === 'GET' ? 'consultar' : String(b.acao ?? ''), b, req.sessao.nome));
     return true;
   }
 
