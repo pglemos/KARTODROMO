@@ -692,3 +692,6 @@ input[type="checkbox"], input[type="radio"] {
   cursor: pointer;
 }
 
+
+/* estado vazio com ação: o que fazer a seguir, no lugar de uma instrução solta */
+.vazio .acoesVazio { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--kib-espaco-1); margin-top: var(--kib-espaco-denso-12); }
