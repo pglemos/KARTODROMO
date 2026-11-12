@@ -4,7 +4,7 @@
  * servidor da operação (SRVKART) buscar pelo /api/sync, gravar na tabela de clientes e apagar daqui.
  * No totem o cliente digita CPF, RG, passaporte ou e-mail e os dados já aparecem.
  */
-import { aceiteDoCadastro, esquecerGrupos, identificarCliente, rotasPublicas, rotasSync } from './extras';
+import { aceiteDoCadastro, esquecerGrupos, identificarCliente, rotasPublicas, rotasSync, SITE } from './extras';
 import { chaveDocumento, digitos, validar, type PreCadastro } from './validar';
 import { lembretesSync } from './lembretes';
 import { cancelar, chamar, consultar, diagnostico, garantirCliente, hojeBrasilia, PAGO } from './asaas';
@@ -155,7 +155,7 @@ async function cobrancaDoLink(env: Env, token: string, chave: string, d: PreCada
   const cob = await chamar<{ id: string; invoiceUrl: string }>(env, '/payments', {
     method: 'POST',
     body: JSON.stringify({
-      customer: cliente, billingType: 'UNDEFINED', value: Math.round(Number(g.precoCentavos)) / 100,
+      customer: cliente, billingType: 'PIX', value: Math.round(Number(g.precoCentavos)) / 100,
       dueDate: /^\d{4}-\d{2}-\d{2}$/.test(dia) && dia >= hoje ? dia : hoje,
       description: `Kartódromo de Betim · ${g.bateria} ${dia.split('-').reverse().join('/')} ${String(g.inicio).slice(11, 16)} · ${d.nome} · grupo do(a) ${g.responsavel}`.slice(0, 500),
       externalReference: `grupo-${g.codigo}-${chave}`.slice(0, 100),
@@ -206,6 +206,18 @@ export default {
         return json(g ? 200 : 404, g ? { responsavel: g.responsavel, bateria: g.bateria, inicio: g.inicio, modo: g.modo, precoCentavos: g.precoCentavos, livres: g.livres,
           // a página do cadastro avisa a cobrança só no modo 'cada um paga o seu' (o responsável paga o grupo pelo admin)
           souResponsavel: false, aCobrarCentavos: g.modo === 'individual' && g.livres > 0 ? g.precoCentavos : 0 } : { erro: 'Reserva não encontrada.' });
+      }
+      // Pix ou cartão da mesma cobrança, nunca boleto (dono, 12/11/2026): troca a forma na Asaas se precisar e abre a fatura
+      if (p === '/api/pagar' && req.method === 'GET') {
+        const id = String(url.searchParams.get('id') ?? '');
+        const forma = url.searchParams.get('forma') === 'cartao' ? 'CREDIT_CARD' : 'PIX';
+        if (!/^pay_[A-Za-z0-9]{6,40}$/.test(id)) return json(400, { erro: 'Pagamento inválido.' });
+        const c = await consultar(env, id) as Awaited<ReturnType<typeof consultar>> & { externalReference?: string | null };
+        if (!String(c.externalReference ?? '').startsWith('grupo-')) return json(404, { erro: 'Pagamento não encontrado.' });
+        if (PAGO.has(c.status)) return Response.redirect(c.invoiceUrl, 302);
+        if (c.status !== 'PENDING' && c.status !== 'OVERDUE') return json(409, { erro: 'Esta cobrança não está mais aberta. Fale com a recepção.' });
+        if (c.billingType !== forma) await chamar(env, `/payments/${encodeURIComponent(id)}`, { method: 'POST', body: JSON.stringify({ billingType: forma }) });
+        return Response.redirect(c.invoiceUrl, 302);
       }
       if (p === '/api/grupo/pagamento' && req.method === 'GET') {
         const id = String(url.searchParams.get('id') ?? '');
@@ -358,14 +370,30 @@ export default {
             method: 'POST',
             body: JSON.stringify({
               customer: cliente,
-              billingType: 'UNDEFINED',
+              // nunca boleto (dono, 12/11/2026): nasce Pix; o cartão sai pela página /pagar (troca a forma da mesma cobrança)
+              billingType: 'PIX',
               value: Math.round(Number(c.valorCentavos)) / 100,
               dueDate,
               description: String(c.descricao ?? '').slice(0, 500),
               externalReference: String(c.referencia ?? '').slice(0, 100),
             }),
           });
-          return json(201, { id: cob.id, link: cob.invoiceUrl, status: cob.status });
+          return json(201, { id: cob.id, link: `${SITE}/pagar?id=${cob.id}`, invoiceUrl: cob.invoiceUrl, status: cob.status });
+        }
+        // cobranças antigas criadas com a forma livre (a fatura da Asaas oferecia boleto): passam para Pix (12/11/2026)
+        if (p === '/api/sync/cobrancas/sem-boleto' && req.method === 'POST') {
+          const { ids } = (await req.json().catch(() => ({}))) as { ids?: unknown[] };
+          const res: Record<string, string> = {};
+          for (const id of (Array.isArray(ids) ? ids : []).map(String).filter((x) => /^pay_[A-Za-z0-9]{6,40}$/.test(x)).slice(0, 40)) {
+            try {
+              const c = await consultar(env, id);
+              if (c.status !== 'PENDING' && c.status !== 'OVERDUE') { res[id] = 'fechada'; continue; }
+              if (c.billingType === 'PIX' || c.billingType === 'CREDIT_CARD') { res[id] = 'ok'; continue; }
+              await chamar(env, `/payments/${encodeURIComponent(id)}`, { method: 'POST', body: JSON.stringify({ billingType: 'PIX' }) });
+              res[id] = 'convertida';
+            } catch (e) { res[id] = 'erro: ' + (e as Error).message.slice(0, 120); if (/Cota/i.test((e as Error).message)) break; }
+          }
+          return json(200, res);
         }
         const mGrupo = p.match(/^\/api\/sync\/cobranca\/([A-Za-z0-9_]{6,40})$/);
         if (mGrupo && req.method === 'GET') {

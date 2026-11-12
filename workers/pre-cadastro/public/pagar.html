@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#030504">
+<meta name="robots" content="noindex">
+<title>Pagar sua vaga · Kartódromo de Betim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@500;600;700&display=swap">
+<style>
+  :root { color-scheme: dark; --fundo: #030504; --cartao: #0b100c; --cartao-2: #111712; --linha: rgba(255,255,255,.12); --linha-forte: rgba(255,255,255,.24);
+    --texto: #f7faf6; --suave: #a8b2aa; --verde: #00e676; --tinta: #03140b; --erro: #ff7a6b; --titulo: 'Anton', Impact, sans-serif; --corpo: 'Rajdhani', 'Segoe UI', Arial, sans-serif; --raio: 4px; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: radial-gradient(900px 340px at 50% 0%, rgba(0,230,118,.14), rgba(0,230,118,0) 70%), var(--fundo); color: var(--texto); font: 500 17px/1.5 var(--corpo); }
+  main { max-width: 480px; margin: 0 auto; padding: 28px 16px 40px; }
+  .logo { display: block; width: min(240px, 70vw); margin: 0 auto 22px; }
+  .cartao { background: linear-gradient(180deg, var(--cartao-2), var(--cartao)); border: 1px solid var(--linha); border-radius: var(--raio); padding: 24px 18px; text-align: center; }
+  h1 { font: 400 34px/1 var(--titulo); text-transform: uppercase; margin: 0 0 8px; }
+  p { color: var(--suave); margin: 0 0 18px; }
+  a.botao { display: flex; align-items: center; justify-content: center; min-height: 58px; margin: 0 0 12px; background: var(--verde); color: var(--tinta); font: 400 20px/1 var(--titulo); text-transform: uppercase; letter-spacing: .03em; text-decoration: none; border-radius: var(--raio); }
+  a.botao.sec { background: transparent; color: var(--texto); border: 1px solid var(--linha-forte); }
+  a.botao:focus-visible { outline: 2px solid var(--verde); outline-offset: 3px; }
+  .erro { color: var(--erro); }
+  small { display: block; color: var(--suave); margin-top: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <img class="logo" src="/kib-logo-escuro.png" alt="Kartódromo Internacional de Betim" width="720" height="200" style="height:auto">
+  <section class="cartao">
+    <h1>Pagar sua vaga</h1>
+    <p id="txt">Escolha como prefere pagar. Abre a página segura da Asaas.</p>
+    <div id="botoes">
+      <a class="botao" id="pix" href="#">Pagar com Pix</a>
+      <a class="botao sec" id="cartao" href="#">Pagar com cartão</a>
+    </div>
+    <small>Depois de pagar, a confirmação chega ao kartódromo em alguns minutos. Dúvidas? WhatsApp da recepção (31) 99884-2898.</small>
+  </section>
+</main>
+<script>
+  const id = new URLSearchParams(location.search).get('id') || '';
+  if (!/^pay_[A-Za-z0-9]{6,40}$/.test(id)) {
+    document.getElementById('botoes').hidden = true;
+    const t = document.getElementById('txt'); t.textContent = 'Link de pagamento inválido. Peça um novo à recepção.'; t.className = 'erro';
+  } else {
+    document.getElementById('pix').href = '/api/pagar?forma=pix&id=' + encodeURIComponent(id);
+    document.getElementById('cartao').href = '/api/pagar?forma=cartao&id=' + encodeURIComponent(id);
+  }
+</script>
+</body>
+</html>

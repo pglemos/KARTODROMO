@@ -209,3 +209,47 @@ describe('check-in de quem entrou pelo link do grupo', () => {
     expect((await ck({ cpf: '123' })).status).toBe(400);
   });
 });
+
+describe('nunca boleto: Pix ou cartão da mesma cobrança', () => {
+  const asaas = (pagamento: Record<string, unknown>) => {
+    const chamadas: { url: string; metodo: string; corpo: unknown }[] = [];
+    const f = vi.spyOn(globalThis, 'fetch').mockImplementation(async (u, init) => {
+      chamadas.push({ url: String(u), metodo: init?.method ?? 'GET', corpo: init?.body ? JSON.parse(String(init.body)) : null });
+      return new Response(JSON.stringify(pagamento), { status: 200 });
+    });
+    return { chamadas, f };
+  };
+  const base = { id: 'pay_abc123', status: 'PENDING', billingType: 'PIX', invoiceUrl: 'https://www.asaas.com/i/abc123', externalReference: 'grupo-12-34' };
+
+  it('cartão: troca a forma da cobrança e abre a fatura', async () => {
+    env.ASAAS_API_KEY = 'x';
+    const { chamadas, f } = asaas(base);
+    const r = await chamar('/api/pagar?forma=cartao&id=pay_abc123');
+    expect(r.status).toBe(302);
+    expect(r.headers.get('location')).toBe('https://www.asaas.com/i/abc123');
+    expect(chamadas.find((c) => c.metodo === 'POST')?.corpo).toEqual({ billingType: 'CREDIT_CARD' });
+    f.mockRestore();
+  });
+
+  it('Pix numa cobrança já Pix: só abre a fatura', async () => {
+    env.ASAAS_API_KEY = 'x';
+    const { chamadas, f } = asaas(base);
+    expect((await chamar('/api/pagar?forma=pix&id=pay_abc123')).status).toBe(302);
+    expect(chamadas.some((c) => c.metodo === 'POST')).toBe(false);
+    f.mockRestore();
+  });
+
+  it('cobrança que não é de grupo não é mexida', async () => {
+    env.ASAAS_API_KEY = 'x';
+    const { f } = asaas({ ...base, externalReference: 'outra-coisa' });
+    expect((await chamar('/api/pagar?forma=cartao&id=pay_abc123')).status).toBe(404);
+    f.mockRestore();
+  });
+
+  it('nenhuma cobrança do código nasce como UNDEFINED (boleto)', async () => {
+    const { readFileSync } = await import('node:fs');
+    for (const arq of ['workers/pre-cadastro/src/index.ts', 'workers/pre-cadastro/src/asaas.ts', 'workers/pre-cadastro/src/reservas.ts', 'workers/pre-cadastro/src/extras.ts']) {
+      expect(readFileSync(arq, 'utf8')).not.toMatch(/billingType:\s*'(UNDEFINED|BOLETO)'/);
+    }
+  });
+});

@@ -756,8 +756,9 @@
     topo.h1.innerHTML = 'Quase <em>lá</em>'; topo.p.textContent = 'Leva menos de um minuto.'; marcarPassos(2);
     const quem = gg.souResponsavel ? '' : (gg.responsavel ? ' no grupo de ' + esc(gg.responsavel) : '');
     c.innerHTML = (gg.bateria ? '<p class="contexto">' + esc(gg.bateria) + ' · ' + quando(gg.inicio) + (nome1 ? ' · cadastro de ' + esc(nome1) : '') + '</p>' : '') + '<p>Pagamento d' + (gg.modo ? (gg.modo === 'individual' ? 'a sua vaga' : gg.modo === 'sinal' ? 'o sinal do grupo' : 'o grupo todo') : 'a sua vaga') + quem + '</p><p class="valor">' + brl(pg.valorCentavos) + '</p>' +
-      '<a class="botao" href="' + encodeURI(pg.link) + '" target="_blank" rel="noopener">Pagar agora · Pix ou cartão</a>' +
-      '<ol><li>Toque no botão: abre a página de pagamento segura da Asaas.</li><li>Escolha Pix (copie o código) ou cartão.</li><li>Volte aqui: a confirmação aparece sozinha.</li></ol>' +
+      '<a class="botao" href="/api/pagar?forma=pix&id=' + encodeURIComponent(pg.id) + '" target="_blank" rel="noopener">Pagar com Pix</a>' +
+      '<a class="botao" style="margin-top:10px;background:transparent;color:var(--texto);border:1px solid var(--linha-forte)" href="/api/pagar?forma=cartao&id=' + encodeURIComponent(pg.id) + '" target="_blank" rel="noopener">Pagar com cartão</a>' +
+      '<ol><li>Toque em Pix ou cartão: abre a página de pagamento segura da Asaas.</li><li>No Pix, copie o código no app do banco.</li><li>Volte aqui: a confirmação aparece sozinha.</li></ol>' +
       '<p class="estado" id="pagarEstado" role="status">Aguardando o pagamento.</p><button type="button" class="link" id="jaPaguei">Já paguei: verificar agora</button>';
     c.hidden = false;
     if ($('ajudaPag')) { $('ajudaPag').hidden = false; $('ajudaPag').open = true; }
