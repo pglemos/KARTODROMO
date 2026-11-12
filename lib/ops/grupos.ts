@@ -1486,3 +1486,51 @@ export async function soltarVagasNaoPagasDoSite(log: Log) {
   if (vagas.length) ultimoResumoSite = '';
   return vagas.length;
 }
+
+// ---------------------------------------------------------------- lembretes por e-mail (12/11/2026)
+
+let proximosLembretes = 0;
+/**
+ * Lembretes dos grupos (decisão do dono: e-mail automático). Até 2 dias antes da bateria (e com mais de 2 h para ela):
+ *  - quem fez o cadastro num grupo "cada um paga o seu" e não pagou recebe o link de pagamento dele;
+ *  - quem organiza recebe o link do grupo quando ainda há vagas sem cadastro.
+ * O site monta o texto, envia e guarda a chave: cada lembrete sai uma vez só. Roda a cada 15 min.
+ */
+export async function enviarLembretesDosGrupos(log: Log) {
+  if (!siteUrl() || !siteChave() || Date.now() < proximosLembretes) return 0;
+  proximosLembretes = Date.now() + 15 * 60_000;
+  const janela = `b.Inicio > DATEADD(hour, 2, SYSDATETIME()) AND b.Inicio <= DATEADD(hour, 48, SYSDATETIME())`;
+  const pagar = await query<{ grupoId: number; pilotoId: number; nome: string; email: string; bateria: string; inicio: string; preco: number; origem: string; responsavel: string; token: string; cobranca: string | null }>(
+    `SELECT g.Id grupoId, p.Id pilotoId, c.Nome nome, c.Email email, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio, g.PrecoCentavos preco, g.Origem origem,
+            r.Nome responsavel, rt.Token token, cob.Link cobranca
+       FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente r ON r.Id = g.ResponsavelId
+       JOIN dbo.ReservaGrupoPiloto p ON p.GrupoId = g.Id AND p.ClienteId IS NOT NULL
+       JOIN dbo.Cliente c ON c.Id = p.ClienteId
+       JOIN dbo.Inscricao i ON i.Id = p.InscricaoId
+       JOIN dbo.ReservaGrupoPiloto rt ON rt.GrupoId = g.Id AND rt.Responsavel = 1
+       OUTER APPLY (SELECT TOP 1 Link FROM dbo.ReservaGrupoCobranca WHERE PilotoId = p.Id AND Status = 'aguardando' ORDER BY Id DESC) cob
+      WHERE g.Status = 'ativa' AND g.Modo = 'individual' AND ${janela}
+        AND i.Status <> 'cancelada' AND i.Pago = 0 AND i.VendaId IS NULL AND c.Email LIKE '%_@_%._%'
+        -- só com a cobrança aberta: o link dela paga direto na Asaas (refazer o cadastro pelo link do grupo é ruim)
+        AND cob.Link LIKE 'https://%'`,
+  );
+  const cadastros = await query<{ grupoId: number; codigo: string; nome: string; email: string; bateria: string; inicio: string; origem: string; modo: string; token: string; faltam: number }>(
+    `SELECT g.Id grupoId, g.Codigo codigo, r.Nome nome, r.Email email, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio, g.Origem origem, g.Modo modo, rt.Token token, COUNT(*) faltam
+       FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente r ON r.Id = g.ResponsavelId
+       JOIN dbo.ReservaGrupoPiloto rt ON rt.GrupoId = g.Id AND rt.Responsavel = 1
+       JOIN dbo.ReservaGrupoPiloto p ON p.GrupoId = g.Id AND p.Responsavel = 0 AND p.ClienteId IS NULL
+       JOIN dbo.Inscricao i ON i.Id = p.InscricaoId AND i.Status <> 'cancelada'
+      WHERE g.Status = 'ativa' AND ${janela} AND r.Email LIKE '%_@_%._%'
+      GROUP BY g.Id, g.Codigo, r.Nome, r.Email, b.Nome, b.Inicio, g.Origem, g.Modo, rt.Token`,
+  );
+  const lembretes = [
+    ...pagar.map((x) => ({ chave: `pagar-${x.pilotoId}-${x.inicio.replace(/\D/g, '')}`, tipo: 'pagar', para: x.email, nome: x.nome, bateria: x.bateria, inicio: x.inicio,
+      link: String(x.cobranca), responsavel: primeiroNome(x.responsavel), valorCentavos: Number(x.preco) || 0, soltaEm24h: x.origem === 'site' })),
+    ...cadastros.map((x) => ({ chave: `cadastros-${x.grupoId}-${x.inicio.replace(/\D/g, '')}`, tipo: 'cadastros', para: x.email, nome: x.nome, bateria: x.bateria, inicio: x.inicio,
+      link: linkCadastro(x.token), painel: linkPainel(x.codigo), faltam: Number(x.faltam) || 0, soltaEm24h: x.origem === 'site' && x.modo === 'individual' })),
+  ];
+  if (!lembretes.length) return 0;
+  const r = (await site('/api/sync/lembretes', { method: 'POST', body: JSON.stringify({ lembretes }) })) as { enviados?: number; falhas?: number };
+  if (r?.enviados || r?.falhas) log(`grupos: lembretes por e-mail ${r.enviados ?? 0} enviado(s)${r.falhas ? `, ${r.falhas} falha(s)` : ''}`);
+  return Number(r?.enviados) || 0;
+}

@@ -149,6 +149,12 @@ export async function sendMobileAccountDeletionEmail(env: MobileEmailEnv, to: st
   return entregar(env, to, subject, text, html);
 }
 
+/** E-mail avulso pelo mesmo caminho (Resend → binding → fila): lembretes dos grupos e outros avisos do site. */
+export async function enviarEmail(env: MobileEmailEnv, to: string, subject: string, text: string, html: string) {
+  if (!mobileEmailConfigured(env)) return false;
+  return entregar(env, to, subject, text, html);
+}
+
 /**
  * Ordem de entrega (11/11/2026): Resend primeiro (API HTTP, chega em segundos). Se falhar, binding do Cloudflare
  * (quando liberado) e, por último, a fila durável que o servidor da cronometragem envia pela HostGator.

@@ -6,6 +6,7 @@
  */
 import { aceiteDoCadastro, esquecerGrupos, identificarCliente, rotasPublicas, rotasSync } from './extras';
 import { chaveDocumento, digitos, validar, type PreCadastro } from './validar';
+import { lembretesSync } from './lembretes';
 import { cancelar, chamar, consultar, diagnostico, garantirCliente, hojeBrasilia, PAGO } from './asaas';
 import { agendaPublica, criarPedido, politicaPublica, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
 import { handleMobileAccountEmail, handleMobileAuth, handleMobileContaAdmin, type MobileAccountAdminEnv } from './mobile/auth';
@@ -388,6 +389,7 @@ export default {
           for (const id of validos) await env.PRE.delete(`grupos/pagos/${id}.json`);
           return json(200, { ok: true, removidos: validos.length });
         }
+        if (p === '/api/sync/lembretes' && req.method === 'POST') return await lembretesSync(req, env);
         if (p === '/api/sync/mobile/coupons' || p.startsWith('/api/sync/mobile/coupons/')) return await handleMobileCouponsSync(req, env);
         if (p === '/api/sync/pedidos' && req.method === 'GET') return await syncPedidos(env);
         if (p === '/api/sync/pedido' && req.method === 'POST') return await syncResultado(req, env, ctx);
