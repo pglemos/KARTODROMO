@@ -5,6 +5,7 @@
  *   e os desvios: recusado (sem vaga), expirado (15 min sem pagar), pago_sem_vaga (pagou depois e o horário lotou).
  */
 import { asaasLigado, buscarCobrancaPorReferencia, cancelar, consultar, criarCobranca, EVENTOS_PAGO, garantirCliente, hojeBrasilia, PAGO, pagasDesde, qrPix, type AsaasEnv } from './asaas';
+import { cupomDoPedido } from './extras';
 import { chaveDocumento, codigoReserva, digitos, validarReserva, type Acompanhante, type Agenda, type PreCadastro } from './validar';
 import { POLITICA_ACEITE, POLITICA_SECOES, POLITICA_TITULO, POLITICA_VERSAO } from '../../../src/config/politica-cancelamento';
 
@@ -121,6 +122,8 @@ export async function criarPedido(req: Request, env: EnvReservas, excedeuLimite:
     compradorPilota: v.dados.compradorPilota,
     cliente: { ...v.dados.cliente, chave: chaveDocumento('CPF', v.dados.cliente.documento) },
     politica: { versao: POLITICA_VERSAO, aceitaEm: agora },
+    // cupom: o SRVKART confere e aplica ao separar as vagas (o valor da cobrança já vem com o desconto)
+    ...(cupomDoPedido((corpo as Record<string, unknown>).cupom) ? { cupom: cupomDoPedido((corpo as Record<string, unknown>).cupom)! } : {}),
   };
   await gravarPedido(env, p, true);
   return json(201, { id: p.id, codigo: p.codigo });

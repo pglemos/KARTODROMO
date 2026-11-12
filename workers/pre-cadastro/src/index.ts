@@ -4,6 +4,7 @@
  * servidor da operação (SRVKART) buscar pelo /api/sync, gravar na tabela de clientes e apagar daqui.
  * No totem o cliente digita CPF, RG, passaporte ou e-mail e os dados já aparecem.
  */
+import { aceiteDoCadastro, esquecerGrupos, rotasPublicas, rotasSync } from './extras';
 import { chaveDocumento, digitos, validar, type PreCadastro } from './validar';
 import { cancelar, chamar, consultar, diagnostico, garantirCliente, hojeBrasilia, PAGO } from './asaas';
 import { agendaPublica, criarPedido, politicaPublica, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
@@ -69,7 +70,10 @@ async function receber(req: Request, env: Env) {
     if (v.dados.tipoDocumento !== 'CPF') return json(400, { erro: 'Para pagar a vaga pelo link do grupo, use o CPF.' });
     pagamento = await cobrancaDoLink(env, reserva!, chave, v.dados, grupo);
   }
-  const registro = { chave, recebidoEm: new Date().toISOString(), ...v.dados, ...(reserva ? { reserva } : {}),
+  // termo de responsabilidade aceito no cadastro (texto publicado pelo SRVKART)
+  const aceite = await aceiteDoCadastro(env, corpo as Record<string, unknown>, req.headers.get('cf-connecting-ip'));
+  if (aceite.erro) return json(409, { erro: aceite.erro });
+  const registro = { chave, recebidoEm: new Date().toISOString(), ...v.dados, ...(reserva ? { reserva } : {}), ...(aceite.termo ? { termo: aceite.termo } : {}),
     ...(pagamento ? { cobranca: { id: pagamento.id, link: pagamento.link, valorCentavos: pagamento.valorCentavos } } : {}) };
   // um cadastro por documento: se a pessoa enviar de novo, vale o último
   await env.PRE.put(`pendentes/${chave}.json`, JSON.stringify(registro), { httpMetadata: { contentType: 'application/json' } });
@@ -169,10 +173,14 @@ export default {
     const url = new URL(req.url);
     const p = url.pathname;
     try {
+      const extra = await rotasPublicas(req, env, p, url, excedeuLimite);
+      if (extra) return extra;
       if (p === '/api/pre-cadastro' && req.method === 'POST') return await receber(req, env);
       if (p === '/api/grupo' && req.method === 'GET') {
         const g = await grupoDoLink(env, String(url.searchParams.get('r') ?? '').replace(/[^A-Za-z0-9]/g, '').slice(0, 24));
-        return json(g ? 200 : 404, g ? { responsavel: g.responsavel, bateria: g.bateria, inicio: g.inicio, modo: g.modo, precoCentavos: g.precoCentavos, livres: g.livres } : { erro: 'Reserva não encontrada.' });
+        return json(g ? 200 : 404, g ? { responsavel: g.responsavel, bateria: g.bateria, inicio: g.inicio, modo: g.modo, precoCentavos: g.precoCentavos, livres: g.livres,
+          // a página do cadastro avisa a cobrança só no modo 'cada um paga o seu' (o responsável paga o grupo pelo admin)
+          souResponsavel: false, aCobrarCentavos: g.modo === 'individual' && g.livres > 0 ? g.precoCentavos : 0 } : { erro: 'Reserva não encontrada.' });
       }
       if (p === '/api/grupo/pagamento' && req.method === 'GET') {
         const id = String(url.searchParams.get('id') ?? '');
@@ -224,6 +232,8 @@ export default {
       if (p === '/api/asaas/webhook' && req.method === 'POST') return await webhookAsaas(req, env);
       if (p.startsWith('/api/sync/')) {
         if (!autorizado(req, env)) return json(401, { erro: 'Não autorizado.' });
+        const sync = await rotasSync(req, env, p);
+        if (sync) return sync;
         if (p === '/api/sync/pendentes' && req.method === 'GET') return json(200, await listar(env));
         if (p === '/api/sync/buscar' && req.method === 'GET') return json(200, await buscar(env, url.searchParams.get('q') ?? ''));
         if (p === '/api/sync/concluir' && req.method === 'POST') {
@@ -239,6 +249,7 @@ export default {
           const lista = (Array.isArray(grupos) ? grupos.slice(0, 500) : []).filter((g) => Array.isArray(g.tokens));
           await env.PRE.put('grupos/todos.json', JSON.stringify(lista), { httpMetadata: { contentType: 'application/json' } });
           cacheGrupos = null;
+          esquecerGrupos();
           return json(200, { gravados: lista.length });
         }
         if (p === '/api/sync/asaas' && req.method === 'GET') return json(200, await diagnostico(env));
