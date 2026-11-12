@@ -32,7 +32,7 @@ describe('ligações do servidor para termo e grupos do totem', () => {
   it('retorna os grupos disponíveis pela rota pública', async () => {
     const send = vi.fn();
     const grupos = [{ id: 7, responsavel: 'Marcus', aguardando: 2 }];
-    const route = carregar('totemRoutes', '// ---------------------------------------------------------------- login', { send, gruposDoDiaNoTotem: async () => grupos });
+    const route = carregar('totemRoutes', '// ---------------------------------------------------------------- login', { send, gruposDoDiaNoTotem: async () => grupos, garantirColunasEventos: async () => undefined });
     expect(await route({ method: 'GET' }, {}, '/api/totem/grupos')).toBe(true);
     expect(send).toHaveBeenCalledWith({}, 200, grupos);
   });

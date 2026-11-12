@@ -14,6 +14,7 @@ import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { insertCliente, one, onlyDigits, query, tx, type ClienteInput } from './db';
 import { HttpError, cancelarReserva, exigePodeFecharBateria, exigePermissaoOffice, inscreverN, moverReservas } from './office';
 import type { Sessao } from './auth';
+import { ANIVERSARIO_MIN_CONVIDADOS, ANIVERSARIO_PRECO_PADRAO } from './eventos-schema';
 
 type Req = { method: string; url: URL; body: () => Promise<Record<string, unknown>>; sessao: Sessao };
 type Res = (status: number, body: unknown) => void;
@@ -62,13 +63,27 @@ function faltaNoCadastro(c: Linha | null): string[] {
 type GrupoRow = {
   id: number; codigo: string; bateriaId: number; vagas: number; disponiveis: number; inicio: string; bateria: string; responsavelId: number; responsavel: string; responsavelTelefone: string | null;
   origem: string; modo: string; preco: number; sinalPct: number; observacao: string | null; status: string; criadoEm: string; criadoPor: string | null;
+  aniversario?: boolean | number; precoAniversariante?: number | null; campeonato?: boolean | number;
 };
+
+/**
+ * Promoção do aniversariante: com pelo menos ANIVERSARIO_MIN_CONVIDADOS convidados ativos, a vaga do responsável
+ * (o aniversariante) custa precoAniversariante; abaixo disso ele paga o preço normal do grupo.
+ */
+export function precoDoPiloto(g: Pick<GrupoRow, 'preco' | 'aniversario' | 'precoAniversariante'>, responsavel: boolean, ativos: number) {
+  const preco = Number(g.preco) || 0;
+  if (!responsavel || !g.aniversario) return preco;
+  if (ativos - 1 < ANIVERSARIO_MIN_CONVIDADOS) return preco;
+  const p = g.precoAniversariante == null ? ANIVERSARIO_PRECO_PADRAO : Number(g.precoAniversariante);
+  return Math.max(0, Math.min(preco, p));
+}
 
 export async function carregarGrupos(where: string, params: Record<string, unknown>) {
   const grupos = await query<GrupoRow>(
     `SELECT g.Id id, g.Codigo codigo, g.BateriaId bateriaId, b.Vagas vagas, b.Vagas - (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') disponiveis, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Nome bateria, g.ResponsavelId responsavelId,
             r.Nome responsavel, r.Telefone responsavelTelefone, g.Origem origem, g.Modo modo, g.PrecoCentavos preco, g.SinalPct sinalPct, g.Observacao observacao,
-            g.Status status, CONVERT(varchar(16), g.CriadoEm, 126) criadoEm, u.Nome criadoPor
+            g.Status status, CONVERT(varchar(16), g.CriadoEm, 126) criadoEm, u.Nome criadoPor,
+            g.Aniversario aniversario, g.PrecoAniversarianteCentavos precoAniversariante, b.Campeonato campeonato
        FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente r ON r.Id = g.ResponsavelId LEFT JOIN dbo.Usuario u ON u.Id = g.CriadoPor
       WHERE ${where} ORDER BY b.Inicio, g.Id`,
     params,
@@ -124,7 +139,6 @@ export async function carregarGrupos(where: string, params: Record<string, unkno
 
 /** Mesmo cálculo da tela: quanto cada piloto já tem coberto e quem ainda falta. */
 export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobrancas: Linha[]) {
-  const preco = Number(g.preco) || 0;
   const ativos = pilotos.filter((p) => p.inscricaoStatus !== 'cancelada');
   const n = ativos.length;
   const idsAtivos = new Set(ativos.map((p) => Number(p.id)));
@@ -138,13 +152,19 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
     else doGrupo += v;
   }
   // pago no caixa da Recepção ou pelo site: a vaga já vem paga e não depende do painel
-  const pagosFora = ativos.filter((p) => p.inscricaoPaga && !p.pagoPeloGrupo).length;
-  const restantes = Math.max(1, n - pagosFora);
+  const precoDe = (p: Linha) => precoDoPiloto(g, Boolean(p.responsavel), n);
+  const fora_ = (p: Linha) => Boolean(p.inscricaoPaga && !p.pagoPeloGrupo);
+  const pagosForaValor = ativos.filter(fora_).reduce((a, p) => a + precoDe(p), 0);
+  // o pagamento "do grupo" se divide proporcionalmente ao preço de cada vaga (a do aniversariante custa menos)
+  const somaRestantes = ativos.filter((p) => !fora_(p)).reduce((a, p) => a + precoDe(p), 0);
+  const restantes = Math.max(1, ativos.filter((p) => !fora_(p)).length);
   const pagoPainel = pagamentosAtivos.reduce((a, pg) => a + (Number(pg.valor) || 0), 0);
   const lista = ativos.map((p) => {
-    const fora = Boolean(p.inscricaoPaga && !p.pagoPeloGrupo);
-    const dela = fora ? preco : (porPiloto.get(Number(p.id)) ?? 0) + doGrupo / restantes;
-    const ok = preco <= 0 || dela >= preco - 0.5;
+    const fora = fora_(p);
+    const precoP = precoDe(p);
+    const parteDoGrupo = somaRestantes > 0 ? doGrupo * precoP / somaRestantes : doGrupo / restantes;
+    const dela = fora ? precoP : (porPiloto.get(Number(p.id)) ?? 0) + parteDoGrupo;
+    const ok = precoP <= 0 || dela >= precoP - 0.5;
     const cliente = p.documento !== undefined && (p.clienteId || p.responsavel) ? { documento: p.documento, email: p.email, peso: p.peso, telefone: p.clienteTelefone } : null;
     const falta = faltaNoCadastro(cliente);
     const cadastro = (p.clienteId || p.responsavel) && !falta.length ? 'completo' : p.cadastroEm || p.clienteId ? 'incompleto' : p.linkEnviadoEm ? 'enviado' : 'pendente';
@@ -152,19 +172,25 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
       id: p.id, ordem: p.ordem, nome: p.nome || p.clienteNome || null, telefone: p.telefone || p.clienteTelefone || null, menor: Boolean(p.menor), responsavel: Boolean(p.responsavel),
       clienteId: p.clienteId ?? (p.responsavel ? g.responsavelId : null), inscricaoId: p.inscricaoId, kart: p.kart ?? null, termo: Boolean(p.termoEm) || Boolean(p.termoOnline), termoOnline: Boolean(p.termoOnline), termoImpresso: Boolean(p.termoEm),
       link: linkCadastro(String(p.token)), linkEnviadoEm: p.linkEnviadoEm, cadastroEm: p.cadastroEm, cadastro, falta: cadastro === 'completo' ? [] : falta,
-      pago: ok, pagoNoCaixa: fora, valorPago: Math.min(Math.round(dela), preco), falta_centavos: Math.max(0, Math.round(preco - dela)),
+      preco: precoP, aniversariante: Boolean(g.aniversario) && Boolean(p.responsavel),
+      pago: ok, pagoNoCaixa: fora, valorPago: Math.min(Math.round(dela), precoP), falta_centavos: Math.max(0, Math.round(precoP - dela)),
       cobranca: cobrancas.find((c) => c.pilotoId === p.id && c.status === 'aguardando') ?? null,
     };
   });
-  const total = n * preco;
-  const pago = Math.min(total, pagoPainel + pagosFora * preco);
+  const total = lista.reduce((a, p) => a + p.preco, 0);
+  const pago = Math.min(total, pagoPainel + pagosForaValor);
+  const convidados = Math.max(0, n - 1);
+  const promocao = g.aniversario ? {
+    ativa: convidados >= ANIVERSARIO_MIN_CONVIDADOS, convidados, minimo: ANIVERSARIO_MIN_CONVIDADOS,
+    precoAniversariante: g.precoAniversariante == null ? ANIVERSARIO_PRECO_PADRAO : Number(g.precoAniversariante),
+  } : null;
   const sinal = Math.round(total * (Number(g.sinalPct) || 0) / 100);
   const responsavel = pilotos.find((p) => p.responsavel);
   return {
     ...g, linkGrupo: responsavel?.token ? linkCadastro(String(responsavel.token)) : null, linkPainel: linkPainel(String(g.codigo)), pilotos: lista, pagamentos: pagamentos.map((pg) => {
       const p = pilotos.find((p) => Number(p.id) === Number(pg.pilotoId));
       return { ...pg, pilotoNome: p?.nome || p?.clienteNome || null, pilotoCancelado: p?.inscricaoStatus === 'cancelada' };
-    }), n, total, pago, falta: Math.max(0, total - pago), sinal,
+    }), n, total, pago, falta: Math.max(0, total - pago), sinal, aniversario: Boolean(g.aniversario), campeonato: Boolean(g.campeonato), promocao,
     pagos: lista.filter((p) => p.pago).length, cadastrados: lista.filter((p) => p.cadastro === 'completo').length,
     prontos: lista.filter((p) => p.pago && p.cadastro === 'completo').length,
     cobrancaGrupo: cobrancas.find((c) => !c.pilotoId && c.status === 'aguardando') ?? null,
@@ -185,11 +211,14 @@ export async function aplicarPagos(grupoId: number) {
   const g = await grupo(grupoId);
   for (const p of g.pilotos) {
     if (!p.inscricaoId || p.pagoNoCaixa) continue;
+    // o caixa da Recepção cobra Inscricao.PrecoCentavos: a vaga do aniversariante acompanha a promoção
+    await query(`UPDATE dbo.Inscricao SET PrecoCentavos = @preco, AtualizadoEm = SYSDATETIME()
+      WHERE Id = @id AND Pago = 0 AND Status <> 'cancelada' AND ISNULL(PrecoCentavos, -1) <> @preco`, { id: p.inscricaoId, preco: p.preco });
     if (p.pago) {
       const feito = await one<{ Id: number }>(
         `UPDATE dbo.Inscricao SET Pago = 1, ValorCentavos = @preco, Status = 'confirmada', AtualizadoEm = SYSDATETIME()
            OUTPUT inserted.Id WHERE Id = @id AND Pago = 0 AND Status <> 'cancelada'`,
-        { id: p.inscricaoId, preco: g.preco },
+        { id: p.inscricaoId, preco: p.preco },
       );
       if (feito) await query(`UPDATE dbo.ReservaGrupoPiloto SET PagoPeloGrupo = 1 WHERE Id = @id`, { id: p.id });
     } else {
@@ -372,18 +401,21 @@ const primeiroNome = (nome: string) => {
  * para o amigo se reconhecer. Só o primeiro nome do responsável aparece (privacidade).
  */
 export async function gruposDoDiaNoTotem() {
-  const rows = await query<{ id: number; responsavel: string; bateriaId: number; inicio: string; total: number }>(
-    `SELECT g.Id id, r.Nome responsavel, g.BateriaId bateriaId, CONVERT(varchar(16), b.Inicio, 126) inicio,
+  const rows = await query<{ id: number; responsavel: string; bateriaId: number; inicio: string; total: number; aniversario: boolean; bateria: string; campeonato: boolean }>(
+    `SELECT g.Id id, r.Nome responsavel, g.BateriaId bateriaId, CONVERT(varchar(16), b.Inicio, 126) inicio, g.Aniversario aniversario, b.Nome bateria, b.Campeonato campeonato,
             (SELECT COUNT(*) FROM dbo.ReservaGrupoPiloto p JOIN dbo.Inscricao i ON i.Id = p.InscricaoId AND i.Status <> 'cancelada' WHERE p.GrupoId = g.Id) total
        FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente r ON r.Id = g.ResponsavelId
       WHERE g.Status = 'ativa' AND b.Status <> 'cancelada' AND CONVERT(date, b.Inicio) = CONVERT(date, SYSDATETIME())
         AND b.Inicio >= DATEADD(MINUTE, -45, SYSDATETIME())
       ORDER BY b.Inicio, g.Id`,
   );
-  const out: { id: number; responsavel: string; inicio: string; total: number; aguardando: number; bateriaId: number }[] = [];
+  const out: { id: number; responsavel: string; inicio: string; total: number; aguardando: number; bateriaId: number; aniversario: boolean; titulo: string }[] = [];
   for (const g of rows) {
     const aguardando = (await vagasAguardando(g.id)).length;
-    if (aguardando > 0) out.push({ id: g.id, responsavel: primeiroNome(g.responsavel), inicio: g.inicio, total: Number(g.total), aguardando, bateriaId: g.bateriaId });
+    const quem = primeiroNome(g.responsavel);
+    // campeonato aparece pelo nome do campeonato (nunca "grupo do organizador"); aniversário destaca o aniversariante
+    const titulo = g.campeonato ? String(g.bateria || 'Campeonato') : g.aniversario ? `Aniversário do(a) ${quem}` : `Grupo do(a) ${quem}`;
+    if (aguardando > 0) out.push({ id: g.id, responsavel: quem, inicio: g.inicio, total: Number(g.total), aguardando, bateriaId: g.bateriaId, aniversario: Boolean(g.aniversario), titulo });
   }
   return out;
 }
@@ -889,6 +921,14 @@ export async function desvincularPilotoDoGrupo(
   });
 }
 
+/** Campos da promoção do aniversariante vindos do painel: { aniversario: true, precoAniversarianteCentavos?: 9000 }. */
+function aniversarioDe(b: Record<string, unknown>) {
+  const aniv = b.aniversario === true || b.aniversario === 1 || b.aniversario === '1';
+  const precoAniv = aniv && b.precoAniversarianteCentavos != null && b.precoAniversarianteCentavos !== ''
+    ? Math.max(0, Math.round(Number(b.precoAniversarianteCentavos)) || 0) : aniv ? ANIVERSARIO_PRECO_PADRAO : null;
+  return { aniv: aniv ? 1 : 0, precoAniv };
+}
+
 export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
   const { method, url, sessao } = req;
   const path = url.pathname.replace(/^\/api\/office/, '');
@@ -976,9 +1016,9 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
       if (!aberta || aberta.status !== 'aberta' || aberta.fechada) throw new HttpError(409, 'Abra a bateria antes de criar outro grupo.');
       const insc = await inscreverN(bateriaId, responsavelId, pilotos.length, origem === 'site' ? 'site' : 'recepcao', sessao.uid, `Reserva em grupo pelo painel web${obs ? ` · ${obs}` : ''}`.slice(0, 400), false, { produtoId: bat.produtoId, vagaDoGrupo: true, run });
         const [g] = await run(
-          `INSERT INTO dbo.ReservaGrupo (Codigo, BateriaId, ResponsavelId, Origem, Modo, PrecoCentavos, SinalPct, Observacao, CriadoPor)
-           OUTPUT inserted.Id id VALUES (@codigo, @b, @r, @o, @m, @preco, @sinal, @obs, @u)`,
-          { codigo: codigoNovo(), b: bateriaId, r: responsavelId, o: origem, m: modo, preco, sinal: sinalPct, obs, u: sessao.uid },
+          `INSERT INTO dbo.ReservaGrupo (Codigo, BateriaId, ResponsavelId, Origem, Modo, PrecoCentavos, SinalPct, Observacao, CriadoPor, Aniversario, PrecoAniversarianteCentavos)
+           OUTPUT inserted.Id id VALUES (@codigo, @b, @r, @o, @m, @preco, @sinal, @obs, @u, @aniv, @precoAniv)`,
+          { codigo: codigoNovo(), b: bateriaId, r: responsavelId, o: origem, m: modo, preco, sinal: sinalPct, obs, u: sessao.uid, ...aniversarioDe(b) },
         );
         for (let k = 0; k < pilotos.length; k++) await novoPiloto(run, Number(g.id), k + 1, pilotos[k], insc[k], k === 0, k === 0 ? responsavelId : null);
         // cada amigo é uma pessoa: a vaga nasce com cadastro provisório próprio, não no nome do responsável
@@ -989,6 +1029,7 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
         await run(`UPDATE dbo.Inscricao SET PrecoCentavos = @preco WHERE Id IN (${insc.map(Number).join(',')})`, { preco });
         return Number(g.id);
     });
+    await aplicarPagos(id);
     send(201, await grupo(id));
     return true;
   }
@@ -1035,6 +1076,10 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
         }
         await run(`UPDATE dbo.ReservaGrupo SET Modo = @modo, PrecoCentavos = @preco, SinalPct = @sinal, Observacao = @obs, AtualizadoEm = SYSDATETIME() WHERE Id = @id`,
           { id, modo, preco, sinal, obs: b.observacao !== undefined ? txt(b.observacao, 300) : atual.observacao ?? null });
+        if (b.aniversario !== undefined || b.precoAniversarianteCentavos !== undefined) {
+          const a = aniversarioDe({ aniversario: b.aniversario !== undefined ? b.aniversario : atual.aniversario, precoAniversarianteCentavos: b.precoAniversarianteCentavos ?? atual.promocao?.precoAniversariante });
+          await run(`UPDATE dbo.ReservaGrupo SET Aniversario = @aniv, PrecoAniversarianteCentavos = @precoAniv, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id, ...a });
+        }
         if (preco !== Number(vigente.preco)) await run(`UPDATE i SET PrecoCentavos = @preco, DescontoCentavos = 0, AtualizadoEm = SYSDATETIME()
           FROM dbo.Inscricao i JOIN dbo.ReservaGrupoPiloto p ON p.InscricaoId = i.Id
           WHERE p.GrupoId = @id AND i.Status <> 'cancelada' AND i.Pago = 0`, { id, preco });

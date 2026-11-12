@@ -25,6 +25,7 @@ import { corrigeEmail } from '../lib/ops/email-dominio';
 import { erroCadastroObrigatorio } from '../lib/ops/cadastro-obrigatorio';
 import { acrescentarInstagramRelatorio, idsClientesRelatorio, prepararRelatorioRecepcao, type SessaoRelatorio } from '../lib/ops/relatorio-crono';
 import { HttpError, inscreverN, officeRoutes } from '../lib/ops/office';
+import { garantirColunasEventos } from '../lib/ops/eventos-schema';
 import { bateriaDisponivelNoTotem, type TotemBateriaCandidate, TOTEM_BATERIAS_SQL } from '../lib/ops/totem-baterias';
 import { relatorio } from '../lib/ops/relatorios';
 import { renderTermoResponsabilidade, type TermoParticipante } from '../lib/ops/termo';
@@ -513,6 +514,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
 
   // "Vim com um grupo": grupos de hoje com vaga aguardando (antes de escolher a bateria) e a entrada do amigo no grupo
   if (path === '/api/totem/grupos' && method === 'GET') {
+    await garantirColunasEventos();
     send(res, 200, await gruposDoDiaNoTotem());
     return true;
   }
@@ -525,6 +527,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
   }
 
   if (path === '/api/totem/baterias' && method === 'GET') {
+    await garantirColunasEventos();
     const rows = await query<TotemBateriaCandidate>(TOTEM_BATERIAS_SQL);
     // ?grupo=id.token,id.token: vagas que o grupo já tem na bateria (as dele e as pagas online pelo responsável)
     // contam como livres para ele — senão uma bateria lotada pela reserva online sumia do totem para quem pagou
@@ -559,6 +562,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
         tipoKart: r.tipoKart,
         ocupadas: r.ocupadas,
         livres: r.livres,
+        campeonato: r.campeonato === true || r.campeonato === 1,
       })));
     return true;
   }
@@ -739,6 +743,7 @@ const server = http.createServer(async (req, res) => {
       if (await totemRoutes(req, res, path)) return;
     }
     if (path.startsWith('/api/office/')) {
+      await garantirColunasEventos();
       const sessao = sessaoDe(req, url);
       const dadosCrono = path.match(/^\/api\/office\/crono\/dados\/([a-zA-Z0-9_-]{1,80})(\/(?:passings|laps))?$/);
       if (dadosCrono && method === 'GET') {
@@ -934,7 +939,10 @@ function paginaDeErro(msg: string) {
 <body><div class="c"><div class="i">!</div><h1>Relatório indisponível</h1><p>${esc(msg)}</p></div></body></html>`;
 }
 
-server.listen(PORT, '0.0.0.0', () => log(`Servidor da operacao em http://0.0.0.0:${PORT} (recepcao /recepcao, totem /totem)`));
+server.listen(PORT, '0.0.0.0', () => {
+  log(`Servidor da operacao em http://0.0.0.0:${PORT} (recepcao /recepcao, totem /totem)`);
+  garantirColunasEventos().catch((e) => log(`colunas de aniversario/campeonato: ${(e as Error).message}`));
+});
 
 // pré-cadastro online (QR code): traz os cadastros do site a cada 30 s
 if (preCadastroLigado()) {

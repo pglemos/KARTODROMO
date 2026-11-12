@@ -64,6 +64,7 @@ const AgendaAcoes = (() => {
         <label class="campo" style="grid-column: span 3;"><span>Vagas (máx. karts)</span><input class="entrada" id="bVagas" type="number" min="1" max="60" inputmode="numeric" value="${novo ? 12 : b.vagas}" style="height: 38px; font-weight: 700;"></label>
         <label class="campo" style="grid-column: span 3;"><span>Traçado</span><select class="entrada" id="bTracado" style="height: 38px;"><option value="">Sem traçado</option>${ap.tracados.map((t) => `<option value="${t.id}" ${b && t.id === b.tracadoId ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')}</select></label>
         <label class="campo" style="grid-column: span 8;"><span>Quem pode reservar</span><select class="entrada" id="bTipo" style="height: 38px;">${TIPOS_RESERVA.filter(([v]) => podeFechar() || v === 'aberta' || v === tipo).map(([v, t, d]) => `<option value="${v}" ${tipo === v ? 'selected' : ''}>${t} — ${d}</option>`).join('')}</select></label>
+        <label class="campo" style="grid-column: 1 / -1; display: flex; flex-direction: row; align-items: center; gap: 10px; cursor: pointer;"><input type="checkbox" id="bCamp" ${!novo && b.campeonato ? 'checked' : ''} style="width: 18px; height: 18px;"><span style="text-transform: none; letter-spacing: 0;"><b>É campeonato</b> — o nome acima é o nome do campeonato; aparece assim no totem, no site e na Recepção, sempre aberta para os pilotos se inscreverem (online ou no totem)</span></label>
         <label class="campo" style="grid-column: span 4;"><span>Volta mínima (segundos)</span><input class="entrada" id="bVolta" type="number" min="0" inputmode="numeric" value="${novo ? 5 : b.voltaMinimaSeg ?? 5}" style="height: 38px;"></label>
         <label class="campo" style="grid-column: 1 / -1"><span>Observação interna (opcional)</span><textarea class="entrada" id="bObs" rows="2" maxlength="400" style="height: auto; resize: vertical;" placeholder="Alguma observação para a equipe">${esc(novo ? '' : b.observacao || '')}</textarea></label>
       </div><p class="erroMsg" id="bErro" style="padding: 0 24px"></p>
@@ -75,6 +76,8 @@ const AgendaAcoes = (() => {
       const nome = m.querySelector('#bNome').value.trim(), data = m.querySelector('#bData').value, h = m.querySelector('#bHora').value;
       const produtoId = Number(m.querySelector('#bProduto').value), vagas = Math.floor(Number(m.querySelector('#bVagas').value));
       if (!nome) return erro('Informe o nome da bateria.');
+      const campeonato = m.querySelector('#bCamp').checked;
+      if (campeonato && /^bateria$/i.test(nome)) return erro('Em campeonato, o nome da bateria é o nome do campeonato (ex.: Campeonato Ultras · Etapa 3).');
       if (!data) return erro('Informe a data.');
       if (!/^\d{2}:\d{2}$/.test(h)) return erro('Informe a hora.');
       if (!produtoId) return erro('Escolha o produto: ele define o preço.');
@@ -85,7 +88,7 @@ const AgendaAcoes = (() => {
       const corpo = {
         nome, inicio: `${data}T${h}`, vagas, produtoId, tracadoId: Number(m.querySelector('#bTracado').value) || null,
         voltaMinimaSeg: Math.max(0, Math.floor(Number(m.querySelector('#bVolta').value) || 0)), observacao: m.querySelector('#bObs').value.trim() || null,
-        ...flagsDoTipo(m.querySelector('#bTipo').value),
+        ...flagsDoTipo(campeonato ? 'aberta' : m.querySelector('#bTipo').value), campeonato,
         ...(novo ? {} : { codigoReserva: b.codigoReserva || null, responsavelId: b.responsavelId || null }),
       };
       const btn = m.querySelector('#bSalvar'); btn.disabled = true;

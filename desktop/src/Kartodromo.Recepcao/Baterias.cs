@@ -10,7 +10,7 @@ public class CamposBateria : Panel
     public readonly DateTimePicker Data = Campos.Data(), Hora = Campos.Hora();
     public readonly NumericUpDown Vagas = Campos.Num(12, 1, 500), VoltaMin = Campos.Num(40, 0, 600);
     public readonly ComboBox Produto = Campos.Combo(), Tracado = Campos.Combo(), Categoria = Campos.Combo("Indoor", "Outdoor", "Pro");
-    public readonly CheckBox Aberta = Campos.Check("Aberta para reservas", true), Totem = Campos.Check("Aparece no totem", true);
+    public readonly CheckBox Aberta = Campos.Check("Aberta para reservas", true), Totem = Campos.Check("Aparece no totem", true), Campeonato = Campos.Check("É campeonato (nome = nome do campeonato)", false);
     public long? RespId;
     public event Action ProdutoMudou;
 
@@ -49,6 +49,7 @@ public class CamposBateria : Panel
         Campos.Add(g, "Responsável", pResp, 2);
         Campos.Add(g, " ", Aberta, 2);
         Campos.Add(g, "  ", Totem, 2);
+        Campos.Add(g, "   ", Campeonato, 6);
 
         Campos.Add(g, "Observações", Obs, 6);
         Controls.Add(g);
@@ -66,6 +67,7 @@ public class CamposBateria : Panel
             CodReserva.Text = b.S("codigoReserva");
             Aberta.Checked = !b.B("reservaFechada");
             Totem.Checked = b.B("autoAtendimento");
+            Campeonato.Checked = b.B("campeonato");
             Obs.Text = b.S("observacao");
             if (!string.IsNullOrEmpty(b.S("categoria"))) Categoria.Text = b.S("categoria");
         }
@@ -74,8 +76,8 @@ public class CamposBateria : Panel
     public object Corpo() => new
     {
         nome = Nome.Text.Trim(), inicio = $"{Fmt.Iso(Data.Value)}T{Hora.Value:HH:mm}", vagas = (int)Vagas.Value, produtoId = Campos.IdDe(Produto), tracadoId = Campos.IdDe(Tracado),
-        voltaMinimaSeg = (int)VoltaMin.Value, responsavelId = RespId, codigoReserva = CodReserva.Text.Trim(), reservaFechada = !Aberta.Checked, autoAtendimento = Totem.Checked, observacao = Obs.Text.Trim(),
-        categoria = Categoria.Text
+        voltaMinimaSeg = (int)VoltaMin.Value, responsavelId = RespId, codigoReserva = CodReserva.Text.Trim(), reservaFechada = !Aberta.Checked && !Campeonato.Checked, autoAtendimento = Totem.Checked || Campeonato.Checked, observacao = Obs.Text.Trim(),
+        categoria = Categoria.Text, campeonato = Campeonato.Checked
     };
 }
 
@@ -145,11 +147,13 @@ public class FormCriarReservas : DialogoDesign
         pesq.Click += (_, _) => Responsavel(); resp.Click += (_, _) => Responsavel();
         var aberta = new CheckBox { Text = "Aberta para reservas", Checked = true };
         var totem = new CheckBox { Text = "Aparece no totem", Checked = true };
+        var camp = new CheckBox { Text = "É campeonato (nome = nome do campeonato)", Checked = false };
         var obs = PecasDesign.Texto("", 400);
         var a1 = Secao("Reserva avulsa");
         Campo(a1, "Nome", nome, 2); Campo(a1, "Data", data, 1); Campo(a1, "Hora", hora, 1); Campo(a1, "Vagas (máx)", vagas, 1); Campo(a1, "Volta mínima (s)", volta, 1);
         Campo(a1, "Produto", produto, 3); Campo(a1, "Traçado", tracado, 2); Campo(a1, "Categoria", categoria, 1);
         Campo(a1, "Responsável", resp, 2, pesq); Marca(a1, aberta, 2); Marca(a1, totem, 2);
+        Marca(a1, camp, 6);
         Campo(a1, "Observações", obs, 6);
         Control[] abaAvulsa = [a1.Parent];
         foreach (var c in abaAvulsa) c.Visible = false;
@@ -208,7 +212,7 @@ public class FormCriarReservas : DialogoDesign
                 await Sessao.Api.PostAsync("/api/office/baterias", new
                 {
                     nome = nome.Text.Trim(), inicio = $"{Fmt.Iso(data.Value)}T{hh:hh\\:mm}", vagas = int.TryParse(vagas.Text, out var v) ? v : 12, produtoId = Campos.IdDe(produto), tracadoId = Campos.IdDe(tracado),
-                    voltaMinimaSeg = int.TryParse(volta.Text, out var vm) ? vm : 0, responsavelId = respId, reservaFechada = !aberta.Checked, autoAtendimento = totem.Checked, observacao = obs.Text.Trim(), categoria = categoria.Text,
+                    voltaMinimaSeg = int.TryParse(volta.Text, out var vm) ? vm : 0, responsavelId = respId, reservaFechada = !aberta.Checked && !camp.Checked, autoAtendimento = totem.Checked || camp.Checked, observacao = obs.Text.Trim(), categoria = categoria.Text, campeonato = camp.Checked,
                 });
                 Msg.Info(this, "Reserva criada com sucesso.");
                 DialogResult = DialogResult.OK; Close();
@@ -303,6 +307,7 @@ public class FormBateria : DialogoDesign
 
         var aberta = new CheckBox { Text = "Aberta para reservas", Checked = !b.B("reservaFechada") };
         var totem = new CheckBox { Text = "Aparece no totem", Checked = b.B("autoAtendimento") };
+        var camp = new CheckBox { Text = "É campeonato (nome = nome do campeonato)", Checked = b.B("campeonato") };
 
         var g = Secao("Bateria");
         Campo(g, "Nome", nome, 2);
@@ -316,6 +321,7 @@ public class FormBateria : DialogoDesign
         Campo(g, "Responsável", resp, 2, setaResp);
         Marca(g, aberta, 2);
         Marca(g, totem, 2);
+        Marca(g, camp, 6);
 
         var provas = SecaoTabelaDesign("Provas (vêm do produto)");
         provas.Colunas(new("Ordem", 0.9f), new("Prova", 5.2f), new("Tipo", 2.6f), new("Tempo", 1.1f, Direita: true));
@@ -343,8 +349,8 @@ public class FormBateria : DialogoDesign
             await Sessao.Api.PutAsync($"/api/office/baterias/{b.S("id")}", new
             {
                 nome = nome.Text.Trim(), inicio = $"{Fmt.Iso(data.Value)}T{h.Hours:00}:{h.Minutes:00}", vagas = nVagas, produtoId = Campos.IdDe(produto), tracadoId = Campos.IdDe(tracado),
-                voltaMinimaSeg = nVolta, responsavelId = respId, codigoReserva = b.S("codigoReserva"), reservaFechada = !aberta.Checked, autoAtendimento = totem.Checked,
-                observacao = b.S("observacao"), categoria = categoria.Text,
+                voltaMinimaSeg = nVolta, responsavelId = respId, codigoReserva = b.S("codigoReserva"), reservaFechada = !aberta.Checked && !camp.Checked, autoAtendimento = totem.Checked || camp.Checked,
+                observacao = b.S("observacao"), categoria = categoria.Text, campeonato = camp.Checked,
             });
             Msg.Info(this, "Bateria editada com sucesso!");
             DialogResult = DialogResult.OK; Close();

@@ -111,8 +111,11 @@ const Grupo = (() => {
   const sujo = () => !!(estado && !estado.g && estado.rasc && (estado.rasc.responsavel || estado.rasc.pilotos.some((p) => (p.nome || '').trim() || (p.telefone || '').trim())));
 
   // valores de cada piloto numa reserva ainda não salva (mesma conta do servidor)
+  // promoção do site: aniversariante + pelo menos 10 convidados → a vaga dele sai por R$ 90,00 (o servidor confere igual)
+  const ANIV_MIN = 10, ANIV_PRECO = 9000;
+  const precoAniv = (r, n) => (r.aniversario && n - 1 >= ANIV_MIN ? Math.min(+r.preco || 0, ANIV_PRECO) : +r.preco || 0);
   function contaRascunho(r) {
-    const n = r.pilotos.length, total = n * (+r.preco || 0);
+    const n = r.pilotos.length, total = (n - 1) * (+r.preco || 0) + (n ? precoAniv(r, n) : 0);
     return { n, total, pago: 0, falta: total, pagos: 0, cadastrados: 0, sinal: Math.round(total * r.sinalPct / 100) };
   }
 
@@ -299,6 +302,9 @@ const Grupo = (() => {
     const modo = novo ? rasc.modo : g.modo;
     const preco = novo ? rasc.preco : g.preco;
     const sinalPct = novo ? rasc.sinalPct : g.sinalPct;
+    const aniv = novo ? !!rasc.aniversario : !!g.aniversario;
+    const nAniv = novo ? rasc.pilotos.length : g.n;
+    const convidadosAniv = Math.max(0, nAniv - 1), promoOk = aniv && convidadosAniv >= ANIV_MIN;
     const max = Math.max(0, +(novo ? b.disponiveis : g.disponiveis) || 0) + (novo ? 0 : g.n);
     const pilotos = novo ? rasc.pilotos.map((p, i) => ({ ...p, ordem: i + 1, responsavel: i === 0 })) : g.pilotos;
     const pendentes = novo ? [] : g.pilotos.filter((p) => !p.pago);
@@ -493,6 +499,13 @@ const Grupo = (() => {
                 </div>
               `}
             </div>
+            <button type="button" role="switch" aria-checked="${aniv}" data-aniv="1" class="cardModoPagamento ${aniv ? 'selecionado' : ''}" title="Promoção do site: o aniversariante que traz pelo menos ${ANIV_MIN} convidados pagantes corre por ${brl(ANIV_PRECO)}">
+              <span class="radioCirculoIndicador"></span>
+              <span class="col" style="gap: 2px">
+                <b class="t-corpo" style="font-size: 13.5px; color: var(--kib-cor-texto-principal);">🎂 Responsável é o aniversariante</b>
+                <span class="peq" style="line-height: 1.35; color: var(--kib-cor-texto-secundario);">${!aniv ? `Promoção: com ${ANIV_MIN} convidados ou mais, o aniversariante paga só ${brl(ANIV_PRECO)}. Exige documento com foto no dia.` : promoOk ? `Promoção valendo: ${convidadosAniv} convidados · aniversariante paga ${brl(Math.min(preco, ANIV_PRECO))}, convidados ${brl(preco)}.` : `Faltam ${ANIV_MIN - convidadosAniv} convidado${ANIV_MIN - convidadosAniv > 1 ? 's' : ''} para a promoção (${convidadosAniv} de ${ANIV_MIN}). Até lá ele paga ${brl(preco)}.`}</span>
+              </span>
+            </button>
             <div style="display: flex; flex-direction: column; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12); border-radius: var(--kib-raio-cartao); background: var(--kib-cor-superficie-padrao); border: 1px solid var(--kib-cor-borda-sutil);">
               <div style="display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
                 <div style="display: flex; align-items: baseline; gap: 6px;">
@@ -731,6 +744,7 @@ const Grupo = (() => {
     if ((x = el('[data-origem]'))) { rasc.origem = x.dataset.origem; lembrar('origem', rasc.origem); if (!rasc.precoManual) rasc.preco = precoPara(rasc.origem, estado.b); pintar(); return; }
     if (el('[data-trocar-resp]')) { rasc.responsavel = null; rasc.pilotos[0].nome = ''; rasc.pilotos[0].telefone = ''; pintar(); return; }
     if ((x = el('[data-enviar-agora]'))) { estado.enviarAgora = !estado.enviarAgora; pintar(); return; }
+    if (el('[data-aniv]')) { if (g) await atualizar(() => office(`/grupos/${g.id}`, { method: 'PUT', body: { aniversario: !g.aniversario } }), g.aniversario ? 'Promoção de aniversário removida' : 'Marcado como aniversariante'); else { rasc.aniversario = !rasc.aniversario; pintar(); } return; }
     if ((x = el('[data-modo]'))) { if (g) await atualizar(() => office(`/grupos/${g.id}`, { method: 'PUT', body: { modo: x.dataset.modo } }), 'Forma de pagamento atualizada'); else { rasc.modo = x.dataset.modo; lembrar('modo', rasc.modo); pintar(); } return; }
     if ((x = el('[data-menor]'))) {
       const i = +x.dataset.menor;
@@ -873,7 +887,7 @@ const Grupo = (() => {
       x.disabled = true; x.setAttribute('aria-busy', 'true'); x.textContent = 'Salvando…';
       try {
         const pilotos = rasc.pilotos.map((p, i) => (i === 0 ? (rasc.responsavel ? { nome: rasc.responsavel.nome, telefone: rasc.responsavel.telefone, menor: !!p.menor } : { nome: p.nome, telefone: p.telefone, menor: !!p.menor }) : p));
-        let novo = await office('/grupos', { method: 'POST', body: { bateriaId: b.id, ...(rasc.responsavel ? { responsavelId: rasc.responsavel.id } : { responsavelNovo: { nome: rasc.pilotos[0].nome, telefone: rasc.pilotos[0].telefone } }), origem: rasc.origem, modo: rasc.modo, precoCentavos: rasc.preco, sinalPct: rasc.sinalPct, pilotos } });
+        let novo = await office('/grupos', { method: 'POST', body: { bateriaId: b.id, ...(rasc.responsavel ? { responsavelId: rasc.responsavel.id } : { responsavelNovo: { nome: rasc.pilotos[0].nome, telefone: rasc.pilotos[0].telefone } }), origem: rasc.origem, modo: rasc.modo, precoCentavos: rasc.preco, sinalPct: rasc.sinalPct, aniversario: !!rasc.aniversario, pilotos } });
         for (let k = 1; k < rasc.pilotos.length; k++) {
           const cid = rasc.pilotos[k].clienteId, vaga = novo.pilotos && novo.pilotos[k];
           if (!cid || !vaga) continue;

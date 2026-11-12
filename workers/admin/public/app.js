@@ -285,6 +285,7 @@ const TIPOS = {
 const ORDEM_TIPOS = ['livre', 'reserva', 'fechada', 'camp', 'evento', 'bloq'];
 function tipoDe(b) {
   const nome = `${b.nome || ''} ${b.produto || ''} ${b.categoria || ''}`.toLowerCase();
+  if (b.campeonato === true || b.campeonato === 1) return 'camp'; // marcada como campeonato na bateria
   if (b.reservaFechada) return 'fechada';
   if (+b.vagas === 0 || b.autoAtendimento === false || b.autoAtendimento === 0) return 'bloq';
   if (/kac|legends|ultras|campeonato|etapa|copa|endurance|milhas/.test(nome) && !/treino/.test(nome)) return 'camp';

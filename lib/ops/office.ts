@@ -268,7 +268,7 @@ const BATERIA_SELECT = `SELECT TOP 5000 b.Id id, CONVERT(varchar(16), b.Inicio, 
   (SELECT COUNT(*) FROM dbo.Inscricao x WHERE x.BateriaId = b.Id AND x.Status <> 'cancelada' AND x.Pago = 1) pagos,
   (SELECT COUNT(*) FROM dbo.Inscricao x WHERE x.BateriaId = b.Id AND x.Status <> 'cancelada' AND x.Aprovada = 0) preReservas,
   rc.Nome responsavel, b.ResponsavelId responsavelId, b.Status status, b.AutoAtendimento autoAtendimento, t.Id tracadoId, t.Nome tracado,
-  b.VoltaMinimaSeg voltaMinimaSeg, b.CodigoReserva codigoReserva, b.ReservaFechada reservaFechada, b.Observacao observacao, b.TipoKart tipoKart
+  b.VoltaMinimaSeg voltaMinimaSeg, b.CodigoReserva codigoReserva, b.ReservaFechada reservaFechada, b.Observacao observacao, b.TipoKart tipoKart, b.Campeonato campeonato
   FROM dbo.Bateria b LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId LEFT JOIN dbo.Tracado t ON t.Id = b.TracadoId LEFT JOIN dbo.Cliente rc ON rc.Id = b.ResponsavelId`;
 
 const VENDA_SELECT = `SELECT TOP 5000 v.Id id, CONVERT(varchar(16), v.CriadoEm, 126) dataHora, ISNULL(v.Codigo, CAST(v.Id AS varchar(20))) codigo, c.Nome cliente, c.Documento documento,
@@ -828,6 +828,16 @@ async function estornar(sessao: Sessao, vendaId: number, body: Record<string, un
 }
 
 // ---------------------------------------------------------------- roteador
+
+/**
+ * Bateria de campeonato: aparece no totem, no site e na Recepção pelo nome do campeonato (nunca "BATERIA" nem
+ * "grupo do organizador") e fica sempre aberta para o piloto se inscrever (online antecipado ou no totem).
+ */
+function campeonatoDe(b: Record<string, unknown>, nome: string | null) {
+  const sim = b.campeonato === true || b.campeonato === 1 || b.campeonato === '1';
+  if (sim && (!nome || /^bateria$/i.test(nome.trim()))) throw new HttpError(400, 'Informe o nome do campeonato no nome da bateria.');
+  return sim;
+}
 
 export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   const { method, url, sessao } = req;
@@ -1442,6 +1452,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (b.reservaFechada) await exigePodeFecharBateria(sessao);
     const nome = str(b.nome, 100);
     if (!nome) throw new HttpError(400, 'Insira um nome para a reserva.');
+    const campeonato = campeonatoDe(b, nome);
     const inicio = localDateTime(b.inicio);
     const vagas = int(b.vagas, 'Quantidade máxima de competidores');
     const produtoId = int(b.produtoId, 'Produto');
@@ -1449,12 +1460,12 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (exists) throw new HttpError(409, 'Já há uma reserva agendada para a data selecionada.');
     const cat = await one<{ c: string }>(`SELECT Categoria c FROM dbo.Produto WHERE Id = @produtoId`, { produtoId });
     const r = await one<{ id: number }>(
-      `INSERT INTO dbo.Bateria (Inicio, Nome, TipoKart, Vagas, ProdutoId, TracadoId, VoltaMinimaSeg, ResponsavelId, CodigoReserva, ReservaFechada, AutoAtendimento, Observacao)
-       OUTPUT inserted.Id id VALUES (@inicio, @nome, @tipo, @vagas, @produtoId, @tracadoId, @volta, @resp, @codigo, @fechada, @aa, @obs)`,
+      `INSERT INTO dbo.Bateria (Inicio, Nome, TipoKart, Vagas, ProdutoId, TracadoId, VoltaMinimaSeg, ResponsavelId, CodigoReserva, ReservaFechada, AutoAtendimento, Observacao, Campeonato)
+       OUTPUT inserted.Id id VALUES (@inicio, @nome, @tipo, @vagas, @produtoId, @tracadoId, @volta, @resp, @codigo, @fechada, @aa, @obs, @camp)`,
       {
         inicio, nome, tipo: cat?.c === 'Super Kart' ? 'super' : 'light', vagas, produtoId, tracadoId: b.tracadoId ? int(b.tracadoId, 'Traçado') : null,
         volta: Number(b.voltaMinimaSeg ?? 5) || 0, resp: b.responsavelId ? int(b.responsavelId, 'Responsável') : null, codigo: str(b.codigoReserva, 20),
-        fechada: b.reservaFechada ? 1 : 0, aa: b.autoAtendimento === false ? 0 : 1, obs: str(b.observacao, 400),
+        fechada: campeonato ? 0 : b.reservaFechada ? 1 : 0, aa: campeonato ? 1 : b.autoAtendimento === false ? 0 : 1, obs: str(b.observacao, 400), camp: campeonato ? 1 : 0,
       },
     );
     send(201, r);
@@ -1511,7 +1522,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const id = Number(m[1]);
     const b = await req.body();
     const atual = await one<Record<string, unknown>>(
-      `SELECT CONVERT(varchar(10), Inicio, 126) data, Vagas vagasAtual, ReservaFechada rfAtual, AutoAtendimento aaAtual, (SELECT COUNT(*) FROM dbo.Inscricao WHERE BateriaId = @id AND Status <> 'cancelada') n,
+      `SELECT CONVERT(varchar(10), Inicio, 126) data, Vagas vagasAtual, ReservaFechada rfAtual, AutoAtendimento aaAtual, Campeonato campAtual, (SELECT COUNT(*) FROM dbo.Inscricao WHERE BateriaId = @id AND Status <> 'cancelada') n,
               (SELECT COUNT(*) FROM dbo.Inscricao WHERE BateriaId = @id AND Pago = 1 AND Status <> 'cancelada') pagas FROM dbo.Bateria WHERE Id = @id`,
       { id },
     );
@@ -1522,14 +1533,16 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if ((b.reservaFechada && !atual.rfAtual) || vagas < Number(atual.vagasAtual)) await exigePodeFecharBateria(sessao);
     if (vagas < (atual.n as number)) throw new HttpError(409, `O máximo de competidores deve ser maior ou igual ao número de reservas. Número de reservas: ${atual.n}.`);
     const produtoId = int(b.produtoId, 'Produto');
+    // a Recepção antiga não manda o campo: sem ele, a bateria continua como estava
+    const campPut = b.campeonato === undefined ? Boolean(atual.campAtual) : campeonatoDe(b, str(b.nome, 100));
     const cat = await one<{ c: string }>(`SELECT Categoria c FROM dbo.Produto WHERE Id = @produtoId`, { produtoId });
     await query(
       `UPDATE dbo.Bateria SET Inicio = @inicio, Nome = @nome, Vagas = @vagas, ProdutoId = @produtoId, TipoKart = @tipo, TracadoId = @tracadoId, VoltaMinimaSeg = @volta,
-         ResponsavelId = @resp, CodigoReserva = @codigo, ReservaFechada = @fechada, AutoAtendimento = @aa, Observacao = @obs WHERE Id = @id`,
+         ResponsavelId = @resp, CodigoReserva = @codigo, ReservaFechada = @fechada, AutoAtendimento = @aa, Observacao = @obs, Campeonato = @camp WHERE Id = @id`,
       {
         id, inicio, nome: str(b.nome, 100) ?? 'BATERIA', vagas, produtoId, tipo: cat?.c === 'Super Kart' ? 'super' : 'light', tracadoId: b.tracadoId ? int(b.tracadoId, 'Traçado') : null,
         volta: Number(b.voltaMinimaSeg ?? 5) || 0, resp: b.responsavelId ? int(b.responsavelId, 'Responsável') : null, codigo: str(b.codigoReserva, 20),
-        fechada: b.reservaFechada ? 1 : 0, aa: b.autoAtendimento ? 1 : 0, obs: str(b.observacao, 400),
+        fechada: campPut ? 0 : b.reservaFechada ? 1 : 0, aa: campPut ? 1 : b.autoAtendimento ? 1 : 0, obs: str(b.observacao, 400), camp: campPut ? 1 : 0,
       },
     );
     send(200, { ok: true });

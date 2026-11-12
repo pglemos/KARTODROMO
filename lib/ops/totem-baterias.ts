@@ -10,11 +10,12 @@ export type TotemBateriaCandidate = {
   autoAtendimento: boolean | number | string;
   reservaFechada: boolean | number | string;
   dataHoje: string;
+  campeonato?: boolean | number;
 };
 
 export const TOTEM_BATERIAS_SQL = `
       SELECT b.Id id, b.Nome nome, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Vagas vagas, b.TipoKart tipoKart,
-             b.Status status, b.AutoAtendimento autoAtendimento, b.ReservaFechada reservaFechada,
+             b.Status status, b.AutoAtendimento autoAtendimento, b.ReservaFechada reservaFechada, b.Campeonato campeonato,
              CONVERT(varchar(10), SYSDATETIME(), 126) dataHoje,
              (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') ocupadas
       FROM dbo.Bateria b

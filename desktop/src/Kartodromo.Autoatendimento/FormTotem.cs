@@ -864,7 +864,7 @@ public class FormTotem : Form, IMessageFilter
             var item = new OpcaoLinha(_k)
             {
                 Height = P(84), Id = g.L("id") ?? 0,
-                Linha1 = "GRUPO DO(A) " + g.S("responsavel").ToUpperInvariant(),
+                Linha1 = (g.S("titulo").Length > 0 ? g.S("titulo") : "Grupo do(a) " + g.S("responsavel")).ToUpperInvariant(),
                 Linha2 = $"Corrida às {Fmt.Hm(g.S("inicio"))} · {g.I("total")} amigos no total",
                 Direita = aguardando + (aguardando == 1 ? " vaga esperando" : " vagas esperando"),
             };
@@ -933,7 +933,7 @@ public class FormTotem : Form, IMessageFilter
             var iniciou = DateTime.TryParse(b.S("inicio"), out var horario) && horario <= DateTime.Now;
             var item = new OpcaoLinha(_k)
             {
-                Height = P(84), Id = b.L("id") ?? 0, Linha1 = b.S("nome").ToUpperInvariant(),
+                Height = P(84), Id = b.L("id") ?? 0, Linha1 = (b.B("campeonato") ? "CAMPEONATO · " : "") + b.S("nome").ToUpperInvariant(),
                 Linha2 = iniciou ? $"Horário iniciado às {inicio} · confirme na recepção" : $"Começa às {inicio} · chegue 10 min antes",
                 Direita = b.I("livres") + (b.I("livres") == 1 ? " vaga" : " vagas"),
                 Tipo = tipoSuper ? "Super Kart" : "Kart Light", Livres = b.I("livres"), Total = b.I("vagas"),
