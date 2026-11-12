@@ -164,6 +164,12 @@
         ],
         "createdAt": "2026-11-05T05:53:18.496Z",
         "reason": "user asked for gradients explicitly on the access page"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "menlo",
+        "createdAt": "2026-11-12T15:52:21.525Z",
+        "reason": "código Pix copia-e-cola em monoespaçada, já existia antes do reskin"
       }
     ]
   }
