@@ -1206,6 +1206,8 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     const g = await grupo(id);
     const pilotoId = b.pilotoId ? int(b.pilotoId, 'Piloto') : null;
     if (pilotoId && !g.pilotos.some((p) => p.id === pilotoId)) throw new HttpError(404, 'Piloto não encontrado no grupo.');
+    // "cada um paga o seu": recebimento sem piloto era dividido entre todos e mostrava "pagou R$ 29 · falta R$ 116" (12/11/2026)
+    if (!pilotoId && g.modo === 'individual') throw new HttpError(400, 'Neste grupo cada um paga o seu: escolha de qual piloto é o pagamento.');
     const valor = cents(b.valorCentavos, 'Valor recebido');
     const forma = txt(b.forma, 40) ?? 'Pix';
     await tx(async (run) => {
