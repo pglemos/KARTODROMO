@@ -77,7 +77,7 @@ Itens originais:
 - Testes (vitest) para `/api/grupo`, `/api/grupo/pagamento`, painel e cobrança Asaas.
 - Só então liberar deploy pelo fonte (main). Atualizar README dos patches como "obsoleto".
 
-**Fase 1 — Mesma cara (~2–3 dias)**
+**Fase 1 — Mesma cara (~2–3 dias)** · Decisão do dono 12/11/2026: o visual vencedor é o do **cadastro** (escuro #030504, verde #00e676, Anton + Rajdhani, cantos 4px, botões chanfrados). O app `apps/reservas` (claro, verde #007a3d, cantos 12px) é que troca de pele: tokens do `public/index.html` viram as variáveis de `apps/reservas/src/styles.css`; estrutura e regras da reserva ficam iguais.
 - Portar a página do link do grupo (`?r=`) e o painel para dentro de `apps/reservas`, usando as rotas que já existem. Sem mudar regra de negócio.
 - `cadastro.` com `?r=` passa a servir a app nova. Formulário de pessoa único (`FormPessoa`) para reserva, grupo e pré-cadastro.
 - Teste com grupo real criado pela recepção.
