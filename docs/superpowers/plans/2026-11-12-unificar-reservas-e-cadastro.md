@@ -96,7 +96,7 @@ Pendências conhecidas: aviso ativo ao organizador quando uma vaga é solta (hoj
 
 **Fase 3 — Acabamento (~2–3 dias)**
 FEITO 12/11/2026: endereço único (cadastro.* → reservas.* por 302; /conta e /privacidade ficam; marca `x-kib-via-reservas` evita loop), grupos em Minhas reservas (por hash do CPF do responsável + links do pedido "cada um paga o seu"), textos EN das telas novas.
-PENDENTE: lembretes (precisa decidir canal e texto: e-mail pelo Resend ou WhatsApp manual), check-in pelo celular para quem entrou por link de grupo (hoje só quem tem código de reserva), trocar 302 por 301 depois de alguns dias sem problema, SRVKART ainda gera links `cadastro.` (redirecionam).
+FEITO: lembretes por e-mail (SRVKART `enviarLembretesDosGrupos` a cada 15 min, até 48h antes e com mais de 2h; 'pagar' só com cobrança aberta; 'cadastros' para quem organiza; site `/api/sync/lembretes`, um envio por chave no R2). PENDENTE: check-in pelo celular para quem entrou por link de grupo (hoje só quem tem código de reserva), trocar 302 por 301 depois de alguns dias sem problema, SRVKART ainda gera links `cadastro.` (redirecionam).
 - "Minhas reservas" inclui grupos; check-in por vaga de grupo.
 - Lembretes (WhatsApp/e-mail) de cadastros/pagamentos pendentes.
 - Versão EN nas telas novas (i18n já existe).
