@@ -286,3 +286,10 @@ main { outline: none; background: radial-gradient(1200px 380px at 50% 0%, rgba(0
 .checkin.ok { background: var(--verde-fundo); color: var(--verde); border: 1px solid var(--verde-borda); }
 .checkin.erro { background: var(--erro-fundo); color: var(--erro); border: 1px solid rgba(255,122,107,.4); }
 .checkin-btn { width: 100%; margin-top: 12px; }
+
+/* ---- cada um paga o seu ---- */
+.escolha label[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+.escolha label[aria-disabled="true"]:hover { border-color: var(--linha-forte); }
+.grupo-convite { width: 100%; max-width: 520px; margin: 6px auto; padding: 20px 18px; border: 1px solid var(--verde); border-radius: var(--raio); background: var(--verde-fundo); display: grid; gap: 10px; text-align: center; }
+.grupo-convite h2 { font-size: 24px; color: var(--verde); }
+.grupo-convite .acoes { margin-top: 6px; }

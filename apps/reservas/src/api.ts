@@ -9,6 +9,8 @@ export type Pedido = {
   id: string; codigo: string; status: StatusPedido; forma: 'pix' | 'cartao'; quantidade: number; nome: string;
   descricao: string | null; inicio: string | null; valorCentavos: number | null; expiraEm: string | null;
   pix: { payload: string; imagem: string } | null; invoiceUrl: string | null; preparandoPagamento: boolean; erro: string | null;
+  /** Cada um paga o seu: link do grupo e do painel, depois de pago. */
+  modo?: 'individual' | null; grupo?: { codigo: string; link: string; painel: string } | null;
 };
 export type MinhaReserva = { id: string; codigo: string; status: StatusPedido; criadoEm: string; quantidade: number; forma: string; inicio: string | null; descricao: string | null; valorCentavos: number | null; checkinEm?: string | null };
 export type Corrida = { sessionId: string; eventName: string; eventDate: string; position: number; kart: string; laps: number; bestLapMs: number | null };

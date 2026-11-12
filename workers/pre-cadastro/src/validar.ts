@@ -145,7 +145,17 @@ export type Acompanhante = {
   nome: string; documento: string; nascimento: string; instagram: string; email: string; telefone: string; peso: string;
   cep: string; endereco: string; complemento: string; bairro: string; cidade: string;
 };
-export type Reserva = { cliente: PreCadastro; bateriaId: number; quantidade: number; forma: 'pix' | 'cartao'; pilotos: string[]; acompanhantes: Acompanhante[]; compradorPilota: boolean };
+export type Reserva = { cliente: PreCadastro; bateriaId: number; quantidade: number; forma: 'pix' | 'cartao'; pilotos: string[]; acompanhantes: Acompanhante[]; compradorPilota: boolean; modo?: 'individual' };
+/** "Cada um paga o seu" pelo site (decisões do dono, 12/11/2026): 2 a 10 pilotos e só com 24h ou mais até a bateria,
+ *  porque as vagas dos amigos sem pagamento voltam para venda 24h antes. */
+export const GRUPO_SITE_MIN = 2;
+export const GRUPO_SITE_MAX = 10;
+export const GRUPO_SITE_ANTECEDENCIA_H = 24;
+/** Bateria daqui a pelo menos 24h (início em horário de Brasília, AAAA-MM-DDTHH:MM). */
+export function grupoSitePermitido(inicio: string, agora = Date.now()) {
+  const t = Date.parse(String(inicio).slice(0, 16) + ':00-03:00');
+  return Number.isFinite(t) && t - agora >= GRUPO_SITE_ANTECEDENCIA_H * 3_600_000;
+}
 /** Idade mínima para pilotar o kart de locação (requisito do kartódromo). */
 export const IDADE_MINIMA_PILOTO = 14;
 
@@ -175,6 +185,13 @@ export function validarReserva(entrada: Record<string, unknown>, agenda: Agenda 
   const v = validar({ ...entrada, tipoDocumento: 'CPF' }, hoje, { exigirEndereco: false, exigirPeso: false });
   if (!v.ok) return v;
   if (idade(v.dados.nascimento, hoje) < 18) return { ok: false, erro: 'A reserva precisa ser feita por um adulto (18 anos ou mais), que é o responsável pelo pagamento.' };
+  const compradorPilota0 = entrada.compradorPilota !== false;
+  if (entrada.modo === 'individual') {
+    // cada amigo faz o próprio cadastro e paga a própria vaga pelo link do grupo; aqui só os dados de quem organiza
+    if (quantidade < GRUPO_SITE_MIN || quantidade > GRUPO_SITE_MAX) return { ok: false, erro: `Para cada um pagar o seu, o grupo precisa ter de ${GRUPO_SITE_MIN} a ${GRUPO_SITE_MAX} pilotos.` };
+    if (!grupoSitePermitido(horario.inicio, hoje.getTime())) return { ok: false, erro: `"Cada um paga o seu" só vale para baterias com ${GRUPO_SITE_ANTECEDENCIA_H}h ou mais de antecedência. Escolha "eu pago tudo" ou outro horário.` };
+    return { ok: true, dados: { cliente: v.dados, bateriaId: horario.id, quantidade, forma, pilotos: compradorPilota0 ? [v.dados.nome] : [], acompanhantes: [], compradorPilota: compradorPilota0, modo: 'individual' } };
+  }
   // cada vaga é de uma pessoa diferente: quem compra ocupa uma vaga se for pilotar (padrão); cada outra vaga precisa do
   // cadastro de quem vai correr (nome, CPF, nascimento). Cadastros a mais (diminuiu a quantidade depois) são ignorados.
   const compradorPilota = entrada.compradorPilota !== false;

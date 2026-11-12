@@ -31,6 +31,10 @@ export type Pedido = {
   acompanhantes?: (Acompanhante & { chave: string })[];
   /** false = quem comprou não vai pilotar (todas as vagas são dos acompanhantes). */
   compradorPilota?: boolean;
+  /** 'individual' = cada um paga o seu: o comprador paga 1 vaga (a dele ou a garantia) e recebe o link do grupo. */
+  modo?: 'individual';
+  /** Links do grupo criado pelo SRVKART depois do pagamento (só no modo individual). */
+  grupo?: { codigo: string; link: string; painel: string };
   cupom?: string;
   cliente: PreCadastro & { chave: string };
   /** Comprovante do aceite: qual versão da Política de Cancelamento o cliente aceitou e quando. */
@@ -91,6 +95,8 @@ export function visaoPublica(p: Pedido) {
     invoiceUrl: p.status === 'aguardando_pagamento' && p.forma === 'cartao' ? p.asaas?.invoiceUrl ?? null : null,
     preparandoPagamento: p.status === 'aguardando_pagamento' && !p.asaas,
     erro: p.erro ?? null,
+    modo: p.modo ?? null,
+    grupo: p.status === 'confirmado' && p.grupo ? p.grupo : null,
   };
 }
 
@@ -121,6 +127,7 @@ export async function criarPedido(req: Request, env: EnvReservas, excedeuLimite:
     pilotos: v.dados.pilotos,
     acompanhantes: v.dados.acompanhantes.map((a) => ({ ...a, chave: chaveDocumento('CPF', a.documento) })),
     compradorPilota: v.dados.compradorPilota,
+    ...(v.dados.modo ? { modo: v.dados.modo } : {}),
     cliente: { ...v.dados.cliente, chave: chaveDocumento('CPF', v.dados.cliente.documento) },
     politica: { versao: POLITICA_VERSAO, aceitaEm: agora },
     // cupom: o SRVKART confere e aplica ao separar as vagas (o valor da cobrança já vem com o desconto)
@@ -298,7 +305,8 @@ export async function syncAgenda(req: Request, env: EnvReservas) {
   return json(200, { horarios: a.horarios.length });
 }
 
-type Resultado = { id: string; acao: string; valorCentavos?: number; expiraEm?: string; descricao?: string; inicio?: string; erro?: string; codigo?: string };
+type Resultado = { id: string; acao: string; valorCentavos?: number; expiraEm?: string; descricao?: string; inicio?: string; erro?: string; codigo?: string; grupo?: { codigo?: unknown; link?: unknown; painel?: unknown } };
+const linkDoKartodromo = (v: unknown) => { const s = String(v ?? ''); return /^https:\/\/(cadastro|reservas)\.kartodromodebetim\.com\.br\/[A-Za-z0-9/?=&_.-]*$/.test(s) ? s : null; };
 
 export async function syncResultado(req: Request, env: EnvReservas, ctx: ExecutionContext) {
   const lista = (await req.json()) as Resultado[];
@@ -315,8 +323,10 @@ export async function syncResultado(req: Request, env: EnvReservas, ctx: Executi
     } else if (r.acao === 'recusado' && p.status === 'novo') {
       p.status = 'recusado'; p.erro = r.erro ?? 'Esse horário não está mais disponível.';
       await gravarPedido(env, p, false);
-    } else if (r.acao === 'confirmado' && (p.status === 'pago' || p.status === 'novo')) {
+    } else if (r.acao === 'confirmado' && (p.status === 'pago' || p.status === 'novo' || (p.status === 'confirmado' && p.modo === 'individual' && !p.grupo))) {
       p.status = 'confirmado';
+      const link = linkDoKartodromo(r.grupo?.link), painel = linkDoKartodromo(r.grupo?.painel);
+      if (p.modo === 'individual' && link && painel) p.grupo = { codigo: String(r.grupo?.codigo ?? '').slice(0, 12), link, painel };
       await gravarPedido(env, p, false);
     } else if (r.acao === 'expirado' && (p.status === 'aguardando_pagamento' || p.status === 'erro_pagamento')) {
       p.status = 'expirado';

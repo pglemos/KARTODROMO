@@ -14,6 +14,7 @@
  */
 import { isValidCpf, one, onlyDigits, query, tx } from './db';
 import { HttpError, inscreverN } from './office';
+import { grupoDaReservaOnline } from './grupos';
 import { gravarAcompanhante, gravarPreCadastro, preCadastroLigado, type AcompanhanteSite, type PreCadastro } from './pre-cadastro';
 import { escutarPedidosDeVinculo, publicarClientesDoApp, publicarHistoricosVinculados, publicarRankingDoApp, sincronizarPerfisDoApp, vincularContasDoApp } from './app-mobile';
 
@@ -132,6 +133,8 @@ export type PedidoSite = {
   acompanhantes?: (AcompanhanteSite & { chave?: string })[];
   /** false = quem comprou não pilota: as vagas são todas dos acompanhantes (ele fica como responsável). */
   compradorPilota?: boolean;
+  /** 'individual' = cada um paga o seu (site, 12/11/2026): segura todas as vagas, cobra só 1 e vira grupo depois de pago. */
+  modo?: 'individual';
   cupom?: string;
   cliente: Omit<PreCadastro, 'key' | 'chave' | 'recebidoEm'> & { chave: string };
   pagamento?: { asaasId: string; billingType: string; pagoEm: string; valorCentavos: number };
@@ -140,7 +143,7 @@ export type PedidoSite = {
 type Resultado =
   | { id: string; acao: 'reservado'; valorCentavos: number; expiraEm: string; descricao: string; inicio: string }
   | { id: string; acao: 'recusado'; erro: string }
-  | { id: string; acao: 'confirmado'; codigo: string }
+  | { id: string; acao: 'confirmado'; codigo: string; grupo?: { codigo: string; link: string; painel: string } }
   | { id: string; acao: 'expirado' }
   | { id: string; acao: 'pago_sem_vaga'; erro: string };
 
@@ -291,16 +294,26 @@ export async function reservarPedido(p: PedidoSite, log: Log): Promise<Resultado
     ? [...(eu ? [clienteId] : []), ...(await Promise.all(outros.map((a) => gravarAcompanhante(a, log))))]
     : undefined;
   if (pessoas && new Set(pessoas).size !== pessoas.length) return { id: p.id, acao: 'recusado', erro: 'Cada vaga precisa ser de uma pessoa diferente (há CPF repetido entre os pilotos).' };
-  const obs = `Reserva online ${p.codigo}` + (p.pilotos?.length ? ` · pilotos: ${p.pilotos.join(', ')}`.slice(0, 380) : '');
+  const individual = p.modo === 'individual';
+  if (individual && (n < 2 || n > 10)) return { id: p.id, acao: 'recusado', erro: 'Para cada um pagar o seu, o grupo precisa ter de 2 a 10 pilotos.' };
+  const obs = `Reserva online ${p.codigo}${individual ? ' · cada um paga o seu' : ''}` + (p.pilotos?.length ? ` · pilotos: ${p.pilotos.join(', ')}`.slice(0, 380) : '');
   try {
     const result = await tx(async (run) => {
       const read: ReadOne = async (sql, params) => (await run(sql, params))[0] ?? null;
-      const quote = await calcularPedidoOnline(
-        { codigo: p.cupom ?? '', documento: p.cliente.documento, bateriaId: Number(p.bateriaId), quantidade: n, documentos },
-        read,
-        true,
-        clienteId,
-      );
+      // cada um paga o seu: agora só 1 vaga (a de quem organiza, com primeira vez e cupom dele; ou a garantia, preço cheio);
+      // as outras vagas ficam seguras pelo preço cheio e cada amigo paga a sua pelo link do grupo
+      const quote = individual
+        ? await calcularPedidoOnline({ codigo: p.cupom ?? '', documento: p.cliente.documento, bateriaId: Number(p.bateriaId), quantidade: 1, documentos: eu ? [p.cliente.documento] : [] }, read, true, clienteId)
+        : await calcularPedidoOnline(
+          { codigo: p.cupom ?? '', documento: p.cliente.documento, bateriaId: Number(p.bateriaId), quantidade: n, documentos },
+          read,
+          true,
+          clienteId,
+        );
+      if (individual) {
+        const cheio = await calcularPedidoOnline({ codigo: '', documento: p.cliente.documento, bateriaId: Number(p.bateriaId), quantidade: n, documentos: [] }, read, false);
+        quote.precos = eu ? [quote.precos[0], ...cheio.precos.slice(1)] : cheio.precos;
+      }
       const inscricoes = await inscreverN(Number(p.bateriaId), clienteId, n, 'site', null, obs, false, { produtoId: quote.produtoId, precos: quote.precos, clientes: pessoas, run });
       await run(
         `INSERT INTO dbo.ReservaOnline (PedidoId, Codigo, ClienteId, BateriaId, Quantidade, ValorCentavos, Status, Forma, InscricaoIds, Pilotos, ExpiraEm)
@@ -330,7 +343,7 @@ export async function reservarPedido(p: PedidoSite, log: Log): Promise<Resultado
 export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resultado> {
   const r = await one<Linha>(`${LINHA} WHERE PedidoId = @id`, { id: p.id });
   if (!r) return { id: p.id, acao: 'pago_sem_vaga', erro: 'Pedido não encontrado no sistema da recepção.' };
-  if (r.Status === 'pago') return { id: p.id, acao: 'confirmado', codigo: r.Codigo };
+  if (r.Status === 'pago') return { id: p.id, acao: 'confirmado', codigo: r.Codigo, ...(await grupoDoPedido(p, r, ids(r.InscricaoIds), log)) };
   // a Asaas diz se o cartão foi de débito (DEBIT_CARD) — a recepção mostra Pix / Crédito / Débito
   const forma = p.pagamento?.billingType === 'PIX' ? 'pix' : p.pagamento?.billingType === 'DEBIT_CARD' ? 'debito' : 'credito';
   if (r.Status === 'pago_sem_vaga') return { id: p.id, acao: 'pago_sem_vaga', erro: 'O pagamento está aguardando a resolução da recepção.' };
@@ -364,6 +377,7 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
     }
   }
   // cada vaga recebe a sua parte do valor pago, na proporção do preço dela (Happy Hour: primeira vez R$ 89,90, as outras R$ 99,90)
+  if (p.modo === 'individual') return await confirmarIndividual(p, r, insc, forma, log);
   const linhasPreco = await query<{ Id: number; PrecoCentavos: number | null }>(`SELECT Id, PrecoCentavos FROM dbo.Inscricao WHERE Id IN (${insc.join(',') || '0'}) ORDER BY Id`);
   const valores = dividirValor(r.ValorCentavos, linhasPreco.map((l) => Number(l.PrecoCentavos ?? 0)));
   const unit = Math.round(r.ValorCentavos / Math.max(1, r.Quantidade));
@@ -377,6 +391,33 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
   });
   log(`reserva online ${r.Codigo}: paga (${forma}), ${insc.length} vaga(s) confirmadas`);
   return { id: p.id, acao: 'confirmado', codigo: r.Codigo };
+}
+
+/** Cada um paga o seu: o pagamento cobre só a vaga de quem organiza (se pilota); as dos amigos seguem reservadas. */
+async function confirmarIndividual(p: PedidoSite, r: Linha, insc: number[], forma: string, log: Log): Promise<Resultado> {
+  const ordenadas = [...insc].sort((a, b) => a - b);
+  const eu = p.compradorPilota !== false;
+  await tx(async (run) => {
+    if (eu && ordenadas[0]) await run(`UPDATE dbo.Inscricao SET Pago = 1, ValorCentavos = @v, Status = 'confirmada', AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id: ordenadas[0], v: r.ValorCentavos });
+    await run(`UPDATE dbo.ReservaOnline SET Status = 'pago', InscricaoIds = @insc, AsaasPagamentoId = @asaas, PagoEm = SYSDATETIME(), Forma = @forma WHERE Id = @id`, { id: r.Id, insc: ordenadas.join(','), asaas: p.pagamento?.asaasId ?? null, forma });
+    await run(`UPDATE dbo.ReservaOnlineVoucherUso SET Estado = 'consumido' WHERE PedidoId = @pedido AND Estado IN ('reservado', 'reembolso_pendente')`, { pedido: p.id });
+  });
+  log(`reserva online ${r.Codigo}: paga (${forma}), cada um paga o seu: ${eu ? 'vaga de quem organiza paga' : 'garantia paga'}, ${ordenadas.length} vaga(s) no grupo`);
+  return { id: p.id, acao: 'confirmado', codigo: r.Codigo, ...(await grupoDoPedido(p, r, ordenadas, log)) };
+}
+
+/** Links do grupo do pedido "cada um paga o seu" (cria o grupo na primeira vez). Falha não desfaz o pagamento: tenta de novo no próximo ciclo. */
+async function grupoDoPedido(p: PedidoSite, r: Linha, insc: number[], log: Log): Promise<{ grupo?: { codigo: string; link: string; painel: string } }> {
+  if (p.modo !== 'individual') return {};
+  try {
+    const preco = Number((await one<{ preco: number }>(`SELECT TOP 1 PrecoCentavos preco FROM dbo.Inscricao WHERE Id IN (${insc.join(',') || '0'}) AND Pago = 0 ORDER BY Id DESC`))?.preco ?? 0)
+      || Number((await one<{ preco: number }>(`SELECT p.PrecoCentavos preco FROM dbo.Bateria b JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @b`, { b: r.BateriaId }))?.preco ?? 0);
+    const ativas = (await query<{ Id: number }>(`SELECT Id FROM dbo.Inscricao WHERE Id IN (${insc.join(',') || '0'}) AND Status <> 'cancelada' ORDER BY Id`)).map((x) => x.Id);
+    return { grupo: await grupoDaReservaOnline({ codigoReserva: r.Codigo, bateriaId: r.BateriaId, responsavelId: r.ClienteId, inscricoes: ativas, compradorPilota: p.compradorPilota !== false, precoCentavos: preco, valorPagoCentavos: r.ValorCentavos }, log) };
+  } catch (e) {
+    log(`reserva online ${r.Codigo}: grupo do "cada um paga o seu" não foi criado agora (${(e as Error).message})`);
+    return {};
+  }
 }
 
 /** Divide o total pelas vagas na proporção dos preços (sem preço: partes iguais). A soma fecha no total, centavo a centavo. */

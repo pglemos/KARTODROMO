@@ -32,7 +32,7 @@ import { renderTermoResponsabilidade, type TermoParticipante } from '../lib/ops/
 import { buscarPreCadastroAgora, preCadastroLigado, sincronizarPreCadastros } from '../lib/ops/pre-cadastro';
 import { publicarTermoNoSite } from '../lib/ops/termo-online';
 import { aplicarCheckins } from '../lib/ops/checkin';
-import { aplicarAcoesDoPainel, conferirCobrancas, entrarNoGrupoPeloTotem, gruposDoDiaNoTotem, gruposRoutes, publicarGruposNoSite, puxarPagamentosDiretoDoAsaas, vincularPorDados } from '../lib/ops/grupos';
+import { aplicarAcoesDoPainel, soltarVagasNaoPagasDoSite, conferirCobrancas, entrarNoGrupoPeloTotem, gruposDoDiaNoTotem, gruposRoutes, publicarGruposNoSite, puxarPagamentosDiretoDoAsaas, vincularPorDados } from '../lib/ops/grupos';
 import { campeonatoOfficeRoutes, campeonatoSiteRoutes, conferirCobrancasCampeonato } from '../lib/ops/campeonato-inscricoes';
 import { painelRoutes, registrarSinal } from '../lib/ops/painel';
 import { enduranceDasBaterias, enduranceRoutes, equipesParaOTotem, paginaDoChefe, vincularNoTotem } from '../lib/ops/endurance';
@@ -979,7 +979,7 @@ if (preCadastroLigado()) {
     conferindo = true;
     await publicarTermoNoSite(TERMO_FILE, log).catch((e) => log(`termo: publicação no site falhou (${(e as Error).message})`));
     if (await aplicarAcoesDoPainel(log).catch((e) => { log(`grupo: ações do painel falharam (${(e as Error).message})`); return 0; })) { /* o resumo abaixo já sai atualizado */ }
-    try { await publicarGruposNoSite(log).catch((e) => log(`grupo: resumo para o site falhou (${(e as Error).message})`)); await conferirCobrancas(log); await puxarPagamentosDiretoDoAsaas(log); await conferirCobrancasCampeonato(log); } catch (e) { log(`grupo: conferência das cobranças falhou (${(e as Error).message})`); } finally { conferindo = false; }
+    try { await soltarVagasNaoPagasDoSite(log).catch((e) => log(`grupo: soltar vagas não pagas falhou (${(e as Error).message})`)); await publicarGruposNoSite(log).catch((e) => log(`grupo: resumo para o site falhou (${(e as Error).message})`)); await conferirCobrancas(log); await puxarPagamentosDiretoDoAsaas(log); await conferirCobrancasCampeonato(log); } catch (e) { log(`grupo: conferência das cobranças falhou (${(e as Error).message})`); } finally { conferindo = false; }
   }, 60_000).unref();
 }
 

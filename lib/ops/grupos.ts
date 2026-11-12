@@ -147,7 +147,8 @@ async function pilotoDaCobranca(asaasId: string | null | undefined) {
 
 /** Mesmo cálculo da tela: quanto cada piloto já tem coberto e quem ainda falta. */
 export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobrancas: Linha[]) {
-  const ativos = pilotos.filter((p) => p.inscricaoStatus !== 'cancelada');
+  // quem organiza pelo site sem pilotar não tem vaga (InscricaoId NULL): não conta como piloto nem no preço
+  const ativos = pilotos.filter((p) => p.inscricaoStatus !== 'cancelada' && !(p.responsavel && p.inscricaoId === null));
   const n = ativos.length;
   const idsAtivos = new Set(ativos.map((p) => Number(p.id)));
   const pagamentosAtivos = pagamentos.filter((pg) => !pg.pilotoId || idsAtivos.has(Number(pg.pilotoId)));
@@ -1394,4 +1395,82 @@ export async function registrarCobrancaDoLink(token: string, clienteId: number, 
   );
   log(`grupo ${vaga.grupoId}: cobrança ${asaasId} do link ligada ao piloto ${vaga.id} (cliente ${clienteId})`);
   return true;
+}
+
+// ---------------------------------------------------------------- "cada um paga o seu" criado pelo site (12/11/2026)
+
+/** Marca na observação do grupo: liga o grupo ao pedido do site (idempotência e conferência na recepção). */
+const marcaDoSite = (codigoReserva: string) => `Reserva online ${codigoReserva}`;
+
+/**
+ * Pedido do site no modo "cada um paga o seu", já pago: vira um grupo da Agenda (Origem 'site', Modo 'individual') com as
+ * MESMAS vagas que o pedido segurou. Quem organiza e pilota fica com a vaga 1 (já paga); quem só organiza pagou 1 vaga
+ * de garantia (anotada na observação, a recepção abate de quem faltar ou devolve pela política) e não ocupa vaga.
+ * Os amigos entram pelo link do grupo, fazem o cadastro e pagam a própria vaga. Idempotente pelo código da reserva.
+ */
+export async function grupoDaReservaOnline(o: {
+  codigoReserva: string; bateriaId: number; responsavelId: number; inscricoes: number[]; compradorPilota: boolean; precoCentavos: number; valorPagoCentavos: number;
+}, log: Log): Promise<{ codigo: string; link: string; painel: string }> {
+  const marca = marcaDoSite(o.codigoReserva);
+  let id = Number((await one<{ id: number }>(`SELECT TOP 1 Id id FROM dbo.ReservaGrupo WHERE Origem = 'site' AND Observacao LIKE @m ORDER BY Id`, { m: `${marca}%` }))?.id ?? 0);
+  if (!id) {
+    const obs = o.compradorPilota
+      ? `${marca} · cada um paga o seu`
+      : `${marca} · cada um paga o seu · garantia de R$ ${(o.valorPagoCentavos / 100).toFixed(2).replace('.', ',')} paga online por quem organiza (abater de quem faltar ou devolver pela política)`;
+    id = await tx(async (run) => {
+      const [g] = await run(
+        `INSERT INTO dbo.ReservaGrupo (Codigo, BateriaId, ResponsavelId, Origem, Modo, PrecoCentavos, SinalPct, Observacao, CriadoPor)
+         OUTPUT inserted.Id id VALUES (@codigo, @b, @r, 'site', 'individual', @preco, 0, @obs, NULL)`,
+        { codigo: codigoNovo(), b: o.bateriaId, r: o.responsavelId, preco: o.precoCentavos, obs },
+      );
+      const gid = Number(g.id);
+      const inserir = (ordem: number, responsavel: boolean, clienteId: number | null, inscricaoId: number | null) => run(
+        `INSERT INTO dbo.ReservaGrupoPiloto (GrupoId, Ordem, Nome, Telefone, Menor, Responsavel, ClienteId, InscricaoId, Token)
+         VALUES (@g, @o, NULL, NULL, 0, @r, @c, @i, @k)`,
+        { g: gid, o: ordem, r: responsavel ? 1 : 0, c: clienteId, i: inscricaoId, k: tokenNovo() },
+      );
+      // quem organiza: vaga 1 se pilota; senão sem vaga (InscricaoId NULL), só o link e o painel
+      await inserir(1, true, o.responsavelId, o.compradorPilota ? o.inscricoes[0] : null);
+      const amigos = o.compradorPilota ? o.inscricoes.slice(1) : o.inscricoes;
+      for (const [k, insc] of amigos.entries()) {
+        const ordem = k + 2;
+        await inserir(ordem, false, null, insc);
+        const prov = await cadastroDaVaga(run, o.responsavelId, ordem, null, null);
+        await run(`UPDATE dbo.Inscricao SET ClienteId = @c, PrecoCentavos = @preco, AtualizadoEm = SYSDATETIME() WHERE Id = @i`, { c: prov, i: insc, preco: o.precoCentavos });
+      }
+      return gid;
+    });
+    log(`grupo ${id}: criado pelo site (reserva ${o.codigoReserva}, ${o.inscricoes.length} vaga(s), cada um paga o seu)`);
+    await aplicarPagos(id).catch((e) => log(`grupo ${id}: aplicar pagos falhou (${(e as Error).message})`));
+    ultimoResumoSite = '';
+  }
+  const g = await one<{ codigo: string; token: string }>(
+    `SELECT g.Codigo codigo, p.Token token FROM dbo.ReservaGrupo g JOIN dbo.ReservaGrupoPiloto p ON p.GrupoId = g.Id AND p.Responsavel = 1 WHERE g.Id = @id`, { id });
+  if (!g) throw new HttpError(500, 'Grupo do site sem responsável.');
+  return { codigo: g.codigo, link: linkCadastro(g.token), painel: linkPainel(g.codigo) };
+}
+
+/**
+ * Decisão do dono (12/11/2026): nos grupos "cada um paga o seu" criados pelo site, a vaga de amigo sem pagamento volta
+ * para venda 24h antes da bateria. Não mexe em vaga paga, que já passou pela recepção ou vendida no caixa.
+ * O organizador vê no painel que a vaga saiu (e pode avisar o amigo); chamado a cada minuto.
+ */
+export async function soltarVagasNaoPagasDoSite(log: Log) {
+  const vagas = await query<{ grupoId: number; pilotoId: number; inscricaoId: number; ordem: number; codigo: string }>(
+    `SELECT g.Id grupoId, p.Id pilotoId, p.InscricaoId inscricaoId, p.Ordem ordem, g.Codigo codigo
+       FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId
+       JOIN dbo.ReservaGrupoPiloto p ON p.GrupoId = g.Id AND p.Responsavel = 0
+       JOIN dbo.Inscricao i ON i.Id = p.InscricaoId
+      WHERE g.Origem = 'site' AND g.Modo = 'individual' AND g.Status = 'ativa'
+        AND b.Inicio > SYSDATETIME() AND b.Inicio <= DATEADD(hour, 24, SYSDATETIME())
+        AND i.Status <> 'cancelada' AND i.Pago = 0 AND i.VendaId IS NULL AND i.TermoImpressoEm IS NULL AND i.Kart IS NULL`,
+  );
+  for (const v of vagas) {
+    const feito = await one<{ Id: number }>(
+      `UPDATE dbo.Inscricao SET Status = 'cancelada', AtualizadoEm = SYSDATETIME() OUTPUT inserted.Id
+        WHERE Id = @i AND Pago = 0 AND Status <> 'cancelada' AND VendaId IS NULL`, { i: v.inscricaoId });
+    if (feito) log(`grupo ${v.grupoId} (${v.codigo}): vaga ${v.ordem} sem pagamento a 24h da bateria voltou para venda`);
+  }
+  if (vagas.length) ultimoResumoSite = '';
+  return vagas.length;
 }

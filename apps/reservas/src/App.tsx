@@ -12,8 +12,14 @@ const PASSOS = ['Corrida', 'Pilotos', 'Cadastro', 'Pagamento'] as const;
 
 type Pessoa = { nome: string; documento: string; nascimento: string; email: string; telefone: string; instagram: string; peso: string; cep: string; endereco: string; complemento: string; bairro: string; cidade: string };
 const vazia = (): Pessoa => ({ nome: '', documento: '', nascimento: '', email: '', telefone: '', instagram: '', peso: '', cep: '', endereco: '', complemento: '', bairro: '', cidade: '' });
-type Rascunho = { bateriaId: number | null; quantidade: number; euPiloto: boolean; comprador: Pessoa; acomp: Pessoa[]; forma: 'pix' | 'cartao' };
-const RASCUNHO0: Rascunho = { bateriaId: null, quantidade: 1, euPiloto: true, comprador: vazia(), acomp: [], forma: 'pix' };
+type Rascunho = { bateriaId: number | null; quantidade: number; euPiloto: boolean; comprador: Pessoa; acomp: Pessoa[]; forma: 'pix' | 'cartao'; modo: 'tudo' | 'cada' };
+const RASCUNHO0: Rascunho = { bateriaId: null, quantidade: 1, euPiloto: true, comprador: vazia(), acomp: [], forma: 'pix', modo: 'tudo' };
+// "Cada um paga o seu" (decisões do dono, 12/11/2026): 2 a 10 pilotos e bateria a 24h ou mais (as vagas não pagas voltam para venda 24h antes)
+const GRUPO_MIN = 2, GRUPO_MAX = 10, GRUPO_ANTECEDENCIA_H = 24;
+const cadaPodeNoHorario = (h: Horario) => Date.parse(h.inicio.slice(0, 16) + ':00-03:00') - Date.now() >= GRUPO_ANTECEDENCIA_H * 3_600_000;
+const cadaPode = (h: Horario, q: number) => q >= GRUPO_MIN && q <= GRUPO_MAX && cadaPodeNoHorario(h);
+/** Modo valendo de fato: a escolha "cada" só vale se o horário e a quantidade permitem. */
+const ehCada = (r: Rascunho, h: Horario | null) => r.modo === 'cada' && !!h && cadaPode(h, r.quantidade);
 
 const ler = <T,>(k: string, padrao: T): T => { try { const v = sessionStorage.getItem(k); return v ? { ...padrao, ...JSON.parse(v) } : padrao; } catch { return padrao; } };
 const gravar = (k: string, v: unknown) => { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch { /* sem armazenamento */ } };
@@ -120,13 +126,13 @@ function Reserva({ onCriado }: { onCriado: (id: string) => void }) {
           {passo === 0 && <EtapaCorrida agenda={agenda} carregando={carregando} erro={erroAgenda} recarregar={carregar} selecionado={r.bateriaId}
             onEscolher={(h) => { setR((x) => ({ ...x, bateriaId: h.id, quantidade: Math.min(x.quantidade, Math.max(1, Math.min(agenda?.maxPilotos ?? 10, h.livres))) })); ir(1); }} />}
           {passo === 1 && horario && <EtapaPilotos r={r} setR={setR} max={maxQtd} horario={horario} voltar={() => ir(0)} avancar={() => ir(2)} />}
-          {passo === 2 && horario && <EtapaCadastro r={r} setR={setR} voltar={() => ir(1)} avancar={() => ir(3)} />}
-          {passo === 3 && horario && agenda && <EtapaPagamento r={r} setR={setR} horario={horario} agenda={agenda} abertoEm={abertoEm.current} voltar={() => ir(2)}
+          {passo === 2 && horario && <EtapaCadastro r={r} setR={setR} cada={ehCada(r, horario)} voltar={() => ir(1)} avancar={() => ir(3)} />}
+          {passo === 3 && horario && agenda && <EtapaPagamento r={r} setR={setR} cada={ehCada(r, horario)} horario={horario} agenda={agenda} abertoEm={abertoEm.current} voltar={() => ir(2)}
             onCriado={(id) => { try { sessionStorage.removeItem('kib-rascunho'); } catch { /* ok */ } onCriado(id); }}
             onIndisponivel={() => { setR((x) => ({ ...x, bateriaId: null })); carregar(); ir(0); }} />}
           {passo > 0 && !horario && <div className="vazio"><p>Esse horário não está mais disponível.</p><button className="btn" onClick={() => ir(0)}>Escolher outro horário</button></div>}
         </section>
-        <Resumo horario={horario} r={r} agenda={agenda} />
+        <Resumo horario={horario} r={r} agenda={agenda} cada={ehCada(r, horario)} />
       </div>
     </div>
   );
@@ -269,7 +275,22 @@ function EtapaPilotos({ r, setR, max, horario, voltar, avancar }: { r: Rascunho;
         <label className={r.euPiloto ? 'on' : ''}><input type="radio" name="eu" checked={r.euPiloto} onChange={() => setR((x) => ({ ...x, euPiloto: true }))} /><span><strong>Sim, vou correr</strong><small>Uma das vagas é minha.</small></span></label>
         <label className={!r.euPiloto ? 'on' : ''}><input type="radio" name="eu" checked={!r.euPiloto} onChange={() => setR((x) => ({ ...x, euPiloto: false }))} /><span><strong>Não, só vou reservar</strong><small>Reservo e pago para outras pessoas.</small></span></label>
       </fieldset>
-      <p className="dica-mini">Cada vaga é de uma pessoa diferente. Na próxima etapa você informa nome, CPF e nascimento de cada piloto.</p>
+      {q >= GRUPO_MIN && (() => {
+        const pode = cadaPode(horario, q);
+        const cada = r.modo === 'cada' && pode;
+        return (
+          <fieldset className="escolha">
+            <legend>Como vocês vão pagar?</legend>
+            <label className={!cada ? 'on' : ''}><input type="radio" name="modo" checked={!cada} onChange={() => setR((x) => ({ ...x, modo: 'tudo' }))} /><span><strong>Eu pago tudo agora</strong><small>{`Você informa os dados de cada piloto e paga as ${q} vagas.`}</small></span></label>
+            <label className={cada ? 'on' : ''} aria-disabled={!pode}><input type="radio" name="modo" checked={cada} disabled={!pode} onChange={() => setR((x) => ({ ...x, modo: 'cada' }))} /><span><strong>Cada um paga o seu</strong>
+              <small>{!pode ? (q > GRUPO_MAX ? `Até ${GRUPO_MAX} pilotos. Grupos maiores, fale com a recepção.` : `Só para baterias com ${GRUPO_ANTECEDENCIA_H}h ou mais de antecedência.`)
+                : r.euPiloto ? 'Você paga só a sua vaga agora e manda o link do grupo para os amigos.' : 'Você paga 1 vaga de garantia agora e manda o link do grupo para os amigos.'}</small></span></label>
+          </fieldset>
+        );
+      })()}
+      <p className="dica-mini">{r.modo === 'cada' && cadaPode(horario, q)
+        ? `Cada amigo abre o link, faz o próprio cadastro e paga a vaga dele. Quem não pagar até ${GRUPO_ANTECEDENCIA_H}h antes da bateria perde a vaga.`
+        : 'Cada vaga é de uma pessoa diferente. Na próxima etapa você informa nome, CPF e nascimento de cada piloto.'}</p>
       <div className="acoes"><button className="btn sec" onClick={voltar}>Voltar</button><button className="btn" onClick={() => { setR((x) => ({ ...x, quantidade: q })); avancar(); }}>Continuar</button></div>
     </>
   );
@@ -277,7 +298,7 @@ function EtapaPilotos({ r, setR, max, horario, voltar, avancar }: { r: Rascunho;
 
 // ------------------------------------------------------------------ 3. cadastro
 type Erros = Record<string, string>;
-function validarTudo(r: Rascunho): Erros {
+function validarTudo(r: Rascunho, cada = false): Erros {
   const e: Erros = {}; const c = r.comprador;
   if (c.nome.trim().split(/\s+/).length < 2) e['c.nome'] = 'Informe nome e sobrenome.';
   if (!cpfValido(c.documento)) e['c.documento'] = 'Confira os 11 números do CPF.';
@@ -288,7 +309,7 @@ function validarTudo(r: Rascunho): Erros {
   if (!c.instagram.trim()) e['c.instagram'] = 'Informe seu Instagram (o @usuário). Ele sai junto com seu nome no resultado da bateria.'; else if (erroInstagram(c.instagram)) e['c.instagram'] = erroInstagram(c.instagram);
   if (r.euPiloto) { const p = Number(c.peso.replace(',', '.')); if (!(p >= 20 && p <= 250)) e['c.peso'] = 'Informe seu peso (kg). Ele é usado para equilibrar os karts.'; }
   const docs = new Set([digitos(c.documento)]);
-  const n = r.quantidade - (r.euPiloto ? 1 : 0);
+  const n = cada ? 0 : r.quantidade - (r.euPiloto ? 1 : 0);
   for (let i = 0; i < n; i++) {
     const a = r.acomp[i] ?? vazia(); const k = `a${i}.`;
     if (a.nome.trim().split(/\s+/).length < 2) e[k + 'nome'] = 'Informe nome e sobrenome.';
@@ -353,12 +374,12 @@ function FormPessoa({ p, prefixo, erros, set, mostrar, comprador, piloto }: { p:
   );
 }
 
-function EtapaCadastro({ r, setR, voltar, avancar }: { r: Rascunho; setR: React.Dispatch<React.SetStateAction<Rascunho>>; voltar: () => void; avancar: () => void }) {
+function EtapaCadastro({ r, setR, cada, voltar, avancar }: { r: Rascunho; setR: React.Dispatch<React.SetStateAction<Rascunho>>; cada: boolean; voltar: () => void; avancar: () => void }) {
   const [tocados, setTocados] = useState<Set<string>>(new Set());
   const [tentou, setTentou] = useState(false);
-  const erros = validarTudo(r);
+  const erros = validarTudo(r, cada);
   const mostrar = (k: string) => tentou || tocados.has(k);
-  const n = r.quantidade - (r.euPiloto ? 1 : 0);
+  const n = cada ? 0 : r.quantidade - (r.euPiloto ? 1 : 0);
   const setC = (campo: keyof Pessoa, v: string) => { setR((x) => ({ ...x, comprador: { ...x.comprador, [campo]: v } })); setTocados((t) => new Set(t).add('c.' + campo)); };
   const setA = (i: number) => (campo: keyof Pessoa, v: string) => {
     setR((x) => { const acomp = [...x.acomp]; while (acomp.length <= i) acomp.push(vazia()); acomp[i] = { ...acomp[i], [campo]: v }; return { ...x, acomp }; });
@@ -383,6 +404,7 @@ function EtapaCadastro({ r, setR, voltar, avancar }: { r: Rascunho; setR: React.
           <FormPessoa p={r.acomp[i] ?? vazia()} prefixo={`a${i}.`} erros={erros} set={setA(i)} mostrar={mostrar} piloto />
         </section>
       ))}
+      {cada && <p className="dica-mini">{`Os ${r.quantidade - (r.euPiloto ? 1 : 0)} amigos fazem o cadastro pelo link do grupo, que aparece assim que você pagar.`}</p>}
       <p className="dica-mini">Seus dados são usados só para a reserva, o cadastro no totem e o resultado da bateria (LGPD). Menores de 18 anos assinam o termo com o responsável no dia.</p>
       {tentou && faltam > 0 && <p className="msg-erro geral" role="alert">{faltam === 1 ? 'Falta 1 campo. Confira os destacados.' : `Faltam ${faltam} campos. Confira os destacados.`}</p>}
       <div className="acoes"><button className="btn sec" onClick={voltar}>Voltar</button><button className="btn" onClick={continuar}>Continuar</button></div>
@@ -391,8 +413,8 @@ function EtapaCadastro({ r, setR, voltar, avancar }: { r: Rascunho; setR: React.
 }
 
 // ------------------------------------------------------------------ 4. pagamento
-function EtapaPagamento({ r, setR, horario, agenda, abertoEm, voltar, onCriado, onIndisponivel }: {
-  r: Rascunho; setR: React.Dispatch<React.SetStateAction<Rascunho>>; horario: Horario; agenda: Agenda; abertoEm: number; voltar: () => void; onCriado: (id: string) => void; onIndisponivel: () => void;
+function EtapaPagamento({ r, setR, cada, horario, agenda, abertoEm, voltar, onCriado, onIndisponivel }: {
+  r: Rascunho; cada: boolean; setR: React.Dispatch<React.SetStateAction<Rascunho>>; horario: Horario; agenda: Agenda; abertoEm: number; voltar: () => void; onCriado: (id: string) => void; onIndisponivel: () => void;
 }) {
   const [aceite, setAceite] = useState(false);
   const [politica, setPolitica] = useState<Politica | null>(null);
@@ -407,15 +429,17 @@ function EtapaPagamento({ r, setR, horario, agenda, abertoEm, voltar, onCriado, 
   const [aplicado, setAplicado] = useState<{ codigo: string; descontoCentavos: number; totalCentavos: number; brutoCentavos: number } | null>(null);
   const [aplicando, setAplicando] = useState(false);
   const [erroCupom, setErroCupom] = useState('');
-  const nOutros = r.quantidade - (r.euPiloto ? 1 : 0);
+  const nOutros = cada ? 0 : r.quantidade - (r.euPiloto ? 1 : 0);
   const documentos = [...(r.euPiloto ? [r.comprador.documento] : []), ...r.acomp.slice(0, nOutros).map((a) => a.documento)].map(digitos);
-  const total = aplicado ? aplicado.totalCentavos : horario.precoCentavos * r.quantidade;
+  // cada um paga o seu: agora só 1 vaga (a de quem organiza ou a garantia)
+  const vagasAgora = cada ? 1 : r.quantidade;
+  const total = aplicado ? aplicado.totalCentavos : horario.precoCentavos * vagasAgora;
   const aplicarCupom = async () => {
     const codigo = cupom.trim().toUpperCase();
     if (!/^[A-Z0-9_-]{1,40}$/.test(codigo)) { setErroCupom('Confira o código do cupom.'); return; }
     setAplicando(true); setErroCupom(''); setAplicado(null);
     try {
-      const { requestId } = await api.cupom({ codigo, bateriaId: horario.id, quantidade: r.quantidade, documento: digitos(r.comprador.documento), documentos });
+      const { requestId } = await api.cupom({ codigo, bateriaId: horario.id, quantidade: vagasAgora, documento: digitos(r.comprador.documento), documentos });
       // o kartódromo confere o cupom em poucos segundos
       for (let i = 0; i < 20; i++) {
         await new Promise((ok) => setTimeout(ok, 1500));
@@ -435,12 +459,13 @@ function EtapaPagamento({ r, setR, horario, agenda, abertoEm, voltar, onCriado, 
     const espera = 6500 - (Date.now() - abertoEm);
     setEnviando(true); setErro('');
     if (espera > 0) await new Promise((ok) => setTimeout(ok, espera));
-    const c = r.comprador; const n = r.quantidade - (r.euPiloto ? 1 : 0);
+    const c = r.comprador; const n = cada ? 0 : r.quantidade - (r.euPiloto ? 1 : 0);
     const corpo = {
       ...c, nome: c.nome.trim(), email: c.email.trim(), documento: c.documento, nascimento: dataIso(c.nascimento), tipoDocumento: 'CPF',
       bateriaId: horario.id, quantidade: r.quantidade, compradorPilota: r.euPiloto,
       pilotos: [...(r.euPiloto ? [c.nome.trim()] : []), ...r.acomp.slice(0, n).map((a) => a.nome.trim())],
       acompanhantes: r.acomp.slice(0, n).map((a) => ({ ...a, nome: a.nome.trim(), email: a.email.trim(), nascimento: dataIso(a.nascimento), endereco: a.endereco.trim(), bairro: a.bairro.trim(), cidade: a.cidade.trim() })),
+      ...(cada ? { modo: 'individual' } : {}),
       forma: r.forma, politica: true, lgpd: true, site: isca.current?.value || '', t: abertoEm, ...(aplicado ? { cupom: aplicado.codigo } : {}),
     };
     try {
@@ -461,7 +486,7 @@ function EtapaPagamento({ r, setR, horario, agenda, abertoEm, voltar, onCriado, 
       <dl className="conferir">
         <div><dt>Bateria</dt><dd>{diaLongo(dt)} · {hora(dt)}</dd></div>
         <div><dt>Chegada</dt><dd>{menosUmaHora(dt)} (1 hora antes)</dd></div>
-        <div><dt>Pilotos</dt><dd>{[...(r.euPiloto ? [r.comprador.nome] : []), ...r.acomp.slice(0, r.quantidade - (r.euPiloto ? 1 : 0)).map((a) => a.nome)].map((x) => x.trim().split(/\s+/)[0]).join(', ')}</dd></div>
+        <div><dt>Pilotos</dt><dd>{cada ? `${r.quantidade} pilotos · cada amigo paga a própria vaga pelo link do grupo` : [...(r.euPiloto ? [r.comprador.nome] : []), ...r.acomp.slice(0, r.quantidade - (r.euPiloto ? 1 : 0)).map((a) => a.nome)].map((x) => x.trim().split(/\s+/)[0]).join(', ')}</dd></div>
         <div><dt>Quem reserva</dt><dd>{r.comprador.nome} · {r.comprador.email}</dd></div>
       </dl>
       <fieldset className="escolha formas">
@@ -477,7 +502,8 @@ function EtapaPagamento({ r, setR, horario, agenda, abertoEm, voltar, onCriado, 
         </div>
         <p id="cupom-msg" className={erroCupom ? 'msg-erro' : 'dica-campo'} role={erroCupom ? 'alert' : undefined}>{erroCupom || (aplicado ? `Cupom ${aplicado.codigo}: desconto de ${reais(aplicado.descontoCentavos)}.` : '')}</p>
       </div>
-      <div className="total"><span>{aplicado ? <><s>{reais(aplicado.brutoCentavos)}</s> com cupom</> : `${r.quantidade} × ${reais(horario.precoCentavos)}`}</span><strong>{reais(total)}</strong></div>
+      <div className="total"><span>{aplicado ? <><s>{reais(aplicado.brutoCentavos)}</s> com cupom</> : cada ? (r.euPiloto ? 'Sua vaga, agora' : '1 vaga de garantia, agora') : `${r.quantidade} × ${reais(horario.precoCentavos)}`}</span><strong>{reais(total)}</strong></div>
+      {cada && <p className="dica-mini">{`${r.euPiloto ? 'Os outros' : 'Os'} ${r.quantidade - (r.euPiloto ? 1 : 0)} pilotos pagam ${reais(horario.precoCentavos)} cada pelo link do grupo. As vagas deles ficam guardadas até ${GRUPO_ANTECEDENCIA_H}h antes da bateria; quem não pagar até lá perde a vaga.${r.euPiloto ? '' : ' A garantia é abatida de quem faltar ou devolvida conforme a política.'}`}</p>}
       {horario.precoPrimeiraVezCentavos ? <p className="dica-mini">{`Estreantes pagam ${reais(horario.precoPrimeiraVezCentavos)} neste horário: o desconto é conferido pelo CPF e já vem no valor do Pix/cartão.`}</p> : null}
       <label className="aceite">
         <input type="checkbox" checked={aceite} onChange={(e) => setAceite(e.target.checked)} />
@@ -490,6 +516,23 @@ function EtapaPagamento({ r, setR, horario, agenda, abertoEm, voltar, onCriado, 
         <button className="btn grande" onClick={enviar} disabled={enviando || !aceite} aria-busy={enviando}>{enviando ? 'Separando suas vagas…' : `Reservar e pagar ${reais(total)}`}</button></div>
       {verPolitica && <ModalPolitica politica={politica} fechar={() => setVerPolitica(false)} aceitar={() => { setAceite(true); setVerPolitica(false); }} />}
     </>
+  );
+}
+
+/** Depois de pago, no "cada um paga o seu": o link para mandar aos amigos e o painel de quem já entrou. */
+function ConvidarGrupo({ p, dt }: { p: Pedido; dt: Date | null }) {
+  if (!p.grupo) return <div className="dica" role="status"><Ico d={I.relogio} /><p>Preparando o link do seu grupo. Ele aparece aqui em instantes.</p></div>;
+  const texto = `Bora correr de kart no Kartódromo de Betim${dt ? `, ${diaLongo(dt)} às ${hora(dt)}` : ''}! Entra no grupo, faz teu cadastro e paga tua vaga: ${p.grupo.link}`;
+  return (
+    <section className="grupo-convite" aria-labelledby="grupo-t">
+      <h2 id="grupo-t">Agora chame o grupo</h2>
+      <p className="muted">Mande o link para os amigos. Cada um faz o próprio cadastro e paga a vaga dele. Quem não pagar até 24h antes da bateria perde a vaga.</p>
+      <div className="acoes centro">
+        <a className="btn" href={`https://wa.me/?text=${encodeURIComponent(texto)}`} target="_blank" rel="noopener"><Ico d={I.compartilhar} />Enviar no WhatsApp</a>
+        <button className="btn sec" onClick={async () => { try { await navigator.clipboard.writeText(p.grupo!.link); avisar('Link do grupo copiado'); } catch { avisar('Não deu para copiar. Use o botão do WhatsApp.'); } }}><Ico d={I.copiar} />Copiar link</button>
+      </div>
+      <a className="lnk centro" href={p.grupo.painel} target="_blank" rel="noopener">Ver quem já entrou e pagou</a>
+    </section>
   );
 }
 
@@ -511,7 +554,7 @@ function ModalPolitica({ politica, fechar, aceitar }: { politica: Politica | nul
 }
 
 // ------------------------------------------------------------------ resumo lateral
-function Resumo({ horario, r, agenda }: { horario: Horario | null; r: Rascunho; agenda: Agenda | null }) {
+function Resumo({ horario, r, agenda, cada }: { horario: Horario | null; r: Rascunho; agenda: Agenda | null; cada: boolean }) {
   const dt = horario ? deIso(horario.inicio) : null;
   const preco = horario?.precoCentavos ?? agenda?.precoCentavos ?? 0;
   return (
@@ -525,7 +568,8 @@ function Resumo({ horario, r, agenda }: { horario: Horario | null; r: Rascunho; 
           <div><dt>Chegada</dt><dd>{dt ? menosUmaHora(dt) : '—'}</dd></div>
           <div><dt>Pilotos</dt><dd>{r.quantidade}</dd></div>
         </dl>
-        <div className="resumo-total"><span>Total</span><strong>{horario ? reais(preco * r.quantidade) : '—'}</strong></div>
+        <div className="resumo-total"><span>{cada ? 'Agora' : 'Total'}</span><strong>{horario ? reais(preco * (cada ? 1 : r.quantidade)) : '—'}</strong></div>
+        {cada && <p className="muted pequeno">Cada amigo paga a própria vaga pelo link.</p>}
         <p className="muted pequeno"><Ico d={I.escudo} s={14} /> Pix ou cartão pela Asaas</p>
       </div>
     </aside>
@@ -542,7 +586,8 @@ function Acompanhar({ id, onNovo }: { id: string; onNovo: () => void }) {
     const tick = async () => {
       try {
         const x = await api.pedido(id); if (!vivo) return; setP(x); setFalhas(0);
-        if (FINAIS.has(x.status)) { if (x.status !== 'confirmado') guardarPedido(id); return; }
+        const esperandoGrupo = x.status === 'confirmado' && x.modo === 'individual' && !x.grupo;
+        if (FINAIS.has(x.status) && !esperandoGrupo) { if (x.status !== 'confirmado') guardarPedido(id); return; }
       } catch (e) {
         if (!vivo) return;
         if ((e as ErroApi).status === 404) { setP({ id, status: 'nao_encontrada' } as Pedido); return; }
@@ -569,6 +614,7 @@ function Acompanhar({ id, onNovo }: { id: string; onNovo: () => void }) {
       <div className="selo ok"><Ico d={I.ok} s={28} /></div>
       <p className="sobre">Tudo certo para a corrida</p><h1>Reserva confirmada</h1>{info}
       <div className="codigo"><span>Código da reserva</span><strong>{p.codigo}</strong><button className="ico-btn" onClick={() => { navigator.clipboard?.writeText(p.codigo); avisar('Código copiado'); }} aria-label="Copiar código"><Ico d={I.copiar} /></button></div>
+      {p.modo === 'individual' && <ConvidarGrupo p={p} dt={dt} />}
       <p className="dica-mini centro">Guarde o código: com ele e o CPF você acessa <a href="#minhas">Minhas reservas</a> para remarcar ou cancelar.</p>
       <ol className="no-dia"><li>Chegue às <strong>{dt && menosUmaHora(dt)}</strong>, uma hora antes da largada.</li><li>No totem, informe o <strong>CPF de quem reservou</strong> e confira os dados.</li><li>O termo de responsabilidade é assinado na recepção.</li></ol>
       <div className="acoes centro">{dt && <button className="btn" onClick={baixar}>Salvar na agenda</button>}<a className="btn sec" href="https://maps.google.com/?q=Kart%C3%B3dromo+Internacional+de+Betim" target="_blank" rel="noopener">Como chegar</a></div>

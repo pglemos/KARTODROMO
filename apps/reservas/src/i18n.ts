@@ -17,6 +17,13 @@ export function trocarIdioma(i: Idioma) {
 }
 
 const D: Record<string, string> = {
+  'Como vocês vão pagar?': 'How will you pay?', 'Eu pago tudo agora': 'I pay for everyone now', 'Cada um paga o seu': 'Everyone pays their own',
+  'Você paga só a sua vaga agora e manda o link do grupo para os amigos.': 'You pay only your spot now and send the group link to your friends.',
+  'Você paga 1 vaga de garantia agora e manda o link do grupo para os amigos.': 'You pay 1 spot as a deposit now and send the group link to your friends.',
+  'Só para baterias com 24h ou mais de antecedência.': 'Only for sessions 24h or more away.', 'Sua vaga, agora': 'Your spot, now', '1 vaga de garantia, agora': '1 deposit spot, now',
+  'Agora chame o grupo': 'Now invite your group', 'Enviar no WhatsApp': 'Send on WhatsApp', 'Copiar link': 'Copy link', 'Ver quem já entrou e pagou': 'See who joined and paid',
+  'Mande o link para os amigos. Cada um faz o próprio cadastro e paga a vaga dele. Quem não pagar até 24h antes da bateria perde a vaga.': 'Send the link to your friends. Each one signs up and pays their own spot. Anyone who has not paid 24h before the session loses the spot.',
+  'Preparando o link do seu grupo. Ele aparece aqui em instantes.': 'Preparing your group link. It will show up here in a moment.', 'Agora': 'Now', 'Cada amigo paga a própria vaga pelo link.': 'Each friend pays their own spot through the link.',
   'Pular para a reserva': 'Skip to booking', 'Cheguei! Fazer check-in': 'I am here! Check in', 'Conferindo sua localização…': 'Checking your location…',
   'Check-in feito! O termo de cada piloto já está indo para a impressora da recepção: no balcão, é só conferir e assinar.': 'Checked in! Each driver’s waiver is being printed at the front desk: just review and sign it there.',
   'Este aparelho não informa a localização. Faça o check-in no totem.': 'This device does not share location. Check in at the kiosk.', 'Permita o acesso à localização para fazer o check-in (ou use o totem).': 'Allow location access to check in (or use the kiosk).',
