@@ -40,3 +40,7 @@ O organizador libera no painel a vaga de quem desistiu. Fluxo: `POST /api/grupo/
 - A vaga volta a ficar aberta e a inscrição continua a mesma, no cadastro provisório "Amigo N".
 - O pedido é recusado (e o motivo aparece no painel por 1 hora) quando: a vaga é do responsável; o termo já foi impresso ou o kart já está definido; a vaga foi paga pela própria pessoa no modo "cada um paga o seu"; ou falta menos de 1 hora para a bateria.
 - Bundle no ar: `worker-acoes.mjs` aplicado sobre `base-painel-resp-aviso-termo.js`.
+
+## 12/11: tudo passou para o código-fonte
+Em 11/11, perto da meia-noite, o worker foi publicado a partir de `workers/pre-cadastro` e os remendos saíram do ar. Desde o commit 2e5228b, painel, termo, aviso, ações e cupom ficam no fonte (`src/extras.ts`, `public/painel.html`, `public/index.html`). **Publique só com `cd workers/pre-cadastro && npx wrangler deploy` a partir do `main` atualizado.** Os scripts `worker-*.mjs` desta pasta ficam só como histórico.
+A busca de cadastro por CPF/e-mail (`/api/cliente/identificar`) não voltou: ela devolvia os dados pessoais de qualquer pessoa sem confirmação.
