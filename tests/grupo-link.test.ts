@@ -186,3 +186,26 @@ describe('endereço único: cadastro.* abre em reservas.*', () => {
     expect((await pagina('/conta')).status).toBe(200);
   });
 });
+
+describe('check-in de quem entrou pelo link do grupo', () => {
+  const PISTA = { lat: -19.92032, lng: -44.17568 };
+  const ck = (corpo: Record<string, unknown>) => chamar('/api/grupo/checkin', { method: 'POST', body: JSON.stringify({ r: 'TOKENAMIGO01', cpf: '529.982.247-25', ...PISTA, precisao: 20, ...corpo }) });
+
+  it('no kartódromo, na janela de 2 h: entra na fila do SRVKART com token e CPF', async () => {
+    await publicar([grupo({ inicio: daquiA(1) })]);
+    const r = await ck({});
+    expect(r.status).toBe(202);
+    const chave = [...env.PRE.mem.keys()].find((k) => k.startsWith('checkins/'))!;
+    expect(chave).toMatch(/^checkins\/[0-9a-f-]{36}\.json$/);
+    expect(JSON.parse(env.PRE.mem.get(chave)!)).toMatchObject({ tipo: 'grupo', token: 'TOKENAMIGO01', cpf: '52998224725', state: 'pending' });
+  });
+
+  it('cedo demais, longe da pista ou grupo desconhecido: recusa', async () => {
+    await publicar([grupo({ inicio: daquiA(5) })]);
+    expect((await ck({})).status).toBe(409);
+    await publicar([grupo({ inicio: daquiA(1) })]);
+    expect(await (await ck({ lat: -19.80, lng: -44.0 })).json()).toMatchObject({ erro: expect.stringMatching(/km do kartódromo/) });
+    expect((await ck({ r: 'NAOEXISTE999' })).status).toBe(404);
+    expect((await ck({ cpf: '123' })).status).toBe(400);
+  });
+});

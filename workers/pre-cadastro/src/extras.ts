@@ -109,6 +109,27 @@ export async function rotasPublicas(req: Request, env: EnvExtras, p: string, url
     await env.PRE.delete(`grupos/acoes-erro/${d.codigo}-${vaga.ordem}.json`);
     return json(202, { ok: true });
   }
+  // check-in de quem entrou por link de grupo (12/11/2026): token do link + CPF + GPS; o SRVKART acha a vaga e imprime o termo
+  if (p === '/api/grupo/checkin' && req.method === 'POST') {
+    if (await limite(req.headers.get('cf-connecting-ip') ?? 'x', 'minhas')) return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
+    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const token = String(b.r ?? '').replace(/[^A-Za-z0-9]/g, '').slice(0, 24), cpf = digitos(b.cpf);
+    if (token.length < 10 || cpf.length !== 11) return json(400, { erro: 'Informe o seu CPF (11 números).' });
+    const g = (await grupos(env)).lista.find((x) => (x as GrupoResumo & { tokens?: string[] }).tokens?.includes(token));
+    if (!g || g.status !== 'ativa') return json(404, { erro: 'Grupo não encontrado. Faça o check-in no totem.' });
+    const inicio = Date.parse(String(g.inicio).slice(0, 16) + ':00-03:00');
+    const agora = Date.now();
+    if (!Number.isFinite(inicio) || agora < inicio - 2 * 3_600_000) return json(409, { erro: 'O check-in abre 2 horas antes da largada.' });
+    if (agora > inicio + 15 * 60_000) return json(409, { erro: 'O horário de check-in desta bateria terminou. Fale com a recepção.' });
+    const lat = Number(b.lat), lng = Number(b.lng), precisao = Number(b.precisao);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return json(400, { erro: 'Permita a localização para fazer o check-in.' });
+    if (Number.isFinite(precisao) && precisao > 300) return json(409, { erro: 'A localização está imprecisa. Tente de novo em um lugar aberto.' });
+    const dist = Math.round(distanciaM({ lat, lng }, PISTA));
+    if (dist > RAIO_M) return json(409, { erro: `Você está a ${(dist / 1000).toFixed(1).replace('.', ',')} km do kartódromo. O check-in libera quando você chegar.` });
+    const id = crypto.randomUUID();
+    await env.PRE.put(`checkins/${id}.json`, JSON.stringify({ tipo: 'grupo', token, cpf, codigo: g.codigo, em: new Date().toISOString(), distancia: dist, state: 'pending' }), JSON_R2);
+    return json(202, { ok: true });
+  }
   if (p === '/api/reservas/minhas' && req.method === 'POST') {
     if (await limite(req.headers.get('cf-connecting-ip') ?? 'x', 'minhas')) return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
     const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;

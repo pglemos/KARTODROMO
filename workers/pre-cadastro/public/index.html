@@ -192,6 +192,15 @@
     </div>
   </div>
 
+  <section class="cartao" id="checkinGrupo" hidden aria-labelledby="ckTitulo">
+    <h2 id="ckTitulo">Já chegou? Faça o check-in</h2>
+    <p class="sub" style="margin-left:0">Cadastro já feito? Informe seu CPF: o termo vai direto para a impressora da recepção, é só conferir e assinar no balcão.</p>
+    <label for="ckCpf">Seu CPF</label>
+    <input id="ckCpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00">
+    <p class="msg-campo" id="ckMsg" hidden></p>
+    <button type="button" class="enviar" id="ckBotao" style="position:static;margin-top:14px">Cheguei! Fazer check-in</button>
+  </section>
+
   <form id="form" novalidate autocomplete="on">
     <div class="erro" id="erro" role="alert"></div>
     <p class="legenda"><span class="obrig" aria-hidden="true">*</span> campo obrigatório</p>
@@ -673,6 +682,30 @@
     }
   };
   if (tokenReserva) fetch('/api/grupo?r=' + encodeURIComponent(tokenReserva)).then((r) => r.ok ? r.json() : null).then((g) => { if (g && g.responsavel) aplicarGrupo(g); }).catch(() => {});
+  // check-in pelo celular de quem entrou pelo link do grupo (abre 2 h antes da largada, até 15 min depois)
+  const mostrarCheckin = (g) => {
+    const ini = Date.parse(String(g.inicio).slice(0, 16) + ':00-03:00'), agora = Date.now();
+    if (!(agora >= ini - 2 * 3600e3 && agora <= ini + 15 * 60e3)) return;
+    $('checkinGrupo').hidden = false;
+    $('ckCpf').addEventListener('input', (e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 11); e.target.value = d.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'); });
+    const msg = (t, ok) => { const m = $('ckMsg'); m.hidden = false; m.textContent = t; m.style.color = ok ? 'var(--verde)' : ''; m.className = ok ? 'legenda' : 'msg-campo'; };
+    $('ckBotao').addEventListener('click', () => {
+      const cpf = $('ckCpf').value.replace(/\D/g, '');
+      if (cpf.length !== 11) { msg('Informe os 11 números do CPF.'); return; }
+      if (!navigator.geolocation) { msg('Este aparelho não informa a localização. Faça o check-in no totem.'); return; }
+      $('ckBotao').disabled = true; $('ckBotao').textContent = 'Conferindo sua localização…';
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+          const r = await fetch('/api/grupo/checkin', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ r: tokenReserva, cpf, lat: pos.coords.latitude, lng: pos.coords.longitude, precisao: pos.coords.accuracy }) });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j.erro || 'Não foi possível fazer o check-in. Use o totem.');
+          msg('Check-in feito! Seu termo está indo para a impressora da recepção: no balcão, é só conferir e assinar.', true);
+          $('ckBotao').hidden = true;
+        } catch (e) { msg(e.message); $('ckBotao').disabled = false; $('ckBotao').textContent = 'Cheguei! Fazer check-in'; }
+      }, (e) => { msg(e.code === 1 ? 'Permita o acesso à localização para fazer o check-in (ou use o totem).' : 'Não foi possível obter sua localização. Tente de novo em um lugar aberto.'); $('ckBotao').disabled = false; $('ckBotao').textContent = 'Cheguei! Fazer check-in'; }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+    });
+  };
+  if (tokenReserva) fetch('/api/grupo?r=' + encodeURIComponent(tokenReserva)).then((r) => r.ok ? r.json() : null).then((g) => { if (g && g.inicio) mostrarCheckin(g); }).catch(() => {});
 
   // ---- pagamento ----
   let timerPag = null;
