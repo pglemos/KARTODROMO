@@ -95,6 +95,8 @@ Ordem obrigatória de publicação: **1) SRVKART** (`lib/ops/grupos.ts`, `lib/op
 Pendências conhecidas: aviso ativo ao organizador quando uma vaga é solta (hoje só aparece no painel); primeira vez/cupom do AMIGO no link do grupo (o link cobra o preço cheio do grupo); testes de banco do SRVKART (só lógica pura testada).
 
 **Fase 3 — Acabamento (~2–3 dias)**
+FEITO 12/11/2026: endereço único (cadastro.* → reservas.* por 302; /conta e /privacidade ficam; marca `x-kib-via-reservas` evita loop), grupos em Minhas reservas (por hash do CPF do responsável + links do pedido "cada um paga o seu"), textos EN das telas novas.
+PENDENTE: lembretes (precisa decidir canal e texto: e-mail pelo Resend ou WhatsApp manual), check-in pelo celular para quem entrou por link de grupo (hoje só quem tem código de reserva), trocar 302 por 301 depois de alguns dias sem problema, SRVKART ainda gera links `cadastro.` (redirecionam).
 - "Minhas reservas" inclui grupos; check-in por vaga de grupo.
 - Lembretes (WhatsApp/e-mail) de cadastros/pagamentos pendentes.
 - Versão EN nas telas novas (i18n já existe).
