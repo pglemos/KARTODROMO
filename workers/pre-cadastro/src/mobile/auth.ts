@@ -420,11 +420,22 @@ async function register(
       .run();
   } catch (error) {
     if (String(error).includes('UNIQUE constraint failed')) {
+      // antes respondia 202 "confira o e-mail" sem enviar nada nos conflitos: o cliente ficava esperando um link que nunca chegava
       const existing = await findAccount(context, email);
-      if (existing?.cpf_lookup === cpfLookup && existing.email_verified_at === null) {
-        await deliverEmail(env, context, existing, 'verify');
+      if (existing?.cpf_lookup === cpfLookup) {
+        if (existing.deleted_at !== null) {
+          return json(409, { codigo: 'CONTA_EM_EXCLUSAO', erro: 'Esta conta está marcada para exclusão. Entre com CPF e senha para restaurá-la.' });
+        }
+        if (existing.email_verified_at === null) {
+          await deliverEmail(env, context, existing, 'verify');
+          return acceptedRegistration();
+        }
+        return json(409, { codigo: 'CONTA_EXISTENTE', erro: 'Você já tem conta no app. Entre com seu CPF e senha ou toque em "Esqueci a senha".' });
       }
-      return acceptedRegistration();
+      if (existing) {
+        return json(409, { codigo: 'EMAIL_EM_USO', erro: 'Este e-mail já está em outra conta. Use outro e-mail ou toque em "Esqueci a senha".' });
+      }
+      return json(409, { codigo: 'CPF_EM_USO', erro: 'Este CPF já tem conta no app com outro e-mail. Entre com seu CPF e senha ou toque em "Esqueci a senha".' });
     }
     throw error;
   }
