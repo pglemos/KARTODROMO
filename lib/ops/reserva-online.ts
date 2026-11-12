@@ -440,6 +440,17 @@ export async function sincronizarCuponsOnline(log: Log) {
       log(`prévia de cupom ${String(job.requestId).slice(0, 8)}: não foi possível concluir agora`);
     }
   }
+  // cupom digitado na reserva do site (reservas.kartodromodebetim.com.br): mesma conta, sem conta do app
+  const doSite = (await chamar('/api/sync/cupons-site').catch(() => [])) as (CouponInput & { requestId: string })[];
+  for (const job of Array.isArray(doSite) ? doSite : []) {
+    try {
+      const result = await previsualizarVoucherOnline(job);
+      await chamar(`/api/sync/cupons-site/${encodeURIComponent(job.requestId)}`, { method: 'POST', body: JSON.stringify(result) });
+      processados++;
+    } catch {
+      log(`prévia de cupom do site ${String(job.requestId).slice(0, 8)}: não foi possível concluir agora`);
+    }
+  }
   return processados;
 }
 

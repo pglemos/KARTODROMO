@@ -149,6 +149,14 @@ main { outline: none; }
 .conferir div + div { border-top: 1px solid var(--border); }
 .conferir dt { color: var(--muted); font-size: 13px; }
 .conferir dd { margin: 0; font-weight: 500; }
+.cupom { margin-top: 18px; display: grid; gap: 6px; }
+.cupom label { font-size: 13px; font-weight: 600; }
+.cupom label small { font-weight: 400; color: var(--muted); }
+.cupom-linha { display: flex; gap: 8px; }
+.cupom-linha input { flex: 1; min-width: 0; border: 1px solid #c9d2ca; border-radius: 8px; padding: 10px 12px; min-height: 46px; text-transform: uppercase; letter-spacing: .06em; }
+.cupom-linha input:focus { border-color: var(--green); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 18%, transparent); }
+.cupom .msg-erro, .cupom .dica-campo { min-height: 18px; }
+.total s { color: var(--muted); }
 .total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 18px; padding: 14px; background: var(--light); border-radius: 10px; }
 .total strong { font-size: 24px; letter-spacing: -.02em; }
 .aceite { display: flex; gap: 10px; align-items: flex-start; margin-top: 16px; cursor: pointer; }

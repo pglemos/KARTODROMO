@@ -41,4 +41,7 @@ export const api = {
   aviso: async (): Promise<Aviso> => { try { const a = await chamar<Aviso>('/api/aviso', undefined, 5000); return a && a.texto ? a : null; } catch { return null; } },
   criar: (corpo: unknown) => chamar<{ id: string; codigo: string }>('/api/reservas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) }, 30000),
   pedido: (id: string) => chamar<Pedido>(`/api/reservas/${id}`),
+  cupom: (corpo: { codigo: string; bateriaId: number; quantidade: number; documento: string; documentos: string[] }) =>
+    chamar<{ requestId: string }>('/api/reservas/cupom', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) }),
+  cupomResultado: (id: string) => chamar<{ status: 'pending' | 'completed'; erro?: string; brutoCentavos?: number; descontoCentavos?: number; totalCentavos?: number }>(`/api/reservas/cupom/${id}`),
 };

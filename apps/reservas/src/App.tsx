@@ -395,7 +395,31 @@ function EtapaPagamento({ r, setR, horario, agenda, abertoEm, voltar, onCriado, 
   const isca = useRef<HTMLInputElement>(null);
   useEffect(() => { api.politica().then(setPolitica).catch(() => undefined); }, []);
   const dt = deIso(horario.inicio);
-  const total = horario.precoCentavos * r.quantidade;
+  const [cupom, setCupom] = useState('');
+  const [aplicado, setAplicado] = useState<{ codigo: string; descontoCentavos: number; totalCentavos: number; brutoCentavos: number } | null>(null);
+  const [aplicando, setAplicando] = useState(false);
+  const [erroCupom, setErroCupom] = useState('');
+  const nOutros = r.quantidade - (r.euPiloto ? 1 : 0);
+  const documentos = [...(r.euPiloto ? [r.comprador.documento] : []), ...r.acomp.slice(0, nOutros).map((a) => a.documento)].map(digitos);
+  const total = aplicado ? aplicado.totalCentavos : horario.precoCentavos * r.quantidade;
+  const aplicarCupom = async () => {
+    const codigo = cupom.trim().toUpperCase();
+    if (!/^[A-Z0-9_-]{1,40}$/.test(codigo)) { setErroCupom('Confira o código do cupom.'); return; }
+    setAplicando(true); setErroCupom(''); setAplicado(null);
+    try {
+      const { requestId } = await api.cupom({ codigo, bateriaId: horario.id, quantidade: r.quantidade, documento: digitos(r.comprador.documento), documentos });
+      // o kartódromo confere o cupom em poucos segundos
+      for (let i = 0; i < 20; i++) {
+        await new Promise((ok) => setTimeout(ok, 1500));
+        const x = await api.cupomResultado(requestId);
+        if (x.status === 'pending') continue;
+        if (x.erro) { setErroCupom(x.erro); return; }
+        setAplicado({ codigo, descontoCentavos: x.descontoCentavos ?? 0, totalCentavos: x.totalCentavos ?? 0, brutoCentavos: x.brutoCentavos ?? 0 });
+        return;
+      }
+      setErroCupom('O kartódromo não respondeu agora. Tente de novo em instantes ou finalize sem cupom.');
+    } catch (e) { setErroCupom((e as Error).message); } finally { setAplicando(false); }
+  };
   const enviar = async () => {
     if (!aceite) { setErro('Para reservar, aceite a política de cancelamento.'); return; }
     if (!agenda.pagamentoOnline) { setErro('Pagamento online indisponível. Fale com a recepção.'); return; }
@@ -409,7 +433,7 @@ function EtapaPagamento({ r, setR, horario, agenda, abertoEm, voltar, onCriado, 
       bateriaId: horario.id, quantidade: r.quantidade, compradorPilota: r.euPiloto,
       pilotos: [...(r.euPiloto ? [c.nome.trim()] : []), ...r.acomp.slice(0, n).map((a) => a.nome.trim())],
       acompanhantes: r.acomp.slice(0, n).map((a) => ({ ...a, nome: a.nome.trim(), email: a.email.trim(), nascimento: dataIso(a.nascimento), endereco: a.endereco.trim(), bairro: a.bairro.trim(), cidade: a.cidade.trim() })),
-      forma: r.forma, politica: true, lgpd: true, site: isca.current?.value || '', t: abertoEm,
+      forma: r.forma, politica: true, lgpd: true, site: isca.current?.value || '', t: abertoEm, ...(aplicado ? { cupom: aplicado.codigo } : {}),
     };
     try {
       const res = await api.criar(corpo);
@@ -437,7 +461,15 @@ function EtapaPagamento({ r, setR, horario, agenda, abertoEm, voltar, onCriado, 
         <label className={r.forma === 'pix' ? 'on' : ''}><input type="radio" name="forma" checked={r.forma === 'pix'} onChange={() => setR((x) => ({ ...x, forma: 'pix' }))} /><span><strong>Pix</strong><small>Aprovação na hora. QR code na próxima tela.</small></span></label>
         <label className={r.forma === 'cartao' ? 'on' : ''}><input type="radio" name="forma" checked={r.forma === 'cartao'} onChange={() => setR((x) => ({ ...x, forma: 'cartao' }))} /><span><strong>Cartão de crédito</strong><small>Página segura da Asaas.</small></span></label>
       </fieldset>
-      <div className="total"><span>{r.quantidade} × {reais(horario.precoCentavos)}</span><strong>{reais(total)}</strong></div>
+      <div className="cupom">
+        <label htmlFor="cupom">Cupom de desconto <small>(opcional)</small></label>
+        <div className="cupom-linha">
+          <input id="cupom" value={cupom} onChange={(e) => { setCupom(e.target.value.toUpperCase().replace(/\s/g, '')); setAplicado(null); setErroCupom(''); }} maxLength={40} autoComplete="off" autoCapitalize="characters" aria-invalid={!!erroCupom} aria-describedby="cupom-msg" />
+          <button type="button" className="btn sec" onClick={aplicarCupom} disabled={aplicando || !cupom.trim()} aria-busy={aplicando}>{aplicando ? 'Conferindo…' : aplicado ? 'Aplicado' : 'Aplicar'}</button>
+        </div>
+        <p id="cupom-msg" className={erroCupom ? 'msg-erro' : 'dica-campo'} role={erroCupom ? 'alert' : undefined}>{erroCupom || (aplicado ? `Cupom ${aplicado.codigo}: desconto de ${reais(aplicado.descontoCentavos)}.` : '')}</p>
+      </div>
+      <div className="total"><span>{aplicado ? <><s>{reais(aplicado.brutoCentavos)}</s> com cupom</> : `${r.quantidade} × ${reais(horario.precoCentavos)}`}</span><strong>{reais(total)}</strong></div>
       {horario.precoPrimeiraVezCentavos ? <p className="dica-mini">Estreantes pagam {reais(horario.precoPrimeiraVezCentavos)} neste horário: o desconto é conferido pelo CPF e já vem no valor do Pix/cartão.</p> : null}
       <label className="aceite">
         <input type="checkbox" checked={aceite} onChange={(e) => setAceite(e.target.checked)} />
