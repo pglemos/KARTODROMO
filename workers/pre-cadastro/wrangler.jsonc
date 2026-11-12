@@ -42,6 +42,7 @@
   "vars": {
     "RESERVAS_ATIVAS": "1",
     "ASAAS_URL": "https://api.asaas.com/v3",
-    "MOBILE_EMAIL_FILA": "1"
+    "MOBILE_EMAIL_FILA": "1",
+    "RESEND_FROM_EMAIL": "Kartódromo de Betim <nao-responda@kartodromodebetim.com.br>"
   }
 }

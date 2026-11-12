@@ -115,7 +115,7 @@ export function montarConfig(atual: ConfigEmail, entrada: Record<string, unknown
     anexarPdf: typeof entrada.anexarPdf === 'boolean' ? entrada.anexarPdf : atual.anexarPdf,
   };
   if (![465, 587].includes(novo.porta) || (smtpCloudflare(novo.host) && novo.porta !== 465)) throw new Error('Porta SMTP inválida: use 465 (TLS) ou 587 (STARTTLS); Cloudflare Email Sending exige 465.');
-  if (novo.usuario && !emailValido(novo.usuario) && !(novo.usuario === 'api_token' && smtpCloudflare(novo.host)))
+  if (novo.usuario && !emailValido(novo.usuario) && !(novo.usuario === 'api_token' && smtpCloudflare(novo.host)) && !(novo.usuario === 'resend' && smtpResend(novo.host)))
     throw new Error('Usuário deve ser o e-mail completo da caixa (ex.: resultados@kartodromodebetim.com.br).');
   if (novo.remetenteEmail && !emailValido(novo.remetenteEmail)) throw new Error('E-mail do remetente inválido.');
   if (novo.copiaOculta && !emailValido(novo.copiaOculta)) throw new Error('E-mail da cópia oculta inválido.');
@@ -137,6 +137,9 @@ export function montarConfig(atual: ConfigEmail, entrada: Record<string, unknown
 export const SMTP_CLOUDFLARE = 'smtp.mx.cloudflare.net';
 export const REMETENTE_PADRAO = 'crono@kartodromodebetim.com.br';
 export function smtpCloudflare(host: string) { return host.trim().toLowerCase() === SMTP_CLOUDFLARE; }
+/** SMTP do Resend (11/11/2026): usuário fixo "resend", senha = API key (re_...). Entrega em segundos, sem a fila da HostGator. */
+export const SMTP_RESEND = 'smtp.resend.com';
+export function smtpResend(host: string) { return host.trim().toLowerCase() === SMTP_RESEND; }
 
 /** O remetente tem que ser uma caixa do domínio (crono@ ou resultados@); na HostGator, a própria caixa autenticada. */
 export function enderecoRemetente(cfg: ConfigEmail, padrao = REMETENTE_PADRAO) {
@@ -255,7 +258,7 @@ function motivoEntrega(tipo: string, mensagem: string) {
  * porta 2096, mesma conta) mostra o destino real. null = não deu para consultar (outra hospedagem, sem rede…).
  */
 export async function conferirEntrega(cfg: ConfigEmail, desdeMs: number): Promise<Map<string, Entrega & { t: number }> | null> {
-  if (smtpCloudflare(cfg.host) || !cfg.usuario.includes('@')) return null; // o rastreio é do webmail da HostGator; nunca mandar o token para lá
+  if (smtpCloudflare(cfg.host) || smtpResend(cfg.host) || !cfg.usuario.includes('@')) return null; // o rastreio é do webmail da HostGator; nunca mandar o token para lá
   const caminho = '/json-api/cpanel?cpanel_jsonapi_module=EmailTrack&cpanel_jsonapi_func=search&cpanel_jsonapi_apiversion=2&success=1&defer=1&failure=1&inprogress=1&deliverytype=all';
   const corpo = await new Promise<string | null>((ok) => {
     const req = https.request({
@@ -290,6 +293,8 @@ export async function conferirEntrega(cfg: ConfigEmail, desdeMs: number): Promis
 
 /** Espera o rastreio registrar os destinatários (costuma levar segundos). */
 async function conferirComEspera(cfg: ConfigEmail, desdeMs: number, enderecos: string[]) {
+  // sem rastreio da HostGator (Resend/Cloudflare): não há o que conferir, então não espera os 4 s
+  if (smtpCloudflare(cfg.host) || smtpResend(cfg.host) || !cfg.usuario.includes('@')) return null;
   let r: Awaited<ReturnType<typeof conferirEntrega>> = null;
   for (let i = 0; i < 3; i++) {
     await new Promise((ok) => setTimeout(ok, 4_000));
@@ -306,7 +311,7 @@ export const SMTP_EHLO_PADRAO = 'mail.kartodromodebetim.com.br';
 function nomeEhlo(host: string) {
   const limpo = host.trim().replace(/^\[|\]$/g, '');
   const ipv4 = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(limpo);
-  const local = !limpo || limpo === 'localhost' || ipv4 || limpo.includes(':') || !limpo.includes('.') || smtpCloudflare(limpo);
+  const local = !limpo || limpo === 'localhost' || ipv4 || limpo.includes(':') || !limpo.includes('.') || smtpCloudflare(limpo) || smtpResend(limpo);
   return local ? SMTP_EHLO_PADRAO : limpo;
 }
 
@@ -337,7 +342,59 @@ export function situacaoEnvioEmail(entrega: Entrega | null, simulador: boolean):
   return situacaoTesteEmail(entrega);
 }
 
+type Endereco = string | { name?: string; address: string };
+interface MensagemEmail {
+  from: Endereco; to: string; bcc?: string; subject: string; html?: string; text?: string;
+  attachments?: { filename: string; content: Buffer; contentType?: string; cid?: string }[];
+}
+const formatarEndereco = (e: Endereco) => typeof e === 'string' ? e : e.name ? `${e.name.replace(/["\\\r\n]/g, '')} <${e.address}>` : e.address;
+
+/**
+ * Resend pela API HTTP (12/11/2026): um POST por e-mail, com a conexão HTTPS reaproveitada pelo fetch do Node.
+ * Elimina o handshake SMTP/TLS + AUTH de cada envio. A senha gravada é a API key (re_...).
+ */
+export async function enviarPelaApiResend(apiKey: string, m: MensagemEmail, fetcher: typeof fetch = fetch) {
+  const corpo = {
+    from: formatarEndereco(m.from),
+    to: [m.to],
+    ...(m.bcc ? { bcc: [m.bcc] } : {}),
+    subject: m.subject,
+    ...(m.html ? { html: m.html } : {}),
+    ...(m.text ? { text: m.text } : {}),
+    ...(m.attachments?.length ? { attachments: m.attachments.map((a) => ({
+      filename: a.filename,
+      content: a.content.toString('base64'),
+      ...(a.contentType ? { content_type: a.contentType } : {}),
+      ...(a.cid ? { content_id: a.cid } : {}),
+    })) } : {}),
+  };
+  const r = await fetcher('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+    body: JSON.stringify(corpo),
+    signal: AbortSignal.timeout(20_000),
+  });
+  const texto = await r.text();
+  if (!r.ok) {
+    // 4xx de validação = permanente (550); 429/5xx = temporário (451), entra no reenvio
+    const err = new Error(`Resend ${r.status}: ${texto.slice(0, 160)}`) as Error & { responseCode?: number };
+    err.responseCode = r.status === 429 || r.status >= 500 ? 451 : 550;
+    throw err;
+  }
+  let id = '';
+  try { id = String((JSON.parse(texto) as { id?: unknown }).id ?? ''); } catch { /* resposta sem JSON */ }
+  return { messageId: id };
+}
+
 function transporte(cfg: ConfigEmail, simulador: boolean) {
+  if (!simulador && smtpResend(cfg.host) && cfg.senha.startsWith('re_')) {
+    return {
+      sendMail: (m: MensagemEmail) => enviarPelaApiResend(cfg.senha, m),
+      // verificação real (só a tela "verificar" usa): autentica no SMTP do Resend sem enviar nada
+      verify: async () => { const t = nodemailer.createTransport(opcoesTransporte(cfg, false)); try { return await t.verify(); } finally { t.close(); } },
+      close: () => undefined,
+    };
+  }
   return nodemailer.createTransport(opcoesTransporte(cfg, simulador));
 }
 
@@ -659,7 +716,7 @@ export async function enviarTeste(cfgArquivo: string, para: string, simulador: b
   const t = transporte(cfg, simulador);
   const inicio = Date.now();
   try {
-    if (!simulador) await t.verify();
+    if (!simulador && !smtpResend(cfg.host)) await t.verify(); // no Resend o próprio envio já autentica
     await t.sendMail({
       from: { name: sanitizarNomeDestinatario(cfg.remetenteNome), address: enderecoRemetente(cfg) },
       to: paraLimpo,
