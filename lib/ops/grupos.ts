@@ -11,6 +11,7 @@
  * Pagamento feito no caixa da Recepção ou pelo site também conta (a vaga já vem paga).
  */
 import { createHash, createHmac, randomBytes } from 'node:crypto';
+import { precoPrimeiraVezDoGrupo } from './reserva-online';
 import { insertCliente, one, onlyDigits, query, tx, type ClienteInput } from './db';
 import { HttpError, cancelarReserva, exigePodeFecharBateria, exigePermissaoOffice, inscreverN, moverReservas } from './office';
 import type { Sessao } from './auth';
@@ -93,7 +94,7 @@ export async function carregarGrupos(where: string, params: Record<string, unkno
   const lista = ids.join(',');
   const pilotos = await query(
     `SELECT p.Id id, p.GrupoId grupoId, p.Ordem ordem, p.Nome nome, p.Telefone telefone, p.Menor menor, p.Responsavel responsavel, p.ClienteId clienteId,
-            p.InscricaoId inscricaoId, p.Token token, p.PagoPeloGrupo pagoPeloGrupo, CONVERT(varchar(16), p.LinkEnviadoEm, 126) linkEnviadoEm,
+            p.InscricaoId inscricaoId, p.Token token, p.PagoPeloGrupo pagoPeloGrupo, p.PrecoCentavos precoProprio, CONVERT(varchar(16), p.LinkEnviadoEm, 126) linkEnviadoEm,
             CONVERT(varchar(16), p.CadastroEm, 126) cadastroEm, i.Pago inscricaoPaga, i.Status inscricaoStatus, i.VendaId vendaId, i.Origem inscricaoOrigem,
             i.TermoImpressoEm termoEm, i.Kart kart,
             c.Nome clienteNome, c.Documento documento, c.Email email, c.Peso peso, c.Telefone clienteTelefone,
@@ -161,7 +162,8 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
     else doGrupo += v;
   }
   // pago no caixa da Recepção ou pelo site: a vaga já vem paga e não depende do painel
-  const precoDe = (p: Linha) => precoDoPiloto(g, Boolean(p.responsavel), n);
+  // preço próprio da vaga (estreante pelo link do grupo, 12/11/2026) vale sobre o do grupo
+  const precoDe = (p: Linha) => (p.precoProprio != null && Number(p.precoProprio) > 0 ? Number(p.precoProprio) : precoDoPiloto(g, Boolean(p.responsavel), n));
   const fora_ = (p: Linha) => Boolean(p.inscricaoPaga && !p.pagoPeloGrupo);
   const pagosForaValor = ativos.filter(fora_).reduce((a, p) => a + precoDe(p), 0);
   // o pagamento "do grupo" se divide proporcionalmente ao preço de cada vaga (a do aniversariante custa menos)
@@ -1399,6 +1401,12 @@ export async function registrarCobrancaDoLink(token: string, clienteId: number, 
     { token, c: clienteId },
   );
   if (!vaga) { log(`grupo: cobrança ${asaasId} do link sem vaga para o cliente ${clienteId} (conferir na recepção)`); return false; }
+  // estreante pelo link pagou o preço de primeira vez: a vaga passa a valer esse preço (só o valor configurado é aceito)
+  const valorCob = Math.round(Number(cob.valorCentavos) || 0);
+  if (valorCob > 0) {
+    const pv = await precoPrimeiraVezDoGrupo(vaga.grupoId);
+    if (pv && valorCob === pv) await query(`UPDATE dbo.ReservaGrupoPiloto SET PrecoCentavos = @v WHERE Id = @p AND PrecoCentavos IS NULL`, { v: pv, p: vaga.id });
+  }
   if (await one(`SELECT 1 x FROM dbo.ReservaGrupoCobranca WHERE AsaasId = @a`, { a: asaasId })) return true;
   await query(`UPDATE dbo.ReservaGrupoCobranca SET Status = 'cancelada' WHERE PilotoId = @p AND Status = 'aguardando'`, { p: vaga.id });
   await query(

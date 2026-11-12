@@ -132,16 +132,31 @@ async function situacaoCobranca(env: Env, id: string): Promise<{ pago: boolean; 
   return r;
 }
 
+/**
+ * Preço da vaga de quem entra pelo link (estreante paga o de primeira vez da bateria, 12/11/2026): o SRVKART sabe se o
+ * CPF já correu. Sem resposta em 3,5 s, vale o preço do grupo (nunca cobra a mais; o desconto só é aceito se for menor).
+ */
+async function precoDaVaga(env: Env, token: string, cpf: string, cheio: number) {
+  try {
+    const ops = ((env as { OPS_URL?: string }).OPS_URL || 'https://ops.kartodromodebetim.com.br').replace(/\/+$/, '');
+    const r = await fetch(`${ops}/api/publico/grupo-preco`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, cpf: digitos(cpf) }), signal: AbortSignal.timeout(3500) });
+    if (!r.ok) return cheio;
+    const v = Math.round(Number(((await r.json()) as { precoCentavos?: number }).precoCentavos));
+    return v > 0 && v <= cheio ? v : cheio;
+  } catch { return cheio; }
+}
+
 /** Uma cobrança por pessoa no grupo (o mesmo CPF reenviando reaproveita a que está aberta). */
 async function cobrancaDoLink(env: Env, token: string, chave: string, d: PreCadastro, g: NonNullable<Awaited<ReturnType<typeof grupoDoLink>>>): Promise<CobrancaDoLink> {
   const k = `grupo-pag/${token}/${chave}.json`;
+  const valor = await precoDaVaga(env, token, d.documento, Number(g.precoCentavos));
   const antiga = await env.PRE.get(k);
   if (antiga) {
     const a = await antiga.json<CobrancaDoLink>();
     try {
       const s = await situacaoCobranca(env, a.id);
       if (s.pago) return { ...a, pago: true };
-      if (s.status === 'PENDING' && Number(a.valorCentavos) === Number(g.precoCentavos)) return { ...a, pago: false };
+      if (s.status === 'PENDING' && Number(a.valorCentavos) === valor) return { ...a, pago: false };
     } catch { /* cobrança antiga sumiu: cria outra */ }
   }
   const dados = { nome: d.nome, cpf: digitos(d.documento), email: d.email, celular: digitos(d.telefone), referencia: `grupo-${g.codigo}` };
@@ -155,13 +170,13 @@ async function cobrancaDoLink(env: Env, token: string, chave: string, d: PreCada
   const cob = await chamar<{ id: string; invoiceUrl: string }>(env, '/payments', {
     method: 'POST',
     body: JSON.stringify({
-      customer: cliente, billingType: 'PIX', value: Math.round(Number(g.precoCentavos)) / 100,
+      customer: cliente, billingType: 'PIX', value: Math.round(valor) / 100,
       dueDate: /^\d{4}-\d{2}-\d{2}$/.test(dia) && dia >= hoje ? dia : hoje,
       description: `Kartódromo de Betim · ${g.bateria} ${dia.split('-').reverse().join('/')} ${String(g.inicio).slice(11, 16)} · ${d.nome} · grupo do(a) ${g.responsavel}`.slice(0, 500),
       externalReference: `grupo-${g.codigo}-${chave}`.slice(0, 100),
     }),
   });
-  const r: CobrancaDoLink = { id: cob.id, link: cob.invoiceUrl, valorCentavos: Number(g.precoCentavos), pago: false };
+  const r: CobrancaDoLink = { id: cob.id, link: cob.invoiceUrl, valorCentavos: valor, pago: false };
   await env.PRE.put(k, JSON.stringify(r), { httpMetadata: { contentType: 'application/json' } });
   return r;
 }

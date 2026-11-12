@@ -253,3 +253,56 @@ describe('nunca boleto: Pix ou cartão da mesma cobrança', () => {
     }
   });
 });
+
+describe('estreante pelo link do grupo paga o preço de primeira vez', () => {
+  const corpo = {
+    tipoDocumento: 'CPF', documento: '529.982.247-25', nome: 'Maria da Silva', email: 'maria@exemplo.com', instagram: '@maria.silva', telefone: '(31) 98888-7777',
+    nascimento: '1990-05-20', peso: '62', cep: '32600000', endereco: 'Rua A', numero: '10', bairro: 'Centro', cidade: 'Betim', estado: 'MG', lgpd: true, reserva: 'TOKENAMIGO01',
+  };
+  const simular = (precoOps: number | 'fora') => {
+    const pagamentos: { value: number; billingType: string }[] = [];
+    const f = vi.spyOn(globalThis, 'fetch').mockImplementation(async (u, init) => {
+      const url = String(u);
+      if (url.includes('/api/publico/grupo-preco')) {
+        if (precoOps === 'fora') throw new Error('timeout');
+        return new Response(JSON.stringify({ precoCentavos: precoOps, primeiraVez: true }), { status: 200 });
+      }
+      if (url.includes('/customers?')) return new Response(JSON.stringify({ data: [{ id: 'cus_1' }] }), { status: 200 });
+      if (url.endsWith('/payments') && init?.method === 'POST') {
+        pagamentos.push(JSON.parse(String(init.body)));
+        return new Response(JSON.stringify({ id: 'pay_novo123', invoiceUrl: 'https://www.asaas.com/i/novo123' }), { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    return { pagamentos, f };
+  };
+  const enviar = () => chamar('/api/pre-cadastro', { method: 'POST', body: JSON.stringify({ ...corpo, t: Date.now() - 10_000 }) });
+
+  it('SRVKART diz que é estreante: a cobrança sai pelo preço de primeira vez, só Pix', async () => {
+    await publicar([grupo({ precoCentavos: 9990 })]);
+    env.ASAAS_API_KEY = 'x';
+    const { pagamentos, f } = simular(8990);
+    const b = await (await enviar()).json() as { pagamento?: { valorCentavos: number } };
+    expect(pagamentos[0]).toMatchObject({ value: 89.9, billingType: 'PIX' });
+    expect(b.pagamento?.valorCentavos).toBe(8990);
+    f.mockRestore();
+  });
+
+  it('SRVKART fora do ar: cobra o preço do grupo', async () => {
+    await publicar([grupo({ precoCentavos: 9990 })]);
+    env.ASAAS_API_KEY = 'x';
+    const { pagamentos, f } = simular('fora');
+    await enviar();
+    expect(pagamentos[0].value).toBe(99.9);
+    f.mockRestore();
+  });
+
+  it('nunca cobra a mais que o preço do grupo', async () => {
+    await publicar([grupo({ precoCentavos: 9990 })]);
+    env.ASAAS_API_KEY = 'x';
+    const { pagamentos, f } = simular(50000);
+    await enviar();
+    expect(pagamentos[0].value).toBe(99.9);
+    f.mockRestore();
+  });
+});

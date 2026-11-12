@@ -582,3 +582,31 @@ export async function sincronizarReservasOnline(log: Log) {
   if (resultados.length) await chamar('/api/sync/pedido', { method: 'POST', body: JSON.stringify(resultados) });
   return resultados.length;
 }
+
+/**
+ * Preço da vaga de quem entra pelo link do grupo (12/11/2026, decisão 5 do dono: primeira vez vale por piloto também no
+ * "cada um paga o seu"): estreante paga o preço de primeira vez do produto da bateria, quando houver e for menor.
+ * Chamado pelo site na hora de gerar a cobrança (POST /api/publico/grupo-preco). Devolve só o valor.
+ */
+export async function precoDaVagaPeloLink(token: string, cpf: string): Promise<{ precoCentavos: number; primeiraVez: boolean } | null> {
+  if (!/^[A-Za-z0-9]{10,24}$/.test(token) || !isValidCpf(onlyDigits(cpf))) return null;
+  const c = configOnline();
+  const g = await one<{ preco: number; produtoId: number | null }>(
+    `SELECT g.PrecoCentavos preco, b.ProdutoId produtoId FROM dbo.ReservaGrupoPiloto t
+       JOIN dbo.ReservaGrupo g ON g.Id = t.GrupoId AND g.Status = 'ativa' JOIN dbo.Bateria b ON b.Id = g.BateriaId
+      WHERE t.Token = @token`, { token },
+  );
+  if (!g) return null;
+  const cheio = Number(g.preco) || 0;
+  const pv = c.primeiraVez[produtoDaBateria(Number(g.produtoId), c)];
+  if (!pv || pv >= cheio) return { precoCentavos: cheio, primeiraVez: false };
+  const [novo] = await primeiraVez([cpf], (sql, params) => one(sql, params));
+  return { precoCentavos: novo ? pv : cheio, primeiraVez: Boolean(novo) };
+}
+
+/** Valor de primeira vez configurado para o produto da bateria do grupo (para conferir o que o site cobrou). */
+export async function precoPrimeiraVezDoGrupo(grupoId: number): Promise<number | null> {
+  const b = await one<{ produtoId: number | null }>(`SELECT b.ProdutoId produtoId FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId WHERE g.Id = @id`, { id: grupoId });
+  const c = configOnline();
+  return b ? c.primeiraVez[produtoDaBateria(Number(b.produtoId), c)] ?? null : null;
+}

@@ -141,3 +141,17 @@ describe('Minhas reservas: grupos que o CPF organiza', async () => {
     expect(await gruposDoResponsavel(env([{ ...g, status: 'cancelada' }]), '52998224725')).toEqual([]);
   });
 });
+
+describe('vaga com preço próprio (estreante pelo link)', async () => {
+  const { montar } = await import('../lib/ops/grupos');
+  const g = { id: 1, codigo: 'G1', bateriaId: 9, vagas: 20, disponiveis: 0, inicio: '2026-11-20T19:00', bateria: 'HAPPY HOUR', responsavelId: 50, responsavel: 'Ana', responsavelTelefone: null,
+    origem: 'recepcao', modo: 'individual', preco: 9990, sinalPct: 0, observacao: null, status: 'ativa', criadoEm: '', criadoPor: null } as never;
+  it('pagou R$ 89,90 de primeira vez: vaga quitada, sem "falta R$ 10"', () => {
+    const m = montar(g, [
+      { id: 1, ordem: 1, responsavel: 1, token: 't1', inscricaoId: 101, inscricaoStatus: 'confirmada', inscricaoPaga: 1, pagoPeloGrupo: 0 },
+      { id: 2, ordem: 2, responsavel: 0, token: 't2', inscricaoId: 102, inscricaoStatus: 'reservada', inscricaoPaga: 0, pagoPeloGrupo: 0, precoProprio: 8990 },
+    ], [{ pilotoId: 2, valor: 8990 }], []);
+    expect(m.pilotos[1]).toMatchObject({ preco: 8990, pago: true, falta_centavos: 0 });
+    expect(m.total).toBe(9990 + 8990);
+  });
+});

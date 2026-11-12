@@ -38,7 +38,7 @@ import { painelRoutes, registrarSinal } from '../lib/ops/painel';
 import { enduranceDasBaterias, enduranceRoutes, equipesParaOTotem, paginaDoChefe, vincularNoTotem } from '../lib/ops/endurance';
 import { ENDURANCE_VINCULO_SQL } from '../lib/ops/endurance-vinculo';
 import { atualizarIndice as atualizarIndicePilotos, pilotosRoutes } from '../lib/ops/pilotos';
-import { publicarAgenda, sincronizarReservasOnline, vagaOnlineDoGrupo } from '../lib/ops/reserva-online';
+import { precoDaVagaPeloLink, publicarAgenda, sincronizarReservasOnline, vagaOnlineDoGrupo } from '../lib/ops/reserva-online';
 import { syncTimingTracks } from '../lib/ops/tracado-sync';
 import { selecionarSessoesParaRelatorio, type ReceptionTimingSession } from '../lib/timing/reception-crono-reports';
 
@@ -366,6 +366,14 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     return true;
   }
 
+  // preço da vaga de quem entra pelo link do grupo (estreante paga o de primeira vez): o site pergunta ao gerar a cobrança
+  if (path === '/api/publico/grupo-preco' && method === 'POST') {
+    const body = await readBody(req);
+    const r = await precoDaVagaPeloLink(String(body.token ?? ''), String(body.cpf ?? ''));
+    if (!r) throw new HttpError(404, 'Grupo não encontrado.');
+    send(res, 200, r);
+    return true;
+  }
   if ((path === '/api/totem/identificar' || path === '/api/publico/cliente-busca') && (method === 'POST' || method === 'GET')) {
     const body = method === 'POST' ? await readBody(req) : {};
     const raw = String(body.identificador ?? body.documento ?? body.cpf ?? getParam('identificador') ?? getParam('q') ?? getParam('cpf') ?? getParam('documento') ?? '').trim();
