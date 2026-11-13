@@ -413,10 +413,38 @@ export async function verificarTransporteEmail(cfgArquivo: string, simulador: bo
 const EDGE = [process.env.TIMING_EDGE_PATH, 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
   'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'].filter(Boolean) as string[];
 
+/**
+ * Chrome aberto uma vez só (13/11/2026): abrir um Chrome por PDF custava ~7 s por piloto no serviço do ORBITS.
+ * Com o navegador já aberto cada PDF sai em uma fração de segundo; ele fecha sozinho depois de 2 min parado.
+ * Se der qualquer erro, gerarPdf cai no caminho antigo (um Chrome por PDF).
+ */
+type NavegadorPdf = { newPage(): Promise<{ setContent(h: string, o: object): Promise<unknown>; pdf(o: object): Promise<Buffer>; close(): Promise<void> }>; close(): Promise<void> };
+let navegador: Promise<NavegadorPdf> | null = null;
+let fecharNavegador: NodeJS.Timeout | null = null;
+async function pdfPeloNavegador(executavel: string, html: string): Promise<Buffer> {
+  if (fecharNavegador) clearTimeout(fecharNavegador);
+  if (!navegador) {
+    navegador = import('playwright-core').then(({ chromium }) => chromium.launch({ executablePath: executavel, headless: true, args: ['--no-sandbox', '--disable-gpu', '--no-first-run', '--disable-crash-reporter'] }) as unknown as Promise<NavegadorPdf>);
+    navegador.catch(() => { navegador = null; });
+  }
+  const nav = await navegador;
+  const pagina = await nav.newPage();
+  try {
+    await pagina.setContent(html, { waitUntil: 'load', timeout: 20_000 });
+    return await pagina.pdf({ printBackground: true, preferCSSPageSize: true, timeout: 20_000 });
+  } finally {
+    await pagina.close().catch(() => undefined);
+    fecharNavegador = setTimeout(() => { const n = navegador; navegador = null; void n?.then((x) => x.close()).catch(() => undefined); }, 120_000);
+    fecharNavegador.unref?.();
+  }
+}
+
 /** HTML → PDF pelo Edge headless (perfil próprio, não mexe no Edge de quem usa o PC). null se não conseguir. */
 export async function gerarPdf(html: string, pasta: string, base: string, log: (t: string) => void): Promise<Buffer | null> {
   const edge = EDGE.find((p) => existsSync(p));
   if (!edge) { log('e-mail: Chrome/Edge não encontrado; PDF obrigatório indisponível'); return null; }
+  try { return await pdfPeloNavegador(edge, html); }
+  catch (e) { navegador = null; log(`e-mail: PDF pelo navegador aberto falhou (${(e as Error).message.split('\n')[0].slice(0, 120)}); usando um Chrome por PDF`); }
   mkdirSync(pasta, { recursive: true });
   const htmlArq = join(pasta, `${base}.html`);
   const pdfArq = join(pasta, `${base}.pdf`);
