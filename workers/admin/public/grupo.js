@@ -14,7 +14,7 @@ const Grupo = (() => {
   const lembrado = (k, validos, padrao) => { try { const v = localStorage.getItem('kib-grupo-' + k); return validos.includes(v) ? v : padrao; } catch (e) { return padrao; } };
   const lembrar = (k, v) => { try { localStorage.setItem('kib-grupo-' + k, v); } catch (e) { /* sem armazenamento: segue sem lembrar */ } };
   const precoPara = (origem, b) => (origem === 'recepcao' ? (+b.preco || PRECO_ANTECIPADO) : PRECO_ANTECIPADO);
-  const nomeBonito = (n) => String(n || '').trim().toLowerCase().replace(/(^|[\s'\(\[\-])([\p{L}])/gu, (_, a, b) => a + b.toUpperCase()).replace(/\s(Da|De|Do|Das|Dos|E)(?=\s)/g, (x) => x.toLowerCase());
+  const nomeBonito = (n) => String(n || '').split(/\s+/).filter((t) => /[\p{L}\p{N}]/u.test(t)).join(' ').toLowerCase().replace(/(^|[\s'\(\[\-])([\p{L}])/gu, (_, a, b) => a + b.toUpperCase()).replace(/\s(Da|De|Do|Das|Dos|E)(?=\s)/g, (x) => x.toLowerCase());
   const formatarTelefone = (v) => {
     let d = String(v || '').replace(/\D/g, '');
     if (d.startsWith('55') && (d.length === 12 || d.length === 13)) d = d.slice(2);

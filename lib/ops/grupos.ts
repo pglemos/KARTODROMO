@@ -180,7 +180,7 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
     const falta = faltaNoCadastro(cliente);
     const cadastro = (p.clienteId || p.responsavel) && !falta.length ? 'completo' : p.cadastroEm || p.clienteId ? 'incompleto' : p.linkEnviadoEm ? 'enviado' : 'pendente';
     return {
-      id: p.id, ordem: p.ordem, nome: p.nome || p.clienteNome || null, telefone: p.telefone || p.clienteTelefone || null, menor: Boolean(p.menor), responsavel: Boolean(p.responsavel),
+      id: p.id, ordem: p.ordem, nome: nomeDaVaga(p), telefone: p.telefone || p.clienteTelefone || null, menor: Boolean(p.menor), responsavel: Boolean(p.responsavel),
       clienteId: p.clienteId ?? (p.responsavel ? g.responsavelId : null), inscricaoId: p.inscricaoId, kart: p.kart ?? null, termo: Boolean(p.termoEm) || Boolean(p.termoOnline), termoOnline: Boolean(p.termoOnline), termoImpresso: Boolean(p.termoEm),
       link: linkCadastro(String(p.token)), linkEnviadoEm: p.linkEnviadoEm, cadastroEm: p.cadastroEm, cadastro, falta: cadastro === 'completo' ? [] : falta,
       preco: precoP, aniversariante: Boolean(g.aniversario) && Boolean(p.responsavel),
@@ -200,7 +200,7 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
   return {
     ...g, linkGrupo: responsavel?.token ? linkCadastro(String(responsavel.token)) : null, linkPainel: linkPainel(String(g.codigo)), pilotos: lista, pagamentos: pagamentos.map((pg) => {
       const p = pilotos.find((p) => Number(p.id) === Number(pg.pilotoId));
-      return { ...pg, pilotoNome: p?.nome || p?.clienteNome || null, pilotoCancelado: p?.inscricaoStatus === 'cancelada' };
+      return { ...pg, pilotoNome: p ? nomeDaVaga(p) : null, pilotoCancelado: p?.inscricaoStatus === 'cancelada' };
     }), n, total, pago, falta: Math.max(0, total - pago), sinal, aniversario: Boolean(g.aniversario), campeonato: Boolean(g.campeonato), promocao,
     pagos: lista.filter((p) => p.pago).length, cadastrados: lista.filter((p) => p.cadastro === 'completo').length,
     prontos: lista.filter((p) => p.pago && p.cadastro === 'completo').length,
@@ -401,6 +401,14 @@ export async function vincularPorDados(bateriaId: number, clienteId: number, log
 }
 
 // ---------------------------------------------------------------- totem: "Vim com um grupo"
+
+// nome limpo: tira pedaços só de pontuação ("Weder ." → "Weder")
+const limparNome = (n: unknown) => String(n ?? '').split(/\s+/).filter((t) => /[\p{L}\p{N}]/u.test(t)).join(' ');
+// vaga com cadastro ligado mostra o nome do cadastro (é o que o título e o caixa usam); sem cadastro, o que foi digitado na vaga
+function nomeDaVaga(p: { nome?: unknown; clienteNome?: unknown; clienteId?: unknown; responsavel?: unknown }) {
+  const cad = limparNome(p.clienteNome), vaga = limparNome(p.nome);
+  return ((p.clienteId || p.responsavel) && cad ? cad : vaga || cad) || null;
+}
 
 const primeiroNome = (nome: string) => {
   const p = String(nome ?? '').trim().split(/\s+/).filter(Boolean);
