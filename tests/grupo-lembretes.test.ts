@@ -61,7 +61,7 @@ describe('envio', () => {
   it('falha no envio não marca como enviado (tenta no próximo ciclo)', async () => {
     const { mem, env: e } = env();
     const f = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('erro', { status: 500 }));
-    const r = await (await pedir(e, [base])).json();
+    const r = (await (await pedir(e, [base])).json()) as { enviados: number };
     expect(r.enviados).toBe(0);
     expect(mem.has('lembretes/pagar-12-202611201900')).toBe(false);
     f.mockRestore();

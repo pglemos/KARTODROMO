@@ -360,7 +360,15 @@ async function deliverEmail(
   context: CryptoContext,
   account: Pick<AccountRow, 'id' | 'email_cipher'>,
   purpose: MobileEmailPurpose,
+  evitarRepetido = false,
 ) {
+  // 13/11/2026: login repetido com e-mail não confirmado mandava um link a cada toque (4 e-mails iguais à mesma
+  // pessoa). Se um link igual saiu há menos de 2 min e ainda vale, não manda outro.
+  const recente = evitarRepetido && await context.db
+    .prepare('SELECT 1 FROM mobile_email_tokens WHERE account_id = ? AND purpose = ? AND used_at IS NULL AND created_at > ? AND expires_at > ? LIMIT 1')
+    .bind(account.id, purpose, Date.now() - 2 * 60_000, Date.now())
+    .first();
+  if (evitarRepetido && recente) return;
   const email = await decrypt(context, account.email_cipher);
   const token = await createEmailToken(context, account.id, purpose);
   const delivered = await sendMobileAuthEmail(env, email, purpose, token);
@@ -573,7 +581,7 @@ async function login(request: Request, input: Record<string, unknown>, env: Mobi
   }
   if (account.email_verified_at === null) {
     // senha certa mas e-mail ainda não confirmado: reenvia o link em vez de dizer "senha inválida"
-    if (mobileEmailConfigured(env)) await deliverEmail(env, context, account, 'verify');
+    if (mobileEmailConfigured(env)) await deliverEmail(env, context, account, 'verify', true);
     return json(403, { erro: 'Confirme seu e-mail para entrar. Reenviamos o link de confirmação; confira também o spam.' });
   }
   return json(200, await createSession(context, account.id));
