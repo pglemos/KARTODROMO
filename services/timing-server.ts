@@ -1867,12 +1867,13 @@ async function emailsAoEncerrar(s: Session) {
   }
 }
 /**
- * O e-mail do resultado sai 3 min depois do encerramento e de cada ajuste na classificação. Ultras 13/10: o kart 114
+ * O e-mail do resultado sai 1 min depois do encerramento e de cada ajuste na classificação (13/11/2026: era 3 min;
+ * cliente reclamou da demora e a correção tardia já reenvia com o aviso de resultado corrigido). Ultras 13/10: o kart 114
  * foi posto em P10 por engano, a bateria encerrou, o e-mail saiu 1 min depois e a correção para P28 veio 30 s
  * depois do envio — os pilotos receberam o 114 em 10º. Se já tinha saído, vai de novo para todos com o aviso de
  * resultado corrigido (só até 6 h do encerramento; depois disso, reenvio manual pelo menu).
  */
-const ESPERA_EMAIL_MS = Number(process.env.TIMING_ESPERA_EMAIL_MS || 3 * 60_000); // o simulador de teste encurta
+const ESPERA_EMAIL_MS = Number(process.env.TIMING_ESPERA_EMAIL_MS || 60_000); // o simulador de teste encurta
 const emailsAgendados = new Map<string, NodeJS.Timeout>();
 
 /**

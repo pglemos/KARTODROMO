@@ -530,7 +530,27 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
   const gerar = dep.simulador && dep.simuladorGerarPdf ? dep.simuladorGerarPdf : gerarPdf;
   const logoDataUri = dep.logoPng ? `data:image/png;base64,${dep.logoPng.toString('base64')}` : null;
   const base = nomeArquivo(`Resultado ${[ctx.grupo, ctx.prova].filter(Boolean).join(' ')}`);
-  const pdfResultado = cfg.anexarPdf ? await gerar(htmlPdfResultado(ctx, logoDataUri), pasta, `${s.id}-resultado`, dep.log) : null;
+  // PDFs em paralelo (13/11/2026): cada um abre um Chrome (~7 s); um por vez, 31 pilotos levavam 4 min.
+  // O oficial e os volta a volta começam juntos, até PDFS_SIMULTANEOS de cada vez; o laço só espera o do piloto da vez.
+  const PDFS_SIMULTANEOS = 3;
+  const fila: (() => Promise<void>)[] = [];
+  let rodando = 0;
+  const agendar = <T>(tarefa: () => Promise<T>) => new Promise<T>((ok, falha) => {
+    const proxima = () => { rodando++; tarefa().then(ok, falha).finally(() => { rodando--; fila.shift()?.(); }); return Promise.resolve(); };
+    if (rodando < PDFS_SIMULTANEOS) void proxima(); else fila.push(proxima);
+  });
+  const pdfResultadoP = cfg.anexarPdf ? agendar(() => gerar(htmlPdfResultado(ctx, logoDataUri), pasta, `${s.id}-resultado`, dep.log)) : Promise.resolve(null);
+  const pdfsPiloto = new Map<number, Promise<Buffer | null>>();
+  if (cfg.anexarPdf && !op.organizador) {
+    alvos.forEach((a, i) => {
+      if (!a.piloto) return;
+      const pil = a.piloto;
+      const p = agendar(() => gerar(htmlPdfVoltaAVolta(ctx, pil, logoDataUri), pasta, `${s.id}-${nomeArquivo(a.kart)}`, dep.log));
+      p.catch(() => undefined); // erro tratado quando o laço chega neste piloto
+      pdfsPiloto.set(i, p);
+    });
+  }
+  const pdfResultado = await pdfResultadoP;
   if (cfg.anexarPdf && !pdfResultado && !op.organizador) throw new Error('PDF oficial não foi gerado; nenhum e-mail foi enviado. Verifique Edge/Chrome e tente novamente.');
   if (op.organizador && !pdfResultado) throw new Error('PDF oficial não foi gerado; o pacote do organizador não foi enviado.');
   const t = transporte(cfg, dep.simulador);
@@ -546,8 +566,8 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
 
   for (let idx = 0; idx < alvos.length; idx++) {
     const a = alvos[idx];
-    if (idx > 0) {
-      // Item 16: Pausa entre envios para não estourar rate-limit do provedor de e-mail (HostGator)
+    if (idx > 0 && !smtpResend(cfg.host)) {
+      // Item 16: Pausa entre envios para não estourar rate-limit do provedor de e-mail (HostGator); o Resend aceita rajada
       await new Promise((r) => setTimeout(r, 200));
     }
     try {
@@ -572,7 +592,7 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
           anexos.push({ filename: `${base}.pdf`, content: r, contentType: 'application/pdf' });
         }
       } else if (cfg.anexarPdf && a.piloto) {
-        const vv = await gerar(htmlPdfVoltaAVolta(ctx, a.piloto, logoDataUri), pasta, `${s.id}-${nomeArquivo(a.kart)}`, dep.log);
+        const vv = await (pdfsPiloto.get(idx) ?? gerar(htmlPdfVoltaAVolta(ctx, a.piloto, logoDataUri), pasta, `${s.id}-${nomeArquivo(a.kart)}`, dep.log));
         if (!vv) throw new Error('PDF volta a volta não foi gerado; nenhum e-mail foi enviado.');
         anexos.push({ filename: nomeArquivo(`Volta a volta ${a.nome} kart ${a.kart}`) + '.pdf', content: vv, contentType: 'application/pdf' });
       }
