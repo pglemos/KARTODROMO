@@ -15,6 +15,7 @@
 import { isValidCpf, one, onlyDigits, query, tx } from './db';
 import { HttpError, inscreverN } from './office';
 import { grupoDaReservaOnline } from './grupos';
+import { emCurso } from './andamento';
 import { gravarAcompanhante, gravarPreCadastro, preCadastroLigado, type AcompanhanteSite, type PreCadastro } from './pre-cadastro';
 import { escutarPedidosDeVinculo, publicarClientesDoApp, publicarHistoricosVinculados, publicarRankingDoApp, sincronizarPerfisDoApp, vincularContasDoApp } from './app-mobile';
 
@@ -558,7 +559,7 @@ const ultimoAviso = new Map<string, number>();
 function emParalelo(nome: string, tarefa: () => Promise<unknown>, log: Log, aviso: (e: Error) => string) {
   if (emAndamento.has(nome)) return;
   emAndamento.add(nome);
-  void tarefa()
+  void emCurso(`app:${nome}`, tarefa())
     .catch((e: Error) => {
       if (Date.now() - (ultimoAviso.get(nome) ?? 0) < 10 * 60_000) return;
       ultimoAviso.set(nome, Date.now());

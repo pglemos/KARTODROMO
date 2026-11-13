@@ -38,6 +38,7 @@ import { painelRoutes, registrarSinal } from '../lib/ops/painel';
 import { enduranceDasBaterias, enduranceRoutes, equipesParaOTotem, paginaDoChefe, vincularNoTotem } from '../lib/ops/endurance';
 import { ENDURANCE_VINCULO_SQL } from '../lib/ops/endurance-vinculo';
 import { atualizarIndice as atualizarIndicePilotos, pilotosRoutes } from '../lib/ops/pilotos';
+import { descreverAndamento, emCurso } from '../lib/ops/andamento';
 import { acertarCuponsDosGrupos, precoDaVagaPeloLink, publicarAgenda, sincronizarReservasOnline, vagaOnlineDoGrupo } from '../lib/ops/reserva-online';
 import { syncTimingTracks } from '../lib/ops/tracado-sync';
 import { selecionarSessoesParaRelatorio, type ReceptionTimingSession } from '../lib/timing/reception-crono-reports';
@@ -83,7 +84,7 @@ setInterval(() => {
   const agora = Date.now();
   const atraso = agora - pingAnterior;
   pingAnterior = agora;
-  if (atraso > 2000) log(`AVISO: event loop travado por ${atraso} ms`);
+  if (atraso > 2000) log(`AVISO: event loop travado por ${atraso} ms · em curso: ${descreverAndamento(agora)}`);
 }, 1000).unref();
 
 /** Espelha o catálogo da Cronometragem sob demanda, inclusive quando a Recepção é aberta depois de uma alteração. */
@@ -706,7 +707,10 @@ function sessaoDe(req: http.IncomingMessage, url: URL) {
 
 // ---------------------------------------------------------------- servidor
 
-const server = http.createServer(async (req, res) => {
+const server = http.createServer((req, res) => {
+  void emCurso(`http ${req.method} ${String(req.url ?? '').split('?')[0].slice(0, 60)}`, atender(req, res));
+});
+async function atender(req: http.IncomingMessage, res: http.ServerResponse) {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
   const path = url.pathname;
   const method = req.method ?? 'GET';
@@ -937,7 +941,7 @@ const server = http.createServer(async (req, res) => {
     log('erro', method, path, err);
     if (!res.headersSent) send(res, 500, { error: 'Erro interno. Tente de novo.' });
   }
-});
+}
 
 function paginaDeErro(msg: string) {
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -960,7 +964,7 @@ if (preCadastroLigado()) {
     if (sincronizando) return;
     sincronizando = true;
     try {
-      const n = await sincronizarPreCadastros(log);
+      const n = await emCurso('pre-cadastro', sincronizarPreCadastros(log));
       if (n) log(`pré-cadastro: ${n} cadastro(s) do site gravado(s)`);
     } catch (e) {
       log(`pré-cadastro: sincronização falhou (${(e as Error).message})`);
@@ -975,7 +979,7 @@ if (preCadastroLigado()) {
   setInterval(async () => {
     if (checando) return;
     checando = true;
-    try { await aplicarCheckins(log, (id) => enfileirarImpressao(termoLink([id]), 'Termo de responsabilidade', 'celular')); }
+    try { await emCurso('checkins', aplicarCheckins(log, (id) => enfileirarImpressao(termoLink([id]), 'Termo de responsabilidade', 'celular'))); }
     catch (e) { log(`check-in: sincronização falhou (${(e as Error).message})`); }
     finally { checando = false; }
   }, 20_000).unref();
@@ -985,15 +989,17 @@ if (preCadastroLigado()) {
   setInterval(async () => {
     if (conferindo) return;
     conferindo = true;
+    await emCurso('grupos-ciclo', (async () => {
     await publicarTermoNoSite(TERMO_FILE, log).catch((e) => log(`termo: publicação no site falhou (${(e as Error).message})`));
     if (await aplicarAcoesDoPainel(log).catch((e) => { log(`grupo: ações do painel falharam (${(e as Error).message})`); return 0; })) { /* o resumo abaixo já sai atualizado */ }
     try { await acertarCuponsDosGrupos().catch((e) => log(`grupo: acerto dos cupons falhou (${(e as Error).message})`)); await enviarLembretesDosGrupos(log).catch((e) => log(`grupo: lembretes falharam (${(e as Error).message})`)); await soltarVagasNaoPagasDoSite(log).catch((e) => log(`grupo: soltar vagas não pagas falhou (${(e as Error).message})`)); await publicarGruposNoSite(log).catch((e) => log(`grupo: resumo para o site falhou (${(e as Error).message})`)); await conferirCobrancas(log); await puxarPagamentosDiretoDoAsaas(log); await conferirCobrancasCampeonato(log); } catch (e) { log(`grupo: conferência das cobranças falhou (${(e as Error).message})`); } finally { conferindo = false; }
+    })());
   }, 60_000).unref();
 }
 
 // página Pilotos do painel web: lê da cronometragem as baterias encerradas novas (carreira e ranking por traçado)
-setTimeout(() => { atualizarIndicePilotos(log).catch(() => undefined); }, 20_000);
-setInterval(() => { atualizarIndicePilotos(log).catch(() => undefined); }, 120_000).unref();
+setTimeout(() => { emCurso('indice-pilotos', atualizarIndicePilotos(log)).catch(() => undefined); }, 20_000);
+setInterval(() => { emCurso('indice-pilotos', atualizarIndicePilotos(log)).catch(() => undefined); }, 120_000).unref();
 
 // reserva online (reservas.kartodromodebetim.com.br): agenda a cada 5 s, pedidos/pagamentos/prazos a cada 5 s.
 // Liga com OPS_RESERVA_ONLINE=1 no .env.local (usa a mesma chave do pré-cadastro).
@@ -1003,9 +1009,9 @@ if (preCadastroLigado() && process.env.OPS_RESERVA_ONLINE === '1') {
   const pedidos = async () => {
     if (ocupado) return;
     ocupado = true;
-    try { await sincronizarReservasOnline(log); } catch (e) { falhou('pedidos', e); } finally { ocupado = false; }
+    try { await emCurso('pedidos', sincronizarReservasOnline(log)); } catch (e) { falhou('pedidos', e); } finally { ocupado = false; }
   };
-  const agenda = async () => { try { await publicarAgenda(); } catch (e) { falhou('agenda', e); } };
+  const agenda = async () => { try { await emCurso('agenda', publicarAgenda()); } catch (e) { falhou('agenda', e); } };
   setTimeout(agenda, 3_000);
   setInterval(agenda, 5_000).unref();
   setInterval(pedidos, 5_000).unref();
