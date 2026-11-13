@@ -441,7 +441,7 @@ export default {
         }
         if (p === '/api/sync/lembretes' && req.method === 'POST') return await lembretesSync(req, env);
         if (p === '/api/sync/mobile/coupons' || p.startsWith('/api/sync/mobile/coupons/')) return await handleMobileCouponsSync(req, env);
-        if (p === '/api/sync/pedidos' && req.method === 'GET') return await syncPedidos(env);
+        if (p === '/api/sync/pedidos' && req.method === 'GET') return await syncPedidos(env, ctx);
         if (p === '/api/sync/pedido' && req.method === 'POST') return await syncResultado(req, env, ctx);
       }
       if (p.startsWith('/api/')) return json(404, { erro: 'Rota desconhecida.' });

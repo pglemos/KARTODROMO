@@ -290,8 +290,11 @@ export async function conciliarPagamentos(env: EnvReservas, agora = Date.now()) 
   return n;
 }
 
-export async function syncPedidos(env: EnvReservas) {
-  await conciliarPagamentos(env);
+export async function syncPedidos(env: EnvReservas, ctx?: Pick<ExecutionContext, 'waitUntil'>) {
+  // a conferência na Asaas (a cada 5 min) roda em segundo plano: dentro da resposta ela estourava o tempo do SRVKART
+  // e aquele ciclo de reservas se perdia ("reserva online: pedidos falhou", 08–13/11/2026). O que ela achar entra no próximo ciclo.
+  if (ctx) ctx.waitUntil(conciliarPagamentos(env).then(() => undefined, (e) => console.error('conciliação asaas', (e as Error).message)));
+  else await conciliarPagamentos(env);
   const fila = await env.PRE.list({ prefix: 'reservas/fila/', limit: 50 });
   const itens: Pedido[] = [];
   for (const o of fila.objects) {

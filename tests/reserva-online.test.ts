@@ -277,3 +277,19 @@ describe('fluxo da reserva no site', () => {
     expect(((await r.json()) as { erro: string }).erro).toContain('lotou');
   });
 });
+
+describe('busca de pedidos não espera a conferência da Asaas (timeouts de 08–13/11/2026)', () => {
+  it('com ctx, a conferência vai para segundo plano e a fila responde na hora', async () => {
+    const mem = new Map<string, string>();
+    const env = { PRE: { get: async (k: string) => (mem.has(k) ? { json: async () => JSON.parse(mem.get(k)!) } : null), put: async (k: string, v: string) => { mem.set(k, v); }, delete: async () => undefined, list: async () => ({ objects: [] }) },
+      ASAAS_API_KEY: 'x' } as unknown as EnvReservas;
+    let solta: () => void = () => undefined;
+    const f = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise((ok) => { solta = () => ok(new Response('{"data":[]}', { status: 200 })); }));
+    const adiadas: Promise<unknown>[] = [];
+    const r = await syncPedidos(env, { waitUntil: (p: Promise<unknown>) => { adiadas.push(p); } });
+    expect(r.status).toBe(200);
+    expect(adiadas).toHaveLength(1);
+    solta(); await Promise.all(adiadas);
+    f.mockRestore();
+  });
+});
