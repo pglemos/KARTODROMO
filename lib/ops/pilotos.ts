@@ -9,6 +9,7 @@
  * equalização, de piloto com nome (não "Kart 12") e não desclassificado.
  */
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { rename, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { CLIENTE_COLS, one, onlyDigits, query } from './db';
 import { HttpError } from './office';
@@ -50,10 +51,14 @@ async function gravarIndiceArq() {
     if ((++n & 255) === 255) await new Promise<void>((r) => setImmediate(r));
   }
   const tmp = ARQ + '.tmp';
-  writeFileSync(tmp, '{"baterias":{' + pares.join(',') + '}}');
-  renameSync(tmp, ARQ);
+  // 56 MB: gravação assíncrona (writeFileSync travava o servidor; 13/11/2026)
+  await writeFile(tmp, '{"baterias":{' + pares.join(',') + '}}');
+  await rename(tmp, ARQ);
   indiceVersao++;
 }
+
+/** O índice de baterias já carregado na memória (o mesmo conteúdo do arquivo de 56 MB, sem ler o disco). */
+export function bateriasDoIndice(): Readonly<Record<string, BateriaCrono>> { return indice; }
 
 const diaSp = (ms: number) => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
 const hojeSp = () => diaSp(Date.now());

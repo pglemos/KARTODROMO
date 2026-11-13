@@ -179,16 +179,15 @@ export function historicoDoCliente(baterias: Record<string, BateriaIndice>, clie
     .slice(0, 500);
 }
 
-const ARQ_INDICE_PILOTOS = () => resolve(join(process.cwd(), '.runtime', 'pilotos-cronometragem.json'));
 
 /** Publica no app o histórico completo de um cliente (chave historico:<id>). Devolve quantas baterias foram. */
 export async function publicarHistoricoDoCliente(clienteId: string) {
   if (!/^\d{1,20}$/.test(clienteId) || !vinculoAutomaticoLigado()) return 0;
   const base = mobileApiEndpoint(process.env.MOBILE_IDENTITY_LINK_URL!, '/api/mobile/v1/internal/identity-links');
   if (!base) return 0;
-  const arquivo = ARQ_INDICE_PILOTOS();
-  if (!existsSync(arquivo)) return 0;
-  const baterias = (JSON.parse(readFileSync(arquivo, 'utf8')) as { baterias?: Record<string, BateriaIndice> }).baterias ?? {};
+  // índice já na memória do SRVKART: ler e converter o arquivo de 56 MB travava o servidor por segundos (13/11/2026)
+  const baterias = (await import('./pilotos')).bateriasDoIndice() as unknown as Record<string, BateriaIndice>;
+  if (!Object.keys(baterias).length) return 0;
   const results = historicoDoCliente(baterias, clienteId);
   if (!results.length) return 0;
   const r = await fetch(new URL('/api/mobile/v1/internal/ranking', base), {
@@ -222,15 +221,16 @@ export async function publicarHistoricosVinculados(log: Log, agora = Date.now())
   historicosVersao = versao;
   const base = mobileApiEndpoint(process.env.MOBILE_IDENTITY_LINK_URL!, '/api/mobile/v1/internal/identity-links');
   if (!base) return 0;
-  const arquivo = ARQ_INDICE_PILOTOS();
-  if (!existsSync(arquivo)) return 0;
   const token = process.env.MOBILE_ADMIN_TOKEN!;
   const r = await fetch(base, { headers: { 'x-mobile-admin-token': token }, redirect: 'error', signal: AbortSignal.timeout(15_000) });
   if (!r.ok) throw new Error(`contas vinculadas: HTTP ${r.status}`);
   const ids = ((await r.json()) as { customerIds?: unknown[] }).customerIds?.map(String).filter((id) => /^\d{1,20}$/.test(id)) ?? [];
-  const baterias = (JSON.parse(readFileSync(arquivo, 'utf8')) as { baterias?: Record<string, BateriaIndice> }).baterias ?? {};
+  const baterias = (await import('./pilotos')).bateriasDoIndice() as unknown as Record<string, BateriaIndice>;
+  if (!Object.keys(baterias).length) return 0;
   const mudaram: { chave: string; dados: { results: ResultadoHistorico[] }; texto: string }[] = [];
   for (const id of ids) {
+    // cede o event loop entre clientes: cada um percorre todas as baterias do índice
+    await new Promise<void>((r) => setImmediate(r));
     const results = historicoDoCliente(baterias, id);
     if (!results.length) continue;
     const texto = hashDe(JSON.stringify(results));
