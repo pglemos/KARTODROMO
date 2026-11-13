@@ -427,6 +427,10 @@ export default {
         }
         // pagamentos de grupo avisados pelo webhook da Asaas (gravados em grupos/pagos/): o SRVKART lê e limpa.
         // Existiam só no bundle remendado e sumiram no deploy do fonte; sem elas o pagamento só chegava consultando a Asaas.
+        // rede de segurança antiga do SRVKART (lista de pagas direto na Asaas a cada minuto): sumiu num deploy e dava 404.
+        // Não volta a consultar a Asaas (cota de 12 h, 12/11/2026): a conciliação a cada 5 min já põe os pagamentos de
+        // grupo em grupos/pagos/, que o SRVKART lê em /api/sync/grupos/pagos.
+        if (p === '/api/sync/asaas/pagamentos' && req.method === 'GET') return json(200, []);
         if (p === '/api/sync/grupos/pagos' && req.method === 'GET') {
           const lista = await env.PRE.list({ prefix: 'grupos/pagos/', limit: 200 });
           const itens: unknown[] = [];
