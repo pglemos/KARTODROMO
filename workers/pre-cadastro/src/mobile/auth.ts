@@ -1,3 +1,4 @@
+import { emailsQueVoltaram } from './bounces';
 import { scryptSync } from 'node:crypto';
 
 import { cpfValido, digitos } from '../validar';
@@ -1036,6 +1037,10 @@ export async function handleMobileContaAdmin(request: Request, env: MobileAccoun
   if (!input) return json(400, { erro: 'Envio inválido.' });
 
   const acao = value(input, 'acao');
+  if (acao === 'emails-que-voltaram') {
+    // painel da recepção: e-mails cadastrados que a caixa do destinatário recusou (webhook do Resend)
+    return json(200, { emails: await emailsQueVoltaram(context.db) });
+  }
   if (acao === 'status') {
     // lista de Pilotos: situação no app de cada cadastro ligado (ativo = já entrou; convidado = conta pronta, nunca entrou)
     const { results } = await context.db.prepare(

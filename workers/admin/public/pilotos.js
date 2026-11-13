@@ -83,6 +83,7 @@ TELAS.pilotos = async (tela) => {
     if (c.app === 'ativo') ch.push(['verde', 'App', '', 'Tem conta no app e já entrou']);
     else if (c.app === 'convidado') ch.push(['cinza', 'Convidado', '', 'Conta no app pronta, mas ainda não entrou: reenvie o convite na aba App']);
     if (c.bloqueado) ch.push(['vermelho', 'Bloqueado', '', 'Cliente bloqueado: não pode reservar nem correr']);
+    if (c.emailVoltou) ch.push(['vermelho', 'E-mail voltou', `#/piloto/${c.id}`, `O e-mail ${c.email || ''} não existe ou recusa mensagens: o piloto não recebe resultado nem confirmação. Corrija na ficha`]);
     if (c.duplicado) ch.push(['vermelho', 'Possível duplicado', `#/piloto/${c.duplicado.id}`, 'Outro cadastro com o mesmo CPF ou nome parecido. Clique para abrir o outro']);
     if (c.responsavelId && c.responsavelNome && nomeBonitoPiloto(c.responsavelNome) === nomeBonitoPiloto(c.nome)) ch.push(['laranja', 'Nome igual ao do responsável', '', 'O menor foi cadastrado com o nome do responsável: confira o cadastro']);
     else if (c.responsavelId) ch.push(['azul', 'Menor · ' + nomeBonitoPiloto(c.responsavelNome || 'responsável').split(' ')[0], '', 'Menor de idade; o responsável aparece no perfil']);
@@ -232,6 +233,7 @@ TELAS.pilotos = async (tela) => {
       <div style="padding: var(--kib-espaco-2) var(--kib-espaco-3); display: grid; gap: var(--kib-espaco-2)">
         <div class="col" style="gap: var(--kib-espaco-1)"><b>Avisos</b>
           <span><span class="chip vermelho">Bloqueado</span> não pode reservar nem correr.</span>
+          <span><span class="chip vermelho">E-mail voltou</span> o e-mail cadastrado não existe ou recusa mensagens: o piloto não recebe resultado nem confirmação. Peça o e-mail certo e corrija a ficha.</span>
           <span><span class="chip vermelho">Possível duplicado</span> outro cadastro com o mesmo CPF ou nome parecido. Clique no aviso para abrir o outro.</span>
           <span><span class="chip laranja">Nome igual ao do responsável</span> menor cadastrado com o nome de quem responde por ele.</span>
           <span><span class="chip azul">Menor · Nome</span> menor de idade e seu responsável.</span>
@@ -483,6 +485,7 @@ TELAS.piloto = async (tela) => {
       <form id="fPiloto" class="formPiloto" novalidate>
         ${CAMPOS.map(([k, t, tipo, ac, im]) => `<label class="campo"><span>${t}</span>${tipo === 'sexo' ? `<select class="entrada" name="sexo"><option value="" ${!c.sexo ? 'selected' : ''}>Não informado</option><option value="M" ${c.sexo === 'M' ? 'selected' : ''}>Masculino</option><option value="F" ${c.sexo === 'F' ? 'selected' : ''}>Feminino</option></select>` : `<input class="entrada" name="${k}" type="${tipo}" value="${esc(c[k] ?? '')}" autocomplete="${ac || 'off'}" ${im ? `inputmode="${im}"` : ''} ${k === 'nome' ? 'required' : ''} ${k === 'instagram' && c.instagram && !instagramValido(c.instagram) ? 'aria-invalid="true" style="box-shadow: inset 0 0 0 2px var(--aviso)"' : ''}>`}</label>`).join('')}
         <label class="campo linha-toda"><span>Observação (só a equipe vê)</span><textarea class="entrada" name="observacao" rows="2" style="height: auto; padding: var(--kib-espaco-1) var(--kib-espaco-denso-12)">${esc(c.observacao || '')}</textarea></label>
+        ${c.emailVoltou ? `<p class="erroMsg" role="note" style="grid-column: 1 / -1; margin: 0"><span class="chip vermelho">E-mail voltou</span> O e-mail ${esc(c.email || '')} não existe ou recusa mensagens (${esc(c.emailVoltou.motivo || 'recusado')}, em ${esc(new Date(c.emailVoltou.em).toLocaleDateString('pt-BR'))}). O piloto não recebe resultado nem confirmação: peça o e-mail certo e salve.</p>` : ''}
         ${c.responsavelNome ? `<p class="peq" style="grid-column: 1 / -1; margin: 0">Menor de idade · responsável: <a href="#/piloto/${c.responsavelId}">${esc(nomeBonitoPiloto(c.responsavelNome))}</a></p>` : ''}
         ${d.dependentes && d.dependentes.length ? `<p class="peq" style="grid-column: 1 / -1; margin: 0">Responsável por: ${d.dependentes.map((x) => `<a href="#/piloto/${x.id}">${esc(nomeBonitoPiloto(x.nome))}</a>`).join(', ')}</p>` : ''}
       </form>

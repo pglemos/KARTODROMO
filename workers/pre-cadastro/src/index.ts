@@ -4,6 +4,7 @@
  * servidor da operação (SRVKART) buscar pelo /api/sync, gravar na tabela de clientes e apagar daqui.
  * No totem o cliente digita CPF, RG, passaporte ou e-mail e os dados já aparecem.
  */
+import { handleResendWebhook, type BouncesEnv } from './mobile/bounces';
 import { aceiteDoCadastro, esquecerGrupos, identificarCliente, rotasPublicas, rotasSync, SITE } from './extras';
 import { chaveDocumento, digitos, validar, type PreCadastro } from './validar';
 import { lembretesSync } from './lembretes';
@@ -21,7 +22,7 @@ import { handleMobilePerfil, type MobilePerfilEnv } from './mobile/perfil';
 import { handleMobileRanking } from './mobile/ranking';
 import { handleMobileOutbox } from './mobile/outbox';
 
-export interface Env extends EnvReservas, MobileAccountAdminEnv, MobileResultsEnv, MobileLiveEnv, MobilePerfilEnv, SinalVinculoEnv {
+export interface Env extends EnvReservas, BouncesEnv, MobileAccountAdminEnv, MobileResultsEnv, MobileLiveEnv, MobilePerfilEnv, SinalVinculoEnv {
   ASSETS: Fetcher;
   PRE: R2Bucket;
   SYNC_KEY: string;
@@ -247,6 +248,7 @@ export default {
         return json(200, await situacaoCobranca(env, id));
       }
       if (p === '/api/mobile/v1/internal/account-email') return await handleMobileAccountEmail(req, env);
+      if (p === '/api/resend/webhook') return await handleResendWebhook(req, env);
       if (p === '/api/mobile/v1/internal/conta-admin') return await handleMobileContaAdmin(req, env);
       if (p.startsWith('/api/mobile/v1/auth/')) {
         const resposta = await handleMobileAuth(req, env);

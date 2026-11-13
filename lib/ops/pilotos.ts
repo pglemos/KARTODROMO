@@ -478,6 +478,17 @@ export async function statusApp(fresco = false): Promise<StatusApp> {
   catch { if (!statusCache) return {}; }
   return statusCache!.v;
 }
+// e-mails que a caixa do destinatário recusou (webhook do Resend no Worker do app): a recepção vê "E-mail voltou"
+type EmailVoltou = { motivo: string; assunto: string; em: number };
+let voltaramCache: { em: number; v: Record<string, EmailVoltou> } | null = null;
+export async function emailsQueVoltaram(): Promise<Record<string, EmailVoltou>> {
+  if (voltaramCache && Date.now() - voltaramCache.em < 5 * 60_000) return voltaramCache.v;
+  try { voltaramCache = { em: Date.now(), v: (await chamarApp({ acao: 'emails-que-voltaram' })).emails ?? {} }; }
+  catch { if (!voltaramCache) return {}; }
+  return voltaramCache!.v;
+}
+const emailVoltouDe = (lista: Record<string, EmailVoltou>, email: unknown) => (typeof email === 'string' && email.trim() ? lista[email.trim().toLowerCase()] ?? null : null);
+
 async function contaApp(id: number, acao: string, b: Record<string, unknown>, quem: string) {
   if (!['consultar', 'criar', 'editar', 'senha', 'convite'].includes(acao)) throw new HttpError(400, 'Ação desconhecida.');
   const c = await one<{ nome: string; doc: string | null; email: string | null; fone: string | null }>(
@@ -570,8 +581,9 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
       total = (await one<{ n: number }>(`SELECT COUNT(*) n FROM dbo.Cliente c WHERE ${where}`))?.n ?? 0;
       rows = await query(`SELECT ${COLS_LISTA} ${DE_LISTA} WHERE ${where} ORDER BY ${ordemSql} OFFSET @ini ROWS FETCH NEXT ${porPag} ROWS ONLY`, { ini });
     }
-    const st = await statusApp();
-    const linhas = (await completar(rows, hoje, car)).map((l) => ({ ...l, app: st[String((l as { id?: unknown }).id)]?.s ?? null }));
+    const [st, voltaram] = await Promise.all([statusApp(), emailsQueVoltaram()]);
+    const linhas = (await completar(rows, hoje, car)).map((l) => ({ ...l, app: st[String((l as { id?: unknown }).id)]?.s ?? null,
+      emailVoltou: emailVoltouDe(voltaram, (l as { email?: unknown }).email) }));
     send(200, { total, pagina, porPagina: porPag, ordem, linhas, atualizadoEm });
     return true;
   }
@@ -610,7 +622,7 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
     const validos = meusAntigos.filter((y) => valeNoRanking(y.tracado, y.ms));
     const melhorPos = validos.reduce((min, y) => Math.min(min, y.pos), Infinity);
     const laptimeResumo = validos.length ? { meses: porMes.size, melhorPos: Number.isFinite(melhorPos) ? melhorPos : null, vitorias: new Set(validos.filter((y) => y.pos === 1).map((y) => y.tipo + y.periodo + y.tracado)).size } : null;
-    send(200, { cliente: c, hoje, resumo, tracados, principal, evolucao, laptime, semanasTop, laptimeResumo, duplicado, corridas: corridas.slice(0, 200), totalCorridas: corridas.length, dependentes, financeiro, desde: Object.values(indice).reduce((a, b) => (!a || b.dia < a ? b.dia : a), '' as string) || null });
+    send(200, { cliente: { ...c, emailVoltou: emailVoltouDe(await emailsQueVoltaram(), (c as { email?: unknown }).email) }, hoje, resumo, tracados, principal, evolucao, laptime, semanasTop, laptimeResumo, duplicado, corridas: corridas.slice(0, 200), totalCorridas: corridas.length, dependentes, financeiro, desde: Object.values(indice).reduce((a, b) => (!a || b.dia < a ? b.dia : a), '' as string) || null });
     return true;
   }
 
