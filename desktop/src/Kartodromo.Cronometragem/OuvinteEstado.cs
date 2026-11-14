@@ -81,8 +81,16 @@ sealed class OuvinteEstado(string url, Action<JsonObject> aoReceber) : IDisposab
         JsonObject estado;
         try { estado = JsonNode.Parse(json)?.AsObject(); } catch { return; }
         if (estado == null) return;
-        _tela.Post(_ => { if (!_parar.IsCancellationRequested) _aoReceber(estado); }, null);
+        // só o aviso mais novo interessa: com a tela ocupada, os avisos não fazem fila (a fila mostrava placar velho)
+        if (Interlocked.Exchange(ref _ultimo, estado) != null) return;
+        _tela.Post(_ =>
+        {
+            var atual = Interlocked.Exchange(ref _ultimo, null);
+            if (atual != null && !_parar.IsCancellationRequested) _aoReceber(atual);
+        }, null);
     }
+
+    JsonObject _ultimo;
 
     public void Dispose()
     {

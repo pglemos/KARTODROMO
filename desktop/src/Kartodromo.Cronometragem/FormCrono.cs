@@ -1138,7 +1138,17 @@ public partial class FormCrono : Form
         _ocupado = true;
         try
         {
-            if (!jaTemEstado) _state = (await Crono.Api.GetAsync("/api/state", ct))?.AsObject();
+            if (!jaTemEstado)
+            {
+                // se um aviso ao vivo chegou durante a leitura, ele é mais novo: a resposta antiga não pode
+                // sobrescrever (o placar de LED voltava para o tempo anterior até o próximo ciclo de 1 s)
+                var versaoAntes = _versaoEstado;
+                var lido = (await Crono.Api.GetAsync("/api/state", ct))?.AsObject();
+                if (versaoAntes == _versaoEstado || _state == null) _state = lido;
+                else if (lido != null)
+                    foreach (var chave in new[] { "sessions", "lastQualifying", "lastFinished" })
+                        if (!_state.ContainsKey(chave) && lido.Remove(chave, out var v)) _state[chave] = v;
+            }
             var focus = _state?["focus"] as JsonObject;
             var correndo = _state.S("runningId");
             // com uma janela aberta (Registro de competidor, Trocar kart, Penalidade...) a tela não pula para a bateria
@@ -1219,6 +1229,7 @@ public partial class FormCrono : Form
     }
 
     OuvinteEstado _ouvinte;
+    int _versaoEstado;
     DateTime _telaRapidaEm = DateTime.MinValue;
 
     /// <summary>Aviso do serviço (passagem, bandeira…): o placar de LED muda na hora; a tela, no máximo 4x por segundo.</summary>
@@ -1229,6 +1240,7 @@ public partial class FormCrono : Form
         foreach (var chave in new[] { "sessions", "lastQualifying", "lastFinished" })
             if (!estado.ContainsKey(chave) && _state != null && _state.Remove(chave, out var guardado)) estado[chave] = guardado;
         _state = estado;
+        _versaoEstado++;
         int? kartRecente = null;
         if (estado?["recentPassings"] is JsonArray pass && pass.Count > 0 && pass[0] is JsonObject p)
         {
