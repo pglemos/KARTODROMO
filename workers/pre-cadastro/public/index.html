@@ -56,15 +56,11 @@
   .menor { border: 1px solid var(--linha); border-radius: var(--raio); padding: 14px; margin-bottom: 10px; position: relative; background: var(--fundo); }
   .menor .tirar { position: absolute; top: 4px; right: 4px; width: 44px; height: 44px; border: 0; background: none; color: var(--suave); font-size: 24px; line-height: 1; cursor: pointer; }
   .btn2 { width: 100%; min-height: 50px; border: 1px dashed var(--linha-forte); border-radius: var(--raio); background: transparent; font: 400 15px/1 var(--titulo); text-transform: uppercase; letter-spacing: .05em; color: var(--verde); cursor: pointer; }
-  .termo-texto { max-height: 260px; overflow: auto; border: 1px solid var(--linha); border-radius: var(--raio); padding: 12px 14px; margin: 12px 0; background: rgba(255,255,255,.02); font: 500 15px/1.55 var(--corpo); color: var(--suave); text-transform: none; letter-spacing: 0; }
-  .termo-texto p { margin: 0 0 10px; }
-  .termo-texto strong { color: var(--texto); }
-  .termo-foto-wrap { margin-top: 12px; }
-  .termo-foto-wrap details { margin-top: 0; }
-  .termo-foto-wrap summary { display: flex; align-items: center; gap: 8px; color: var(--verde); font-weight: 600; }
-  .termo-foto-card { margin-top: 10px; text-align: center; background: #000; border-radius: var(--raio); padding: 10px; border: 1px solid var(--linha); }
-  .termo-foto-card img { max-width: 100%; height: auto; border-radius: 4px; display: block; margin: 0 auto; box-shadow: 0 4px 16px rgba(0,0,0,.6); }
-  .termo-foto-card figcaption { margin-top: 8px; font-size: 13.5px; color: var(--suave); }
+  .termo-texto { max-height: 360px; overflow: auto; border: 1px solid var(--linha); border-radius: var(--raio); padding: 14px 16px; margin: 12px 0 16px; background: rgba(255,255,255,.02); font: 500 15px/1.6 var(--corpo); color: var(--suave); text-transform: none; letter-spacing: 0; }
+  .termo-texto p { margin: 0 0 12px; }
+  .termo-texto strong { color: var(--texto); font-weight: 700; }
+  .termo-texto h3 { color: var(--verde); font: 700 16px/1.3 var(--corpo); margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .03em; }
+  .termo-texto h3:first-child { margin-top: 0; }
   .termo { display: flex; gap: 12px; align-items: flex-start; font: 500 16px/1.45 var(--corpo); text-transform: none; letter-spacing: 0; color: var(--texto); }
   .termo input { width: 24px; height: 24px; flex: none; margin: 1px 0 0; accent-color: var(--verde); -webkit-appearance: checkbox; appearance: auto; }
   details { margin-top: 10px; background: var(--fundo); border: 1px solid var(--linha); border-radius: var(--raio); padding: 11px 14px; font-size: 15.5px; color: var(--suave); }
@@ -269,30 +265,12 @@
     </section>
 
     <section class="cartao" id="secTermo" hidden>
-      <h2><span class="n">6</span>Termo de responsabilidade</h2>
-      <p class="sub">Leia e aceite agora. No dia, a recepção só confere e você assina o impresso.</p>
-      <div class="termo-texto" id="termoTexto" data-sem-traducao tabindex="0" role="region" aria-label="Texto do termo de responsabilidade"></div>
-      <div class="termo-foto-wrap">
-        <details>
-          <summary>Ver modelo do termo impresso no totem</summary>
-          <figure class="termo-foto-card">
-            <a href="/termo-totem-exemplo.jpg" target="_blank" rel="noopener">
-              <img src="/termo-totem-exemplo.jpg" alt="Exemplo do termo de responsabilidade impresso no totem do Kartódromo de Betim" loading="lazy">
-            </a>
-            <figcaption>Termo de responsabilidade emitido nos totens e na recepção do kartódromo (toque na imagem para ampliar).</figcaption>
-          </figure>
-        </details>
-      </div>
-      <label class="termo"><input type="checkbox" id="aceiteTermo"><span>Li e aceito o Termo de Responsabilidade. <span class="obrig">*</span></span></label>
+      <h2><span class="n">6</span>Termo de Responsabilidade e Consentimento LGPD</h2>
+      <p class="sub">Leia os termos completos abaixo e confirme seu aceite. No dia da corrida, a recepção só confere e você assina o impresso.</p>
+      <div class="termo-texto" id="termoTexto" data-sem-traducao tabindex="0" role="region" aria-label="Texto completo do Termo de Responsabilidade e Consentimento para Tratamento de Dados Pessoais"></div>
+      <label class="termo"><input type="checkbox" id="aceiteTermo"><span>Li e aceito integralmente o Termo de Responsabilidade e o Termo de Consentimento para Tratamento de Dados Pessoais (LGPD). <span class="obrig">*</span></span></label>
       <label class="termo"><input type="checkbox" id="naoImagem"><span>Não autorizo o uso da minha imagem em fotos e vídeos do kartódromo.</span></label>
-    </section>
-
-    <section class="cartao">
-      <label class="termo"><input type="checkbox" id="lgpd"><span>Li e concordo com o Termo de Consentimento para Tratamento de Dados Pessoais. <span class="obrig">*</span></span></label>
-      <details><summary>Ler o termo</summary>
-        <p>Ao se cadastrar, você autoriza o Kartódromo Internacional de Betim a tratar seus dados pessoais (nome, documento, contato, data de nascimento, peso e endereço) para identificar você nas baterias e corridas, emitir o termo de responsabilidade, registrar tempos e resultados, cumprir obrigações legais e entrar em contato sobre suas reservas.</p>
-        <p>Os dados ficam armazenados nos sistemas do kartódromo e não são vendidos a terceiros. Você pode pedir a qualquer momento, na recepção, acesso, correção ou exclusão dos seus dados, nos termos da Lei nº 13.709/2018 (LGPD).</p>
-      </details>
+      <input type="checkbox" id="lgpd" checked style="display:none" tabindex="-1" aria-hidden="true">
       <div class="oculto" aria-hidden="true" inert><label>Site<input id="site" tabindex="-1" autocomplete="off"></label></div>
     </section>
 
@@ -636,8 +614,8 @@
   }
   var TERMO = null;
   const atualizarProgresso = () => {
-    const feitos = campos.filter((id) => regras[id][0]()).length + ($('lgpd').checked ? 1 : 0) + (TERMO && $('aceiteTermo').checked ? 1 : 0);
-    const total = campos.length + 1 + (TERMO ? 1 : 0);
+    const feitos = campos.filter((id) => regras[id][0]()).length + ($('aceiteTermo').checked ? 1 : 0);
+    const total = campos.length + 1;
     const falta = total - feitos;
     const pct = Math.round(feitos / total * 100);
     $('progBarra').style.width = pct + '%'; $('progBarra').parentNode.setAttribute('aria-valuenow', String(pct));
@@ -648,8 +626,8 @@
   };
   $('form').addEventListener('input', atualizarProgresso);
   $('form').addEventListener('change', atualizarProgresso);
-  const primeiroQueFalta = () => { for (const id of campos) { if (!regras[id][0]()) return id; } if (TERMO && !$('aceiteTermo').checked) return 'aceiteTermo'; return $('lgpd').checked ? null : 'lgpd'; };
-  $('progIr').addEventListener('click', () => { const id = primeiroQueFalta(); if (!id) return; const el = $(id); if (id !== 'lgpd' && id !== 'aceiteTermo') conferir(id); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus({ preventScroll: true }); });
+  const primeiroQueFalta = () => { for (const id of campos) { if (!regras[id][0]()) return id; } return $('aceiteTermo').checked ? null : 'aceiteTermo'; };
+  $('progIr').addEventListener('click', () => { const id = primeiroQueFalta(); if (!id) return; const el = $(id); if (id !== 'aceiteTermo') conferir(id); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus({ preventScroll: true }); });
   setInterval(() => {
     atualizarProgresso();
     for (const id of campos) { const el = $(id); if (el.classList.contains('campo-animado') && val(id) && document.activeElement !== el && !regras[id][0]() && !$('m-' + id)) conferir(id); }
@@ -854,8 +832,7 @@
       if (!m.nascimento) return erro(`Informe a data de nascimento de ${m.nome.trim()} (DD/MM/AAAA).`, m.el.querySelector('.mNasc'));
     }
     if (grupo && grupo.aCobrarCentavos > 0 && tipo !== 'CPF') return erro('Para pagar pelo link do grupo, use o CPF.', doc);
-    if (TERMO && !$('aceiteTermo').checked) return erro('Para continuar, leia e aceite o Termo de Responsabilidade.', $('aceiteTermo'));
-    if (!$('lgpd').checked) return erro('Para continuar, aceite o Termo de Consentimento para Tratamento de Dados Pessoais.', null);
+    if (!$('aceiteTermo').checked) return erro('Para continuar, leia e aceite o Termo de Responsabilidade e Consentimento LGPD.', $('aceiteTermo'));
 
     const btn = $('enviar'); btn.disabled = true; btn.textContent = 'Enviando…';
     try {

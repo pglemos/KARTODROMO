@@ -580,34 +580,23 @@ function ModalTermo({ fechar }: { fechar: () => void }) {
   return (
     <dialog ref={ref} className="modal" onClose={fechar} aria-labelledby="termo-modal-t">
       <div className="modal-topo">
-        <h2 id="termo-modal-t">{termo?.titulo ?? 'Termo de Responsabilidade'}</h2>
+        <h2 id="termo-modal-t">{termo?.titulo ?? 'Termo de Responsabilidade e Consentimento LGPD'}</h2>
         <button className="ico-btn" onClick={fechar} aria-label="Fechar"><Ico d={I.x} /></button>
       </div>
       <div className="modal-corpo">
-        <p className="dica-mini" style={{ marginBottom: '12px' }}>
-          Este é o texto oficial impresso nos totens de autoatendimento e na recepção antes da bateria:
+        <p className="dica-mini" style={{ marginBottom: '14px' }}>
+          Texto completo e unificado das condições de pista, responsabilidade civil e desportiva e consentimento para tratamento de dados pessoais (LGPD):
         </p>
         {!termo ? (
           <p>Carregando termo…</p>
         ) : (
           termo.paragrafos.map((p, i) => (
-            <div key={i} style={{ marginBottom: '10px' }}>
-              {p.titulo && <strong style={{ color: 'var(--texto)', display: 'block', marginBottom: '2px' }}>{p.titulo}</strong>}
-              <p style={{ margin: 0 }}>{p.texto}</p>
+            <div key={i} style={{ marginBottom: '12px' }}>
+              {p.titulo && <strong style={{ color: 'var(--verde)', display: 'block', marginBottom: '3px', fontSize: '15px' }}>{p.titulo}</strong>}
+              <p style={{ margin: 0, lineHeight: 1.55 }}>{p.texto}</p>
             </div>
           ))
         )}
-        <div className="termo-foto-box">
-          <details open>
-            <summary>Foto do termo impresso no totem</summary>
-            <figure className="termo-foto-preview">
-              <a href="/booking-media/termo-totem-exemplo.jpg" target="_blank" rel="noopener">
-                <img src="/booking-media/termo-totem-exemplo.jpg" alt="Foto do termo de responsabilidade impresso no totem do Kartódromo de Betim" loading="lazy" />
-              </a>
-              <figcaption>Exemplo real do termo impresso no totem (toque para ampliar em alta resolução).</figcaption>
-            </figure>
-          </details>
-        </div>
       </div>
       <div className="modal-pe">
         <button className="btn" onClick={fechar}>Entendi</button>
