@@ -166,3 +166,53 @@ export async function avisarPorEmail(env: MobileEmailEnv, p: PedidoEmail) {
   p.emails[p.status] = new Date().toISOString();
   return true;
 }
+
+// ---------------------------------------------------------------- cadastro (link do grupo e termo)
+
+export type CadastroEmail = {
+  nome: string; email?: string;
+  grupo?: { responsavel: string; bateria: string; inicio: string } | null;
+  pagamento?: { link?: string; valorCentavos?: number } | null;
+  termo?: { versao: string; aceitoEm: string; imagem?: boolean } | null;
+};
+
+/** "Confirmação de participação": quem entrou pelo link do grupo. */
+export function conteudoParticipacao(c: CadastroEmail) {
+  const g = c.grupo!;
+  const nome = c.nome.trim().split(/\s+/)[0] || 'piloto';
+  const dia = quandoBateria(g.inicio);
+  const pagar = c.pagamento?.link ? c.pagamento : null;
+  const texto = `Oi, ${nome}! Você entrou no grupo de ${g.responsavel} para ${g.bateria}, ${dia}.`
+    + (pagar ? ` Para garantir sua vaga, pague${pagar.valorCentavos ? ` ${reais(pagar.valorCentavos)}` : ''} pelo link abaixo.` : ' Seu cadastro já está com a recepção.');
+  const linhas: [string, string][] = [['Grupo de', g.responsavel], ['Bateria', g.bateria], ['Data', dia]];
+  return {
+    subject: `Confirmação de participação · ${g.bateria} · ${dia}`,
+    text: `${texto}\n\n${linhas.map(([k, v]) => `${k}: ${v}`).join('\n')}${pagar ? `\n\nPagar: ${pagar.link}` : ''}\n\nChegue 1 hora antes da largada.`,
+    html: moldura('Você está no grupo', `<p>${esc(texto)}</p>${tabela(linhas)}${pagar ? botao('Pagar minha vaga', pagar.link!) : ''}<p style="color:#a8b2aa;font-size:14px">Chegue 1 hora antes da largada.</p>`),
+  };
+}
+
+/** "Termo de responsabilidade": comprovante do aceite digital. */
+export function conteudoTermo(c: CadastroEmail) {
+  const t = c.termo!;
+  const nome = c.nome.trim().split(/\s+/)[0] || 'piloto';
+  const quando = new Date(Date.parse(t.aceitoEm)).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
+  const texto = `Oi, ${nome}! Seu termo de responsabilidade foi assinado digitalmente no cadastro. Guarde este e-mail como comprovante.`;
+  const linhas: [string, string][] = [['Nome', c.nome], ['Versão do termo', t.versao], ['Assinado em', quando], ['Uso de imagem', t.imagem === false ? 'Não autorizado' : 'Autorizado']];
+  return {
+    subject: 'Termo de responsabilidade assinado · Kartódromo de Betim',
+    text: `${texto}\n\n${linhas.map(([k, v]) => `${k}: ${v}`).join('\n')}`,
+    html: moldura('Termo assinado', `<p>${esc(texto)}</p>${tabela(linhas)}`),
+  };
+}
+
+/** Manda os e-mails do cadastro (participação e termo). Falha de envio não atrapalha o cadastro. */
+export async function avisarCadastro(env: MobileEmailEnv, c: CadastroEmail) {
+  const para = String(c.email ?? '').trim();
+  if (!EMAIL_OK.test(para)) return 0;
+  let n = 0;
+  for (const m of [c.grupo ? conteudoParticipacao(c) : null, c.termo ? conteudoTermo(c) : null]) {
+    if (m && (await enviarEmail(env, para, m.subject, m.text, m.html).catch(() => false))) n++;
+  }
+  return n;
+}

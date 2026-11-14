@@ -10,6 +10,7 @@ import { chaveDocumento, digitos, validar, type PreCadastro } from './validar';
 import { lembretesSync } from './lembretes';
 import { cancelar, chamar, consultar, diagnostico, garantirCliente, hojeBrasilia, PAGO } from './asaas';
 import { agendaPublica, criarPedido, politicaPublica, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
+import { avisarCadastro } from './emails-reserva';
 import { handleMobileAccountEmail, handleMobileAuth, handleMobileContaAdmin, type MobileAccountAdminEnv } from './mobile/auth';
 import { handleMobileReservations } from './mobile/reservations';
 import { handleMobileCoupons, handleMobileCouponsSync } from './mobile/coupons';
@@ -82,6 +83,7 @@ async function receber(req: Request, env: Env) {
     ...(pagamento ? { cobranca: { id: pagamento.id, link: pagamento.link, valorCentavos: pagamento.valorCentavos, ...(pagamento.cupom ? { cupom: pagamento.cupom } : {}) } } : {}) };
   // um cadastro por documento: se a pessoa enviar de novo, vale o último
   await env.PRE.put(`pendentes/${chave}.json`, JSON.stringify(registro), { httpMetadata: { contentType: 'application/json' } });
+  await avisarCadastro(env as never, { nome: v.dados.nome, email: v.dados.email, grupo, pagamento, termo: aceite.termo as never }).catch(() => 0);
   return json(201, { ok: true, nome: v.dados.nome.split(' ')[0],
     ...(grupo ? { grupo: { responsavel: grupo.responsavel, bateria: grupo.bateria, inicio: grupo.inicio } } : {}), ...(pagamento ? { pagamento } : {}),
     ...(pagamentoFalhou ? { aviso: 'Cadastro salvo! O pagamento online está fora do ar agora. Pague a sua vaga na recepção ou abra este link de novo mais tarde.' } : {}) });

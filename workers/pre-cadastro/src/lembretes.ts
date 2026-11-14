@@ -12,7 +12,7 @@ type R2 = { get(k: string): Promise<unknown | null>; put(k: string, v: string): 
 export type EnvLembretes = MobileEmailEnv & { PRE: R2 };
 
 export type Lembrete = {
-  chave: string; tipo: 'pagar' | 'cadastros' | 'soltas'; para: string; nome: string; bateria: string; inicio: string;
+  chave: string; tipo: 'pagar' | 'cadastros' | 'soltas' | 'removido'; para: string; nome: string; bateria: string; inicio: string;
   link: string; painel?: string | null; responsavel?: string; valorCentavos?: number; faltam?: number; soltaEm24h?: boolean;
 };
 
@@ -49,6 +49,11 @@ export function conteudoLembrete(l: Lembrete) {
       + botao('Pagar minha vaga', l.link) + `<p style="color:#a8b2aa">Já pagou? Pode ignorar este e-mail: a confirmação chega em alguns minutos.</p>`);
     return { subject, text, html };
   }
+  if (l.tipo === 'removido') {
+    const texto = `Oi, ${nome}. ${l.responsavel ?? 'Quem organiza'} tirou você do grupo de ${l.bateria}, ${dia}. Sua vaga voltou para o grupo e nada foi cobrado de você. Se foi engano, fale com quem organizou ou com a recepção.`;
+    return { subject: `Remoção de participação · ${l.bateria} · ${dia}`, text: `${texto}\n\nQuer correr em outro horário? ${l.link}`,
+      html: moldura('Você saiu do grupo', `<p>${esc(texto)}</p>` + botao('Reservar outro horário', l.link)) };
+  }
   if (l.tipo === 'soltas') {
     const n = Number(l.faltam) || 0;
     const qtd = n === 1 ? '1 vaga' : `${n} vagas`;
@@ -78,7 +83,7 @@ export async function lembretesSync(req: Request, env: EnvLembretes) {
   const res = { enviados: 0, jaEnviados: 0, invalidos: 0, falhas: 0 };
   for (const l of lista) {
     const link = linkSeguro(l?.link);
-    const ok = l && (l.tipo === 'pagar' || l.tipo === 'cadastros' || l.tipo === 'soltas') && /^[\w:.-]{3,80}$/.test(String(l.chave)) && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(l.para)) && link;
+    const ok = l && (l.tipo === 'pagar' || l.tipo === 'cadastros' || l.tipo === 'soltas' || l.tipo === 'removido') && /^[\w:.-]{3,80}$/.test(String(l.chave)) && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(l.para)) && link;
     if (!ok) { res.invalidos++; continue; }
     const marca = `lembretes/${l.chave}`;
     if (await env.PRE.get(marca)) { res.jaEnviados++; continue; }

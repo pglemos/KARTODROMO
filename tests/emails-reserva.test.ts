@@ -39,3 +39,14 @@ describe('e-mails da reserva', () => {
     vi.unstubAllGlobals();
   });
 });
+
+import { conteudoParticipacao, conteudoTermo } from '../workers/pre-cadastro/src/emails-reserva';
+describe('e-mails do cadastro', () => {
+  it('participação e termo', () => {
+    const c = { nome: 'João Souza', email: 'j@x.com', grupo: { responsavel: 'Maria', bateria: 'Rental', inicio: '2026-11-14T18:00:00' }, pagamento: { link: 'https://www.asaas.com/i/1', valorCentavos: 15000 }, termo: { versao: 'v3', aceitoEm: '2026-11-13T22:00:00Z', imagem: false } };
+    expect(conteudoParticipacao(c).html).toContain('Pagar minha vaga');
+    expect(conteudoParticipacao(c).text).toContain('R$');
+    expect(conteudoTermo(c).text).toContain('13/11/2026');
+    expect(conteudoTermo(c).text).toContain('Não autorizado');
+  });
+});

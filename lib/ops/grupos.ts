@@ -1358,9 +1358,10 @@ type AcaoPainel = { key: string; codigo: string; acao: string; ordem: number; em
  * A Inscricao continua a mesma (a bateria não perde a vaga nem o pagamento do grupo). Recusa vaga paga por conta própria,
  * vaga com termo impresso ou kart, e baterias que começam em menos de 1 hora (aí é com a recepção).
  */
-export async function liberarVagaPeloOrganizador(codigo: string, ordem: number, log: Log): Promise<string | null> {
+export async function liberarVagaPeloOrganizador(codigo: string, ordem: number, log: Log, saiu?: { nome?: string; email?: string | null; responsavel?: string; bateria?: string; inicio?: string }): Promise<string | null> {
   return await tx(async (run) => {
-    const [g] = await run(`SELECT g.Id id, g.ResponsavelId responsavelId, g.Modo modo, b.Inicio inicio, CASE WHEN b.Inicio < DATEADD(hour, 1, SYSDATETIME()) THEN 1 ELSE 0 END perto
+    const [g] = await run(`SELECT g.Id id, g.ResponsavelId responsavelId, g.Modo modo, b.Inicio inicio, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicioIso,
+      (SELECT Nome FROM dbo.Cliente WHERE Id = g.ResponsavelId) responsavelNome, CASE WHEN b.Inicio < DATEADD(hour, 1, SYSDATETIME()) THEN 1 ELSE 0 END perto
       FROM dbo.ReservaGrupo g WITH (UPDLOCK, HOLDLOCK) JOIN dbo.Bateria b ON b.Id = g.BateriaId WHERE g.Codigo = @c AND g.Status = 'ativa'`, { c: codigo });
     if (!g) return 'grupo não encontrado';
     if (Number(g.perto)) return 'bateria começa em menos de 1 hora';
@@ -1372,13 +1373,14 @@ export async function liberarVagaPeloOrganizador(codigo: string, ordem: number, 
     if (p.termo || p.kart) return 'piloto já passou pela recepção';
     // cada um paga o seu: vaga paga é dinheiro da pessoa (reembolso/troca na recepção); nos outros modos o pagamento é do grupo
     if (g.modo === 'individual' && p.pago) return 'vaga já paga pela pessoa (reembolso é com a recepção)';
-    const [cli] = p.clienteId ? await run(`SELECT Origem origem, Documento documento FROM dbo.Cliente WHERE Id = @c`, { c: p.clienteId }) : [];
+    const [cli] = p.clienteId ? await run(`SELECT Origem origem, Documento documento, Nome nome, Email email FROM dbo.Cliente WHERE Id = @c`, { c: p.clienteId }) : [];
     if (!p.clienteId || (cli && cli.origem === 'grupo' && !cli.documento)) return null; // já estava aberta
     const prov = await cadastroDaVaga(run, Number(g.responsavelId), ordem, null, null);
     if (p.inscricaoId) await run(`UPDATE dbo.Inscricao SET ClienteId = @c, AtualizadoEm = SYSDATETIME() WHERE Id = @i`, { c: prov, i: p.inscricaoId });
     // igual às vagas ainda não ocupadas: o grupo não aponta para ninguém e a inscrição fica no cadastro provisório "Amigo N"
     await run(`UPDATE dbo.ReservaGrupoPiloto SET ClienteId = NULL, Nome = NULL, Telefone = NULL, CadastroEm = NULL, LinkEnviadoEm = NULL WHERE Id = @p`, { p: p.id });
     log(`grupo ${g.id}: organizador liberou a vaga ${ordem} pelo painel (cliente ${p.clienteId} saiu)`);
+    if (saiu && cli) Object.assign(saiu, { nome: String(cli.nome ?? ''), email: cli.email ?? null, responsavel: String(g.responsavelNome ?? ''), bateria: String(g.bateria ?? ''), inicio: String(g.inicioIso ?? '') });
     return null;
   });
 }
@@ -1390,8 +1392,15 @@ export async function aplicarAcoesDoPainel(log: Log) {
   const feitas: { key: string; erro: string | null }[] = [];
   for (const a of acoes.acoes ?? []) {
     let erro: string | null = 'ação desconhecida';
-    try { if (a.acao === 'liberar' && /^G[0-9A-F]{4,11}$/.test(a.codigo) && Number.isInteger(a.ordem)) erro = await liberarVagaPeloOrganizador(a.codigo, a.ordem, log); }
+    const saiu: { nome?: string; email?: string | null; responsavel?: string; bateria?: string; inicio?: string } = {};
+    try { if (a.acao === 'liberar' && /^G[0-9A-F]{4,11}$/.test(a.codigo) && Number.isInteger(a.ordem)) erro = await liberarVagaPeloOrganizador(a.codigo, a.ordem, log, saiu); }
     catch (e) { erro = (e as Error).message; }
+    // "Remoção de participação": avisa por e-mail quem saiu do grupo
+    if (!erro && saiu.email && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(saiu.email)) {
+      await site('/api/sync/lembretes', { method: 'POST', body: JSON.stringify({ lembretes: [{ chave: `removido-${a.key}`.replace(/[^\w:.-]/g, '').slice(0, 80), tipo: 'removido', para: saiu.email, nome: saiu.nome,
+        bateria: saiu.bateria, inicio: saiu.inicio, responsavel: saiu.responsavel, link: 'https://reservas.kartodromodebetim.com.br/' }] }) })
+        .catch((e) => log(`grupo ${a.codigo}: e-mail de remoção falhou (${(e as Error).message})`));
+    }
     if (erro) log(`grupo ${a.codigo}: ação do painel '${a.acao}' na vaga ${a.ordem} recusada (${erro})`);
     feitas.push({ key: a.key, erro });
   }
