@@ -84,7 +84,7 @@ export async function agendaOnline() {
     `SELECT b.Id id, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Nome nome, b.Vagas vagas, b.ProdutoId produto, pb.PrecoCentavos preco,
             (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') ocupadas
        FROM dbo.Bateria b LEFT JOIN dbo.Produto pb ON pb.Id = b.ProdutoId
-      WHERE b.Status = 'aberta' AND b.ReservaFechada = 0 AND b.AutoAtendimento = 1
+      WHERE b.Status = 'aberta' AND b.ReservaFechada = 0
         AND b.ProdutoId IN (${c.produtosBateria.map((n) => Number(n)).join(',') || '0'})
         AND b.Inicio > DATEADD(minute, @antes, SYSDATETIME()) AND b.Inicio < DATEADD(day, @dias, SYSDATETIME())
       ORDER BY b.Inicio`,
@@ -176,7 +176,7 @@ async function calcularPedidoOnline(input: CouponInput, read: ReadOne, lock: boo
   const bateria = await read(
     `SELECT b.Id, b.Nome nome, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Status, b.Vagas, b.ReservaFechada, b.AutoAtendimento, b.ProdutoId,
             (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') ocupadas,
-            CASE WHEN b.Status = 'aberta' AND b.ReservaFechada = 0 AND b.AutoAtendimento = 1
+            CASE WHEN b.Status = 'aberta' AND b.ReservaFechada = 0
                   AND b.ProdutoId IN (${baterias}) AND b.Inicio > DATEADD(minute, @antes, SYSDATETIME()) THEN 1 ELSE 0 END ok
        FROM dbo.Bateria b${lock ? ' WITH (UPDLOCK, HOLDLOCK)' : ''} WHERE b.Id = @id`,
     { id: Number(input.bateriaId), antes: c.antecedenciaMin - 10 },
