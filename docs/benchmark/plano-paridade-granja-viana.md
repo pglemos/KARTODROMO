@@ -37,14 +37,14 @@ O site `reservas.kartodromodebetim.com.br` só existe como **bundle compilado** 
 | 18 | Garantia de Reagendamento (add-on pago) | — | API + reserva [R] | ⬜ (definir preço/regra) |
 | 19 | Cartão com parcelas + motivo de recusa | Asaas checkout | API | 🔶 |
 | 20 | PIX com QR, validade e reaproveitamento da cobrança | ✅ | — | ✅ |
-| 21 | Minhas reservas: ver, pagar pendente, cancelar | CPF + código; cancelar pela recepção (WhatsApp) | reserva + API | 🔶 |
+| 21 | Minhas reservas: ver, pagar pendente, cancelar | CPF + código; cancelar com estorno automático (95% ≥48 h) | reserva + API + SRVKART | ✅ |
 | 22 | Política de cancelamento escalonada calculada | texto genérico + `politica-cancelamento` | API | 🔶 (definir prazos) |
 | 23 | Minhas corridas / histórico por piloto | aba Minhas corridas | site + API | ✅ |
 | 24 | Check-in mobile (GPS, janela de horário) | botão no celular, termo impresso na recepção | site + SRVKART | ✅ |
 | 25 | Cadastro: estrangeiro / passaporte | cadastro aceita RG/passaporte | reserva [R] | 🔶 |
 | 26 | Campos travados após cadastro (nome, CPF, e-mail) | — | cadastro | ⬜ |
 | 27 | Banner de cookies LGPD | não se aplica: sites não usam cookies de rastreio | — | ✅ |
-| 28 | Versão em inglês | site de reservas (PT/EN); cadastro e painel só PT | reserva | 🔶 |
+| 28 | Versão em inglês | reservas, cadastro e painel (botão EN, ?lang=en); texto jurídico do termo segue em PT | reserva + cadastro | ✅ |
 | 29 | Bateria fechada empresarial, sem cobrança imediata (faturamento) | recepção | SRVKART + admin | ⬜ |
 | 30 | Mensagens de erro específicas (timeout, sessão, servidor) | 🔶 | reserva [R] | ✅ |
 
