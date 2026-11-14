@@ -10,8 +10,8 @@
  */
 import { enviarEmail, type MobileEmailEnv } from './mobile/email';
 
-export type TipoEmailReserva = 'aguardando_pagamento' | 'pago' | 'confirmado' | 'expirado' | 'recusado' | 'pago_sem_vaga';
-const TIPOS = new Set<string>(['aguardando_pagamento', 'pago', 'confirmado', 'expirado', 'recusado', 'pago_sem_vaga']);
+export type TipoEmailReserva = 'aguardando_pagamento' | 'pago' | 'confirmado' | 'expirado' | 'recusado' | 'pago_sem_vaga' | 'cancelado';
+const TIPOS = new Set<string>(['aguardando_pagamento', 'pago', 'confirmado', 'expirado', 'recusado', 'pago_sem_vaga', 'cancelado']);
 
 export type PedidoEmail = {
   id: string; codigo: string; status: string; quantidade: number; forma: 'pix' | 'cartao'; modo?: 'individual';
@@ -20,6 +20,7 @@ export type PedidoEmail = {
   pagamento?: { valorCentavos: number; billingType: string; pagoEm: string };
   grupo?: { link: string; painel: string };
   erro?: string;
+  cancelamento?: { reembolsoCentavos: number };
   emails?: Record<string, string>;
 };
 
@@ -124,6 +125,17 @@ export function conteudoEmailReserva(p: PedidoEmail, tipo: TipoEmailReserva) {
         subject: `Reserva ${p.codigo} cancelada: pagamento não recebido`,
         text: `${texto}\n\n${tr}\n\nQuer correr mesmo assim? Faça uma nova reserva: ${SITE}\n\nSe você pagou e recebeu este e-mail, responda com o comprovante que a recepção resolve.`,
         html: moldura('Reserva cancelada', `<p>${esc(texto)}</p>${r}${botao('Fazer nova reserva', SITE)}<p style="color:#a8b2aa;font-size:14px">Se você pagou e recebeu este e-mail, responda com o comprovante que a recepção resolve.</p>`),
+      };
+    }
+    case 'cancelado': {
+      const reemb = p.cancelamento?.reembolsoCentavos ?? 0;
+      const texto = reemb > 0
+        ? `Oi, ${nome}. Sua reserva ${p.codigo} foi cancelada como você pediu. O estorno de ${reais(reemb)} (95% do valor pago) já foi pedido. O prazo para o valor aparecer depende do banco: no Pix costuma ser rápido; no cartão pode levar até 2 faturas.`
+        : `Oi, ${nome}. Sua reserva ${p.codigo} foi cancelada como você pediu. Como faltavam menos de 48 horas para a bateria, não há reembolso, conforme a Política de Cancelamento.`;
+      return {
+        subject: `Reserva ${p.codigo} cancelada${reemb > 0 ? ` · estorno de ${reais(reemb)}` : ''}`,
+        text: `${texto}\n\n${tr}\n\nQuer correr em outro dia? ${SITE}`,
+        html: moldura('Reserva cancelada', `<p>${esc(texto)}</p>${r}${botao('Reservar outro horário', SITE)}`),
       };
     }
     case 'recusado': {

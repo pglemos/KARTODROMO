@@ -11,6 +11,7 @@ import { lembretesSync } from './lembretes';
 import { cancelar, chamar, consultar, diagnostico, garantirCliente, hojeBrasilia, PAGO } from './asaas';
 import { agendaPublica, criarPedido, politicaPublica, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
 import { avisarCadastro } from './emails-reserva';
+import { cancelamentosSync, cancelarReserva } from './cancelamento';
 import { handleMobileAccountEmail, handleMobileAuth, handleMobileContaAdmin, type MobileAccountAdminEnv } from './mobile/auth';
 import { handleMobileReservations } from './mobile/reservations';
 import { handleMobileCoupons, handleMobileCouponsSync } from './mobile/coupons';
@@ -223,6 +224,10 @@ export default {
     try {
       if ((p === '/api/cliente/identificar' || p === '/api/pre-cadastro/identificar' || p === '/api/identificar') && (req.method === 'GET' || req.method === 'POST'))
         return await identificarCliente(req, env, (q) => buscar(env, q) as Promise<Record<string, unknown> | null>, excedeuLimite);
+      if (p === '/api/reservas/cancelar' && req.method === 'POST') {
+        if (await excedeuLimite(req.headers.get('cf-connecting-ip') ?? 'x', 'cancelar')) return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
+        return await cancelarReserva(env as never, (await req.json().catch(() => ({}))) as Record<string, unknown>);
+      }
       const extra = await rotasPublicas(req, env, p, url, excedeuLimite);
       if (extra) return extra;
       if (p === '/api/pre-cadastro' && req.method === 'POST') return await receber(req, env);
@@ -294,6 +299,7 @@ export default {
       if (p === '/api/asaas/webhook' && req.method === 'POST') return await webhookAsaas(req, env);
       if (p.startsWith('/api/sync/')) {
         if (!autorizado(req, env)) return json(401, { erro: 'Não autorizado.' });
+        if (p === '/api/sync/cancelamentos') return await cancelamentosSync(req, env as never);
         const sync = await rotasSync(req, env, p);
         if (sync) return sync;
         if (p === '/api/sync/pendentes' && req.method === 'GET') return json(200, await listar(env));

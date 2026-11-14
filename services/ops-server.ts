@@ -31,7 +31,7 @@ import { relatorio } from '../lib/ops/relatorios';
 import { renderTermoResponsabilidade, type TermoParticipante } from '../lib/ops/termo';
 import { buscarPreCadastroAgora, preCadastroLigado, sincronizarPreCadastros } from '../lib/ops/pre-cadastro';
 import { publicarTermoNoSite } from '../lib/ops/termo-online';
-import { aplicarCheckins } from '../lib/ops/checkin';
+import { aplicarCancelamentos, aplicarCheckins } from '../lib/ops/checkin';
 import { aplicarAcoesDoPainel, enviarLembretesDosGrupos, soltarVagasNaoPagasDoSite, conferirCobrancas, entrarNoGrupoPeloTotem, gruposDoDiaNoTotem, gruposRoutes, publicarGruposNoSite, puxarPagamentosDiretoDoAsaas, vincularPorDados } from '../lib/ops/grupos';
 import { campeonatoOfficeRoutes, campeonatoSiteRoutes, conferirCobrancasCampeonato } from '../lib/ops/campeonato-inscricoes';
 import { painelRoutes, registrarSinal } from '../lib/ops/painel';
@@ -981,6 +981,8 @@ if (preCadastroLigado()) {
     checando = true;
     try { await emCurso('checkins', aplicarCheckins(log, (id) => enfileirarImpressao(termoLink([id]), 'Termo de responsabilidade', 'celular'))); }
     catch (e) { log(`check-in: sincronização falhou (${(e as Error).message})`); }
+    try { await emCurso('cancelamentos', aplicarCancelamentos(log)); }
+    catch (e) { log(`cancelamento: sincronização falhou (${(e as Error).message})`); }
     finally { checando = false; }
   }, 20_000).unref();
   log('pré-cadastro online ligado');

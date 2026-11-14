@@ -671,7 +671,7 @@ const tempoVolta = (ms: number) => { const m = Math.floor(ms / 60000), s = (ms %
 // ------------------------------------------------------------------ minhas reservas
 const ROTULO: Record<string, [string, string]> = {
   confirmado: ['ok', 'Confirmada'], pago: ['pend', 'Pagamento recebido'], aguardando_pagamento: ['pend', 'Aguardando pagamento'], novo: ['pend', 'Em processamento'],
-  expirado: ['neutro', 'Prazo de pagamento encerrado'], recusado: ['neutro', 'Não confirmada'], pago_sem_vaga: ['erro', 'Precisa de atendimento'], erro_pagamento: ['erro', 'Erro no pagamento'],
+  expirado: ['neutro', 'Prazo de pagamento encerrado'], recusado: ['neutro', 'Não confirmada'], pago_sem_vaga: ['erro', 'Precisa de atendimento'], erro_pagamento: ['erro', 'Erro no pagamento'], cancelado: ['neutro', 'Cancelada'],
 };
 /** Política (src/config/politica-cancelamento.ts): 48 h antes ou mais = reembolso de 95% e remarcação sem custo; menos de 48 h = sem reembolso. */
 function regraDaPolitica(inicio: Date, valor: number | null) {
@@ -690,6 +690,19 @@ function MinhasReservas({ onVoltar, onAbrir }: { onVoltar: () => void; onAbrir: 
   const [corridas, setCorridas] = useState<{ corridas: Corrida[]; aviso?: string } | null>(null);
   const [checando, setChecando] = useState<string | null>(null);
   const [msgCheckin, setMsgCheckin] = useState<Record<string, { ok: boolean; texto: string }>>({});
+  const [confirmarCancel, setConfirmarCancel] = useState<string | null>(null);
+  const [cancelando, setCancelando] = useState<string | null>(null);
+  const [msgCancel, setMsgCancel] = useState<Record<string, { ok: boolean; texto: string }>>({});
+  const cancelar = async (rv: MinhaReserva) => {
+    setCancelando(rv.id);
+    try {
+      const x = await api.cancelar({ cpf: digitos(cpf), codigo, pedidoId: rv.id, confirmo: true });
+      setRes((r0) => r0 && { ...r0, reservas: r0.reservas.map((y) => (y.id === rv.id ? { ...y, status: 'cancelado' } : y)) });
+      setMsgCancel((m) => ({ ...m, [rv.id]: { ok: true, texto: x.reembolsoCentavos > 0 ? `Reserva cancelada. O estorno de ${reais(x.reembolsoCentavos)} já foi pedido e você recebe a confirmação por e-mail.` : 'Reserva cancelada. Você recebe a confirmação por e-mail.' } }));
+      setConfirmarCancel(null);
+    } catch (e) { setMsgCancel((m) => ({ ...m, [rv.id]: { ok: false, texto: (e as Error).message } })); }
+    finally { setCancelando(null); }
+  };
   const fazerCheckin = (rv: MinhaReserva) => {
     if (!navigator.geolocation) { setMsgCheckin((m) => ({ ...m, [rv.id]: { ok: false, texto: 'Este aparelho não informa a localização. Faça o check-in no totem.' } })); return; }
     setChecando(rv.id);
@@ -720,7 +733,7 @@ function MinhasReservas({ onVoltar, onAbrir }: { onVoltar: () => void; onAbrir: 
     `https://wa.me/${WHATS}?text=${encodeURIComponent(`Olá! Quero ${acao} a reserva ${rv.codigo}${rv.inicio ? ` (${diaLongo(deIso(rv.inicio))}, ${hora(deIso(rv.inicio))})` : ''}, no CPF de quem reservou. ${acao === 'cancelar' ? regra : 'Quais horários estão livres?'}`)}`;
   return (
     <div className="pagina estreita">
-      <div className="cabeca"><div><p className="sobre">Kartódromo de Betim · Reserva online</p><h1 tabIndex={-1}>Minhas reservas</h1><p className="sub">Veja suas reservas, pague o que ficou pendente e peça remarcação ou cancelamento.</p></div></div>
+      <div className="cabeca"><div><p className="sobre">Kartódromo de Betim · Reserva online</p><h1 tabIndex={-1}>Minhas reservas</h1><p className="sub">Veja suas reservas, pague o que ficou pendente cancele ou peça remarcação.</p></div></div>
       {!res ? (
         <form className="cartao principal" onSubmit={buscar} noValidate>
           <div className="form-grade">
@@ -751,10 +764,25 @@ function MinhasReservas({ onVoltar, onAbrir }: { onVoltar: () => void; onAbrir: 
                   })()}
                   {msgCheckin[rv.id] && <p className={`checkin ${msgCheckin[rv.id].ok ? 'ok' : 'erro'}`} role="status">{msgCheckin[rv.id].texto}</p>}
                   {rv.grupo && <LinksDoGrupo link={rv.grupo.link} painel={rv.grupo.painel} quando={dt} />}
+                  {confirmarCancel === rv.id && regra && (
+                    <div className="confirma-cancel" role="alertdialog" aria-labelledby={`cc-${rv.id}`}>
+                      <p id={`cc-${rv.id}`}><strong>{`Cancelar a reserva ${rv.codigo}?`}</strong></p>
+                      <p>{regra.noPrazo
+                        ? `Você recebe ${rv.valorCentavos ? reais(Math.floor(rv.valorCentavos * 0.95)) : '95% do valor pago'} de volta (5% de taxa administrativa), na mesma forma de pagamento. Não dá para desfazer.`
+                        : 'Faltam menos de 48 horas para a bateria: pela política não há reembolso. As vagas voltam para venda. Não dá para desfazer.'}</p>
+                      <div className="acoes esq">
+                        <button className="btn perigo" onClick={() => cancelar(rv)} disabled={cancelando === rv.id} aria-busy={cancelando === rv.id}>{cancelando === rv.id ? 'Cancelando…' : 'Sim, cancelar'}</button>
+                        <button className="btn sec" onClick={() => setConfirmarCancel(null)} disabled={cancelando === rv.id}>Manter reserva</button>
+                      </div>
+                    </div>
+                  )}
+                  {msgCancel[rv.id] && <p className={`checkin ${msgCancel[rv.id].ok ? 'ok' : 'erro'}`} role="status">{msgCancel[rv.id].texto}</p>}
                   <div className="acoes esq">
                     <button className="btn sec" onClick={() => onAbrir(rv.id)}>{rv.status === 'aguardando_pagamento' ? 'Pagar agora' : 'Ver detalhes'}</button>
                     {regra && !regra.passou && <a className="btn sec" href={zapMsg(rv, 'remarcar', regra.texto)} target="_blank" rel="noopener">{regra.noPrazo ? 'Remarcar' : 'Falar sobre remarcar'}</a>}
-                    {regra && !regra.passou && <a className="lnk" href={zapMsg(rv, 'cancelar', regra.texto)} target="_blank" rel="noopener">Pedir cancelamento</a>}
+                    {regra && !regra.passou && rv.status === 'confirmado' && !rv.grupo && !rv.checkinEm
+                      ? <button className="lnk" onClick={() => setConfirmarCancel(rv.id)}>Cancelar reserva</button>
+                      : regra && !regra.passou && <a className="lnk" href={zapMsg(rv, 'cancelar', regra.texto)} target="_blank" rel="noopener">Pedir cancelamento</a>}
                   </div>
                 </li>
               );

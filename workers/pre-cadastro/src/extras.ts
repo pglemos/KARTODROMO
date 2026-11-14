@@ -251,7 +251,7 @@ export async function indexarPedido(env: EnvExtras, p: PedidoGuardado) {
   if (p.codigo) await env.PRE.put(`reservas/por-codigo/${p.codigo}`, p.id);
 }
 
-async function minhasReservas(env: EnvExtras, cpf: string, codigo: string) {
+export async function minhasReservas(env: EnvExtras, cpf: string, codigo: string) {
   const id = await (await env.PRE.get(`reservas/por-codigo/${codigo}`) as unknown as { text(): Promise<string> } | null)?.text();
   if (!id) return null;
   const dono = await lerJson<PedidoGuardado>(env, `reservas/pedidos/${id}.json`);

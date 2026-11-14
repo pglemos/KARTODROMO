@@ -296,3 +296,6 @@ main { outline: none; background: radial-gradient(1200px 380px at 50% 0%, rgba(0
 
 .meus-grupos { margin: 24px 0 8px; }
 .meus-grupos h2 { font-size: 20px; margin-bottom: 10px; }
+.confirma-cancel { margin: 14px 0 0; padding: 14px 16px; border: 1px solid rgba(255,122,107,.4); background: var(--erro-fundo); border-radius: var(--raio); }
+.confirma-cancel p { margin: 0 0 8px; font-size: 15px; }
+.btn.perigo { background: var(--erro); color: #1a0402; border-color: var(--erro); }

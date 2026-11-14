@@ -14,7 +14,7 @@ const chave = () => process.env.PRECADASTRO_KEY || '';
 async function site(caminho: string, init: RequestInit = {}) {
   const r = await fetch(url() + caminho, { ...init, headers: { 'x-sync-key': chave(), 'content-type': 'application/json', ...(init.headers ?? {}) }, signal: AbortSignal.timeout(10_000) });
   if (!r.ok) throw new Error(`check-in ${caminho}: HTTP ${r.status}`);
-  return r.json() as Promise<{ checkins?: Checkin[] }>;
+  return r.json() as Promise<{ checkins?: Checkin[]; cancelamentos?: Checkin[] }>;
 }
 
 /** Aplica os check-ins pendentes. `imprimirTermo` recebe cada inscrição que ainda não tem termo impresso. */
@@ -66,4 +66,31 @@ async function checkinDoGrupo(c: Checkin, log: Log, imprimirTermo: (inscricaoId:
   if (!v.termo) imprimirTermo(Number(v.id));
   log(`check-in pelo celular: grupo ${v.codigo}, vaga ${v.id}${v.termo ? '' : ' (termo na fila)'}`);
   return null;
+}
+
+/**
+ * Cancelamento pelo cliente em Minhas reservas (13/11/2026): o site já fez o estorno no Asaas; aqui as vagas da reserva
+ * são canceladas e voltam para venda. Vaga com check-in, termo impresso ou kart sorteado não é mexida (fica para a recepção).
+ */
+export async function aplicarCancelamentos(log: Log) {
+  if (!url() || !chave()) return 0;
+  const { cancelamentos = [] } = await site('/api/sync/cancelamentos');
+  const feitos: { key: string; erro: string | null }[] = [];
+  for (const c of cancelamentos) {
+    try {
+      const [r] = await query<{ id: number; ids: string }>(`SELECT Id id, InscricaoIds ids FROM dbo.ReservaOnline WHERE PedidoId = @p AND Status IN ('pago', 'cancelado')`, { p: c.pedidoId });
+      if (!r) { feitos.push({ key: c.key, erro: 'reserva não encontrada ou não paga' }); continue; }
+      const lista = String(r.ids).split(',').map(Number).filter((n) => n > 0).join(',') || '0';
+      const presas = await query<{ id: number }>(`SELECT Id id FROM dbo.Inscricao WHERE Id IN (${lista}) AND Status <> 'cancelada' AND (CheckinEm IS NOT NULL OR TermoImpressoEm IS NOT NULL OR Kart IS NOT NULL)`);
+      const canceladas = await query<{ id: number }>(
+        `UPDATE dbo.Inscricao SET Status = 'cancelada', Pago = 0, AtualizadoEm = SYSDATETIME() OUTPUT inserted.Id id
+         WHERE Id IN (${lista}) AND Status <> 'cancelada' AND CheckinEm IS NULL AND TermoImpressoEm IS NULL AND Kart IS NULL`,
+      );
+      await query(`UPDATE dbo.ReservaOnline SET Status = 'cancelado' WHERE Id = @id`, { id: r.id });
+      log(`reserva online ${c.codigo ?? c.pedidoId} cancelada pelo cliente: ${canceladas.length} vaga(s) liberada(s)${presas.length ? `, ${presas.length} já na recepção (conferir)` : ''}`);
+      feitos.push({ key: c.key, erro: presas.length ? `${presas.length} vaga(s) já na recepção` : null });
+    } catch (e) { log(`cancelamento ${c.codigo ?? c.pedidoId}: erro ${(e as Error).message}`); }
+  }
+  if (feitos.length) await site('/api/sync/cancelamentos', { method: 'POST', body: JSON.stringify({ feitos }) });
+  return feitos.length;
 }
