@@ -731,6 +731,8 @@ export function ehErroLimitePorHora(texto: string): boolean {
 /** Erros do servidor de e-mail em português (a tela e o registro mostram isso para o operador). */
 export function traduzirErro(e: unknown): string {
   const m = e instanceof Error ? e.message : String(e);
+  if (/daily_quota_exceeded|daily email sending quota/i.test(m)) return 'limite DIÁRIO do plano do Resend atingido (renova às 21h de Brasília); fazer upgrade do plano em resend.com/settings/billing';
+  if (/monthly_quota_exceeded|monthly email sending quota/i.test(m)) return 'limite MENSAL do plano do Resend atingido; fazer upgrade do plano em resend.com/settings/billing';
   if (/\(\d+\/\d+ \(\d+%\)\) allowed|exceeded|sending limit|too many login attempts|too many.*connections/i.test(m)) return 'limite de e-mails por hora da hospedagem atingido (500 por hora); tenta de novo sozinho em alguns minutos';
   if (/\b535\b|Invalid login|authentication/i.test(m)) return 'o servidor de e-mail recusou o usuário/senha (confira se a caixa existe na hospedagem e se a senha está certa)';
   if (/certificate|altname|self.signed/i.test(m)) return 'certificado de segurança do servidor de e-mail não confere com o endereço';
