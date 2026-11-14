@@ -1,7 +1,7 @@
 /**
  * Cancelamento pelo próprio cliente em Minhas reservas (13/11/2026, paridade com o Granja Viana, decisão do dono:
  * estorno automático). Regra da Política de Cancelamento (src/config/politica-cancelamento.ts):
- *   - 48 h ou mais antes da largada: estorno de 95% do valor pago (5% de taxa administrativa), pelo Asaas;
+ *   - 48 h ou mais antes da largada: estorno de 90% do valor pago (10% de taxa administrativa/operacional), pelo Asaas;
  *   - menos de 48 h: pode cancelar e liberar a vaga, mas sem reembolso.
  * Não cancela pelo site: reserva "cada um paga o seu" (cada amigo pagou a própria vaga), com check-in feito,
  * já começada ou sem pagamento no Asaas. Esses casos vão para a recepção.
@@ -27,7 +27,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const digitos = (v: unknown) => String(v ?? '').replace(/\D/g, '');
 
 export const PRAZO_REEMBOLSO_H = 48;
-export const PERCENTUAL_REEMBOLSO = 0.95;
+export const PERCENTUAL_REEMBOLSO = 0.90;
 
 type PedidoCompleto = {
   id: string; codigo: string; status: string; quantidade: number; forma: 'pix' | 'cartao'; modo?: 'individual';
@@ -78,7 +78,7 @@ export async function cancelarReserva(env: EnvCancelamento, b: Record<string, un
   if (c.reembolsoCentavos > 0) {
     try {
       const r = await chamar<{ id?: string; status?: string }>(env, `/payments/${encodeURIComponent(p.pagamento!.asaasId)}/refund`, {
-        method: 'POST', body: JSON.stringify({ value: c.reembolsoCentavos / 100, description: `Cancelamento da reserva ${p.codigo} pelo site (95%)` }),
+        method: 'POST', body: JSON.stringify({ value: c.reembolsoCentavos / 100, description: `Cancelamento da reserva ${p.codigo} pelo site (90%)` }),
       });
       estornoId = r?.id ?? null;
     } catch (e) {

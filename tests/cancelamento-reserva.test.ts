@@ -25,8 +25,8 @@ const corpo = { cpf: '52998224725', codigo: 'AB12CD', pedidoId: ID, confirmo: tr
 afterEach(() => vi.unstubAllGlobals());
 
 describe('cancelamento pelo site', () => {
-  it('calcula 95% com 48 h ou mais', () => {
-    expect(calcularCancelamento({ valorCentavos: 30000, inicio: '2026-11-12T12:00:00' }, AGORA)).toMatchObject({ comReembolso: true, reembolsoCentavos: 28500 });
+  it('calcula 90% com 48 h ou mais', () => {
+    expect(calcularCancelamento({ valorCentavos: 30000, inicio: '2026-11-12T12:00:00' }, AGORA)).toMatchObject({ comReembolso: true, reembolsoCentavos: 27000 });
     expect(calcularCancelamento({ valorCentavos: 30000, inicio: '2026-11-12T11:00:00' }, AGORA)).toMatchObject({ comReembolso: false, reembolsoCentavos: 0 });
   });
 
@@ -36,7 +36,7 @@ describe('cancelamento pelo site', () => {
     const e = env(pedido('2026-11-15T18:00:00'));
     const r = await cancelarReserva(e as never, corpo, AGORA);
     expect(r.status).toBe(200);
-    expect(((await r.json()) as { reembolsoCentavos: number }).reembolsoCentavos).toBe(28500);
+    expect(((await r.json()) as { reembolsoCentavos: number }).reembolsoCentavos).toBe(27000);
     expect(String((f.mock.calls[0] as unknown[])[0])).toContain('/payments/pay_abc123/refund');
     expect(JSON.parse(e.PRE.m.get(`reservas/pedidos/${ID}.json`)!).status).toBe('cancelado');
     expect(JSON.parse(e.PRE.m.get(`cancelamentos/${ID}.json`)!).state).toBe('pending');

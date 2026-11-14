@@ -2,7 +2,7 @@
 // Fonte única: site (/reservas), página de reserva online e o comprovante de aceite gravado em cada pedido.
 // Mudou o texto? Troque também POLITICA_VERSAO: cada reserva guarda a versão que o cliente aceitou.
 
-export const POLITICA_VERSAO = '2026-10-09';
+export const POLITICA_VERSAO = '2026-11-14';
 export const POLITICA_TITULO = 'Política de Cancelamento, Reagendamento e Reembolso';
 export const POLITICA_ACEITE = 'Li e aceito a Política de Cancelamento, Reagendamento e Reembolso.';
 
@@ -27,7 +27,7 @@ export const POLITICA_SECOES: SecaoPolitica[] = [
         titulo: '2.1 Prazo para Cancelamento',
         paragrafos: [
           'O cancelamento pode ser solicitado com até 48 horas de antecedência da data e horário agendados.',
-          'Nessa condição, o valor pago será reembolsado com desconto de 5% referente à taxa administrativa.',
+          'Nessa condição, o valor pago será reembolsado com desconto de 10% referente à taxa administrativa e operacional (custos de gateway de pagamento como Asaas, emissão de nota fiscal e gestão do sistema).',
         ],
       },
       {

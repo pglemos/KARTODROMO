@@ -673,11 +673,11 @@ const ROTULO: Record<string, [string, string]> = {
   confirmado: ['ok', 'Confirmada'], pago: ['pend', 'Pagamento recebido'], aguardando_pagamento: ['pend', 'Aguardando pagamento'], novo: ['pend', 'Em processamento'],
   expirado: ['neutro', 'Prazo de pagamento encerrado'], recusado: ['neutro', 'Não confirmada'], pago_sem_vaga: ['erro', 'Precisa de atendimento'], erro_pagamento: ['erro', 'Erro no pagamento'], cancelado: ['neutro', 'Cancelada'],
 };
-/** Política (src/config/politica-cancelamento.ts): 48 h antes ou mais = reembolso de 95% e remarcação sem custo; menos de 48 h = sem reembolso. */
+/** Política (src/config/politica-cancelamento.ts): 48 h antes ou mais = reembolso de 90% e remarcação sem custo; menos de 48 h = sem reembolso. */
 function regraDaPolitica(inicio: Date, valor: number | null) {
   const horas = (inicio.getTime() - Date.now()) / 3600e3;
   if (horas <= 0) return { passou: true, noPrazo: false, texto: 'Bateria já realizada.' };
-  if (horas >= 48) return { passou: false, noPrazo: true, texto: `Dentro do prazo: cancelando agora, o reembolso é de ${valor ? reais(Math.round(valor * 0.95)) : '95% do valor pago'} (5% de taxa administrativa). Remarcar não tem custo.` };
+  if (horas >= 48) return { passou: false, noPrazo: true, texto: `Dentro do prazo: cancelando agora, o reembolso é de ${valor ? reais(Math.round(valor * 0.90)) : '90% do valor pago'} (10% de taxa administrativa/operacional). Remarcar não tem custo.` };
   return { passou: false, noPrazo: false, texto: 'Faltam menos de 48 horas: pela política não há reembolso. A recepção pode avaliar um voucher para outra data em casos excepcionais.' };
 }
 
@@ -768,7 +768,7 @@ function MinhasReservas({ onVoltar, onAbrir }: { onVoltar: () => void; onAbrir: 
                     <div className="confirma-cancel" role="alertdialog" aria-labelledby={`cc-${rv.id}`}>
                       <p id={`cc-${rv.id}`}><strong>{`Cancelar a reserva ${rv.codigo}?`}</strong></p>
                       <p>{regra.noPrazo
-                        ? `Você recebe ${rv.valorCentavos ? reais(Math.floor(rv.valorCentavos * 0.95)) : '95% do valor pago'} de volta (5% de taxa administrativa), na mesma forma de pagamento. Não dá para desfazer.`
+                        ? `Você recebe ${rv.valorCentavos ? reais(Math.floor(rv.valorCentavos * 0.90)) : '90% do valor pago'} de volta (10% de taxa administrativa/operacional), na mesma forma de pagamento. Não dá para desfazer.`
                         : 'Faltam menos de 48 horas para a bateria: pela política não há reembolso. As vagas voltam para venda. Não dá para desfazer.'}</p>
                       <div className="acoes esq">
                         <button className="btn perigo" onClick={() => cancelar(rv)} disabled={cancelando === rv.id} aria-busy={cancelando === rv.id}>{cancelando === rv.id ? 'Cancelando…' : 'Sim, cancelar'}</button>

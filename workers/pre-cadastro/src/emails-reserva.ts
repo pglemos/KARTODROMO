@@ -108,7 +108,7 @@ export function conteudoEmailReserva(p: PedidoEmail, tipo: TipoEmailReserva) {
         'No dia, abra Minhas reservas no celular e toque em "Cheguei! Fazer check-in": seu termo fica pronto na recepção.',
         'Venha de calçado fechado. Gestantes não podem correr.',
         'Menores de 18 anos precisam de um responsável presente para assinar o termo.',
-        'Cancelamento com 48 horas ou mais de antecedência: reembolso de 95%. Com menos de 48 horas não há reembolso.',
+        'Cancelamento com 48 horas ou mais de antecedência: reembolso de 90% (desconto de 10% referente à taxa administrativa/operacional). Com menos de 48 horas não há reembolso.',
       ];
       const texto = `Oi, ${nome}! Sua reserva está confirmada. Te esperamos na pista!`;
       return {
@@ -130,7 +130,7 @@ export function conteudoEmailReserva(p: PedidoEmail, tipo: TipoEmailReserva) {
     case 'cancelado': {
       const reemb = p.cancelamento?.reembolsoCentavos ?? 0;
       const texto = reemb > 0
-        ? `Oi, ${nome}. Sua reserva ${p.codigo} foi cancelada como você pediu. O estorno de ${reais(reemb)} (95% do valor pago) já foi pedido. O prazo para o valor aparecer depende do banco: no Pix costuma ser rápido; no cartão pode levar até 2 faturas.`
+        ? `Oi, ${nome}. Sua reserva ${p.codigo} foi cancelada como você pediu. O estorno de ${reais(reemb)} (90% do valor pago, com desconto de 10% de taxa administrativa/operacional) já foi pedido. O prazo para o valor aparecer depende do banco: no Pix costuma ser rápido; no cartão pode levar até 2 faturas.`
         : `Oi, ${nome}. Sua reserva ${p.codigo} foi cancelada como você pediu. Como faltavam menos de 48 horas para a bateria, não há reembolso, conforme a Política de Cancelamento.`;
       return {
         subject: `Reserva ${p.codigo} cancelada${reemb > 0 ? ` · estorno de ${reais(reemb)}` : ''}`,
