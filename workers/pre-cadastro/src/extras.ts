@@ -68,11 +68,16 @@ async function painelDoGrupo(env: EnvExtras, codigo: string, chave: string) {
 
 // ---------------------------------------------------------------- termo
 
+import { TERMO_PADRAO } from './termo-padrao';
+
 export type Termo = { versao: string; titulo: string; empresa: string; paragrafos: { titulo?: string; texto: string }[] };
 let cacheTermo: { em: number; t: Termo | null } | null = null;
 async function termoPublicado(env: EnvExtras) {
-  if (!cacheTermo || Date.now() - cacheTermo.em > 60_000) cacheTermo = { em: Date.now(), t: await lerJson<Termo>(env, 'config/termo.json') };
-  return cacheTermo.t;
+  if (!cacheTermo || Date.now() - cacheTermo.em > 60_000) {
+    const t = await lerJson<Termo>(env, 'config/termo.json');
+    cacheTermo = { em: Date.now(), t: t && Array.isArray(t.paragrafos) && t.paragrafos.length ? t : TERMO_PADRAO };
+  }
+  return cacheTermo.t || TERMO_PADRAO;
 }
 /** Aceite do termo que vem no cadastro. `erro` quando a pessoa aceitou uma versão que já mudou. */
 export async function aceiteDoCadastro(env: EnvExtras, corpo: Record<string, unknown>, ip: string | null): Promise<{ termo: Record<string, unknown> | null; erro?: string }> {

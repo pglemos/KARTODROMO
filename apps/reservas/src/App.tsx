@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { idiomaInicial, trocarIdioma } from './i18n';
-import { api, ErroApi, FINAIS, ID_PEDIDO, type Agenda, type Aviso, type Horario, type Corrida, type MinhaReserva, type MeuGrupo, type Pedido, type Politica } from './api';
+import { api, ErroApi, FINAIS, ID_PEDIDO, type Agenda, type Aviso, type Horario, type Corrida, type MinhaReserva, type MeuGrupo, type Pedido, type Politica, type TermoResp } from './api';
 import {
   cpfValido, dataIso, deIso, diaChave, diaCurto, diaLongo, digitos, emailValido, erroInstagram, hora, ics, idade,
   mascaraCep, mascaraCpf, mascaraData, mascaraFone, menosUmaHora, nomeMes, reais,
@@ -419,6 +419,7 @@ function EtapaPagamento({ r, setR, cada, horario, agenda, abertoEm, voltar, onCr
   const [aceite, setAceite] = useState(false);
   const [politica, setPolitica] = useState<Politica | null>(null);
   const [verPolitica, setVerPolitica] = useState(false);
+  const [verTermo, setVerTermo] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
   const [incerto, setIncerto] = useState(false);
@@ -509,12 +510,17 @@ function EtapaPagamento({ r, setR, cada, horario, agenda, abertoEm, voltar, onCr
         <input type="checkbox" checked={aceite} onChange={(e) => setAceite(e.target.checked)} />
         <span>{politica?.aceite ?? 'Li e aceito a Política de Cancelamento, Reagendamento e Reembolso.'} <button type="button" className="lnk inline" onClick={() => setVerPolitica(true)}>Ler a política</button></span>
       </label>
+      <div className="dica-mini" style={{ marginTop: '4px' }}>
+        <span>O termo de responsabilidade de cada piloto é conferido e assinado no kartódromo. </span>
+        <button type="button" className="lnk inline" onClick={() => setVerTermo(true)}>Ver modelo e regras do termo</button>
+      </div>
       <input ref={isca} name="site" tabIndex={-1} autoComplete="off" className="isca" aria-hidden="true" />
       {erro && <p className="msg-erro geral" role="alert">{erro}</p>}
       {incerto && <p className="dica-mini">Não conseguimos confirmar se o pedido chegou. Para não pagar duas vezes, <a href={`https://wa.me/${WHATS}`} target="_blank" rel="noopener">fale com a recepção</a> antes de tentar de novo.</p>}
       <div className="acoes"><button className="btn sec" onClick={voltar} disabled={enviando}>Voltar</button>
         <button className="btn grande" onClick={enviar} disabled={enviando || !aceite} aria-busy={enviando}>{enviando ? 'Separando suas vagas…' : `Reservar e pagar ${reais(total)}`}</button></div>
       {verPolitica && <ModalPolitica politica={politica} fechar={() => setVerPolitica(false)} aceitar={() => { setAceite(true); setVerPolitica(false); }} />}
+      {verTermo && <ModalTermo fechar={() => setVerTermo(false)} />}
     </>
   );
 }
@@ -560,6 +566,52 @@ function ModalPolitica({ politica, fechar, aceitar }: { politica: Politica | nul
         ))}
       </div>
       <div className="modal-pe"><button className="btn sec" onClick={fechar}>Fechar</button><button className="btn" onClick={aceitar}>Li e aceito</button></div>
+    </dialog>
+  );
+}
+
+function ModalTermo({ fechar }: { fechar: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [termo, setTermo] = useState<TermoResp | null>(null);
+  useEffect(() => {
+    ref.current?.showModal();
+    api.termo().then(setTermo).catch(() => undefined);
+  }, []);
+  return (
+    <dialog ref={ref} className="modal" onClose={fechar} aria-labelledby="termo-modal-t">
+      <div className="modal-topo">
+        <h2 id="termo-modal-t">{termo?.titulo ?? 'Termo de Responsabilidade'}</h2>
+        <button className="ico-btn" onClick={fechar} aria-label="Fechar"><Ico d={I.x} /></button>
+      </div>
+      <div className="modal-corpo">
+        <p className="dica-mini" style={{ marginBottom: '12px' }}>
+          Este é o texto oficial impresso nos totens de autoatendimento e na recepção antes da bateria:
+        </p>
+        {!termo ? (
+          <p>Carregando termo…</p>
+        ) : (
+          termo.paragrafos.map((p, i) => (
+            <div key={i} style={{ marginBottom: '10px' }}>
+              {p.titulo && <strong style={{ color: 'var(--texto)', display: 'block', marginBottom: '2px' }}>{p.titulo}</strong>}
+              <p style={{ margin: 0 }}>{p.texto}</p>
+            </div>
+          ))
+        )}
+        <div className="termo-foto-box">
+          <details open>
+            <summary>Foto do termo impresso no totem</summary>
+            <figure className="termo-foto-preview">
+              <a href="/booking-media/termo-totem-exemplo.jpg" target="_blank" rel="noopener">
+                <img src="/booking-media/termo-totem-exemplo.jpg" alt="Foto do termo de responsabilidade impresso no totem do Kartódromo de Betim" loading="lazy" />
+              </a>
+              <figcaption>Exemplo real do termo impresso no totem (toque para ampliar em alta resolução).</figcaption>
+            </figure>
+          </details>
+        </div>
+      </div>
+      <div className="modal-pe">
+        <button className="btn" onClick={fechar}>Entendi</button>
+      </div>
     </dialog>
   );
 }

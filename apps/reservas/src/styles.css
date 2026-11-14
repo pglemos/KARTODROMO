@@ -233,6 +233,14 @@ main { outline: none; background: radial-gradient(1200px 380px at 50% 0%, rgba(0
 .modal-corpo p { margin: 0 0 8px; color: var(--suave); }
 .modal-pe { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--linha); }
 
+.termo-foto-box { margin-top: 14px; background: rgba(0,0,0,.3); border: 1px solid var(--linha); border-radius: var(--raio); padding: 10px 14px; }
+.termo-foto-box details { margin: 0; }
+.termo-foto-box summary { cursor: pointer; color: var(--verde); font-weight: 600; font-size: 14px; padding: 4px 0; outline: none; }
+.termo-foto-box summary:hover { text-decoration: underline; }
+.termo-foto-preview { margin-top: 10px; text-align: center; }
+.termo-foto-preview img { max-width: 100%; max-height: 480px; object-fit: contain; border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,.6); }
+.termo-foto-preview figcaption { margin-top: 6px; font-size: 13px; color: var(--suave); }
+
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 10px); background: var(--verde); color: var(--tinta); padding: 12px 18px; border-radius: var(--raio); font-weight: 700; opacity: 0; transition: opacity .2s, transform .2s; z-index: 50; box-shadow: 0 12px 28px rgba(0,0,0,.6); }
 .toast.on { opacity: 1; transform: translate(-50%, 0); }
 

@@ -3,6 +3,7 @@
 export type Horario = { id: number; inicio: string; nome: string; livres: number; precoCentavos: number; precoPrimeiraVezCentavos?: number };
 export type Agenda = { atualizadoEm: string; precoCentavos: number; maxPilotos: number; prazoMin: number; antecedenciaMin: number; horarios: Horario[]; pagamentoOnline: boolean; grupoSite?: boolean };
 export type Politica = { versao: string; titulo: string; aceite: string; secoes: { titulo: string; paragrafos?: string[]; subsecoes?: { titulo: string; paragrafos: string[] }[] }[] };
+export type TermoResp = { versao: string; titulo: string; empresa: string; paragrafos: { titulo?: string; texto: string }[] };
 export type Aviso = { texto: string; tom?: 'info' | 'alerta' } | null;
 export type StatusPedido = 'novo' | 'aguardando_pagamento' | 'pago' | 'confirmado' | 'recusado' | 'expirado' | 'pago_sem_vaga' | 'erro_pagamento' | 'nao_encontrada' | 'cancelado';
 export type Pedido = {
@@ -43,6 +44,7 @@ async function chamar<T>(caminho: string, init?: RequestInit, tempoMs = 20000): 
 export const api = {
   agenda: () => chamar<Agenda>('/api/agenda'),
   politica: () => chamar<Politica>('/api/reservas/politica'),
+  termo: () => chamar<TermoResp>('/api/termo'),
   aviso: async (): Promise<Aviso> => { try { const a = await chamar<Aviso>('/api/aviso', undefined, 5000); return a && a.texto ? a : null; } catch { return null; } },
   criar: (corpo: unknown) => chamar<{ id: string; codigo: string }>('/api/reservas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) }, 30000),
   pedido: (id: string) => chamar<Pedido>(`/api/reservas/${id}`),
