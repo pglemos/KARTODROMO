@@ -21,6 +21,16 @@ import { extname, join, relative, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { format } from 'node:util';
 import { chaveOperadorValida, clienteEhMaquinaOperadora } from '../lib/timing/operator-auth';
+import {
+  defaultTb50Config,
+  executeTb50ViplexAction,
+  mediaMimeType,
+  publicTb50Config,
+  removeTb50MediaFile,
+  sanitizeTb50Config,
+  saveTb50MediaFile,
+  type Tb50Config,
+} from '../lib/timing/tb50-control';
 import { redigirEmails } from '../lib/timing/redact-pii';
 import { DecoderClient, type DecoderProtocol } from '../lib/timing/decoder-client';
 import { formatTrxPassing, type TrxPassing } from '../lib/timing/trx-parser';
@@ -1045,6 +1055,7 @@ function stateView() {
       pageSize: TB50_PAGE_SIZE,
       updatedAt: tb50Page.updatedAt,
       telas: [...tb50Pings.entries()].map(([ip, p]) => ({ ip, ultimoSinalMs: Date.now() - p.at, navegador: p.ua })),
+      config: publicTb50Config(tb50Config),
     },
     painelLed: {
       pagina: painelLedPage.pagina,
@@ -1061,6 +1072,9 @@ function stateView() {
 // ORBITS e o CRONO1 mandarem a mesma coisa; volta para 1-20 na bandeira verde.
 
 const TB50_PAGE_FILE = join(DATA_DIR, 'tb50-page.json');
+const TB50_CONFIG_FILE = join(DATA_DIR, 'tb50-config.json');
+const TB50_MEDIA_DIR = join(DATA_DIR, 'tb50-media');
+mkdirSync(TB50_MEDIA_DIR, { recursive: true });
 const TB50_PAGE_SIZE = 20;
 const tb50Pings = new Map<string, { at: number; ua: string }>();
 let tb50Page: { offset: number; updatedAt: string | null } = { offset: 0, updatedAt: null };
@@ -1070,16 +1084,75 @@ try {
   // arquivo ruim: comeca da primeira pagina
 }
 
+let tb50Config: Tb50Config = defaultTb50Config(tb50Page.offset);
+try {
+  if (existsSync(TB50_CONFIG_FILE)) {
+    tb50Config = sanitizeTb50Config(JSON.parse(readFileSync(TB50_CONFIG_FILE, 'utf8')), tb50Config);
+  }
+} catch {
+  // config invalida: mantem padrao
+}
+
+function saveTb50Config(patch: unknown, motivo = 'cronometragem'): Tb50Config {
+  const prevHw = tb50Config.hardware;
+  const rawPatch = patch && typeof patch === 'object' ? (patch as Record<string, unknown>) : {};
+  // Mantem segredos existentes se o PATCH nao os reenviar
+  const merged = {
+    ...tb50Config,
+    ...rawPatch,
+    camadas: rawPatch.camadas && typeof rawPatch.camadas === 'object'
+      ? { ...tb50Config.camadas, ...(rawPatch.camadas as Record<string, unknown>) }
+      : tb50Config.camadas,
+    hardware: rawPatch.hardware && typeof rawPatch.hardware === 'object'
+      ? { ...prevHw, ...(rawPatch.hardware as Record<string, unknown>) }
+      : prevHw,
+  };
+  tb50Config = sanitizeTb50Config(merged, tb50Config);
+  if (tb50Config.offset !== tb50Page.offset) {
+    tb50Page = { offset: tb50Config.offset, updatedAt: new Date().toISOString() };
+    try { writeJsonAtomic(TB50_PAGE_FILE, tb50Page); } catch { /* fica em memoria */ }
+  }
+  try { writeJsonAtomic(TB50_CONFIG_FILE, tb50Config); } catch { /* fica em memoria */ }
+  log(`TB50 config atualizada (${motivo}): layout=${tb50Config.layout} mode=${tb50Config.mode} offset=${tb50Config.offset}`);
+  scheduleStateBroadcast(20);
+  return tb50Config;
+}
+
 function setTb50Offset(value: unknown, motivo: string) {
   const n = Number(value);
   const offset = Number.isFinite(n) ? Math.min(Math.floor(Math.max(0, n) / TB50_PAGE_SIZE) * TB50_PAGE_SIZE, 80) : 0;
+  if (offset !== tb50Config.offset) {
+    tb50Config = { ...tb50Config, offset, updatedAt: new Date().toISOString() };
+    try { writeJsonAtomic(TB50_CONFIG_FILE, tb50Config); } catch { /* fica em memoria */ }
+  }
   if (offset === tb50Page.offset && tb50Page.updatedAt) return tb50Page;
   tb50Page = { offset, updatedAt: new Date().toISOString() };
   try { writeJsonAtomic(TB50_PAGE_FILE, tb50Page); } catch { /* fica em memoria */ }
   log(`telao TB50: posicoes ${offset + 1}-${offset + TB50_PAGE_SIZE} (${motivo})`);
-  scheduleStateBroadcast();
+  scheduleStateBroadcast(20);
   return tb50Page;
 }
+
+// Agendamentos automaticos da TB50 (verificados a cada 30s)
+let ultimoMinutoAgendaTb50 = '';
+setInterval(() => {
+  if (!tb50Config.agendamentos?.length) return;
+  const spNow = new Date().toLocaleTimeString('sv-SE', { timeZone: 'America/Sao_Paulo', hour12: false }).slice(0, 5);
+  if (spNow === ultimoMinutoAgendaTb50) return;
+  ultimoMinutoAgendaTb50 = spNow;
+  for (const ag of tb50Config.agendamentos) {
+    if (!ag.ativo || ag.horario !== spNow) continue;
+    if (ag.acao === 'layout' && ag.destino) {
+      saveTb50Config({ layout: ag.destino, mode: 'ao_vivo' }, `agendamento:${ag.nome}`);
+    } else if (ag.acao === 'playlist') {
+      saveTb50Config({ mode: 'playlist', playbackState: 'reproduzindo' }, `agendamento:${ag.nome}`);
+    } else if (ag.acao === 'viplex' && ag.destino) {
+      void executeTb50ViplexAction(tb50Config, { acao: 'ativar_programa', nome: ag.destino }).catch((err) => {
+        log(`TB50 agendamento ViPlex erro (${ag.nome}): ${(err as Error).message}`);
+      });
+    }
+  }
+}, 30_000).unref();
 
 // ---------------------------------------------------------------- painel de LED físico (COM3 do ORBITS)
 // O hardware fica no ORBITS, mas a página selecionada é compartilhada para que o CRONO1
@@ -1292,8 +1365,10 @@ function ultimaEncerrada() {
 function liveSnapshot(painelTb50 = false) {
   const s = runningSession() ?? ultimaEncerrada();
   const updatedAt = new Date().toISOString();
-  if (!s) return { status: 'empty', source: 'sql', updatedAt, trackName: TRACK_NAME, drivers: [] };
+  const cfg = painelTb50 ? publicTb50Config(tb50Config) : undefined;
+  if (!s) return { status: 'empty', source: 'sql', updatedAt, trackName: TRACK_NAME, drivers: [], ...(cfg ? { tb50Config: cfg } : {}) };
   const standings = computeStandings(s);
+  const now = Date.now();
   return {
     status: OPEN_STATES.has(s.state) ? 'live' : 'finished',
     clearGrid: Boolean(OPEN_STATES.has(s.state) && !standings.some((r) => r.laps > 0)),
@@ -1301,13 +1376,18 @@ function liveSnapshot(painelTb50 = false) {
     updatedAt,
     sessionType: s.type === 'corrida' ? 'race' : 'qualifying',
     eventName: s.name,
-    trackName: TRACK_NAME,
+    trackName: trackDa(s)?.name || TRACK_NAME,
+    ...(cfg ? { tb50Config: cfg } : {}),
     race: {
       id: s.id,
       name: s.name,
       type: s.type,
       state: s.state === 'em_andamento' ? 3 : s.state === 'bandeira_final' ? 4 : 5,
+      flag: s.currentFlag ?? 'none',
       startedAt: s.startedAt ? new Date(s.startedAt).toISOString() : null,
+      elapsedMs: elapsedMs(s, now),
+      remainingMs: remainingMs(s, now),
+      durationMs: s.durationMs ?? 0,
       rules: { requiredStops: 0, minimumStopMs: 0, additionalStopsAllowed: 0, candidateStopMinMs: 0, penaltyLapsPerStop: 0, boxOpenAfterMs: 0, boxCloseAfterMs: 0 },
     },
     drivers: painelVazio(
@@ -2163,7 +2243,7 @@ async function prepararBateriaDaAgenda(b: BateriaAgenda): Promise<boolean> {
   const antiga = Number.isFinite(inicio) && Date.now() - inicio > 3 * 3_600_000;
   if (!abertas.length && (!faltam.length || antiga)) return false;
   const grade = (await opsGet(`/api/crono/baterias/${b.id}/grid`)) as InscritoAgenda[];
-  const pagos = (Array.isArray(grade) ? grade : []).filter((g) => g.pago !== false && String(g.nome ?? '').trim());
+  const pagos = (Array.isArray(grade) ? grade : []).filter((g) => (g.pago !== false || g.aprovada === true) && String(g.nome ?? '').trim());
   if (!pagos.length) return false;
   const grupo = catalog.groups.find((g) => g.id === provas[0].groupId);
   const doGrid = (g: InscritoAgenda) => ({ kart: String(g.kart ?? '').trim(), name: String(g.nome ?? '').trim(), customerId: g.clienteId != null ? String(g.clienteId) : null, category: grupo?.categoryId ?? null });
@@ -2541,6 +2621,83 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const body = await readBody(req);
     const offset = body.pagina !== undefined ? Number(body.pagina) * TB50_PAGE_SIZE : body.offset;
     return send(res, 200, setTb50Offset(offset, String(body.origem ?? 'cronometragem')));
+  }
+  if (path === '/api/tb50-config' && method === 'GET') {
+    const telas = [...tb50Pings.entries()].map(([ip, p]) => ({ ip, ultimoSinalMs: Date.now() - p.at, navegador: p.ua }));
+    const online = telas.some((t) => t.ultimoSinalMs < 75_000);
+    return send(res, 200, {
+      ok: true,
+      config: publicTb50Config(tb50Config),
+      status: {
+        online,
+        ip: tb50Config.hardware.host,
+        port: tb50Config.hardware.port,
+        serial: tb50Config.hardware.serial,
+        resolucao: '2048x512',
+        ultimoSinalMs: telas.length ? Math.min(...telas.map((t) => t.ultimoSinalMs)) : null,
+        telas,
+      },
+    });
+  }
+  if (path === '/api/tb50-config' && (method === 'PUT' || method === 'POST' || method === 'PATCH')) {
+    const body = await readBody(req);
+    const cfg = saveTb50Config(body, String(body.origem ?? 'painel-tb50'));
+    return send(res, 200, { ok: true, config: publicTb50Config(cfg) });
+  }
+  if (path === '/api/tb50-media' && method === 'POST') {
+    const body = await readBody(req);
+    try {
+      const fileName = String(body.fileName ?? 'midia.png');
+      const titulo = String(body.titulo ?? fileName).slice(0, 80);
+      const categoria = String(body.categoria ?? 'Imagens') as Tb50Config['biblioteca'][number]['categoria'];
+      const mediaUrl = typeof body.dataBase64 === 'string' && body.dataBase64.length > 0
+        ? saveTb50MediaFile(TB50_MEDIA_DIR, fileName, body.dataBase64)
+        : String(body.mediaUrl ?? '');
+      const novo = {
+        id: `mid-${Date.now()}`,
+        nome: titulo,
+        categoria,
+        subtitulo: String(body.subtitulo ?? 'Mídia personalizada TB50'),
+        layoutOuMidia: categoria === 'Patrocinadores' ? 'patrocinadores' : 'patrocinadores',
+        mediaUrl,
+        duracaoSeg: Number(body.duracaoSeg || 15),
+        resolucao: '2048x512',
+        cor: String(body.cor ?? '#0B7A53'),
+      };
+      const cfg = saveTb50Config({ biblioteca: [...tb50Config.biblioteca, novo] }, 'upload-midia');
+      return send(res, 201, { ok: true, item: novo, config: publicTb50Config(cfg) });
+    } catch (err) {
+      return send(res, 400, { error: (err as Error).message });
+    }
+  }
+  if (path.startsWith('/api/tb50-media/') && method === 'DELETE') {
+    const id = decodeURIComponent(path.slice('/api/tb50-media/'.length));
+    const alvo = tb50Config.biblioteca.find((b) => b.id === id);
+    if (!alvo) return send(res, 404, { error: 'Item não encontrado.' });
+    if (alvo.protegido) return send(res, 400, { error: 'Item padrão do sistema não pode ser excluído.' });
+    removeTb50MediaFile(TB50_MEDIA_DIR, alvo.mediaUrl);
+    const cfg = saveTb50Config({ biblioteca: tb50Config.biblioteca.filter((b) => b.id !== id) }, 'remover-midia');
+    return send(res, 200, { ok: true, config: publicTb50Config(cfg) });
+  }
+  if (path === '/api/tb50-viplex' && method === 'POST') {
+    const body = await readBody(req);
+    try {
+      const acao = String(body.acao ?? 'status');
+      if (acao === 'reiniciar_webview') {
+        const cfg = saveTb50Config({ reloadNonce: Date.now() }, 'reiniciar-webview-tb50');
+        return send(res, 200, { ok: true, reloadNonce: cfg.reloadNonce });
+      }
+      const r = await executeTb50ViplexAction(tb50Config, {
+        acao,
+        identifier: typeof body.identifier === 'string' ? body.identifier : undefined,
+        nome: typeof body.nome === 'string' ? body.nome : undefined,
+        password: typeof body.password === 'string' ? body.password : undefined,
+        token: typeof body.token === 'string' ? body.token : undefined,
+      });
+      return send(res, 200, r);
+    } catch (err) {
+      return send(res, 502, { ok: false, error: (err as Error).message });
+    }
   }
 
   if (path === '/api/events') {
@@ -3105,12 +3262,23 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           }
         } catch { /* sem o servidor da operação o sorteio funciona sem o peso */ }
       }
+      let alerta: string | null = null;
+      if (s.agendaId != null) {
+        try {
+          const grade = (await opsGet(`/api/crono/baterias/${s.agendaId}/grid`)) as InscritoAgenda[];
+          const liberados = (Array.isArray(grade) ? grade : []).filter((g) => (g.pago !== false || g.aprovada === true) && String(g.nome ?? '').trim());
+          if (liberados.length !== s.competitors.length) {
+            alerta = `Divergência com a recepção: ${liberados.length} piloto(s) liberado(s) (pagos ou aprovados) na recepção, mas ${s.competitors.length} na bateria. Como resolver: 1) Confira na recepção os pilotos aprovados/pagos; 2) Na cronometragem, atualize a bateria pela agenda ou inclua os pilotos faltantes.`;
+          }
+        } catch { /* sem o servidor da operação segue sem alerta */ }
+      }
       return send(res, 200, {
         sessao: { id: s.id, name: s.name, type: s.type, state: s.state, createdAt: s.createdAt, eventId: s.eventId ?? null },
         programa: [...sessions.values()].filter((x) => ehDaMesmaBateria(s, x)).map((x) => ({ id: x.id, name: x.name, state: x.state })),
         tipoKart: await tipoKartDa(s),
         karts: kartsCadastrados(),
         pilotos: pilotos.map((p) => ({ ...p, pesoKg: p.customerId ? pesos.get(p.customerId) ?? null : null })),
+        ...(alerta ? { alerta } : {}),
       });
     }
     if (method === 'POST') {
@@ -3772,6 +3940,13 @@ const server = http.createServer((req, res) => {
   if (['/admin', '/cadastros', '/ferramentas', '/configuracoes'].includes(url.pathname)) return sendFile(res, 'admin.html');
   if (url.pathname === '/tv') return sendFile(res, 'tv.html');
   if (url.pathname === '/tb50') return sendFile(res, 'tb50.html');
+  if (url.pathname.startsWith('/tb50-media/')) {
+    const safeName = decodeURIComponent(url.pathname.slice('/tb50-media/'.length)).replace(/[/\\]/g, '');
+    const mediaPath = join(TB50_MEDIA_DIR, safeName);
+    if (!safeName || !existsSync(mediaPath) || !statSync(mediaPath).isFile()) return send(res, 404, 'nao encontrado');
+    res.writeHead(200, { 'content-type': mediaMimeType(mediaPath), 'cache-control': 'no-store' });
+    return res.end(readFileSync(mediaPath));
+  }
   // TV com navegador antigo (LG Netcast 2013): mesmo placar em ES5, sem o /tv moderno
   if (url.pathname === '/tv-classica') return sendFile(res, 'tv-classica.html');
   if (url.pathname === '/sorteio') return sendFile(res, 'sorteio.html');

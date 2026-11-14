@@ -118,6 +118,10 @@ fun TelaPreparar(
         }
         Spacer(Modifier.height(14.dp))
         Etapa("02", "PREPARE O GRID", "Confira os pilotos, escolha a frota e libere os karts.")
+        info?.alerta?.let { mensagem ->
+            Aviso(mensagem, erro = true, acaoTexto = "Atualizar", onAcao = { tentativa++ })
+            Spacer(Modifier.height(12.dp))
+        }
         erroAtualizacao?.let { mensagem ->
             Aviso("Não foi possível atualizar os pilotos: $mensagem", erro = true, acaoTexto = "Tentar novamente", onAcao = { tentativa++ })
             Spacer(Modifier.height(12.dp))

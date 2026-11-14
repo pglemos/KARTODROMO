@@ -288,7 +288,7 @@ function tipoDe(b) {
   const nome = `${b.nome || ''} ${b.produto || ''} ${b.categoria || ''}`.toLowerCase();
   if (b.campeonato === true || b.campeonato === 1) return 'camp'; // marcada como campeonato na bateria
   if (b.reservaFechada) return 'fechada';
-  if (+b.vagas === 0 || b.autoAtendimento === false || b.autoAtendimento === 0) return 'bloq';
+  if (+b.vagas === 0) return 'bloq';
   if (/kac|legends|ultras|campeonato|etapa|copa|endurance|milhas/.test(nome) && !/treino/.test(nome)) return 'camp';
   if (/treino|evento|tabajara|bier|super quinta|time attack|ins[oô]nia|empresa|equaliza|anivers/.test(nome)) return 'evento';
   return (+b.inscritos || 0) > 0 ? 'reserva' : 'livre';

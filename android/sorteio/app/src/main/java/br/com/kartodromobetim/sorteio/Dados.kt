@@ -29,6 +29,7 @@ data class InfoSorteio(
     val tipoKart: String?,
     val karts: List<String>,
     val pilotos: List<Piloto>,
+    val alerta: String? = null,
 )
 
 /** Evita gravar um sorteio feito com a lista antiga quando a recepção incluiu outro piloto. */
@@ -260,6 +261,7 @@ class Api(private val base: () -> String) {
             tipoKart = if (o.isNull("tipoKart")) null else o.optString("tipoKart"),
             karts = karts,
             pilotos = pil,
+            alerta = o.optString("alerta", "").takeIf { it.isNotBlank() },
         )
     }
 
