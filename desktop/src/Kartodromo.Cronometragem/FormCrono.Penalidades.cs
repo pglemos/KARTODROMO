@@ -183,8 +183,13 @@ public partial class FormCrono
             InvalidarCachePassagens();
             await AtualizarAsync(ct: ct);
         }
-        d.BotaoRodape("Relargar (zerar o tempo)", true, () => Seguro.Rodar(d, () => EnviarAsync(true)));
-        d.BotaoRodape("Só bandeira verde", false, () => Seguro.Rodar(d, () => EnviarAsync(false)));
+        // o padrão (Enter) é continuar: relargar zera o tempo e só vale quando escolhido de propósito
+        d.BotaoRodape("Continuar (bandeira verde)", true, () => Seguro.Rodar(d, () => EnviarAsync(false)));
+        d.BotaoRodape("Relargar (zerar o tempo)", false, () =>
+        {
+            if (!Msg.Pergunta(d, "RELARGAR zera o tempo e as voltas desta bateria. Confirmar?")) return;
+            Seguro.Rodar(d, () => EnviarAsync(true));
+        });
         d.BotaoRodape("Cancelar", false, d.Close);
         d.ShowDialog(this);
     }

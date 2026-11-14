@@ -412,6 +412,13 @@ public partial class FormCrono
         var g = d.Secao("Bateria");
         d.Campo(g, "Nome da prova", nome, 3); d.Campo(g, "Tempo (min)", dur, 1); d.Campo(g, "Voltas (máx)", voltas, 2);
         d.Campo(g, "Traçado", tracado, 6);
+        // tipo da prova: treino / tomada de tempo / corrida trocam mesmo com a bateria correndo, sem perder passagens
+        var tiposValor = new[] { "treino", "classificacao", "corrida" };
+        var tipoAntes = _sess.S("type");
+        var tipoProva = new ListaDesign(); tipoProva.Items.AddRange(["Treino livre", "Tomada de tempo", "Corrida"]);
+        tipoProva.SelectedIndex = Math.Max(0, Array.IndexOf(tiposValor, tipoAntes));
+        var podeTipo = Array.IndexOf(tiposValor, tipoAntes) >= 0;
+        if (podeTipo) d.Campo(g, "Tipo da prova", tipoProva, 6);
         // Tabajara (áudio 06/10): o organizador divulga o resultado; já vem marcado quando o nome tem "Tabajara"
         var semEmail = new CheckBox { Text = "Não enviar o resultado por e-mail aos pilotos (o organizador divulga, ex.: Tabajara)", Checked = _sess.B("semEmailPilotos"), AutoSize = true };
         d.Marca(g, semEmail, 6);
@@ -421,7 +428,8 @@ public partial class FormCrono
         var durAntes = dur.Text; var voltasAntes = voltas.Text;
         d.BotaoRodape("Salvar", true, () => Seguro.Rodar(d, async () =>
         {
-            var corpo = new JsonObject { ["name"] = nome.Text.Trim(), ["trackId"] = (tracado.SelectedItem as Campos.Item)?.Dados?.S("id"), ["semEmailPilotos"] = semEmail.Checked };
+            var corpo = new JsonObject { ["name"] = nome.Text.Trim(), ["trackId"] = (tracado.SelectedItem as Campos.Item)?.Dados?.S("id"), ["semEmailPilotos"] = semEmail.Checked, ["autor"] = Environment.UserName };
+            if (podeTipo && tipoProva.SelectedIndex >= 0 && tiposValor[tipoProva.SelectedIndex] != tipoAntes) corpo["type"] = tiposValor[tipoProva.SelectedIndex];
             // tempo e voltas só vão se mudaram (durante a quadriculada o serviço não aceita mudar)
             if (podeRegras && (dur.Text != durAntes || voltas.Text != voltasAntes))
             {

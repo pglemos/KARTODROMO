@@ -28,7 +28,8 @@ public partial class FormCrono
     {
         if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
         if (cor == "verde" && _sess.S("state") == "preparando") { Acao("start"); return; }
-        if (cor == "verde" && _sess.S("state") is "encerrada" or "cancelada") { Msg.Aviso(this, "A prova está finalizada. Para correr de novo, use Reiniciar bateria."); return; }
+        if (cor == "verde" && _sess.S("state") == "cancelada") { Msg.Aviso(this, "A prova foi cancelada. Para correr de novo, use Reiniciar bateria."); return; }
+        if (cor == "verde" && _sess.S("state") == "encerrada") { ReabrirBateria(); return; }
         if (cor == "verde" && _sess.B("aguardandoLargada")) { Msg.Info(this, "A bandeira verde já foi dada: o cronômetro começa quando o 1º kart passar na linha."); return; }
         // verde com a prova correndo: relargada (zera o tempo até o 1º kart passar) ou só pista liberada
         if (cor == "verde" && _sess.S("state") is "em_andamento" or "bandeira_final") { VerdeComProvaCorrendo(); return; }
@@ -38,6 +39,22 @@ public partial class FormCrono
         var confirm = cor is "vermelha" or "quadriculada";
         if (confirm && !Msg.Pergunta(this, cor == "vermelha" ? "Dar bandeira vermelha e pausar o cronômetro?" : "Dar bandeira quadriculada e encerrar cada kart na próxima passagem?")) return;
         Seguro.Rodar(this, async () => { await Crono.Api.PostAsync($"/api/sessions/{_sess.S("id")}/flag", new JsonObject { ["flag"] = flag }); InvalidarCachePassagens(); await AtualizarAsync(); });
+    }
+
+    /// <summary>Parou sem querer: reabre a bateria encerrada na vermelha, com tempo e voltas mantidos.
+    /// Depois é só dar a bandeira verde para continuar.</summary>
+    void ReabrirBateria()
+    {
+        if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
+        if (_sess.S("state") != "encerrada") { Msg.Aviso(this, "Só dá para reabrir uma bateria encerrada."); return; }
+        if (!Msg.Pergunta(this, $"A bateria \"{_sess.S("name")}\" está encerrada.\n\nREABRIR e continuar de onde parou? O tempo e as voltas são mantidos; ela volta parada na bandeira vermelha e continua quando você der a verde.")) return;
+        var id = _sess.S("id");
+        Seguro.Rodar(this, async () =>
+        {
+            await Crono.Api.PostAsync($"/api/sessions/{id}/reopen", new JsonObject { ["autor"] = Environment.UserName });
+            InvalidarCachePassagens();
+            await AtualizarAsync();
+        });
     }
 
     void LimparPassagens()

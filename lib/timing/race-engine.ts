@@ -851,6 +851,24 @@ export function closeSession(session: Session, now: number) {
 }
 
 /**
+ * Reabrir uma bateria encerrada SEM perder nada: volta para "em andamento" parada na bandeira vermelha, com o
+ * tempo de prova congelado onde estava ao encerrar. A bandeira verde depois disso continua o tempo e as voltas.
+ */
+export function reopenSession(session: Session, now: number) {
+  if (session.state !== 'encerrada') throw new Error('Só dá para reabrir uma bateria encerrada.');
+  const congelado = session.startedAt !== null ? elapsedMs(session, session.finishedAt ?? now) : null;
+  session.state = 'em_andamento';
+  session.finishedAt = null;
+  session.checkeredAt = null;
+  session.timeUpAt = null;
+  session.lapsReachedAt = null;
+  for (const c of session.competitors) c.finished = false;
+  session.currentFlag = 'red';
+  session.redFlagAt = now;
+  session.redFlagElapsedMs = congelado;
+}
+
+/**
  * Reiniciar a bateria: volta para "preparando" como se não tivesse largado. As passagens ficam excluídas
  * (continuam no diário e podem ser restauradas), bandeiras dos pilotos, advertências e penalidades saem e as
  * linhas "Kart 12" que entraram sozinhas somem. Os pilotos e os números dos karts continuam.

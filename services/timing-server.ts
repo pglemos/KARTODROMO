@@ -34,6 +34,7 @@ import {
   removePenalty,
   voltaAtualDoKart,
   restartSession,
+  reopenSession,
   voltasCompletas,
   applyPassing,
   assignCrossing,
@@ -3387,7 +3388,14 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           ...(body.durationMin !== undefined ? { durationMin: Number(body.durationMin) } : {}),
           ...(body.maxLaps !== undefined ? { maxLaps: body.maxLaps === null ? null : Number(body.maxLaps) } : {}),
         }, now);
-        if (s.state === 'preparando' && body.type && SESSION_TYPES.has(body.type as SessionType)) s.type = body.type as SessionType;
+        if (body.type && SESSION_TYPES.has(body.type as SessionType) && body.type !== s.type) {
+          // treino / tomada de tempo / corrida trocam a qualquer momento (o resultado é recalculado com as mesmas passagens)
+          const livre = (t: string) => t === 'treino' || t === 'classificacao' || t === 'corrida';
+          if (s.state !== 'preparando' && !(livre(s.type) && livre(String(body.type)))) return send(res, 400, { error: 'Equalização não troca de tipo depois de largar.' });
+          const nomeTipo: Record<string, string> = { treino: 'Treino', classificacao: 'Tomada de tempo', corrida: 'Corrida', equalizacao: 'Equalização' };
+          if (s.state !== 'preparando') registrarObservacao(s, `Tipo da prova trocado: ${nomeTipo[s.type]} → ${nomeTipo[String(body.type)]}`, String(body.autor ?? 'Cronometragem'));
+          s.type = body.type as SessionType;
+        }
         if (body.competitors) {
           registrarTrocas(s, setCompetitors(s, parseCompetitors(body.competitors)), 'competitor-list');
           // o número do kart digitado na tomada de tempo vale para a corrida da mesma bateria (e vice-versa),
@@ -3454,6 +3462,15 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         closeSession(s, now);
         void enviarUsoKarts(s);
         agendarEmails(s); // 3 min para o cronometrista acertar posição/penalidade antes do e-mail sair
+      } else if (action === 'reopen' && method === 'POST') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para reabrir a bateria.' });
+        const other = runningSession();
+        if (other && other.id !== s.id) return send(res, 409, { error: `Já existe bateria em andamento: ${other.name}. Encerre ela antes.` });
+        const body = await readBody(req);
+        reopenSession(s, now);
+        clearTimeout(emailsAgendados.get(s.id));
+        registrarObservacao(s, 'Bateria reaberta na bandeira vermelha: tempo e voltas mantidos', String(body.autor ?? 'Cronometragem'));
+        log(`bateria ${s.name}: REABERTA (vermelha, tempo congelado)`);
       } else if (action === 'cancel' && method === 'POST') {
         if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para cancelar a bateria.' });
         cancelSession(s, now);
