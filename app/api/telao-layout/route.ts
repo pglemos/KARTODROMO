@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { denyTelaoWrite } from '@/lib/telao-write-auth';
 import { readTelaoLayoutConfigFromRemote, telaoLayoutStoreStatus, writeTelaoLayoutConfig } from '@/lib/telao-layout-store';
 import { TELAO_LAYOUT_PRESETS } from '@/lib/telao-layout-config';
 
@@ -34,6 +35,8 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
+  const denied = denyTelaoWrite(request);
+  if (denied) return denied;
   const body = await request.json();
   const endpoint = process.env.TELAO_LAYOUT_REMOTE_ENDPOINT;
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { denyTelaoWrite } from '@/lib/telao-write-auth';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 export const dynamic = 'force-dynamic';
@@ -35,6 +36,8 @@ const ALLOWED_TYPES = [
 const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
 export async function POST(request: NextRequest) {
+  const denied = denyTelaoWrite(request);
+  if (denied) return denied;
   if (!hasR2Store()) {
     return NextResponse.json(
       { error: 'R2 storage not configured' },

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { denyTelaoWrite } from '@/lib/telao-write-auth';
 import { readTb50DisplayModeFromStore, tb50DisplayModeStoreStatus, writeTb50DisplayMode } from '@/lib/tb50-display-mode-store';
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,8 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
+  const denied = denyTelaoWrite(request);
+  if (denied) return denied;
   const body = await request.json().catch(() => ({}));
   const state = await writeTb50DisplayMode(body);
   return NextResponse.json({ ...state, store: tb50DisplayModeStoreStatus() }, { headers: NO_CACHE_HEADERS });

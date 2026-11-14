@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { denyTelaoWrite } from '@/lib/telao-write-auth';
 import { readTb50PageFromRemote, tb50PageStoreStatus, writeTb50PageRemote } from '@/lib/tb50-page-store';
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,8 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
+  const denied = denyTelaoWrite(request);
+  if (denied) return denied;
   const body = (await request.json().catch(() => ({}))) as { offset?: unknown };
   const state = await writeTb50PageRemote(body?.offset);
   return NextResponse.json({ ...state, store: tb50PageStoreStatus() }, { headers: NO_CACHE_HEADERS });

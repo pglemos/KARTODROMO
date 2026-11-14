@@ -20,7 +20,7 @@ import { pipeline } from 'node:stream';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { caminhoArquivoAtualizacao, tipoConteudoAtualizacao } from '../lib/desktop-updates';
 import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, updateCliente, type ClienteInput } from '../lib/ops/db';
-import { confereSenha, emiteToken, renovaToken, validaToken } from '../lib/ops/auth';
+import { confereSenha, emiteToken, renovaToken, situacaoSegredoSessao, validaToken } from '../lib/ops/auth';
 import { corrigeEmail } from '../lib/ops/email-dominio';
 import { erroCadastroObrigatorio } from '../lib/ops/cadastro-obrigatorio';
 import { acrescentarInstagramRelatorio, idsClientesRelatorio, prepararRelatorioRecepcao, type SessaoRelatorio } from '../lib/ops/relatorio-crono';
@@ -69,6 +69,14 @@ let tracadosSincronizadosEm = 0;
 let tracadosUltimaQtd = -1;
 
 if (!KEY) console.warn('ATENCAO: OPS_RECEPCAO_KEY vazio, rotas da cronometragem ficam sem protecao');
+{
+  const situacao = situacaoSegredoSessao();
+  if (situacao === 'ausente') {
+    console.error('ERRO: OPS_SESSION_SECRET nao configurado. Sem ele ninguem consegue entrar na Recepcao. Defina no .env.local e reinicie.');
+    process.exit(1);
+  }
+  if (situacao === 'compartilhado') console.warn('ATENCAO: OPS_SESSION_SECRET nao definido; a sessao da Recepcao esta assinada com OPS_RECEPCAO_KEY. Crie um segredo proprio.');
+}
 
 function log(...args: unknown[]) {
   // hora local de Brasília (o servidor roda em -03:00); antes ia UTC e atrapalhava o diagnóstico

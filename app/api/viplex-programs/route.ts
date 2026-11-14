@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { denyTelaoWrite } from '@/lib/telao-write-auth';
 import { resolveViplexEndpoint, BRIDGE_FETCH_HEADERS } from '@/lib/bridge-base';
 
 export const dynamic = 'force-dynamic';
@@ -82,6 +83,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const denied = denyTelaoWrite(request);
+  if (denied) return denied;
   const endpoint = resolveViplexEndpoint();
   if (endpoint) return proxyRemote(request, endpoint);
 

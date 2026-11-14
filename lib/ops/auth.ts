@@ -17,7 +17,23 @@ export function confereSenha(senha: string, armazenado: string): boolean {
 
 export type Sessao = { uid: number; nome: string; admin: boolean; exp: number };
 
-const segredo = () => process.env.OPS_SESSION_SECRET || process.env.OPS_RECEPCAO_KEY || 'sem-segredo';
+/**
+ * Segredo que assina a sessão da Recepção. O certo é OPS_SESSION_SECRET, só para isso.
+ * OPS_RECEPCAO_KEY ainda é aceito para o servidor não parar na troca, mas é a chave que os workers e a
+ * cronometragem também conhecem: quem a tiver consegue fabricar uma sessão de administrador.
+ * Sem nenhum dos dois não há sessão (antes de 13/11/2026 caía num texto fixo, público no código).
+ */
+function segredo(): string {
+  const valor = process.env.OPS_SESSION_SECRET || process.env.OPS_RECEPCAO_KEY;
+  if (!valor) throw new Error('OPS_SESSION_SECRET não configurado: o servidor não pode emitir nem validar sessões.');
+  return valor;
+}
+
+/** Diz como a sessão está sendo assinada, para o servidor avisar (ou recusar subir) na partida. */
+export function situacaoSegredoSessao(): 'proprio' | 'compartilhado' | 'ausente' {
+  if (process.env.OPS_SESSION_SECRET) return 'proprio';
+  return process.env.OPS_RECEPCAO_KEY ? 'compartilhado' : 'ausente';
+}
 
 export function emiteToken(s: Omit<Sessao, 'exp'>, horas = 16): string {
   const payload = Buffer.from(JSON.stringify({ ...s, exp: Date.now() + horas * 3_600_000 })).toString('base64url');
@@ -38,6 +54,7 @@ export function validaToken(token: string | null | undefined): Sessao | null {
   if (!token) return null;
   const [payload, sig] = token.split('.');
   if (!payload || !sig) return null;
+  if (situacaoSegredoSessao() === 'ausente') return null;
   const esperado = createHmac('sha256', segredo()).update(payload).digest('base64url');
   if (esperado.length !== sig.length || !timingSafeEqual(Buffer.from(esperado), Buffer.from(sig))) return null;
   try {
