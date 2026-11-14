@@ -78,7 +78,13 @@
     'Pagar com Pix': 'Pay with Pix', 'Pagar com cartão': 'Pay by card', 'Aguardando o pagamento.': 'Waiting for payment.', 'Já paguei: verificar agora': 'I have paid: check now',
     'Toque em Pix ou cartão: abre a página de pagamento segura da Asaas.': 'Tap Pix or card: it opens Asaas’s secure payment page.',
     'No Pix, copie o código no app do banco.': 'For Pix, paste the code in your bank app.', 'Volte aqui: a confirmação aparece sozinha.': 'Come back here: the confirmation shows up by itself.',
-    'Adicionar à agenda': 'Add to calendar',
+    'Adicionar à agenda': 'Add to calendar', 'Adicionar ao calendário': 'Add to calendar', 'Conferindo sua localização…': 'Checking your location…',
+    'Precisa corrigir algum dado ou de ajuda?': 'Need to fix something or need help?', 'Para corrigir um dado depois do pagamento ou tirar uma dúvida, fale com a recepção.': 'To fix a detail after paying or ask a question, contact the front desk.',
+    'Falta pagar': 'Payment pending', 'Seu cadastro já foi recebido. Pague para garantir a vaga.': 'Your registration was received. Pay to secure your spot.',
+    'Corrigir não altera o valor a pagar.': 'Fixing your details does not change the amount due.', 'Enviando…': 'Sending…', 'Tudo pronto: toque em Concluir': 'All done: tap Finish',
+    '1. Vá à recepção ou totem de autoatendimento.': '1. Go to the front desk or the self-service kiosk.', '3. Você assina o termo na recepção.': '3. You sign the waiver at the front desk.',
+    '1. Pague acima por Pix ou cartão.': '1. Pay above by Pix or card.', '2. No kartódromo, digite seu': '2. At the track, type your', 'no totem.': 'at the kiosk.',
+    'Pagamento por piloto': 'Payment per driver',
     // painel do grupo
     'Carregando seu grupo…': 'Loading your group…', 'Copie o link:': 'Copy the link:', 'Cadastro ok': 'Registered', 'Termo aceito': 'Waiver accepted',
     'Termo na recepção': 'Waiver at the front desk', 'Liberando a vaga… atualiza em até 1 minuto.': 'Freeing the spot… updates within 1 minute.',
@@ -92,6 +98,11 @@
     'Este grupo ainda não tem vagas na bateria. A recepção está ajustando a reserva; fale com ela se precisar.': 'This group has no spots in the session yet. The front desk is adjusting the booking; contact them if needed.',
   };
   var R = [
+    [/^Faltam (\d+) itens( · (\d+) com erro)?$/, function (_, n, x, e) { return n + ' items left' + (e ? ' · ' + e + ' with errors' : ''); }],
+    [/^Falta 1 item( · (\d+) com erro)?$/, function (_, x, e) { return '1 item left' + (e ? ' · ' + e + ' with errors' : ''); }],
+    [/^Ver o que falta \((\d+)\)$/, function (_, n) { return 'See what is missing (' + n + ')'; }],
+    [/^Verificado às (\d\d:\d\d)\. Ainda não recebemos o pagamento; assim que cair, esta tela atualiza sozinha\.$/, function (_, h) { return 'Checked at ' + h + '. Payment not received yet; this screen updates by itself once it arrives.'; }],
+    [/^Seu cadastro foi recebido e vinculado ao grupo( de (.+))?\.$/, function (_, x, g) { var p = g ? g.split(' · ') : []; return 'Your registration was received and linked to ' + (p.length ? p[0] + '’s group' + (p.length > 1 ? ' · ' + p.slice(1).join(' · ') : '') : 'the group') + '.'; }],
     [/^Faltam (\d+) itens$/, function (_, n) { return n + ' items left'; }],
     [/^Falta 1 item$/, function () { return '1 item left'; }],
     [/^Faltam (\d+) pilotos$/, function (_, n) { return n + ' drivers missing'; }],
