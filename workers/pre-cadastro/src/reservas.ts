@@ -6,6 +6,7 @@
  */
 import { asaasLigado, buscarCobrancaPorReferencia, cancelar, consultar, criarCobranca, EVENTOS_PAGO, garantirCliente, hojeBrasilia, PAGO, pagasDesde, qrPix, type AsaasEnv } from './asaas';
 import { cupomDoPedido, indexarPedido } from './extras';
+import { avisarPorEmail } from './emails-reserva';
 import { chaveDocumento, codigoReserva, digitos, validarReserva, type Acompanhante, type Agenda, type PreCadastro } from './validar';
 import { POLITICA_ACEITE, POLITICA_SECOES, POLITICA_TITULO, POLITICA_VERSAO } from '../../../src/config/politica-cancelamento';
 
@@ -43,6 +44,8 @@ export type Pedido = {
   asaas?: { pagamentoId: string; invoiceUrl: string; pixPayload?: string; pixImagem?: string; consultadoEm?: string };
   pagamento?: { asaasId: string; billingType: string; pagoEm: string; valorCentavos: number };
   erro?: string;
+  /** E-mails de status já enviados (status → quando). */
+  emails?: Record<string, string>;
 };
 
 const json = (status: number, body: unknown, cache = 'no-store') =>
@@ -60,6 +63,7 @@ async function lerPedido(env: EnvReservas, id: string) {
 
 async function gravarPedido(env: EnvReservas, p: Pedido, naFila: boolean) {
   p.atualizadoEm = new Date().toISOString();
+  await avisarPorEmail(env as never, p as never).catch((e) => console.error('email reserva', (e as Error).message));
   await env.PRE.put(chavePedido(p.id), JSON.stringify(p), { httpMetadata: { contentType: 'application/json' } });
   await indexarPedido(env as never, p as never).catch(() => undefined);
   if (naFila) await env.PRE.put(chaveFila(p.id), p.status);
