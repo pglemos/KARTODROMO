@@ -134,7 +134,7 @@ const Grupo = (() => {
       <div class="modal" role="dialog" aria-modal="true" style="max-width: 580px; width: 100%;">
         <div class="modalGrupoTopo" style="background: var(--kib-cor-superficie-padrao); border-bottom: 1px solid var(--kib-cor-borda-sutil);">
           <div class="modalGrupoTopoInfo">
-            <h2 class="modalGrupoTitulo" style="font-size: 1.15rem;">Movimentar participante de grupo</h2>
+            <h2 class="modalGrupoTitulo">Movimentar participante de grupo</h2>
             <div class="modalGrupoBadges">
               <span class="badgeNomeBateria">${esc(pNome)}</span>
               <span class="badgeCodigoReserva">Grupo atual: ${esc(g.codigo)}</span>
@@ -153,7 +153,7 @@ const Grupo = (() => {
             <label class="cardModoPagamento optDestino selecionado" style="cursor: pointer; display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 1px solid var(--kib-cor-borda-sutil);">
               <input type="radio" name="destAcao" value="sozinho" checked style="margin-top: 3px;">
               <span class="col" style="gap: 2px; flex: 1;">
-                <b class="t-corpo" style="font-size: 13.5px; color: var(--kib-cor-texto-principal);">Colocar sozinho (reserva individual)</b>
+                <b class="t-subtitulo" style="color: var(--kib-cor-texto-principal);">Colocar sozinho (reserva individual)</b>
                 <span class="peq" style="line-height: 1.35; color: var(--kib-cor-texto-secundario);">
                   O participante passa a ter uma reserva avulsa independente. A vaga no grupo ${esc(g.codigo)} é liberada para outro amigo se cadastrar.
                 </span>
@@ -169,7 +169,7 @@ const Grupo = (() => {
             <label class="cardModoPagamento optDestino" style="cursor: pointer; display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 1px solid var(--kib-cor-borda-sutil);">
               <input type="radio" name="destAcao" value="outro_grupo" style="margin-top: 3px;">
               <span class="col" style="gap: 2px; flex: 1;">
-                <b class="t-corpo" style="font-size: 13.5px; color: var(--kib-cor-texto-principal);">Mover para outro grupo</b>
+                <b class="t-subtitulo" style="color: var(--kib-cor-texto-principal);">Mover para outro grupo</b>
                 <span class="peq" style="line-height: 1.35; color: var(--kib-cor-texto-secundario);">
                   Transfere o participante para outro grupo de amigos da data. A vaga no grupo atual é liberada.
                 </span>
@@ -183,7 +183,7 @@ const Grupo = (() => {
             </label>
           </div>
 
-          <div id="erroMoverPiloto" class="cor-erro peq" style="min-height: 18px; margin-top: 4px;"></div>
+          <div id="erroMoverPiloto" class="cor-erro peq" role="alert" style="min-height: 18px; margin-top: 4px;"></div>
 
           <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; border-top: 1px solid var(--kib-cor-borda-sutil); padding-top: 12px;">
             <button type="button" class="btn link" data-acao="cancelarDlg">Cancelar</button>
@@ -195,18 +195,32 @@ const Grupo = (() => {
 
     document.body.appendChild(veu);
 
+    let fechado = false, enviando = false;
     const fechar = () => {
+      if (fechado) return;
+      fechado = true;
       veu.remove();
       document.removeEventListener('keydown', onKey, true);
       try { antes && antes.focus(); } catch {}
     };
 
     const onKey = (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fechar(); }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fechar(); return; }
+      if (e.key === 'Tab') {
+        const f = [...veu.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled)')].filter((el) => el.offsetParent !== null);
+        if (!f.length) return;
+        const i = f.indexOf(document.activeElement);
+        e.preventDefault(); e.stopPropagation();
+        f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
+      }
     };
     document.addEventListener('keydown', onKey, true);
+    let veuDown = false;
+    veu.addEventListener('pointerdown', (e) => { veuDown = e.target === veu; });
+    veu.addEventListener('click', (e) => { if (veuDown && e.target === veu) fechar(); veuDown = false; });
 
     const radioSozinho = veu.querySelector('input[value="sozinho"]');
+    if (radioSozinho) radioSozinho.focus();
     const radioOutro = veu.querySelector('input[value="outro_grupo"]');
     const boxSozinho = veu.querySelector('#boxDestSozinho');
     const boxOutro = veu.querySelector('#boxDestOutroGrupo');
@@ -227,7 +241,7 @@ const Grupo = (() => {
     radioOutro.onchange = atualizarCards;
 
     office(`/baterias?data=${dataIso}&status=todas`).then((bats) => {
-      if (!bats || !Array.isArray(bats)) return;
+      if (fechado || !veu.isConnected || !bats || !Array.isArray(bats)) return;
       const outras = bats.filter((b) => b.id !== g.bateriaId && b.status !== 'cancelada' && (+b.disponiveis > 0));
       for (const b of outras) {
         const opt = document.createElement('option');
@@ -238,6 +252,7 @@ const Grupo = (() => {
     }).catch(() => undefined);
 
     office(`/grupos?de=${dataIso}&ate=${dataIso}`).then((grupos) => {
+      if (fechado || !veu.isConnected) return;
       selGrupo.innerHTML = '';
       const outros = (grupos || []).filter((gr) => gr.id !== g.id && gr.status === 'ativa');
       if (!outros.length) {
@@ -255,6 +270,7 @@ const Grupo = (() => {
         selGrupo.appendChild(opt);
       }
     }).catch((err) => {
+      if (fechado || !veu.isConnected) return;
       selGrupo.innerHTML = `<option value="">Erro ao carregar grupos (${err.message})</option>`;
     });
 
@@ -262,6 +278,7 @@ const Grupo = (() => {
     veu.querySelector('[data-acao="cancelarDlg"]').onclick = fechar;
 
     btnConfirmar.onclick = async () => {
+      if (enviando || fechado) return;
       erroDiv.textContent = '';
       const destino = radioSozinho.checked ? 'sozinho' : 'outro_grupo';
       const body = { destino };
@@ -276,8 +293,10 @@ const Grupo = (() => {
         body.novoGrupoId = gid;
       }
 
+      enviando = true;
       btnConfirmar.disabled = true;
-      btnConfirmar.textContent = 'Movimentando...';
+      btnConfirmar.setAttribute('aria-busy', 'true');
+      btnConfirmar.textContent = 'Movimentando…';
 
       try {
         const res = await office(`/grupos/${g.id}/pilotos/${p.id}/desvincular`, { method: 'POST', body });
@@ -285,9 +304,16 @@ const Grupo = (() => {
         fechar();
         if (aoConcluir) aoConcluir(res);
       } catch (e) {
-        erroDiv.textContent = e.message || String(e);
-        btnConfirmar.disabled = false;
-        btnConfirmar.textContent = 'Confirmar movimentação';
+        if (!fechado && veu.isConnected) {
+          erroDiv.textContent = e.message || String(e);
+          btnConfirmar.disabled = false;
+          btnConfirmar.removeAttribute('aria-busy');
+          btnConfirmar.textContent = 'Confirmar movimentação';
+        } else {
+          falhou(e);
+        }
+      } finally {
+        enviando = false;
       }
     };
   }
@@ -328,7 +354,7 @@ const Grupo = (() => {
       if (!novo) {
         cad = chipCad(p);
         if (modo === 'unico') { pg = p.pago ? ['verde', 'Pago pelo grupo'] : resp ? ['laranja', 'Paga o grupo · falta ' + brlCurto(g.falta)] : ['cinza', 'Responsável paga']; }
-        else if (modo === 'sinal') { pg = p.pago ? ['verde', p.pagoNoCaixa ? 'Pago no caixa' : 'Pago'] : ['laranja', 'Resto ' + brlCurto(p.falta_centavos) + ' na recepção']; }
+        else if (modo === 'sinal') { pg = p.pago ? ['verde', p.pagoNoCaixa ? 'Pago no caixa' : 'Pago'] : ['laranja', 'Resto ' + brlCurto(p.falta_centavos) + ' na Recepção']; }
         else { pg = p.pago ? ['verde', p.pagoNoCaixa ? 'Pago no caixa' : 'Pago'] : p.valorPago > 0 ? ['laranja', `Pagou ${brlCurto(p.valorPago)} · falta ${brlCurto(p.falta_centavos)}`] : ['vermelho', 'Falta ' + brlCurto(p.falta_centavos)]; }
         if (!p.pago && (modo !== 'unico' || resp)) {
           acoesPg = `<details class="menuCobrar">
@@ -350,11 +376,11 @@ const Grupo = (() => {
             ${respExistente ? `<span class="entrada" style="height: 36px; display: flex; align-items: center; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${nomeVal ? '' : 'color: var(--mudo2)'}">${esc(nomeBonito(nomeVal) || 'Escolha o responsável')}</span>` : `<input class="entrada" style="height: 36px; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 500;" value="${esc(nomeBonito(nomeVal))}" placeholder="${resp ? 'Nome do responsável' : 'Nome (ou deixe para o link)'}" aria-label="Nome do piloto ${i + 1}" title="${esc(nomeBonito(nomeVal))}" aria-describedby="erroGrupo" data-campo="nome" data-i="${i}" ${!novo && resp ? 'readonly' : ''}>`}
             ${resp ? `<span class="badgeRespTag" title="Responsável pela reserva">${svg(IC.ok, 10, 'currentColor')} RESPONSÁVEL</span>` : ''}
           </div>
-          ${resp && respExistente ? '<span class="peq cor-apoio" style="font-size: 11px; line-height: 1">cliente já cadastrado · <button type="button" class="btn link peq" data-trocar-resp="1" style="font-size: 11px; padding: 0">Trocar</button></span>' : resp && novo ? '<span class="peq cor-apoio" style="font-size: 11px; line-height: 1">cliente novo: só nome e WhatsApp</span>' : ''}
-          ${!resp && !p.clienteId ? `<button type="button" class="btn link peq" style="font-size: 11px; padding: 0; justify-content: flex-start; min-height: 0" data-buscar-vaga="${i}" aria-label="Buscar cadastro do piloto ${i + 1} por CPF, nome ou telefone">${svg(IC.busca, 11)} Buscar cadastro (CPF, nome ou telefone)</button>` : !resp && p.clienteId ? '<span class="peq cor-apoio" style="font-size: 11px; line-height: 1">cadastro puxado do banco</span>' : ''}
+          ${resp && respExistente ? '<span class="peq cor-apoio" style="font-size: 12px; line-height: 1.35">cliente já cadastrado · <button type="button" class="btn link peq" data-trocar-resp="1" style="font-size: 12px; padding: 0">Trocar</button></span>' : resp && novo ? '<span class="peq cor-apoio" style="font-size: 12px; line-height: 1.35">cliente novo: só nome e WhatsApp</span>' : ''}
+          ${!resp && !p.clienteId ? `<button type="button" class="btn link peq" style="font-size: 12px; line-height: 1.35; padding: 0; justify-content: flex-start; min-height: 0" data-buscar-vaga="${i}" aria-label="Buscar cadastro do piloto ${i + 1} por CPF, nome ou telefone">${svg(IC.busca, 11)} Buscar cadastro (CPF, nome ou telefone)</button>` : !resp && p.clienteId ? '<span class="peq cor-apoio" style="font-size: 12px; line-height: 1.35">cadastro puxado do banco</span>' : ''}
         </div>
         ${respExistente ? `<span class="mono peq" style="font-size: 12.5px; color: var(--kib-cor-texto-principal);">${esc(foneVal || '—')}</span>` : `<input class="entrada mono" style="height: 36px; font-size: 12.5px;" value="${esc(foneVal)}" placeholder="(31) 9 0000-0000" inputmode="tel" aria-label="WhatsApp do piloto ${i + 1}" aria-describedby="erroGrupo" data-campo="telefone" data-i="${i}" ${!novo && resp ? 'readonly' : ''}>`}
-        <button type="button" class="btnToggleIdade ${p.menor ? 'menor' : 'adulto'}" role="switch" aria-checked="${!!p.menor}" data-menor="${i}" title="${p.menor ? 'Menor de idade (clique para mudar)' : 'Adulto (clique para mudar para Menor)'}"><span style="width: 6px; height: 6px; border-radius: 50%; background: currentColor"></span> ${p.menor ? 'Menor' : 'Adulto'}</button>
+        <button type="button" class="btnToggleIdade ${p.menor ? 'menor' : 'adulto'}" role="switch" aria-checked="${!!p.menor}" data-menor="${i}" title="${p.menor ? 'Menor de idade (clique para mudar para Adulto)' : 'Adulto (clique para mudar para Menor)'}"><span style="width: 6px; height: 6px; border-radius: 50%; background: currentColor"></span> ${p.menor ? 'Menor' : 'Adulto'}</button>
         <div style="display: flex; align-items: center; min-width: 0;">
           ${novo ? `<span class="chipTotemStatus aguardando">${esc(cad[1])}</span>` : cad[0] === 'verde' ? `<span class="chipTotemStatus completo" title="Cadastro completo">${svg(IC.ok, 12, '#15803d', 2.2)} Pronto para o totem</span>` : `<span class="chipTotemStatus incompleto" title="${esc(cad[1])}">${svg(IC_ALERTA, 12, '#b45309', 2)} <span class="trunc">${esc(cad[1])}</span></span>`}
         </div>
@@ -363,7 +389,7 @@ const Grupo = (() => {
           ${acoesPg}
         </div>
         ${resp ? '<span></span>' : `<div style="display: flex; align-items: center; gap: 4px;">
-          ${!novo && (p.clienteId || p.nome) ? `<button type="button" class="btn sec peq" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; height: 26px; padding: 0 8px; color: var(--kib-cor-marca-principal); border-color: color-mix(in srgb, var(--kib-cor-marca-principal) 30%, transparent); font-weight: 600;" aria-label="Mover participante de grupo ou colocar sozinho" title="Grupo errado / Mover participante (colocar sozinho ou em outro grupo)" data-mover-piloto="${p.id}" data-piloto-nome="${esc(nomeVal || 'Piloto ' + (i + 1))}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg> Mover</button>` : ''}
+          ${!novo && (p.clienteId || p.nome) ? `<button type="button" class="btn sec peq" style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; height: 26px; padding: 0 8px; color: var(--kib-cor-marca-principal); border-color: color-mix(in srgb, var(--kib-cor-marca-principal) 30%, transparent); font-weight: 600;" aria-label="Mover participante de grupo ou colocar sozinho" title="Grupo errado / Mover participante (colocar sozinho ou em outro grupo)" data-mover-piloto="${p.id}" data-piloto-nome="${esc(nomeVal || 'Piloto ' + (i + 1))}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg> Mover</button>` : ''}
           <button type="button" class="btnRemoverPiloto hov" aria-label="Tirar o piloto ${i + 1}" title="Tirar piloto da reserva" data-tirar="${i}">${svg(IC.fechar, 13, 'currentColor', 2.2)}</button>
         </div>`}
       </div>${bvHtml(i)}`;
@@ -380,10 +406,10 @@ const Grupo = (() => {
     const faltamCad = novo ? [] : g.pilotos.filter((p) => p.cadastro !== 'completo');
     const blocoLinks = novo ? '' : `<div style="padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); border-top: 1px solid var(--linha); display: flex; flex-direction: column; gap: var(--kib-espaco-1)">
       <span class="linha gap-1"><b class="t-corpo">Link de cadastro do grupo</b><span class="chip ${faltamCad.length ? 'laranja' : 'verde'} empurra">${faltamCad.length ? `faltam ${faltamCad.length} de ${g.n}` : 'todos cadastrados'}</span></span>
-      <div class="linha-quebra gap-1" style="align-items: center"><input class="entrada peq mono cresce" style="flex: 1 1 280px; min-width: 0" readonly value="${esc(linkDoGrupo(g))}" aria-label="Link de cadastro do grupo" onfocus="this.select()"><button class="btn peq sec" data-copiar-links="1">Copiar</button><button class="btnZapWhatsApp peq" data-enviar-grupo="1">${svg(IC.zap, 13, 'var(--kib-branco)')} Enviar no WhatsApp</button></div>
+      <div class="linha-quebra gap-1" style="align-items: center"><input class="entrada peq mono cresce" style="flex: 1 1 280px; min-width: 0" readonly value="${esc(linkDoGrupo(g))}" aria-label="Link de cadastro do grupo" onfocus="this.select()"><button type="button" class="btn peq sec" data-copiar-links="1">Copiar</button><button type="button" class="btnZapWhatsApp peq" data-enviar-grupo="1">${svg(IC.zap, 13, 'var(--kib-branco)')} Enviar no WhatsApp</button></div>
       <span class="peq cor-apoio" style="line-height: 1.4">Mande o mesmo link para todo mundo (grupo de WhatsApp, por exemplo). Quem abrir e se cadastrar ocupa a próxima vaga livre${faltamCad.length ? ': ainda faltam ' + esc(faltamCad.map((p) => p.nome || 'piloto ' + p.ordem).join(', ')) : ''}.</span>
       ${g.linkPainel ? `<span class="linha gap-1" style="margin-top: var(--kib-espaco-1)"><b class="t-corpo">Painel do responsável</b><span class="peq cor-apoio">só para ${esc(primeiro(g.responsavel))}: mostra quem já se cadastrou e pagou</span></span>
-      <div class="linha-quebra gap-1"><button class="btn peq sec" data-copiar-painel="1">Copiar link do painel</button><button class="btnZapWhatsApp peq" data-enviar-painel="1">${svg(IC.zap, 13, 'var(--kib-branco)')} Enviar ao responsável</button></div>` : ''}
+      <div class="linha-quebra gap-1"><button type="button" class="btn peq sec" data-copiar-painel="1">Copiar link do painel</button><button type="button" class="btnZapWhatsApp peq" data-enviar-painel="1">${svg(IC.zap, 13, 'var(--kib-branco)')} Enviar ao responsável</button></div>` : ''}
     </div>`;
     const respOk = novo ? respValido(rasc) : true;
     const erroNovo = novo ? faltaResp(rasc) : '';
@@ -398,10 +424,10 @@ const Grupo = (() => {
             ${novo ? '' : `<span class="badgeCodigoReserva">Reserva ${esc(g.codigo)}</span>`}
             <span class="badgeDataBateria">${svg(IC.agenda, 14, 'var(--kib-cor-texto-secundario)')} ${quando(b.dataHora)}</span>
             <span class="badgeNomeBateria">${esc(b.nome || 'Bateria')}</span>
-            ${novo && estado.voltar ? '<button type="button" class="btn link peq" data-voltar-horario="1" style="font-size: 12.5px;">‹ Trocar horário</button>' : ''}
+            ${novo && estado.voltar ? '<button type="button" class="btn link peq" data-voltar-horario="1" style="font-size: var(--kib-fonte-tamanho-pequeno);">‹ Trocar horário</button>' : ''}
           </div>
         </div>
-        <button class="btnFecharModal hov" data-acao="fechar" aria-label="Fechar janela" title="Fechar (Esc)">
+        <button type="button" class="btnFecharModal hov" data-acao="fechar" aria-label="Fechar janela" title="Fechar (Esc)">
           ${svg(IC.fechar, 16, 'currentColor', 2.4)}
         </button>
       </div>
@@ -421,7 +447,7 @@ const Grupo = (() => {
             </div>
             ${novo ? `<div style="display: flex; flex-direction: column; gap: var(--kib-espaco-1); padding: 0 var(--kib-espaco-2) var(--kib-espaco-denso-12)">
               <label class="buscaCampo" style="height: 38px">${svg(IC.busca, 14, 'var(--kib-cor-borda-campo)')}<input id="qResp" value="${esc(estado.busca)}" placeholder="Já é cliente? Busque por nome, CPF ou telefone" autocomplete="off" aria-label="Buscar o responsável"></label>
-              <div id="achados">${estado.achados.length ? `<div class="resultadoBusca">${estado.achados.slice(0, 10).map((x) => `<button type="button" class="hov" data-resp='${esc(JSON.stringify({ id: x.id, nome: x.nome, telefone: x.telefone, documento: x.documento }))}'><span class="avatar p" style="background: ${CORG[x.id % 6]}">${esc(iniciais(x.nome))}</span><span class="col"><b class="trunc">${esc(nomeBonito(x.nome))}</b><span class="peq">${esc(x.documento || 'sem CPF')} · ${esc(formatarTelefone(x.telefone) || 'sem telefone')}</span></span></button>`).join('')}</div>` : ''}</div>
+              <div id="achados">${estado.achados.length ? `<div class="resultadoBusca">${estado.achados.slice(0, 10).map((x) => `<button type="button" class="hov" data-resp="${esc(JSON.stringify({ id: x.id, nome: x.nome, telefone: x.telefone, documento: x.documento }))}"><span class="avatar p" style="background: ${CORG[x.id % 6]}">${esc(iniciais(x.nome))}</span><span class="col"><b class="trunc">${esc(nomeBonito(x.nome))}</b><span class="peq">${esc(x.documento || 'sem CPF')} · ${esc(formatarTelefone(x.telefone) || 'sem telefone')}</span></span></button>`).join('')}</div>` : ''}</div>
               <span style="display: flex; flex-wrap: wrap; align-items: center; gap: var(--kib-espaco-1)"><span class="peq peso-semibold">Chegou por</span><span class="seg">${ORIGENS.map(([v, t]) => `<button type="button" data-origem="${v}" class="${rasc.origem === v ? 'sel' : ''}">${t}</button>`).join('')}</span><span class="peq">Não é cliente ainda? Sem problema: preencha nome e WhatsApp na linha 1.</span></span></div>` : ''}
             <div class="rolagemX">
               <div style="min-width: 860px">
@@ -461,14 +487,14 @@ const Grupo = (() => {
           <section class="secao" style="padding: var(--kib-espaco-denso-12) var(--kib-espaco-2) var(--kib-espaco-2); gap: var(--kib-espaco-denso-12)">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--kib-espaco-1)">
               <span class="titulo t-subtitulo" style="font-size: var(--kib-fonte-tamanho-subtitulo); margin: 0">Como o grupo vai pagar?</span>
-              ${dica("Escolha uma opção: o responsável paga tudo em um link; cada piloto paga o seu; ou o responsável paga um sinal agora e o resto é acertado na recepção.", "como o grupo vai pagar")}
+              ${dica("Escolha uma opção: o responsável paga tudo em um link; cada piloto paga o seu; ou o responsável paga um sinal agora e o resto é acertado na Recepção.", "como o grupo vai pagar")}
             </div>
             <div role="radiogroup" style="display: flex; flex-direction: column; gap: 8px">
               ${MODOS.map(([v, t, d]) => `
                 <button type="button" role="radio" aria-checked="${modo === v}" data-modo="${v}" class="cardModoPagamento ${modo === v ? 'selecionado' : ''}">
                   <span class="radioCirculoIndicador"></span>
                   <span class="col" style="gap: 2px">
-                    <b class="t-corpo" style="font-size: 13.5px; color: var(--kib-cor-texto-principal);">${t}</b>
+                    <b class="t-subtitulo" style="color: var(--kib-cor-texto-principal);">${t}</b>
                     <span class="peq" style="line-height: 1.35; color: var(--kib-cor-texto-secundario);">${d}</span>
                   </span>
                 </button>
@@ -477,17 +503,17 @@ const Grupo = (() => {
             <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--kib-espaco-1)">
               <div class="cardMetricaFinanceira">
                 <span class="cardMetricaFinanceiraLabel">Preço por piloto${novo ? (rasc.origem === 'recepcao' ? ' · balcão' : ' · antecipado') : ''}</span>
-                <div style="display: flex; align-items: center; gap: 4px; height: 32px">
-                  <span style="font-size: var(--kib-fonte-tamanho-corpo); font-weight: 600; color: var(--kib-cor-texto-secundario);">R$</span>
-                  <input type="number" min="0" step="0.01" value="${(preco / 100).toFixed(2)}" data-preco="1" style="width: 100%; border: 0; outline: none; background: transparent; font-size: var(--kib-fonte-tamanho-titulo); font-weight: 700; color: var(--kib-cor-texto-principal); font-family: var(--kib-fonte-familia-numero);">
+                <div style="display: flex; align-items: center; gap: 4px; height: 32px; min-width: 0">
+                  <span style="flex-shrink: 0; white-space: nowrap; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 600; color: var(--kib-cor-texto-secundario);">R$</span>
+                  <input type="number" min="0" step="0.01" value="${(preco / 100).toFixed(2)}" data-preco="1" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: var(--kib-fonte-tamanho-titulo); font-weight: 700; color: var(--kib-cor-texto-principal); font-family: var(--kib-fonte-familia-numero);">
                 </div>
               </div>
               ${modo === 'sinal' ? `
                 <div class="cardMetricaFinanceira">
                   <span class="cardMetricaFinanceiraLabel">Sinal agora (%)</span>
-                  <div style="display: flex; align-items: center; gap: 4px; height: 32px">
-                    <input type="number" min="0" max="100" step="5" value="${sinalPct}" data-sinal="1" style="width: 100%; border: 0; outline: none; background: transparent; font-size: var(--kib-fonte-tamanho-titulo); font-weight: 700; color: var(--kib-cor-texto-principal); font-family: var(--kib-fonte-familia-numero);">
-                    <span style="font-size: var(--kib-fonte-tamanho-corpo); font-weight: 600; color: var(--kib-cor-texto-secundario);">%</span>
+                  <div style="display: flex; align-items: center; gap: 4px; height: 32px; min-width: 0">
+                    <input type="number" min="0" max="100" step="5" value="${sinalPct}" data-sinal="1" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: var(--kib-fonte-tamanho-titulo); font-weight: 700; color: var(--kib-cor-texto-principal); font-family: var(--kib-fonte-familia-numero);">
+                    <span style="flex-shrink: 0; white-space: nowrap; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 600; color: var(--kib-cor-texto-secundario);">%</span>
                   </div>
                 </div>
               ` : `
@@ -502,14 +528,14 @@ const Grupo = (() => {
             <button type="button" role="switch" aria-checked="${aniv}" data-aniv="1" class="cardModoPagamento ${aniv ? 'selecionado' : ''}" title="Promoção do site: o aniversariante que traz pelo menos ${ANIV_MIN} convidados pagantes corre por ${brl(ANIV_PRECO)}">
               <span class="radioCirculoIndicador"></span>
               <span class="col" style="gap: 2px">
-                <b class="t-corpo" style="font-size: 13.5px; color: var(--kib-cor-texto-principal);">🎂 Responsável é o aniversariante</b>
+                <b class="t-subtitulo" style="color: var(--kib-cor-texto-principal);">🎂 Responsável é o aniversariante</b>
                 <span class="peq" style="line-height: 1.35; color: var(--kib-cor-texto-secundario);">${!aniv ? `Promoção: com ${ANIV_MIN} convidados ou mais, o aniversariante paga só ${brl(ANIV_PRECO)}. Exige documento com foto no dia.` : promoOk ? `Promoção valendo: ${convidadosAniv} convidados · aniversariante paga ${brl(Math.min(preco, ANIV_PRECO))}, convidados ${brl(preco)}.` : `Faltam ${ANIV_MIN - convidadosAniv} convidado${ANIV_MIN - convidadosAniv > 1 ? 's' : ''} para a promoção (${convidadosAniv} de ${ANIV_MIN}). Até lá ele paga ${brl(preco)}.`}</span>
               </span>
             </button>
             <div style="display: flex; flex-direction: column; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12); border-radius: var(--kib-raio-cartao); background: var(--kib-cor-superficie-padrao); border: 1px solid var(--kib-cor-borda-sutil);">
               <div style="display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
                 <div style="display: flex; align-items: baseline; gap: 6px;">
-                  <span class="num t-titulo-grande peso-negrito" style="font-size: 1.4rem; color: var(--kib-cor-texto-principal);">${brl(c.pago)}</span>
+                  <span class="num t-titulo-grande peso-negrito" style="color: var(--kib-cor-texto-principal);">${brl(c.pago)}</span>
                   <span class="peq" style="color: var(--kib-cor-texto-secundario);">de ${brl(c.total)}</span>
                 </div>
                 <span class="chipPgStatus ${novo ? 'aguardando' : c.falta ? 'parcial' : 'pago'}">
@@ -542,27 +568,27 @@ const Grupo = (() => {
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                   <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="width: 26px; height: 26px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; background: var(--kib-acao-info); color: var(--kib-branco); font-size: var(--kib-fonte-tamanho-corpo); font-weight: 800;">A</span>
-                    <b style="font-size: 13.5px; color: var(--kib-cor-texto-principal);">Asaas · Pix e cartão</b>
+                    <b class="t-subtitulo" style="color: var(--kib-cor-texto-principal);">Asaas · Pix e cartão</b>
                   </div>
                   <span class="chipPgStatus ${!g.falta ? 'pago' : g.pago ? 'parcial' : 'aguardando'}">
                     ${!g.falta ? 'Pago' : g.pago ? 'Parcial' : 'Aguardando'}
                   </span>
                 </div>
                 <span class="peq" style="line-height: 1.45; color: var(--kib-cor-texto-secundario);">
-                  ${modo === 'individual' ? `Cada piloto paga sua vaga (${brl(preco)}) pelo link do grupo. O botão “Cobrar” no piloto gera um link avulso.` : modo === 'sinal' ? `Sinal: ${brl(g.sinal)} (${sinalPct}%). O restante cada piloto acerta na recepção.` : `Cobrança total do grupo: ${brl(g.falta)}.`}
+                  ${modo === 'individual' ? `Cada piloto paga sua vaga (${brl(preco)}) pelo link do grupo. O botão “Cobrar” no piloto gera um link avulso.` : modo === 'sinal' ? `Sinal: ${brl(g.sinal)} (${sinalPct}%). O restante cada piloto acerta na Recepção.` : `Cobrança total do grupo: ${brl(g.falta)}.`}
                 </span>
-                ${modo !== 'individual' && g.falta && (modo !== 'sinal' || g.sinal > g.pago) ? `<button class="btn prim peq" data-cobrar="" style="margin-top: 4px;">Gerar e enviar link ao responsável</button>` : ''}
-                ${g.cobrancaGrupo ? `<a class="mono peq trunc" target="_blank" rel="noopener" href="${esc(g.cobrancaGrupo.link)}" style="padding: 6px 8px; border-radius: 6px; background: var(--kib-cor-superficie-padrao); border: 1px solid var(--kib-cor-borda-sutil); color: var(--kib-cor-texto-link);">${esc(g.cobrancaGrupo.link)}</a>` : ''}
+                ${modo !== 'individual' && g.falta && (modo !== 'sinal' || g.sinal > g.pago) ? `<button type="button" class="btn prim peq" data-cobrar="" style="margin-top: 4px;">Gerar e enviar link ao responsável</button>` : ''}
+                ${g.cobrancaGrupo ? `<a class="mono peq trunc" target="_blank" rel="noopener" href="${esc(g.cobrancaGrupo.link)}" style="display: block; max-width: 100%; min-width: 0; padding: 6px 8px; border-radius: 6px; background: var(--kib-cor-superficie-padrao); border: 1px solid var(--kib-cor-borda-sutil); color: var(--kib-cor-texto-link);">${esc(g.cobrancaGrupo.link)}</a>` : ''}
               </div>
             ` : ''}
           </section>${novo ? '</details>' : ''}
         </div>
       </div>
       <div class="modalRodape" style="display: flex; align-items: center; gap: var(--kib-espaco-1); padding: 12px var(--kib-espaco-denso-20); background: var(--kib-cor-superficie-padrao); border-top: 1px solid var(--kib-cor-borda-sutil);">
-        ${novo ? `<button type="button" role="switch" aria-checked="${estado.enviarAgora}" data-enviar-agora="1" style="display: flex; align-items: center; gap: var(--kib-espaco-1); padding: 0; border: 0; background: transparent; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 600; color: var(--kib-cor-texto-principal); cursor: pointer;"><span class="chave ${estado.enviarAgora ? 'on' : ''}"></span>Depois de salvar, já mostrar o link de cadastro do grupo para mandar no WhatsApp</button>` : `<button class="btn perigo peq" data-cancelar-grupo="1">Cancelar reserva</button>`}
-        <span class="${estado.tentou ? 'erroMsg' : 'ajuda-campo'} empurra" id="erroGrupo" role="alert" style="font-size: 12.5px;">${estado.tentou ? erroNovo : ajudaSalvar}</span>
-        ${novo ? '' : '<button class="btn sec peq" data-grupo-atualizar>Atualizar</button>'}<button class="btn sec peq" data-acao="fechar">${novo ? 'Cancelar' : 'Fechar'}</button>
-        ${novo ? `<button class="btn prim peq ${respOk ? '' : 'quase'}" data-salvar-grupo="1" aria-describedby="erroGrupo" ${respOk ? '' : 'aria-disabled="true"'} title="Salvar reserva (Ctrl+Enter)">Salvar reserva de ${c.n} piloto${c.n > 1 ? 's' : ''}</button>` : ''}
+        ${novo ? `<button type="button" role="switch" aria-checked="${estado.enviarAgora}" data-enviar-agora="1" style="display: flex; align-items: center; gap: var(--kib-espaco-1); padding: 0; border: 0; background: transparent; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 600; color: var(--kib-cor-texto-principal); cursor: pointer;"><span class="chave ${estado.enviarAgora ? 'on' : ''}"></span>Depois de salvar, já mostrar o link de cadastro do grupo para mandar no WhatsApp</button>` : `<button type="button" class="btn perigo peq" data-cancelar-grupo="1">Cancelar reserva</button>`}
+        <span class="${estado.tentou ? 'erroMsg' : 'ajuda-campo'} empurra" id="erroGrupo" role="alert" style="font-size: var(--kib-fonte-tamanho-pequeno);">${estado.tentou ? erroNovo : ajudaSalvar}</span>
+        ${novo ? '' : '<button type="button" class="btn sec peq" data-grupo-atualizar>Atualizar</button>'}<button type="button" class="btn sec peq" data-acao="fechar">${novo ? 'Cancelar' : 'Fechar'}</button>
+        ${novo ? `<button type="button" class="btn prim peq ${respOk ? '' : 'quase'}" data-salvar-grupo="1" aria-describedby="erroGrupo" ${respOk ? '' : 'aria-disabled="true"'} title="Salvar reserva (Ctrl+Enter)">Salvar reserva de ${c.n} piloto${c.n > 1 ? 's' : ''}</button>` : ''}
       </div>`;
   }
 
@@ -655,11 +681,11 @@ const Grupo = (() => {
     }
   }, true);
   document.addEventListener('keydown', (e) => {
-    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || !estado || estado.g || !e.target.closest || !e.target.closest('#camada .modal')) return;
+    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || !ativo(estado) || estado.g || estado.ocupado || document.querySelector('.veuTopo') || !e.target.closest || !e.target.closest('#camada .modal')) return;
     const bt = $('#camada [data-qtd="' + (e.key === 'ArrowUp' ? 1 : -1) + '"]'); if (bt && !bt.disabled) { e.preventDefault(); bt.click(); setTimeout(() => { const f = $('#camada [data-qtd="' + (e.key === 'ArrowUp' ? 1 : -1) + '"]') || $('#camada [data-qtd]'); if (f) f.focus(); }, 0); }
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey) || !estado || estado.g || !e.target.closest || !e.target.closest('#camada .modal')) return;
+    if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey) || !ativo(estado) || estado.g || estado.ocupado || document.querySelector('.veuTopo') || !e.target.closest || !e.target.closest('#camada .modal')) return;
     const bt = $('#camada [data-salvar-grupo]'); if (bt && !bt.disabled) { e.preventDefault(); bt.click(); }
   });
   document.addEventListener('toggle', (e) => { if (estado && e.target.dataset && e.target.dataset.detPag) estado.pagAberto = e.target.open; if (e.target.classList && e.target.classList.contains('menuCobrar')) { const sm = e.target.querySelector('summary'); if (sm) sm.setAttribute('aria-expanded', String(e.target.open)); } }, true);
@@ -669,7 +695,7 @@ const Grupo = (() => {
     if (t.dataset.reg) { estado.reg[t.dataset.reg] = t.value; return; }
     if (t.dataset.preco) {
       const v = Math.round(parseFloat(String(t.value).replace(',', '.')) * 100);
-      if (!(v > 0)) return toast('Informe um preço maior que zero.', true);
+      if (!Number.isFinite(v) || v <= 0) return toast('Informe um preço maior que zero.', true);
       if (estado.g) await atualizar(() => office(`/grupos/${estado.g.id}`, { method: 'PUT', body: { precoCentavos: v } }), 'Preço atualizado');
       else { estado.rasc.preco = v; estado.rasc.precoManual = true; pintar(); }
       return;
@@ -756,7 +782,7 @@ const Grupo = (() => {
       const d = +x.dataset.qtd;
       if (g) {
         if (d > 0) await atualizar(() => office(`/grupos/${g.id}/pilotos`, { method: 'POST', body: {} }), 'Piloto adicionado · 1 vaga a menos no site');
-        else { const ult = g.pilotos[g.pilotos.length - 1]; if (ult && !ult.responsavel) { if (!confirm(`Tirar ${ult.nome || 'o piloto ' + ult.ordem} do grupo? A vaga volta para o site e o totem. Pagamentos serão mantidos no histórico, sem reembolso automático.`)) return; await atualizar(() => office(`/grupos/${g.id}/pilotos/${ult.id}`, { method: 'DELETE' }), 'Piloto tirado · vaga liberada'); } }
+        else { const ult = g.pilotos[g.pilotos.length - 1]; if (ult && !ult.responsavel) { if (!(await confirmar(`Tirar ${ult.nome || 'o piloto ' + ult.ordem} do grupo?`, `${ult.pago ? 'O pagamento será mantido no histórico, sem reembolso automático. ' : ''}A vaga volta para o site e o totem.`, 'Tirar do grupo', true)) || !ativo(ctx)) return; await atualizar(() => office(`/grupos/${g.id}/pilotos/${ult.id}`, { method: 'DELETE' }), 'Piloto tirado · vaga liberada'); } }
       } else {
         if (d > 0 && rasc.pilotos.length < +b.disponiveis) rasc.pilotos.push({ nome: '', telefone: '', menor: false });
         if (d < 0 && rasc.pilotos.length > 1) rasc.pilotos.pop();
@@ -805,7 +831,25 @@ const Grupo = (() => {
       const forma = await escolherForma(`Marcar ${faltam.length} pilotos como pagos?`, `Total ${brl(faltam.reduce((a, p) => a + p.falta_centavos, 0))}. Como eles pagaram?`);
       if (!forma || !ativo(ctx)) return;
       ctx.ocupado = true;
-      try { for (const p of faltam) { if (!ativo(ctx)) return; ctx.g = await office(`/grupos/${g.id}/pagamentos`, { method: 'POST', body: { pilotoId: p.id, valorCentavos: p.falta_centavos, forma: forma.trim() } }); } if (!ativo(ctx)) return; pintar(); if (ativo(ctx)) ctx.aoMudar && ctx.aoMudar(); toast(`${faltam.length} pagamentos registrados · aparecem pagos na Recepção`); } catch (er) { if (ativo(ctx)) falhou(er); } finally { ctx.ocupado = false; }
+      let pagosAgora = 0;
+      try {
+        for (const p of faltam) {
+          if (!ativo(ctx)) { if (pagosAgora > 0) ctx.aoMudar && ctx.aoMudar(); return; }
+          ctx.g = await office(`/grupos/${g.id}/pagamentos`, { method: 'POST', body: { pilotoId: p.id, valorCentavos: p.falta_centavos, forma: forma.trim() } });
+          pagosAgora++;
+        }
+        if (!ativo(ctx)) { if (pagosAgora > 0) ctx.aoMudar && ctx.aoMudar(); return; }
+        pintar(); ctx.aoMudar && ctx.aoMudar();
+        toast(`${faltam.length} pagamentos registrados · aparecem pagos na Recepção`);
+      } catch (er) {
+        if (pagosAgora > 0) ctx.aoMudar && ctx.aoMudar();
+        if (ativo(ctx)) {
+          if (pagosAgora > 0) { pintar(); toast(`${pagosAgora} de ${faltam.length} registrados antes do erro: ${er.message}`, true); }
+          else falhou(er);
+        } else {
+          falhou(er);
+        }
+      } finally { ctx.ocupado = false; }
       return;
     }
     if ((x = el('[data-link]'))) {
@@ -834,7 +878,7 @@ const Grupo = (() => {
         if (!ativo(ctx)) return;
         x.disabled = false; x.textContent = rotuloAntes;
         const lk = $('#listaLinks');
-        if (lk) lk.innerHTML = `<div class="aviso-faixa" role="alert">Não consegui gerar o link de pagamento: ${esc(er.message)} <button type="button" class="btn link peq" data-cobrar="${x.dataset.cobrar || ''}">Tentar de novo</button> · ou use “Marcar como pago” se o cliente pagou por fora.</div>`;
+        if (lk) lk.innerHTML = `<div class="aviso-faixa" role="alert">Não foi possível gerar o link de pagamento: ${esc(er.message)} <button type="button" class="btn link peq" data-cobrar="${x.dataset.cobrar || ''}">Tentar de novo</button> · ou use “Marcar como pago” se o cliente pagou por fora.</div>`;
         else falhou(er);
       } finally { ctx.ocupado = false; }
       return;
@@ -855,7 +899,7 @@ const Grupo = (() => {
     }
     if (el('[data-registrar]')) {
       const v = Math.round(parseFloat(String(estado.reg.valor).replace(',', '.')) * 100);
-      if (!(v > 0)) return toast('Informe o valor recebido, maior que zero.', true);
+      if (!Number.isFinite(v) || v <= 0) return toast('Informe o valor recebido, maior que zero.', true);
       if (v > g.falta && !(await confirmar('Valor maior do que falta receber', `Você digitou ${brl(v)} e faltam ${brl(g.falta)}. Registrar mesmo assim?`, 'Registrar mesmo assim'))) return;
       if (!ativo(ctx)) return;
       const corpo = { pilotoId: ctx.reg.quem ? +ctx.reg.quem : null, valorCentavos: v, forma: ctx.reg.forma };
@@ -874,6 +918,7 @@ const Grupo = (() => {
       return;
     }
     if ((x = el('[data-salvar-grupo]'))) {
+      if (x.disabled || x.getAttribute('aria-busy') === 'true') return;
       if (!respValido(rasc)) {
         estado.tentou = true;
         { const er0 = $('#erroGrupo'); if (er0) er0.className = 'erroMsg empurra'; }
@@ -884,6 +929,7 @@ const Grupo = (() => {
         if (campo) { campo.setAttribute('aria-invalid', 'true'); campo.scrollIntoView({ block: 'center', behavior: 'smooth' }); campo.focus(); }
         return;
       }
+      const rotuloSalvar = x.textContent;
       x.disabled = true; x.setAttribute('aria-busy', 'true'); x.textContent = 'Salvando…';
       try {
         const pilotos = rasc.pilotos.map((p, i) => (i === 0 ? (rasc.responsavel ? { nome: rasc.responsavel.nome, telefone: rasc.responsavel.telefone, menor: !!p.menor } : { nome: p.nome, telefone: p.telefone, menor: !!p.menor }) : p));
@@ -894,7 +940,7 @@ const Grupo = (() => {
           try { novo = await office(`/grupos/${novo.id}/vincular`, { method: 'POST', body: { clienteId: cid, pilotoId: vaga.id, puxarDados: true } }); }
           catch (er) { toast(`Vaga ${k + 1}: não deu para vincular o cadastro (${er.message})`, true); }
         }
-        if (!ativo(ctx)) { try { sessionStorage.removeItem(chaveRasc(b)); } catch {} return; }
+        if (!ativo(ctx)) { try { sessionStorage.removeItem(chaveRasc(b)); } catch {} ctx.aoMudar && ctx.aoMudar(); return; }
         guardarRascunho(true); estado.g = novo; estado.rasc = null;
         { const gid = novo.id; toastAcao(`Reserva de ${plural(novo.n, 'piloto', 'pilotos')} salva · já aparece na Recepção, no site e no totem`, 'Desfazer', async () => { await office(`/grupos/${gid}`, { method: 'DELETE' }); if (ativo(ctx)) { fecharCamada(); estado = null; } toast('Reserva desfeita · vagas liberadas'); }); }
         pintar();
@@ -905,7 +951,7 @@ const Grupo = (() => {
           const fone = novo.responsavelTelefone || '';
           mostrarLinks([[fone ? `Mandar o link do grupo para ${novo.responsavel} · ${fone}` : 'Copie o link do grupo e mande no WhatsApp', fone ? zap(fone, msgGrupo(novo)) : '#']], 'Link de cadastro do grupo');
         }
-      } catch (er) { if (!ativo(ctx)) return; const m = $('#erroGrupo'); if (m) { m.className = 'erroMsg empurra'; m.textContent = /vaga/i.test(er.message) ? er.message + ' Reduza a quantidade ou use "‹ Trocar horário".' : er.message; } x.disabled = false; x.removeAttribute('aria-busy'); x.textContent = 'Salvar reserva'; }
+      } catch (er) { if (!ativo(ctx)) return falhou(er); const m = $('#erroGrupo'); if (m) { m.className = 'erroMsg empurra'; m.textContent = /vaga/i.test(er.message) ? er.message + ' Reduza a quantidade ou use “‹ Trocar horário”.' : er.message; } if (x.isConnected) { x.disabled = false; x.removeAttribute('aria-busy'); x.textContent = rotuloSalvar; } }
     }
   });
 

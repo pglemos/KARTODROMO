@@ -32,7 +32,7 @@ const AgendaAcoes = (() => {
     await office(`/baterias/${b.id}/tipo`, { method: 'POST', body: { tipo, estadoAnterior: { status: b.status, reservaFechada: !!b.reservaFechada, autoAtendimento: !(b.autoAtendimento === false || b.autoAtendimento === 0) } } });
   }
   const tipoDe = (b) => (b.reservaFechada ? 'fechada' : (b.autoAtendimento === false || b.autoAtendimento === 0) ? 'bloqueada' : 'aberta');
-  const TIPOS_RESERVA = [['aberta', 'Vagas abertas', 'site, totem e Recepção'], ['fechada', 'Bateria fechada para novos', 'só o grupo, sai do site'], ['bloqueada', 'Bloqueada', 'só a Recepção vende']];
+  const TIPOS_RESERVA = [['aberta', 'Vagas abertas', 'site, totem e Recepção'], ['fechada', 'Bateria fechada', 'só o grupo, sai do site e do totem'], ['bloqueada', 'Bloqueada', 'só a Recepção vende']];
   const flagsDoTipo = (t) => ({ reservaFechada: t === 'fechada', autoAtendimento: t === 'aberta' });
 
   // ------------------------------------------------------------------ nova bateria / editar
@@ -52,7 +52,7 @@ const AgendaAcoes = (() => {
           ${novo ? '' : `<span class="badgeNomeBateria">${esc(b.nome || 'BATERIA')}</span>`}
         </div>
       </div>
-      <button class="btnFecharModal hov" data-ag-voltar aria-label="Fechar janela" title="Fechar (Esc)">
+      <button type="button" class="btnFecharModal hov" data-ag-voltar aria-label="Fechar janela" title="Fechar (Esc)">
         ${svg(IC.fechar, 16, 'currentColor', 2.4)}
       </button>
     </div>
@@ -67,38 +67,40 @@ const AgendaAcoes = (() => {
         <label class="campo" style="grid-column: 1 / -1; display: flex; flex-direction: row; align-items: center; gap: 10px; cursor: pointer;"><input type="checkbox" id="bCamp" ${!novo && b.campeonato ? 'checked' : ''} style="width: 18px; height: 18px;"><span style="text-transform: none; letter-spacing: 0;"><b>É campeonato</b> — o nome acima é o nome do campeonato; aparece assim no totem, no site e na Recepção, sempre aberta para os pilotos se inscreverem (online ou no totem)</span></label>
         <label class="campo" style="grid-column: span 4;"><span>Volta mínima (segundos)</span><input class="entrada" id="bVolta" type="number" min="0" inputmode="numeric" value="${novo ? 5 : b.voltaMinimaSeg ?? 5}" style="height: 38px;"></label>
         <label class="campo" style="grid-column: 1 / -1"><span>Observação interna (opcional)</span><textarea class="entrada" id="bObs" rows="2" maxlength="400" style="height: auto; resize: vertical;" placeholder="Alguma observação para a equipe">${esc(novo ? '' : b.observacao || '')}</textarea></label>
-      </div><p class="erroMsg" id="bErro" style="padding: 0 24px"></p>
-      <div class="modalRodape" style="padding: 14px 24px; display: flex; align-items: center; justify-content: flex-end; gap: 8px;"><button class="btn sec peq" data-ag-voltar>Cancelar</button><button class="btn prim peq" id="bSalvar">${novo ? 'Criar bateria' : 'Salvar alterações'}</button></div>`;
+      </div><p class="erroMsg" id="bErro" role="alert" style="padding: 0 24px"></p>
+      <div class="modalRodape" style="padding: 14px 24px; display: flex; align-items: center; justify-content: flex-end; gap: 8px;"><button type="button" class="btn sec peq" data-ag-voltar>Cancelar</button><button type="button" class="btn prim peq" id="bSalvar">${novo ? 'Criar bateria' : 'Salvar alterações'}</button></div>`;
     m.querySelectorAll('[data-ag-voltar]').forEach((btn) => btn.onclick = () => voltar(b && b.id));
     m.querySelector('#bNome').focus();
     m.querySelector('#bSalvar').onclick = async () => {
-      const erro = (t) => { m.querySelector('#bErro').textContent = t; };
+      m.querySelectorAll('[aria-invalid]').forEach((el) => el.removeAttribute('aria-invalid'));
+      const erro = (t, sel) => { m.querySelector('#bErro').textContent = t; const alvo = sel && m.querySelector(sel); if (alvo) { alvo.setAttribute('aria-invalid', 'true'); alvo.focus(); } };
+      erro('');
       const nome = m.querySelector('#bNome').value.trim(), data = m.querySelector('#bData').value, h = m.querySelector('#bHora').value;
       const produtoId = Number(m.querySelector('#bProduto').value), vagas = Math.floor(Number(m.querySelector('#bVagas').value));
-      if (!nome) return erro('Informe o nome da bateria.');
+      if (!nome) return erro('Informe o nome da bateria.', '#bNome');
       const campeonato = m.querySelector('#bCamp').checked;
-      if (campeonato && /^bateria$/i.test(nome)) return erro('Em campeonato, o nome da bateria é o nome do campeonato (ex.: Campeonato Ultras · Etapa 3).');
-      if (!data) return erro('Informe a data.');
-      if (!/^\d{2}:\d{2}$/.test(h)) return erro('Informe a hora.');
-      if (!produtoId) return erro('Escolha o produto: ele define o preço.');
-      if (!(vagas >= 1)) return erro('Informe as vagas (pelo menos 1).');
-      if (!novo && !podeFechar() && vagas < Number(b.vagas)) return erro('Seu usuário não pode diminuir as vagas de uma bateria. Chame o administrador.');
-      if (!podeFechar() && m.querySelector('#bTipo').value !== 'aberta' && m.querySelector('#bTipo').value !== tipo) return erro('Seu usuário não pode fechar nem bloquear baterias.');
-      if (!novo && vagas < b.inscritos) return erro(`A bateria já tem ${plural(b.inscritos, 'inscrito', 'inscritos')}. As vagas não podem ficar abaixo disso.`);
+      if (campeonato && /^bateria$/i.test(nome)) return erro('Em campeonato, o nome da bateria é o nome do campeonato (ex.: Campeonato Ultras · Etapa 3).', '#bNome');
+      if (!data) return erro('Informe a data.', '#bData');
+      if (!/^\d{2}:\d{2}$/.test(h)) return erro('Informe a hora.', '#bHora');
+      if (!produtoId) return erro('Escolha o produto: ele define o preço.', '#bProduto');
+      if (!(vagas >= 1)) return erro('Informe as vagas (pelo menos 1).', '#bVagas');
+      if (!novo && !podeFechar() && vagas < Number(b.vagas)) return erro('Seu usuário não pode diminuir as vagas de uma bateria. Chame o administrador.', '#bVagas');
+      if (!podeFechar() && m.querySelector('#bTipo').value !== 'aberta' && m.querySelector('#bTipo').value !== tipo) return erro('Seu usuário não pode fechar nem bloquear baterias.', '#bTipo');
+      if (!novo && vagas < b.inscritos) return erro(`A bateria já tem ${plural(b.inscritos, 'inscrito', 'inscritos')}. As vagas não podem ficar abaixo disso.`, '#bVagas');
       const corpo = {
         nome, inicio: `${data}T${h}`, vagas, produtoId, tracadoId: Number(m.querySelector('#bTracado').value) || null,
         voltaMinimaSeg: Math.max(0, Math.floor(Number(m.querySelector('#bVolta').value) || 0)), observacao: m.querySelector('#bObs').value.trim() || null,
         ...flagsDoTipo(campeonato ? 'aberta' : m.querySelector('#bTipo').value), campeonato,
         ...(novo ? {} : { codigoReserva: b.codigoReserva || null, responsavelId: b.responsavelId || null }),
       };
-      const btn = m.querySelector('#bSalvar'); btn.disabled = true;
+      const btn = m.querySelector('#bSalvar'); const rotuloAntes = btn.textContent; btn.disabled = true; btn.setAttribute('aria-busy', 'true'); btn.textContent = 'Salvando…';
       try {
         const r = await office(novo ? '/baterias' : `/baterias/${b.id}`, { method: novo ? 'POST' : 'PUT', body: corpo });
         toast(novo ? 'Bateria criada' : 'Bateria salva');
         const id = novo ? r.id : b.id;
         if (novo || data !== b.dataHora.slice(0, 10)) { C.A.base = data; if (C.A.vista === 'lista' && data < hojeIso()) C.A.base = hojeIso(); }
         C.A.sel = id; fecharCamada(); await C.carregar(); C.abrir(id);
-      } catch (e) { erro(e.message); btn.disabled = false; }
+      } catch (e) { erro(e.message); btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = rotuloAntes; }
     };
   }
 
@@ -119,49 +121,76 @@ const AgendaAcoes = (() => {
     const m = modal('', 'Excluir bateria'); m.style.maxWidth = '540px';
     const pagos = +b.pagos || 0, n = +b.inscritos || 0;
     const bloqueada = pagos > 0;
-    m.innerHTML = `<div style="padding: var(--kib-espaco-3)"><b style="font-size: var(--kib-fonte-tamanho-titulo)">Excluir a bateria das ${horaDe(b.dataHora)}?</b>
-      <p style="line-height: 1.5; margin: var(--kib-espaco-1) 0 0">${esc(diaExtenso(b.dataHora.slice(0, 10)))} · ${esc(b.nome || b.produto || '')}</p>
+    m.innerHTML = `<div class="modalGrupoTopo">
+        <div class="modalGrupoTopoInfo">
+          <h2 class="modalGrupoTitulo">Excluir a bateria das ${horaDe(b.dataHora)}?</h2>
+          <div class="modalGrupoBadges"><span class="badgeDataBateria">${esc(diaExtenso(b.dataHora.slice(0, 10)))} · ${esc(b.nome || b.produto || '')}</span></div>
+        </div>
+        <button type="button" class="btnFecharModal hov" data-ag-voltar aria-label="Fechar janela" title="Fechar (Esc)">${svg(IC.fechar, 16, 'currentColor', 2.4)}</button>
+      </div>
+      <div style="padding: var(--kib-espaco-2) var(--kib-espaco-3)">
       ${bloqueada
-        ? `<p style="line-height: 1.5; margin: var(--kib-espaco-denso-12) 0 0"><b>Não dá para excluir:</b> ${pagos} ${pagos === 1 ? 'reserva já está paga' : 'reservas já estão pagas'}. Mova ${pagos === 1 ? 'o cliente' : 'os clientes'} para outra bateria (em “Mover clientes”, na gaveta) ou faça o estorno antes.</p>`
+        ? `<p style="line-height: 1.5; margin: 0"><b>Não dá para excluir:</b> ${pagos} ${pagos === 1 ? 'reserva já está paga' : 'reservas já estão pagas'}. Mova ${pagos === 1 ? 'o cliente' : 'os clientes'} para outra bateria (em “Mover clientes”, na gaveta) ou faça o estorno antes.</p>`
         : n > 0
-          ? `<p style="line-height: 1.5; margin: var(--kib-espaco-denso-12) 0 0">${n} ${n === 1 ? 'reserva será cancelada' : 'reservas serão canceladas'} junto. Avise ${n === 1 ? 'o cliente' : 'os clientes'} ou mova-${n === 1 ? 'o' : 'os'} para outra bateria antes.</p>`
-          : '<p style="line-height: 1.5; margin: var(--kib-espaco-denso-12) 0 0">A bateria não tem reservas.</p>'}
-      <p class="erroMsg" id="xErro"></p></div>
-      <div class="modalRodape"><button class="btn sec" style="margin-left: auto" data-ag-voltar>${bloqueada ? 'Entendi' : 'Cancelar'}</button>${bloqueada ? '' : '<button class="btn prim" id="xOk" style="background: var(--kib-cor-estado-perigo-solido)">Excluir bateria</button>'}</div>`;
-    m.querySelector('[data-ag-voltar]').onclick = () => voltar(b.id);
+          ? `<p style="line-height: 1.5; margin: 0">${n} ${n === 1 ? 'reserva será cancelada' : 'reservas serão canceladas'} junto. Avise ${n === 1 ? 'o cliente' : 'os clientes'} ou mova-${n === 1 ? 'o' : 'os'} para outra bateria antes.</p>`
+          : '<p style="line-height: 1.5; margin: 0">A bateria não tem reservas.</p>'}
+      <p class="erroMsg" id="xErro" role="alert"></p></div>
+      <div class="modalRodape"><button type="button" class="btn sec" style="margin-left: auto" data-ag-voltar>${bloqueada ? 'Entendi' : 'Cancelar'}</button>${bloqueada ? '' : '<button type="button" class="btn perigo-solido" id="xOk">Excluir bateria</button>'}</div>`;
+    m.querySelectorAll('[data-ag-voltar]').forEach((bt) => bt.onclick = () => voltar(b.id));
     const ok = m.querySelector('#xOk'); if (!ok) return;
     ok.onclick = async () => {
-      ok.disabled = true;
+      if (ok.disabled) return;
+      ok.disabled = true; ok.setAttribute('aria-busy', 'true'); ok.textContent = 'Excluindo…';
       try {
         await office(`/baterias/${b.id}`, { method: 'DELETE' });
         if (n === 0) toastAcao('Bateria excluída', 'Desfazer', async () => { try { await office(`/baterias/${b.id}/restaurar`, { method: 'POST', body: { status: b.status === 'fechada' ? 'fechada' : 'aberta' } }); toast('Bateria restaurada'); await C.carregar(); } catch (e) { falhou(e); } });
         else toast('Bateria excluída. As reservas dela foram canceladas');
-        C.A.sel = null; fecharCamada(); await C.carregar();
+        C.A.sel = null; if (m.isConnected) fecharCamada(); await C.carregar();
       }
-      catch (e) { m.querySelector('#xErro').textContent = e.message; ok.disabled = false; }
+      catch (e) { if (!m.isConnected) return falhou(e); m.querySelector('#xErro').textContent = e.message; ok.disabled = false; ok.removeAttribute('aria-busy'); ok.textContent = 'Excluir bateria'; }
     };
   }
 
   // ------------------------------------------------------------------ aviso no topo da reserva online
   async function avisoReserva() {
     const m = modal('', 'Aviso da reserva online'); m.style.maxWidth = '560px';
-    m.innerHTML = `<div class="modalTopo"><span class="col" style="gap: var(--kib-espaco-meio)"><span style="font-size: var(--kib-fonte-tamanho-titulo); font-weight: 700">Aviso da reserva online</span><span class="peq">Faixa no topo de reservas.kartodromodebetim.com.br. Deixe em branco para tirar.</span></span></div>
+    m.innerHTML = `<div class="modalGrupoTopo">
+        <div class="modalGrupoTopoInfo">
+          <h2 class="modalGrupoTitulo">Aviso da reserva online</h2>
+          <div class="modalGrupoBadges"><span class="badgeDataBateria">Faixa no topo de reservas.kartodromodebetim.com.br. Deixe em branco para tirar.</span></div>
+        </div>
+        <button type="button" class="btnFecharModal hov" data-ag-voltar aria-label="Fechar janela" title="Fechar (Esc)">${svg(IC.fechar, 16, 'currentColor', 2.4)}</button>
+      </div>
       <div style="padding: var(--kib-espaco-2) var(--kib-espaco-3); display: grid; gap: var(--kib-espaco-denso-12)">
-        <label class="campo"><span>Texto (até 400 caracteres)</span><textarea class="entrada" id="avTexto" rows="3" maxlength="400" placeholder="Ex.: Sábado (15/11) a pista fecha às 14h para o 500 Milhas."></textarea></label>
+        <label class="campo"><span>Texto (até 400 caracteres)</span><textarea class="entrada" id="avTexto" rows="3" maxlength="400" style="height: auto; min-height: 76px; padding: var(--kib-espaco-1) var(--kib-espaco-denso-12); resize: vertical" placeholder="Ex.: Sábado (15/11) a pista fecha às 14h para o 500 Milhas."></textarea></label>
         <label class="campo"><span>Cor</span><select class="entrada" id="avTom"><option value="info">Verde (informação)</option><option value="alerta">Amarelo (atenção)</option></select></label>
         <label class="campo"><span>Mostrar até (opcional)</span><input class="entrada" id="avAte" type="datetime-local"></label>
         <div id="avErro" class="peq" style="color: var(--kib-cor-estado-perigo-texto)" role="alert"></div>
       </div>
-      <div class="modalRodape"><button class="btn sec" style="margin-left: auto" data-ag-voltar>Cancelar</button><button class="btn prim" id="avOk">Salvar aviso</button></div>`;
-    m.querySelector('[data-ag-voltar]').onclick = () => fecharCamada();
-    try { const a = await office('/aviso-reserva'); if (a && m.isConnected) { m.querySelector('#avTexto').value = a.texto || ''; m.querySelector('#avTom').value = a.tom === 'alerta' ? 'alerta' : 'info'; } } catch (e) { /* sem aviso no ar */ }
+      <div class="modalRodape"><button type="button" class="btn sec" style="margin-left: auto" data-ag-voltar>Cancelar</button><button type="button" class="btn prim" id="avOk">Salvar aviso</button></div>`;
+    m.querySelectorAll('[data-ag-voltar]').forEach((bt) => bt.onclick = () => fecharCamada());
+    try {
+      const a = await office('/aviso-reserva');
+      if (a && m.isConnected) {
+        m.querySelector('#avTexto').value = a.texto || '';
+        m.querySelector('#avTom').value = a.tom === 'alerta' ? 'alerta' : 'info';
+        if (a.ate) {
+          const dt = new Date(a.ate);
+          if (!Number.isNaN(dt.getTime())) {
+            const p2 = (v) => String(v).padStart(2, '0');
+            m.querySelector('#avAte').value = `${dt.getFullYear()}-${p2(dt.getMonth() + 1)}-${p2(dt.getDate())}T${p2(dt.getHours())}:${p2(dt.getMinutes())}`;
+          }
+        }
+      }
+    } catch (e) { /* sem aviso no ar */ }
     m.querySelector('#avOk').onclick = async () => {
-      const ok = m.querySelector('#avOk'); ok.disabled = true;
+      const ok = m.querySelector('#avOk'); if (ok.disabled) return;
+      ok.disabled = true; ok.setAttribute('aria-busy', 'true'); ok.textContent = 'Salvando…';
       const ate = m.querySelector('#avAte').value;
       try {
         const r = await office('/aviso-reserva', { method: 'PUT', body: { texto: m.querySelector('#avTexto').value, tom: m.querySelector('#avTom').value, ate: ate ? new Date(ate).toISOString() : null } });
-        fecharCamada(); toast(r ? 'Aviso publicado na reserva online' : 'Aviso retirado da reserva online');
-      } catch (e) { m.querySelector('#avErro').textContent = e.message; ok.disabled = false; }
+        if (m.isConnected) fecharCamada(); toast(r ? 'Aviso publicado na reserva online' : 'Aviso retirado da reserva online');
+      } catch (e) { if (!m.isConnected) return falhou(e); m.querySelector('#avErro').textContent = e.message; ok.disabled = false; ok.removeAttribute('aria-busy'); ok.textContent = 'Salvar aviso'; }
     };
   }
 
@@ -169,13 +198,20 @@ const AgendaAcoes = (() => {
   async function fecharDia() {
     const m = modal('', 'Fechar o dia'); m.style.maxWidth = '560px';
     const dia0 = C.A.base;
-    m.innerHTML = `<div class="modalTopo"><span class="col" style="gap: var(--kib-espaco-meio)"><span style="font-size: var(--kib-fonte-tamanho-titulo); font-weight: 700">Fechar o dia (feriado)</span><span class="peq">Cancela as baterias do dia que não têm ninguém inscrito</span></span></div>
-      <div style="padding: var(--kib-espaco-2) var(--kib-espaco-3); display: grid; gap: var(--kib-espaco-denso-12)"><label class="campo"><span>Dia</span><input class="entrada" id="fdData" type="date" value="${dia0}"></label><div id="fdResumo" class="peq" style="line-height: 1.5" role="status"></div><p class="erroMsg" id="fdErro"></p></div>
-      <div class="modalRodape"><button class="btn sec" style="margin-left: auto" data-ag-voltar>Cancelar</button><button class="btn prim" id="fdOk" style="background: var(--kib-cor-estado-perigo-solido)" disabled>Fechar o dia</button></div>`;
-    m.querySelector('[data-ag-voltar]').onclick = () => fecharCamada();
+    m.innerHTML = `<div class="modalGrupoTopo">
+        <div class="modalGrupoTopoInfo">
+          <h2 class="modalGrupoTitulo">Fechar o dia (feriado)</h2>
+          <div class="modalGrupoBadges"><span class="badgeDataBateria">Cancela as baterias do dia que não têm ninguém inscrito</span></div>
+        </div>
+        <button type="button" class="btnFecharModal hov" data-ag-voltar aria-label="Fechar janela" title="Fechar (Esc)">${svg(IC.fechar, 16, 'currentColor', 2.4)}</button>
+      </div>
+      <div style="padding: var(--kib-espaco-2) var(--kib-espaco-3); display: grid; gap: var(--kib-espaco-denso-12)"><label class="campo"><span>Dia</span><input class="entrada" id="fdData" type="date" value="${dia0}"></label><div id="fdResumo" class="peq" style="line-height: 1.5" role="status"></div><p class="erroMsg" id="fdErro" role="alert"></p></div>
+      <div class="modalRodape"><button type="button" class="btn sec" style="margin-left: auto" data-ag-voltar>Cancelar</button><button type="button" class="btn perigo-solido" id="fdOk" disabled>Fechar o dia</button></div>`;
+    m.querySelectorAll('[data-ag-voltar]').forEach((bt) => bt.onclick = () => fecharCamada());
     let lista = [], consulta = 0;
     const resumo = async () => {
       const pedido = ++consulta; const d = m.querySelector('#fdData').value; const ok = m.querySelector('#fdOk'); ok.disabled = true;
+      m.querySelector('#fdErro').textContent = '';
       if (!d) { m.querySelector('#fdResumo').textContent = ''; return; }
       m.querySelector('#fdResumo').textContent = 'Conferindo as baterias do dia…';
       try {
@@ -191,22 +227,25 @@ const AgendaAcoes = (() => {
     };
     m.querySelector('#fdData').onchange = resumo; resumo();
     m.querySelector('#fdOk').onclick = async () => {
-      const ok = m.querySelector('#fdOk'); ok.disabled = true;
+      const ok = m.querySelector('#fdOk'); if (ok.disabled) return;
+      ok.disabled = true; ok.setAttribute('aria-busy', 'true'); ok.textContent = 'Fechando…';
+      m.querySelector('#fdErro').textContent = '';
       try {
         const dia = m.querySelector('#fdData').value;
         const antes = await office(`/baterias?status=todas&filtro=entre&data=${dia}&ate=${dia}`).catch(() => []);
+        if (!m.isConnected) return;
         const alvos = antes.filter((x) => x.status !== 'cancelada' && !(+x.inscritos));
         const r = await office('/baterias/fechar-dia', { method: 'POST', body: { data: dia } });
         const msg = `${r.canceladas} ${r.canceladas === 1 ? 'bateria cancelada' : 'baterias canceladas'}${r.mantidas ? ` · ${r.mantidas} com reserva continuam` : ''}`;
         if (r.canceladas && alvos.length) toastAcao(msg, 'Desfazer', async () => {
           const falhas = [];
           for (const x of alvos) { try { await office(`/baterias/${x.id}/restaurar`, { method: 'POST', body: { status: x.status === 'fechada' ? 'fechada' : 'aberta' } }); } catch (e) { falhas.push(e.message); } }
-          if (falhas.length) toast(`Restaurei parte do dia. Falhou: ${falhas[0]}`, true); else toast('Dia reaberto');
+          if (falhas.length) toast(`Parte do dia foi restaurada. Falhou: ${falhas[0]}`, true); else toast('Dia reaberto');
           await C.carregar();
         });
         else toast(msg);
-        C.A.sel = null; fecharCamada(); await C.carregar();
-      } catch (e) { m.querySelector('#fdErro').textContent = e.message; ok.disabled = false; }
+        C.A.sel = null; if (m.isConnected) fecharCamada(); await C.carregar();
+      } catch (e) { if (!m.isConnected) return falhou(e); m.querySelector('#fdErro').textContent = e.message; ok.disabled = false; ok.removeAttribute('aria-busy'); ok.textContent = 'Fechar o dia'; }
     };
   }
 
@@ -214,8 +253,15 @@ const AgendaAcoes = (() => {
   async function gerar() {
     const m = modal('<div class="esqueleto" style="height: 320px; margin: var(--kib-espaco-denso-20)"></div>', 'Gerar baterias'); m.style.maxWidth = '640px';
     let ap; try { ap = await carregarApoio(); } catch (e) { falhou(e); return fecharCamada(); }
+    if (!m.isConnected) return;
     const d0 = deIso(C.A.base), ini = `${d0.getFullYear()}-${String(d0.getMonth() + 1).padStart(2, '0')}-01`, fim = (() => { const f = new Date(d0.getFullYear(), d0.getMonth() + 1, 0); return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`; })();
-    m.innerHTML = `<div class="modalTopo"><span class="col" style="gap: var(--kib-espaco-meio)"><span style="font-size: var(--kib-fonte-tamanho-titulo); font-weight: 700">Gerar baterias</span><span class="peq">Aplica uma configuração padrão nos dias escolhidos</span></span></div>
+    m.innerHTML = `<div class="modalGrupoTopo">
+        <div class="modalGrupoTopoInfo">
+          <h2 class="modalGrupoTitulo">Gerar baterias</h2>
+          <div class="modalGrupoBadges"><span class="badgeDataBateria">Aplica uma configuração padrão nos dias escolhidos</span></div>
+        </div>
+        <button type="button" class="btnFecharModal hov" data-ag-voltar aria-label="Fechar janela" title="Fechar (Esc)">${svg(IC.fechar, 16, 'currentColor', 2.4)}</button>
+      </div>
       <div style="display: grid; gap: var(--kib-espaco-denso-12); padding: var(--kib-espaco-2) var(--kib-espaco-3)">
         <label class="campo"><span>Configuração padrão</span><select class="entrada" id="gPadrao"><option value="">Escolha</option>${ap.padroes.map((p) => `<option value="${p.id}">${esc(p.nome)} · ${p.quantidade} baterias a partir das ${esc(p.primeiraHora)}, a cada ${p.intervaloMin} min · ${p.vagas} vagas</option>`).join('')}</select></label>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--kib-espaco-denso-12)"><label class="campo"><span>De</span><input class="entrada" id="gDe" type="date" value="${ini < hojeIso() ? hojeIso() : ini}"></label><label class="campo"><span>Até</span><input class="entrada" id="gAte" type="date" value="${fim}"></label></div>
@@ -223,28 +269,32 @@ const AgendaAcoes = (() => {
         <label style="display: flex; gap: var(--kib-espaco-1); align-items: center"><input type="checkbox" id="gFeriados" checked style="accent-color: var(--verde)">Pular feriados cadastrados</label>
         <label style="display: flex; gap: var(--kib-espaco-1); align-items: center"><input type="checkbox" id="gExistentes" checked style="accent-color: var(--verde)">Pular horários que já existem (evita duplicar)</label>
         <label style="display: flex; gap: var(--kib-espaco-1); align-items: center"><input type="checkbox" id="gAtivo" checked style="accent-color: var(--verde)">Criar já abertas para reserva</label>
-        <p class="erroMsg" id="gErro"></p></div>
-      <div class="modalRodape"><button class="btn sec" style="margin-left: auto" data-ag-voltar>Cancelar</button><button class="btn prim" id="gOk">Gerar baterias</button></div>`;
-    m.querySelector('[data-ag-voltar]').onclick = () => fecharCamada();
+        <p class="erroMsg" id="gErro" role="alert"></p></div>
+      <div class="modalRodape"><button type="button" class="btn sec" style="margin-left: auto" data-ag-voltar>Cancelar</button><button type="button" class="btn prim" id="gOk">Gerar baterias</button></div>`;
+    m.querySelectorAll('[data-ag-voltar]').forEach((bt) => bt.onclick = () => fecharCamada());
     m.querySelector('#gOk').onclick = async () => {
-      const erro = (t) => { m.querySelector('#gErro').textContent = t; };
+      const ok = m.querySelector('#gOk'); if (ok.disabled) return;
+      m.querySelectorAll('[aria-invalid]').forEach((el) => el.removeAttribute('aria-invalid'));
+      const erro = (t, sel) => { if (!m.isConnected) return; m.querySelector('#gErro').textContent = t; const alvo = sel && m.querySelector(sel); if (alvo) { alvo.setAttribute('aria-invalid', 'true'); alvo.focus(); } };
       const padraoId = Number(m.querySelector('#gPadrao').value), de = m.querySelector('#gDe').value, ate = m.querySelector('#gAte').value;
       const dias = [...m.querySelectorAll('[name=gDia]:checked')].map((x) => +x.value);
-      if (!padraoId) return erro('Escolha a configuração padrão.');
-      if (!de || !ate || ate < de) return erro('Confira o período: a data final vem depois da inicial.');
+      const pularFeriados = m.querySelector('#gFeriados').checked, pularExistentes = m.querySelector('#gExistentes').checked, ativo = m.querySelector('#gAtivo').checked;
+      if (!padraoId) return erro('Escolha a configuração padrão.', '#gPadrao');
+      if (!de || !ate || ate < de) return erro('Confira o período: a data final deve ser igual ou posterior à inicial.', !de ? '#gDe' : '#gAte');
       if (!dias.length) return erro('Escolha pelo menos um dia da semana.');
-      const ok = m.querySelector('#gOk'); ok.disabled = true; ok.textContent = 'Gerando…'; erro('');
+      ok.disabled = true; ok.setAttribute('aria-busy', 'true'); ok.textContent = 'Gerando…'; erro('');
       let criadas = 0;
       try {
         // um mês por vez, como na Recepção: período grande não estoura o tempo do servidor
         for (let a = deIso(de); iso(a) <= ate; a = new Date(a.getFullYear(), a.getMonth() + 1, 1)) {
+          if (!m.isConnected) break;
           const fimMes = new Date(a.getFullYear(), a.getMonth() + 1, 0); const f = iso(fimMes) > ate ? ate : iso(fimMes);
-          const r = await office('/baterias/gerar', { method: 'POST', body: { padraoId, de: iso(a) < de ? de : iso(a), ate: f, diasSemana: dias, pularFeriados: m.querySelector('#gFeriados').checked, pularExistentes: m.querySelector('#gExistentes').checked, ativo: m.querySelector('#gAtivo').checked, soFeriados: false } });
+          const r = await office('/baterias/gerar', { method: 'POST', body: { padraoId, de: iso(a) < de ? de : iso(a), ate: f, diasSemana: dias, pularFeriados, pularExistentes, ativo, soFeriados: false } });
           criadas += r.criadas || 0;
         }
         toast(`${criadas} ${criadas === 1 ? 'bateria criada' : 'baterias criadas'}`);
-        fecharCamada(); await C.carregar();
-      } catch (e) { erro(criadas ? `${criadas} baterias foram criadas, mas a geração parou: ${e.message}. Gere de novo o mesmo período: os horários que já existem são pulados.` : e.message); ok.disabled = false; ok.textContent = 'Gerar baterias'; }
+        if (m.isConnected) fecharCamada(); await C.carregar();
+      } catch (e) { if (!m.isConnected) { if (criadas) C.carregar(); return falhou(e); } erro(criadas ? `${plural(criadas, 'bateria foi criada', 'baterias foram criadas')}, mas a geração parou: ${e.message}. Gere de novo o mesmo período: os horários que já existem são pulados.` : e.message); ok.disabled = false; ok.removeAttribute('aria-busy'); ok.textContent = 'Gerar baterias'; if (criadas) C.carregar(); }
     };
   }
 
@@ -275,7 +325,17 @@ const AgendaAcoes = (() => {
             return;
           }
         }
-        moverGrupoInteiro = await confirmar('Mover o grupo inteiro?', `Os pilotos selecionados fazem parte de grupo (${ampliadas.length} vagas no total).\n\nClique em 'Mover grupo inteiro' para mover todas as vagas do grupo, ou 'Cancelar' para mover apenas os ${reservas.length} selecionados (eles serão desvinculados do grupo).`, 'Mover grupo inteiro');
+        const escolha = await dialogo({
+          titulo: 'Mover o grupo inteiro?',
+          texto: `Os pilotos selecionados fazem parte de grupo (${ampliadas.length} vagas no total). Mover todas as vagas juntas ou desvincular e mover apenas ${plural(reservas.length, 'o selecionado', 'os selecionados')}?`,
+          botoes: [
+            { rotulo: 'Cancelar', valor: 'cancelar' },
+            { rotulo: `Só ${plural(reservas.length, 'selecionado', 'selecionados')}`, valor: 'parcial', classe: 'sec' },
+            { rotulo: 'Mover grupo inteiro', valor: 'grupo', classe: 'prim' },
+          ],
+        });
+        if (!escolha || escolha === 'cancelar') return;
+        moverGrupoInteiro = escolha === 'grupo';
         if (moverGrupoInteiro) reservas = ampliadas;
       } else {
         moverGrupoInteiro = true;
@@ -317,15 +377,20 @@ const AgendaAcoes = (() => {
       catch (e) { if (pedido !== consulta || !m.isConnected) return; lista = []; m.querySelector('#mvErro').textContent = e.message; }
       pintar();
     };
-    m.innerHTML = `<div class="modalTopo"><span class="col" style="gap: var(--kib-espaco-meio); min-width: 0"><span style="font-size: var(--kib-fonte-tamanho-titulo); font-weight: 700">Mover ${esc(nome)}</span>
-        <span class="peq">Hoje em ${diaExtenso(origem.dataHora.slice(0, 10))}, ${horaDe(origem.dataHora)} · ${pagas.length ? `${pagas.length} ${pagas.length === 1 ? 'pago' : 'pagos'}` : ''}${pagas.length && n > pagas.length ? ' · ' : ''}${n > pagas.length ? `${n - pagas.length} sem pagar` : ''}</span></span></div>
+    m.innerHTML = `<div class="modalGrupoTopo">
+        <div class="modalGrupoTopoInfo">
+          <h2 class="modalGrupoTitulo">Mover ${esc(nome)}</h2>
+          <div class="modalGrupoBadges"><span class="badgeDataBateria">Hoje em ${diaExtenso(origem.dataHora.slice(0, 10))}, ${horaDe(origem.dataHora)} · ${pagas.length ? `${pagas.length} ${pagas.length === 1 ? 'pago' : 'pagos'}` : ''}${pagas.length && n > pagas.length ? ' · ' : ''}${n > pagas.length ? `${n - pagas.length} sem pagar` : ''}</span></div>
+        </div>
+        <button type="button" class="btnFecharModal hov" data-ag-voltar aria-label="Fechar janela" title="Fechar (Esc)">${svg(IC.fechar, 16, 'currentColor', 2.4)}</button>
+      </div>
       <div style="padding: var(--kib-espaco-2) var(--kib-espaco-3); display: grid; gap: var(--kib-espaco-denso-12)">
-        <div class="linha gap-1" style="flex-wrap: wrap"><button class="btn sec peq" data-mv-dia="-1" aria-label="Dia anterior">${svg(IC.esq, 14)}</button><input class="entrada" id="mvDia" type="date" style="width: auto" value="${dia}" aria-label="Dia da nova bateria"><button class="btn sec peq" data-mv-dia="1" aria-label="Próximo dia">${svg(IC.dir, 14)}</button>
-          <button class="btn sec peq" data-mv-hoje>Hoje</button><button class="btn sec peq" data-mv-amanha>Amanhã</button><b id="mvTitulo2" style="margin-left: auto"></b></div>
-        <div id="mvLista" role="radiogroup" aria-label="Baterias do dia" style="display: grid; gap: var(--kib-espaco-meio); max-height: 46vh; overflow: auto"></div>
-        <p class="peq" id="mvAviso" style="margin: 0" role="status"></p><p class="erroMsg" id="mvErro"></p></div>
-      <div class="modalRodape"><button class="btn sec" style="margin-left: auto" data-ag-voltar>Cancelar</button><button class="btn prim" id="mvOk" disabled>Escolha a bateria</button></div>`;
-    m.querySelector('[data-ag-voltar]').onclick = () => voltar(origem.id);
+        <div class="linha gap-1" style="flex-wrap: wrap"><button type="button" class="btn sec peq" data-mv-dia="-1" aria-label="Dia anterior">${svg(IC.esq, 14)}</button><input class="entrada" id="mvDia" type="date" style="width: auto" value="${dia}" aria-label="Dia da nova bateria"><button type="button" class="btn sec peq" data-mv-dia="1" aria-label="Próximo dia">${svg(IC.dir, 14)}</button>
+          <button type="button" class="btn sec peq" data-mv-hoje>Hoje</button><button type="button" class="btn sec peq" data-mv-amanha>Amanhã</button><b id="mvTitulo2" style="margin-left: auto"></b></div>
+        <div id="mvLista" role="radiogroup" aria-label="Baterias do dia" style="display: grid; gap: var(--kib-espaco-meio); max-height: 46vh; overflow: auto; overscroll-behavior: contain"></div>
+        <p class="peq" id="mvAviso" style="margin: 0" role="status"></p><p class="erroMsg" id="mvErro" role="alert"></p></div>
+      <div class="modalRodape"><button type="button" class="btn sec" style="margin-left: auto" data-ag-voltar>Cancelar</button><button type="button" class="btn prim" id="mvOk" disabled>Escolha a bateria</button></div>`;
+    (m.querySelectorAll ? m.querySelectorAll('[data-ag-voltar]') : [m.querySelector('[data-ag-voltar]')]).forEach((bt) => bt && (bt.onclick = () => voltar(origem.id)));
     m.addEventListener('click', (e) => {
       const d = e.target.closest('[data-mv-dia]'); if (d) { dia = somaDias(dia, +d.dataset.mvDia); carregarDia(); return; }
       if (e.target.closest('[data-mv-hoje]')) { dia = hojeIso(); carregarDia(); return; }
@@ -335,10 +400,12 @@ const AgendaAcoes = (() => {
     m.querySelector('#mvLista').onchange = (e) => { if (e.target.name === 'dest') { escolhida = +e.target.value; pintar(); } };
     m.querySelector('#mvOk').onclick = async () => {
       const alvo = lista.find((b) => b.id === escolhida); if (ocupado || !alvo || motivo(alvo)) return;
-      ocupado = true; m.querySelector('#mvOk').disabled = true; m.querySelector('#mvErro').textContent = '';
+      const btnOk = m.querySelector('#mvOk');
+      ocupado = true; btnOk.disabled = true; btnOk.setAttribute?.('aria-busy', 'true'); btnOk.textContent = 'Movendo…'; m.querySelector('#mvErro').textContent = '';
       const falhas = [], pendentes = [], feitosPath = []; let feitas = 0;
       const processados = new Set();
       for (const r of reservas) {
+        if (m.isConnected === false) break;
         const grupoId = grupoPorInscricao.get(r.id);
         if (grupoId && processados.has(grupoId)) continue;
         if (grupoId) processados.add(grupoId);
@@ -347,6 +414,7 @@ const AgendaAcoes = (() => {
         catch (e) { pendentes.push(...membros); falhas.push(`${r.cliente}: ${e.message}`); }
       }
       ocupado = false;
+      m.querySelector('#mvOk')?.removeAttribute?.('aria-busy');
       if (!falhas.length) {
         toastAcao(feitas === 1 ? 'Cliente movido' : `${feitas} clientes movidos`, 'Desfazer', async () => {
           const erros = [];
@@ -354,8 +422,9 @@ const AgendaAcoes = (() => {
           if (erros.length) toast(`Não deu para devolver tudo: ${erros[0]}`, true); else toast('Movimento desfeito');
           await C.recarregar();
         });
-        C.A.sel = origem.id; fecharCamada(); await C.recarregar(); return;
+        C.A.sel = origem.id; if (m.isConnected !== false) fecharCamada(); await C.recarregar(); return;
       }
+      if (m.isConnected === false) { if (feitas) await C.carregar().catch(() => undefined); return; }
       m.querySelector('#mvErro').textContent = (feitas ? `${plural(feitas, 'movido', 'movidos')}. Não deu para mover: ` : 'Não foi possível mover: ') + falhas.join(' · ');
       reservas = pendentes; alvo.disponiveis = Math.max(0, Number(alvo.disponiveis) - feitas); pintar();
       if (feitas) await C.carregar().catch(() => undefined);
@@ -364,13 +433,13 @@ const AgendaAcoes = (() => {
   }
 
   // ------------------------------------------------------------------ seleção em lote: abrir ou fechar várias baterias
-  const lote = { modo: false, sel: new Set(), obs: null, abort: null };
+  const lote = { modo: false, sel: new Set(), obs: null, abort: null, ocupado: false };
   const lista = () => (C && C.bats ? C.bats() : []);
   const porId = (id) => lista().find((x) => x.id === id);
   const editavel = (b) => !!b && b.status !== 'cancelada' && !passou(b);
 
   function decorar() {
-    if (!C) return;
+    if (!C || !C.tela?.isConnected) return;
     const cal = C.tela.querySelector('#calendario'); if (!cal) return;
     // some da seleção o que saiu da tela (outra semana) ou já passou
     for (const id of [...lote.sel]) if (!editavel(porId(id))) lote.sel.delete(id);
@@ -388,32 +457,35 @@ const AgendaAcoes = (() => {
 
   function barraLote() {
     let barra = document.getElementById('agBarraLote');
-    const bt = C.tela.querySelector('[data-ag-selecionar]'); if (bt) bt.setAttribute('aria-pressed', String(lote.modo));
+    const bt = C.tela?.querySelector('[data-ag-selecionar]'); if (bt) bt.setAttribute('aria-pressed', String(lote.modo));
     if (!lote.modo) { if (barra) barra.remove(); return; }
     if (!barra) { barra = document.createElement('div'); barra.id = 'agBarraLote'; barra.className = 'agBarraLote'; barra.setAttribute('role', 'region'); barra.setAttribute('aria-label', 'Seleção de baterias'); document.body.appendChild(barra); }
     const sel = [...lote.sel].map(porId).filter(Boolean);
     const fechadas = sel.filter(estaFechada), abertas = sel.filter((b) => !estaFechada(b));
     const futuras = lista().filter(editavel);
     barra.innerHTML = `<span class="agBarraTxt" role="status" aria-live="polite"><b>${sel.length ? `${sel.length} ${sel.length === 1 ? 'bateria selecionada' : 'baterias selecionadas'}` : 'Escolha as baterias na agenda'}</b><span class="peq">${sel.length ? `${abertas.length} ${abertas.length === 1 ? 'aberta' : 'abertas'} · ${fechadas.length} ${fechadas.length === 1 ? 'fechada' : 'fechadas'}` : 'Toque ou clique em cada uma. Horários já encerrados não entram.'}</span></span>
-      <span class="agBarraAcoes"><button type="button" class="btn sec peq" data-ag-lote-todas ${futuras.length ? '' : 'disabled'}>${sel.length && sel.length === futuras.length ? 'Limpar seleção' : 'Todas desta tela'}</button>
-      <button type="button" class="btn sec peq" data-ag-lote-abrir ${fechadas.length ? '' : 'disabled'}>Abrir${fechadas.length ? ' ' + fechadas.length : ''}</button>
-      ${podeFechar() ? `<button type="button" class="btn prim peq" data-ag-lote-fechar style="background: var(--kib-cor-estado-perigo-solido)" ${abertas.length ? '' : 'disabled'}>Fechar${abertas.length ? ' ' + abertas.length : ''}</button>` : ''}
-      <button type="button" class="btn sec peq" data-ag-lote-sair>Sair</button></span>`;
+      <span class="agBarraAcoes"><button type="button" class="btn sec peq" data-ag-lote-todas ${futuras.length && !lote.ocupado ? '' : 'disabled'}>${sel.length && sel.length === futuras.length ? 'Limpar seleção' : 'Todas desta tela'}</button>
+      <button type="button" class="btn sec peq" data-ag-lote-abrir ${fechadas.length && !lote.ocupado ? '' : 'disabled'}>Abrir${fechadas.length ? ' ' + fechadas.length : ''}</button>
+      ${podeFechar() ? `<button type="button" class="btn prim peq" data-ag-lote-fechar style="background: var(--kib-cor-estado-perigo-solido)" ${abertas.length && !lote.ocupado ? '' : 'disabled'}>Fechar${abertas.length ? ' ' + abertas.length : ''}</button>` : ''}
+      <button type="button" class="btn sec peq" data-ag-lote-sair ${lote.ocupado ? 'disabled' : ''}>Sair</button></span>`;
   }
 
   function alternarLote(ligar = !lote.modo) {
+    if (lote.ocupado) return;
     lote.modo = ligar; if (!ligar) lote.sel.clear();
     if (ligar) { A_fecharGaveta(); }
     decorar();
   }
   function A_fecharGaveta() { if (document.querySelector('#camada .gaveta')) { C.A.sel = null; fecharCamada(); } }
   function marcar(id) {
+    if (lote.ocupado) return;
     const b = porId(id);
     if (!editavel(b)) { toast('O horário desta bateria já encerrou: não dá para abrir ou fechar', true); return; }
     if (lote.sel.has(id)) lote.sel.delete(id); else lote.sel.add(id);
     decorar();
   }
   async function aplicarLote(fechar) {
+    if (lote.ocupado) return;
     if (fechar && !podeFechar()) { toast('Seu usuário não pode fechar baterias', true); return; }
     const alvo = [...lote.sel].map(porId).filter((b) => b && (fechar ? !estaFechada(b) : estaFechada(b)));
     if (!alvo.length) return;
@@ -426,30 +498,58 @@ const AgendaAcoes = (() => {
       const reservas = alvo.reduce((a, b) => a + (+b.inscritos || 0), 0);
       const ordenadas = alvo.slice().sort((x, y) => x.dataHora.localeCompare(y.dataHora));
       const m = modal('', 'Fechar baterias'); m.style.maxWidth = '540px';
-      m.innerHTML = `<div style="padding: var(--kib-espaco-3)"><b style="font-size: var(--kib-fonte-tamanho-titulo)">Fechar ${alvo.length} ${alvo.length === 1 ? 'bateria' : 'baterias'}?</b>
-        <p style="line-height: 1.5; margin: var(--kib-espaco-denso-12) 0 0">Elas saem do site e do totem; só quem já tem reserva (e a Recepção) continua usando. ${reservas ? `<b>${reservas}</b> ${reservas === 1 ? 'reserva que já existe continua' : 'reservas que já existem continuam'}.` : 'Nenhuma tem reserva.'} Dá para abrir de novo a qualquer momento.</p>
-        <ul class="peq" style="margin: var(--kib-espaco-denso-12) 0 0; padding-left: var(--kib-espaco-3); max-height: 22vh; overflow: auto; line-height: 1.6">${ordenadas.map((b) => `<li>${dataBr(b.dataHora)} · ${horaDe(b.dataHora)}${+b.inscritos ? ` · ${b.inscritos} ${+b.inscritos === 1 ? 'reserva' : 'reservas'}` : ''}</li>`).join('')}</ul><p class="erroMsg" id="lErro"></p></div>
-        <div class="modalRodape"><button class="btn sec" style="margin-left: auto" data-ag-lote-nao>Cancelar</button><button class="btn prim" id="lOk" style="background: var(--kib-cor-estado-perigo-solido)">Fechar ${alvo.length === 1 ? 'a bateria' : 'as ' + alvo.length + ' baterias'}</button></div>`;
-      m.querySelector('[data-ag-lote-nao]').onclick = () => fecharCamada();
+      const rotuloLote = `Fechar ${alvo.length === 1 ? 'a bateria' : 'as ' + alvo.length + ' baterias'}`;
+      m.innerHTML = `<div class="modalGrupoTopo">
+          <div class="modalGrupoTopoInfo">
+            <h2 class="modalGrupoTitulo">Fechar ${alvo.length} ${alvo.length === 1 ? 'bateria' : 'baterias'}?</h2>
+          </div>
+          <button type="button" class="btnFecharModal hov" data-ag-lote-nao aria-label="Fechar janela" title="Fechar (Esc)">${svg(IC.fechar, 16, 'currentColor', 2.4)}</button>
+        </div>
+        <div style="padding: var(--kib-espaco-2) var(--kib-espaco-3)">
+        <p style="line-height: 1.5; margin: 0">Elas saem do site e do totem; só quem já tem reserva (e a Recepção) continua usando. ${reservas ? `<b>${reservas}</b> ${reservas === 1 ? 'reserva que já existe continua' : 'reservas que já existem continuam'}.` : 'Nenhuma tem reserva.'} Dá para abrir de novo a qualquer momento.</p>
+        <ul class="peq" style="margin: var(--kib-espaco-denso-12) 0 0; padding-left: var(--kib-espaco-3); max-height: 22vh; overflow: auto; overscroll-behavior: contain; line-height: 1.6">${ordenadas.map((b) => `<li>${dataBr(b.dataHora)} · ${horaDe(b.dataHora)}${+b.inscritos ? ` · ${b.inscritos} ${+b.inscritos === 1 ? 'reserva' : 'reservas'}` : ''}</li>`).join('')}</ul><p class="erroMsg" id="lErro" role="alert"></p></div>
+        <div class="modalRodape"><button type="button" class="btn sec" style="margin-left: auto" data-ag-lote-nao>Cancelar</button><button type="button" class="btn perigo-solido" id="lOk">${rotuloLote}</button></div>`;
+      m.querySelectorAll('[data-ag-lote-nao]').forEach((bt) => bt.onclick = () => fecharCamada());
       m.querySelector('#lOk').onclick = async () => {
-        m.querySelector('#lOk').disabled = true;
-        const r = await executar();
-        if (!r.erros.length) { toastAcao(`${r.feitas} ${r.feitas === 1 ? 'bateria fechada' : 'baterias fechadas'}`, 'Desfazer', desfazerLote(alvo, true)); fecharCamada(); await C.carregar(); decorar(); return; }
-        m.querySelector('#lErro').textContent = `${plural(r.feitas, 'fechada', 'fechadas')}. Não deu para fechar: ${r.erros.join(' · ')}`; await C.carregar(); decorar();
+        if (lote.ocupado) return;
+        const lOk = m.querySelector('#lOk'); lote.ocupado = true; lOk.disabled = true; lOk.setAttribute('aria-busy', 'true'); lOk.textContent = 'Fechando…'; barraLote();
+        let r;
+        try {
+          r = await executar();
+        } finally {
+          lote.ocupado = false;
+        }
+        if (!r.erros.length) {
+          toastAcao(`${r.feitas} ${r.feitas === 1 ? 'bateria fechada' : 'baterias fechadas'}`, 'Desfazer', desfazerLote(alvo, true));
+          if (m.isConnected) fecharCamada();
+          if (C?.tela?.isConnected) { await C.carregar(); decorar(); } else barraLote();
+          return;
+        }
+        if (m.isConnected) {
+          lOk.disabled = false; lOk.removeAttribute('aria-busy'); lOk.textContent = rotuloLote;
+          m.querySelector('#lErro').textContent = `${plural(r.feitas, 'fechada', 'fechadas')}. Não deu para fechar: ${r.erros.join(' · ')}`;
+        }
+        if (C?.tela?.isConnected) { await C.carregar(); decorar(); } else barraLote();
       };
       return;
     }
-    const r = await executar();
+    lote.ocupado = true; barraLote();
+    let r;
+    try {
+      r = await executar();
+    } finally {
+      lote.ocupado = false;
+    }
     if (r.erros.length) toast(`${plural(r.feitas, 'aberta', 'abertas')}. Falhou: ${r.erros.join(' · ')}`, true);
     else toastAcao(`${r.feitas} ${r.feitas === 1 ? 'bateria aberta' : 'baterias abertas'} para reservas`, 'Desfazer', desfazerLote(alvo, false));
-    await C.carregar(); decorar();
+    if (C?.tela?.isConnected) { await C.carregar(); decorar(); } else barraLote();
   }
   // devolve a função que põe as baterias do lote de volta como estavam
   function desfazerLote(alvo, foiFechar) {
     return async () => {
       let falhas = 0;
       for (const b of alvo) { try { await restaurar(b); } catch { falhas++; } }
-      if (falhas) toast(`${falhas} não voltou${falhas === 1 ? '' : 'ram'} ao estado anterior`, true);
+      if (falhas) toast(`${falhas} ${falhas === 1 ? 'bateria não voltou' : 'baterias não voltaram'} ao estado anterior`, true);
       await C.carregar(); decorar();
     };
   }
@@ -462,7 +562,7 @@ const AgendaAcoes = (() => {
     const acoes = C.tela.querySelector('.cab .acoes'); if (!acoes) return;
     const caixa = document.createElement('span');
     caixa.style.display = 'contents';
-    caixa.innerHTML = `<button class="btn sec" data-ag-selecionar aria-pressed="false" title="Escolher várias baterias para abrir ou fechar (tecla X)">Selecionar</button>
+    caixa.innerHTML = `<button type="button" class="btn sec" data-ag-selecionar aria-pressed="false" title="Escolher várias baterias para abrir ou fechar (tecla X)">Selecionar</button>
       <details class="menuMais"><summary class="btn sec" aria-label="Ações de bateria: nova, gerar, fechar o dia">Baterias</summary><div class="menuLista menuDir"><button type="button" data-ag-nova-bat>Nova bateria…</button><button type="button" data-ag-gerar>Gerar baterias do mês…</button>${podeFechar() ? '<button type="button" data-ag-fechar-dia>Fechar o dia (feriado)…</button><button type="button" data-ag-aviso>Aviso da reserva online…</button>' : ''}</div></details>`;
     acoes.prepend(caixa);
     lote.abort = new AbortController();
@@ -523,28 +623,48 @@ const AgendaAcoes = (() => {
       <p class="erroMsg" data-ag-pend-erro></p>`;
     corpo.appendChild(sec);
     const erro = (m) => { sec.querySelector('[data-ag-pend-erro]').textContent = m || ''; };
-    const vincular = async (clienteId, valor) => {
+    const vincular = async (clienteId, valor, bt) => {
+      if (sec.dataset.ocupado === '1') return;
+      sec.dataset.ocupado = '1';
+      sec.querySelectorAll('[data-ag-pend-ok]').forEach((b) => { b.disabled = true; });
+      if (bt) bt.setAttribute('aria-busy', 'true');
       const [grupoId, pilotoId] = String(valor).split(':').map(Number); erro('');
-      try { await office(`/grupos/${grupoId}/vincular`, { method: 'POST', body: { clienteId, pilotoId } }); toast('Cadastro vinculado à vaga do grupo'); await C.recarregar(); if (!$('#camada .gaveta')) C.abrir(b.id); }
-      catch (e) { erro(e.message || String(e)); }
+      try {
+        await office(`/grupos/${grupoId}/vincular`, { method: 'POST', body: { clienteId, pilotoId } });
+        toast('Cadastro vinculado à vaga do grupo');
+        await C.recarregar();
+        if (!$('#camada .gaveta')) C.abrir(b.id);
+      } catch (e) {
+        if (sec.isConnected) erro(e.message || String(e)); else falhou(e);
+      } finally {
+        delete sec.dataset.ocupado;
+        if (sec.isConnected) sec.querySelectorAll('[data-ag-pend-ok]').forEach((b) => { b.disabled = false; b.removeAttribute('aria-busy'); });
+      }
     };
-    let tq = null;
+    let tq = null, buscaSeq = 0;
     sec.addEventListener('input', (e) => {
       if (!e.target.matches('[data-ag-pend-q]')) return;
       clearTimeout(tq); const q = e.target.value.trim(); const res = sec.querySelector('[data-ag-pend-res]');
+      if (q.length < 2) { ++buscaSeq; res.innerHTML = ''; return; }
       tq = setTimeout(async () => {
-        if (q.length < 2) { res.innerHTML = ''; return; }
-        let lista = []; try { lista = await office('/clientes?q=' + encodeURIComponent(q)); } catch (er) { lista = []; }
-        res.innerHTML = lista.slice(0, 6).map((c) => `<div class="linha gap-1" style="flex-wrap: wrap; margin-top: var(--kib-espaco-meio)"><span class="trunc cresce"><b>${esc(c.nome)}</b> <span class="peq">${esc(c.documento || c.telefone || '')}</span></span><select class="entrada" data-ag-pend-vaga="${c.id}" style="max-width: 230px">${opcoes}</select><button type="button" class="btn sec peq" data-ag-pend-ok="${c.id}">Vincular</button></div>`).join('') || '<p class="peq">Nenhum cadastro encontrado.</p>';
+        const seq = ++buscaSeq;
+        try {
+          const lista = await office('/clientes?q=' + encodeURIComponent(q));
+          if (seq !== buscaSeq || !sec.isConnected) return;
+          res.innerHTML = lista.slice(0, 6).map((c) => `<div class="linha gap-1" style="flex-wrap: wrap; margin-top: var(--kib-espaco-meio)"><span class="trunc cresce"><b>${esc(c.nome)}</b> <span class="peq">${esc(c.documento || c.telefone || '')}</span></span><select class="entrada" data-ag-pend-vaga="${c.id}" style="max-width: 230px">${opcoes}</select><button type="button" class="btn sec peq" data-ag-pend-ok="${c.id}">Vincular</button></div>`).join('') || '<p class="peq">Nenhum cadastro encontrado.</p>';
+        } catch (er) {
+          if (seq !== buscaSeq || !sec.isConnected) return;
+          res.innerHTML = `<p class="erroMsg" role="alert">Não foi possível buscar cadastros: ${esc(er.message)}</p>`;
+        }
       }, 280);
     });
     sec.addEventListener('click', (e) => {
       const ok = e.target.closest('[data-ag-pend-ok]'); if (!ok) return;
-      const sel = sec.querySelector(`[data-ag-pend-vaga="${ok.dataset.agPendOk}"]`); vincular(+ok.dataset.agPendOk, sel.value);
+      const sel = sec.querySelector(`[data-ag-pend-vaga="${ok.dataset.agPendOk}"]`); if (sel) vincular(+ok.dataset.agPendOk, sel.value, ok);
     });
   }
 
-  function gaveta({ b, reservas }) {
+  function gaveta({ b, reservas, grupos }) {
     if (!C || !permitido()) return;
     const g = document.querySelector('#camada .gaveta'); if (!g || +g.dataset.bateria !== b.id) return;
     if (estaFechada(b) && !passou(b)) { const topo = g.querySelector('.gavetaTopo'); if (topo) topo.innerHTML = topo.innerHTML.replace(' · já correu', ' · bateria fechada para reservas'); }
@@ -568,8 +688,8 @@ const AgendaAcoes = (() => {
       <div class="listaMover">${lista.map((r) => `<label class="linhaMover"><input type="checkbox" data-ag-sel="${r.id}" aria-label="Selecionar ${esc(r.cliente)}"><span class="col" style="min-width: 0"><span class="trunc peso-semibold">${esc(r.cliente)}</span><span class="peq trunc">${esc(r.responsavel && r.responsavel !== r.cliente ? 'responsável ' + r.responsavel : r.origem || 'Recepção')}</span></span><span class="chip ${r.pago ? 'verde' : 'laranja'}">${r.pago ? 'pago' : 'falta ' + brlCurto(r.total)}</span><span class="acoesLinha"><button type="button" class="btn sec peq" data-ag-mover="${r.id}">Mover</button><button type="button" class="btn sec peq" data-ag-edit-cli="${r.clienteId}" aria-label="Editar cadastro de ${esc(r.cliente)}">Editar</button><button type="button" class="btn sec peq" style="color: var(--erroTxt)" data-ag-del-res="${r.id}" aria-label="Excluir a reserva de ${esc(r.cliente)}">Excluir</button></span></label>`).join('')}</div>
       <div class="linha gap-1" style="flex-wrap: wrap"><button type="button" class="btn sec peq" data-ag-sel-todos>Selecionar todos</button><button type="button" class="btn prim peq" data-ag-mover-sel disabled>Mover selecionados</button></div>`;
     corpo.appendChild(sec);
-    let porInsc = {};
-    office(`/grupos?bateriaId=${b.id}`).then((gs) => {
+    const porInsc = {};
+    const decorarGrupos = (gs) => {
       for (const gr of gs || []) {
         for (const p of gr.pilotos || []) {
           if (p.inscricaoId) {
@@ -592,8 +712,8 @@ const AgendaAcoes = (() => {
                   btn.className = 'btn sec peq';
                   btn.style.cssText = 'color: var(--kib-cor-marca-principal); border-color: color-mix(in srgb, var(--kib-cor-marca-principal) 40%, transparent); font-weight: 600;';
                   btn.setAttribute('data-ag-grupo-mover', p.inscricaoId);
-                  btn.title = 'Entrou no grupo errado? Coloque sozinho ou em outro grupo';
-                  btn.textContent = 'Grupo errado';
+                  btn.title = 'Mover este participante para outro grupo ou deixá-lo sozinho';
+                  btn.textContent = 'Trocar de grupo';
                   acoes.insertBefore(btn, acoes.firstChild);
                 }
               }
@@ -601,7 +721,9 @@ const AgendaAcoes = (() => {
           }
         }
       }
-    }).catch(() => undefined);
+    };
+    if (Array.isArray(grupos)) decorarGrupos(grupos);
+    else office(`/grupos?bateriaId=${b.id}`).then(decorarGrupos).catch(() => undefined);
     const excluirReserva = async (r) => {
       const vaga = porInsc[r.id];
       const ok = await dialogo({ titulo: `Excluir a reserva de ${r.cliente}?`, texto: 'A vaga será liberada. O cadastro e os pagamentos serão mantidos no histórico, sem reembolso automático.', botoes: [{ rotulo: 'Cancelar', valor: false }, { rotulo: 'Excluir reserva', valor: true, classe: 'perigo-solido' }] });

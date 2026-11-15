@@ -42,7 +42,8 @@
 .btn.icone.peq { width: var(--kib-componente-controle-altura-p); }
 .btn.mudo { background: transparent; }
 .btn.sec.risco { color: var(--kib-cor-estado-perigo-texto); }
-.btn:focus-visible, .seg button:focus-visible, .linhaDia:focus-visible { outline: var(--kib-foco-largura) solid var(--kib-cor-borda-foco); outline-offset: var(--kib-foco-deslocamento); }
+.btn:focus-visible, .seg button:focus-visible { outline: var(--kib-foco-largura) solid var(--kib-cor-borda-foco); outline-offset: var(--kib-foco-deslocamento); }
+.linhaDia:focus-visible, .bloco2:focus-visible, .cabDia:focus-visible, .linhaLado:focus-visible, .miniCal button:focus-visible, .filtroTipo:focus-visible, .linhaTabela:focus-visible { outline: var(--kib-foco-largura) solid var(--kib-cor-borda-foco); outline-offset: calc(var(--kib-foco-largura) * -1); }
 .btn:disabled, .btn[aria-busy="true"] { opacity: .55; cursor: not-allowed; }
 
 /* ---------- campos de formulário */
@@ -110,13 +111,14 @@
 .faixaPista { position: relative; display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--kib-espaco-1) var(--kib-espaco-2); padding: var(--kib-espaco-denso-20) var(--kib-espaco-2) var(--kib-espaco-denso-12); background: var(--kib-cor-superficie-inversa); color: var(--kib-cor-acao-sobre-principal); overflow: hidden; }
 .faixaPista::before { content: ''; position: absolute; inset: 0 0 auto 0; height: var(--kib-espaco-1); background: repeating-conic-gradient(var(--kib-cor-acao-sobre-principal) 0% 25%, var(--kib-cor-superficie-inversa) 0% 50%) 0 0 / var(--kib-espaco-1) var(--kib-espaco-1); }
 .pistaAgora { flex: 1 1 340px; min-width: 0; display: flex; align-items: center; gap: var(--kib-espaco-2); padding: 0; border: 0; background: transparent; color: inherit; text-align: left; border-radius: var(--kib-raio-botao); }
-.pistaAgora .col { color: inherit; }
-.pistaAgora .t-pequeno { color: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 78%, transparent); }
+.pistaAgora .col { color: inherit; min-width: 0; overflow-wrap: anywhere; }
+.pistaAgora .t-subtitulo { line-height: 1.3; }
+.pistaAgora .t-pequeno { color: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 86%, transparent); font-weight: var(--kib-fonte-peso-medio); line-height: 1.4; letter-spacing: 0.01em; }
 .pistaHora { font-size: var(--kib-fonte-tamanho-display-p); font-weight: var(--kib-fonte-peso-negrito); line-height: var(--kib-fonte-altura-linha-titulo); letter-spacing: -0.02em; }
 .pistaAgora.vazia .pistaHora { color: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 55%, transparent); }
 .pistaFila { flex: 1 1 280px; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--kib-espaco-1); }
-.pistaProx { display: flex; flex-direction: column; gap: 0; min-width: 84px; padding: var(--kib-espaco-meio) var(--kib-espaco-denso-12); border: 0; border-radius: var(--kib-raio-botao); background: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 12%, transparent); color: var(--kib-cor-acao-sobre-principal); text-align: left; }
-.pistaProx .t-pequeno { color: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 78%, transparent); }
+.pistaProx { display: flex; flex-direction: column; gap: 2px; min-width: 84px; max-width: 100%; overflow-wrap: anywhere; padding: var(--kib-espaco-meio) var(--kib-espaco-denso-12); border: 0; border-radius: var(--kib-raio-botao); background: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 12%, transparent); color: var(--kib-cor-acao-sobre-principal); text-align: left; }
+.pistaProx .t-pequeno { color: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 86%, transparent); font-weight: var(--kib-fonte-peso-medio); line-height: 1.35; letter-spacing: 0.01em; }
 .pistaAgora:focus-visible, .pistaProx:focus-visible { outline: var(--kib-foco-largura) solid var(--kib-cor-acao-sobre-principal); outline-offset: var(--kib-foco-deslocamento); }
 
 /* celular: alvos de toque de 44px nos controles principais da Agenda */
@@ -141,7 +143,7 @@
 .maisOpcoes[open] > summary { margin-bottom: var(--kib-espaco-1); }
 
 /* ---------- atalho escrito dentro do botão e botão dentro do aviso */
-kbd.atalho { margin-left: var(--kib-espaco-1); padding: 0 var(--kib-espaco-meio); border-radius: var(--kib-raio-chip); background: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 24%, transparent); font: var(--kib-fonte-peso-negrito) var(--kib-fonte-tamanho-pequeno) var(--kib-fonte-familia-numero); }
+kbd.atalho { margin-left: var(--kib-espaco-1); padding: 0 var(--kib-espaco-meio); border: 1px solid color-mix(in srgb, currentColor 28%, transparent); border-radius: var(--kib-raio-chip); box-shadow: none; background: color-mix(in srgb, var(--kib-cor-superficie-inversa) 28%, transparent); color: inherit; font: var(--kib-fonte-peso-negrito) var(--kib-fonte-tamanho-pequeno) var(--kib-fonte-familia-numero); }
 .toastBtn { margin-left: var(--kib-espaco-1); background: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 18%, transparent); color: var(--kib-cor-acao-sobre-principal); }
 .btn.link.peq { min-height: var(--kib-espaco-3); }
 
@@ -152,10 +154,12 @@ kbd.atalho { margin-left: var(--kib-espaco-1); padding: 0 var(--kib-espaco-meio)
 }
 
 /* ---------- diálogo próprio (confirmar / escolher forma): por cima da janela aberta */
-.veuTopo { position: fixed; inset: 0; z-index: 400; display: flex; align-items: center; justify-content: center; background: var(--kib-cor-sobreposicao); padding: var(--kib-espaco-2); }
+.veuTopo { position: fixed; inset: 0; z-index: 400; display: flex; align-items: center; justify-content: center; overscroll-behavior: contain; background: var(--kib-cor-sobreposicao); padding: var(--kib-espaco-2); }
 .dialogoCaixa { width: min(440px, 100%); max-width: 440px; margin: 0; }
 .dialogoCorpo { padding: var(--kib-espaco-3); display: flex; flex-direction: column; gap: var(--kib-espaco-denso-12); }
 .dialogoCorpo h2, .dialogoCorpo p { margin: 0; }
+.dialogoCorpo h2 { line-height: 1.25; text-wrap: balance; }
+.dialogoCorpo p { line-height: var(--kib-fonte-altura-linha-leitura); max-width: 65ch; text-wrap: pretty; }
 .dialogoBotoes { justify-content: flex-end; margin-top: var(--kib-espaco-1); }
 
 /* ---------- ajuda "?": abre embaixo sem espremer o título */
@@ -265,7 +269,7 @@ input[type="checkbox"], input[type="radio"] {
     flex-wrap: wrap;
   }
   .modalGrupoTitulo {
-    font-size: 1.15rem;
+    font-size: var(--kib-fonte-tamanho-titulo);
   }
   .modalGrupoBadges {
     gap: 5px;
@@ -277,14 +281,16 @@ input[type="checkbox"], input[type="radio"] {
   flex-direction: column;
   gap: 5px;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .modalGrupoTitulo {
-  font-size: 1.35rem;
+  font-size: var(--kib-fonte-tamanho-titulo-grande);
   font-weight: 700;
   letter-spacing: -0.015em;
   color: var(--kib-cor-texto-principal);
-  line-height: 1.25;
+  line-height: 1.2;
+  text-wrap: balance;
   margin: 0;
 }
 
@@ -293,11 +299,13 @@ input[type="checkbox"], input[type="radio"] {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: var(--kib-fonte-tamanho-pequeno);
+  font-variant-numeric: tabular-nums;
 }
 
 .badgeCodigoReserva {
   font-family: var(--kib-fonte-familia-numero);
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: 12px;
   letter-spacing: 0.04em;
@@ -347,6 +355,16 @@ input[type="checkbox"], input[type="radio"] {
   background: var(--kib-cor-borda-forte);
   color: var(--kib-cor-texto-principal);
 }
+.btnFecharModal:focus-visible,
+.btnToggleIdade:focus-visible,
+.btnRemoverPiloto:focus-visible,
+.btnMoverPilotoGrupo:focus-visible,
+.cardModoPagamento:focus-visible,
+.btnCobrarSumario:focus-visible,
+.btnZapWhatsApp:focus-visible {
+  outline: var(--kib-foco-largura) solid var(--kib-cor-borda-foco);
+  outline-offset: var(--kib-foco-deslocamento);
+}
 
 /* Tabela de Pilotos do Grupo */
 .cabTabelaGrupo {
@@ -356,7 +374,8 @@ input[type="checkbox"], input[type="radio"] {
   align-items: center;
   height: 36px;
   padding: 0 var(--kib-espaco-2);
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 1.2;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -388,9 +407,10 @@ input[type="checkbox"], input[type="radio"] {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 1px 6px;
+  padding: 2px 6px;
   border-radius: var(--kib-raio-chip);
-  font-size: 10px;
+  font-size: 11.5px;
+  line-height: 1.2;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -467,6 +487,7 @@ input[type="checkbox"], input[type="radio"] {
   padding: 3px 8px;
   border-radius: 6px;
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -496,7 +517,7 @@ input[type="checkbox"], input[type="radio"] {
   height: 26px;
   padding: 0 10px;
   border-radius: 6px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
   background: #15803d;
   border: 1px solid #15803d;
@@ -515,8 +536,8 @@ input[type="checkbox"], input[type="radio"] {
 /* Botão WhatsApp Compartilhar Link */
 .btnZapWhatsApp {
   height: 32px;
-  background: #25d366;
-  color: var(--kib-branco) !important;
+  background: var(--kib-cor-estado-sucesso-texto);
+  color: var(--kib-cor-acao-sobre-principal) !important;
   font-size: 12px;
   font-weight: 700;
   display: inline-flex;
@@ -529,7 +550,7 @@ input[type="checkbox"], input[type="radio"] {
   transition: background 0.15s ease;
 }
 .btnZapWhatsApp:hover {
-  background: var(--kib-whatsapp);
+  background: var(--kib-sucesso-texto-escuro);
 }
 
 /* Grade Responsiva Form Bateria */
@@ -647,10 +668,13 @@ input[type="checkbox"], input[type="radio"] {
   border-radius: 8px;
   background: var(--kib-cor-superficie-campo);
   border: 1px solid var(--kib-cor-borda-sutil);
-  height: 60px;
+  min-height: 64px;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
 }
 .cardMetricaFinanceiraLabel {
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 1.2;
   font-weight: 600;
   color: var(--kib-cor-texto-secundario);
   text-transform: uppercase;
@@ -670,9 +694,10 @@ input[type="checkbox"], input[type="radio"] {
   gap: 5px;
   max-height: 88px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .chipPilotoPendente {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   padding: 3px 8px;
   border-radius: var(--kib-raio-chip);
@@ -682,7 +707,7 @@ input[type="checkbox"], input[type="radio"] {
   white-space: nowrap;
 }
 .chipPilotoPendenteMais {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   padding: 3px 8px;
   border-radius: var(--kib-raio-chip);
