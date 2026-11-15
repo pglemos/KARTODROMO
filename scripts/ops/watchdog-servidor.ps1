@@ -1,4 +1,5 @@
-# Vigia do servidor da operacao (porta 4060). Roda a cada minuto como SYSTEM (tarefa "Kartodromo Servidor Watchdog").
+# Vigia E iniciador do servidor da operacao (porta 4060). Roda a cada minuto e no boot, como SYSTEM (tarefa "Kartodromo Servidor Watchdog").
+# A tarefa antiga "Kartodromo Servidor" foi desativada: subir por ela travava mudo de vez em quando (causa nao achada).
 # Se /healthz falhar 2 vezes seguidas (event loop travado, processo mudo ou fora do ar), derruba tudo e sobe de novo,
 # com ate 3 tentativas. O servidor e iniciado por Win32_Process.Create: sobrevive ao fim desta tarefa (filho de tarefa agendada morre junto).
 $ErrorActionPreference = 'Continue'
@@ -22,6 +23,7 @@ try {
   if ($novo) { Log 'sem resposta, mas o processo subiu ha menos de 2 min: aguardando'; exit 0 }
 
   $n = 1; if (Test-Path $cont) { $n = [int](Get-Content $cont -ErrorAction SilentlyContinue) + 1 }
+  if (-not (ProcServidor)) { $n = 2 } # nenhum processo (boot ou queda): sobe na hora, sem esperar a segunda falha
   Set-Content $cont $n
   if ($n -lt 2) { Log "healthz falhou ($n/2)"; exit 0 }
 

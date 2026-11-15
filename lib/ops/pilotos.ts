@@ -577,7 +577,9 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
     const porPag = Number(url.searchParams.get("por")) === 20 ? 20 : POR_PAGINA; // celular pede 20
     const ini = (pagina - 1) * porPag;
     const hojeLista = await hojeNaPista(), hoje = new Map(hojeLista.map((h) => [h.id, h.hora]));
-    const car = carreiras();
+    await new Promise<void>((r) => setImmediate(r));
+  const car = carreiras();
+  await new Promise<void>((r) => setImmediate(r));
     // ordem: recentes (padrão) | nome | baterias | melhor (as duas últimas só nas listas que vêm da carreira)
     const ordem = ['nome', 'baterias', 'melhor'].includes(url.searchParams.get('ordem') ?? '') ? url.searchParams.get('ordem')! : 'recentes';
     let rows: Record<string, unknown>[] = [], total = 0;
@@ -756,6 +758,15 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
  *  contagens de corridas (nada de documento, telefone, nascimento, compras). `ranking` = top 100 de cada traçado em
  *  semana/mês/geral; `pilotos` = carreira de todo piloto com cadastro que andou desde o início do índice. */
 // cache do ranking do app: a reconstrução leva ~20 s sobre o índice inteiro; só refaz quando o índice muda
+// Hora (0-23) em São Paulo de um instante. O formatador é caro de criar (toLocaleString com fuso recriava um por chamada:
+// ~2 milhões de chamadas por ciclo = 37 s de CPU travando o servidor, 15/11/2026): reaproveita um só e guarda por instante.
+const fmtHoraSp = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false });
+const horaSpCache = new Map<number, number>();
+const horaSp = (ms: number) => {
+  let h = horaSpCache.get(ms);
+  if (h === undefined) { h = Number(fmtHoraSp.format(ms)) % 24; if (horaSpCache.size > 200_000) horaSpCache.clear(); horaSpCache.set(ms, h); }
+  return h;
+};
 /** Posições de um traçado num período: { de: total, pos: { cid: posição } }. Uma linha por traçado/período no app. */
 export type PosicoesTracado = { periodo: string; tracado: string; de: number; pos: Record<string, number> };
 let rankingCache: { versao: number; dia: string; ranking: unknown; pilotos: unknown; posicoes: Record<string, PosicoesTracado> } | null = null;
@@ -885,7 +896,6 @@ export async function rankingPublicoParaApp() {
     const ordem = [...lista].sort((a, b) => a.inicio - b.inicio);
     let seq = 0, maiorSeq = 0;
     for (const c of ordem) if (c.tipo === 'corrida' && !c.dq && !c.reserva) { seq = c.pos === 1 ? seq + 1 : 0; maiorSeq = Math.max(maiorSeq, seq); }
-    const horaSp = (ms: number) => Number(new Date(ms).toLocaleString('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }));
     const cheias = lista.filter((c) => c.tipo === 'corrida' && !c.dq && !c.reserva && c.de >= 10);
     p.estatisticas = {
       corridas: lista.filter((c) => c.tipo === 'corrida').length,
@@ -907,9 +917,12 @@ export async function rankingPublicoParaApp() {
     .filter(([, p]) => p.baterias > 0)
     .map(([id, p]) => ({ id, nome: p.nome, xp: p.baterias * 50 + p.podios * 50 + p.vitorias * 100 + p.poles * 50 + p.voltasMaisRapidas * 50 }))
     .sort((a, b) => b.xp - a.xp);
-  porXp.forEach((x, i) => {
+  await new Promise<void>((r) => setImmediate(r));
+  for (let i = 0; i < porXp.length; i++) {
+    const x = porXp[i];
     (pilotos[x.id] as Record<string, unknown>).comparativo = { pos: i + 1, de: porXp.length, lider: i ? porXp[0] : null, acima: i ? porXp[i - 1] : null, abaixo: porXp[i + 1] ?? null, acimaLista: porXp.slice(Math.max(0, i - 10), i).reverse() };
-  });
+    if ((i & 1023) === 1023) await new Promise<void>((r) => setImmediate(r));
+  }
   // karts do último dia com baterias da cronometragem: melhor volta, melhor posição e as baterias de cada kart
   const doDia = Object.values(indice).filter((b) => !/^(lt|lr|cx)-/.test(b.id) && !b.chuva);
   const ultimoDia = doDia.reduce((a, b) => (b.dia > a ? b.dia : a), '');
