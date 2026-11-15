@@ -367,15 +367,38 @@ function antigosDo(tracado: string | null, per: Periodo) {
   return rankAntigo.filter((x) => (!tracado || x.tracado === tracado) && x.dia < lim && (per.nome === 'geral' || (x.tipo === (per.nome === 'semana' ? 'semana' : 'mes') && (!per.de || x.dia >= per.de) && (!per.ate || x.dia <= per.ate))));
 }
 /** Melhor volta de cada piloto num traçado e período (um tempo por piloto), juntando cronometragem nova, corridas do LapTime e o ranking antigo. */
-function ranking(tracado: string, per: Periodo): LinhaRank[] {
+type ItemRank = { b: BateriaCrono; p: Corrida };
+/** Uma passagem pelo índice para o período: separa por traçado os tempos que valem (evita varrer o índice inteiro por traçado). */
+async function itensPorTracado(per: Periodo): Promise<Map<string, ItemRank[]>> {
+  const m = new Map<string, ItemRank[]>();
+  let n = 0;
+  for (const b of Object.values(indice)) {
+    if (!b.chuva && !(per.de && b.dia < per.de) && !(per.ate && b.dia > per.ate)) {
+      for (const p of b.pilotos) {
+        if (!p.melhor || p.dq) continue;
+        const t = tk(b, p);
+        if (!valeNoRanking(t, p.melhor)) continue;
+        const l = m.get(t); if (l) l.push({ b, p }); else m.set(t, [{ b, p }]);
+      }
+    }
+    if ((++n & 255) === 255) await new Promise<void>((r) => setImmediate(r));
+  }
+  return m;
+}
+function ranking(tracado: string, per: Periodo, itens?: Map<string, ItemRank[]>): LinhaRank[] {
   const melhor = new Map<string, LinhaRank>();
   const por = (cid: string | null, nome: string) => (cid ? 'c' + cid : 'n' + nome.toLowerCase());
-  for (const b of Object.values(indice)) {
-    if (b.chuva) continue;
-    if (per.de && b.dia < per.de) continue;
-    if (per.ate && b.dia > per.ate) continue;
-    for (const p of b.pilotos) {
-      if (tk(b, p) !== tracado || !p.melhor || p.dq || !valeNoRanking(tracado, p.melhor)) continue;
+  const fonte: Iterable<ItemRank> = itens ? (itens.get(tracado) ?? []) : (function* () {
+    for (const b of Object.values(indice)) {
+      if (b.chuva) continue;
+      if (per.de && b.dia < per.de) continue;
+      if (per.ate && b.dia > per.ate) continue;
+      for (const p of b.pilotos) if (tk(b, p) === tracado && p.melhor && !p.dq && valeNoRanking(tracado, p.melhor)) yield { b, p };
+    }
+  })();
+  {
+    for (const { b, p } of fonte) {
+      if (!p.melhor) continue;
       const k = por(p.cid, p.nome), at = melhor.get(k);
       if (at && at.ms <= p.melhor) continue;
       melhor.set(k, { pos: 0, cid: p.cid, nome: p.nome, ms: p.melhor, kart: p.kart, bateria: b.nome, dia: b.dia, sessaoId: b.id.startsWith('lt-') ? null : b.id, categoria: catDoKart(p.kart) ?? nomeCategoria(p.cat), antigo: b.id.startsWith('lt-') });
@@ -399,10 +422,11 @@ function ranking(tracado: string, per: Periodo): LinhaRank[] {
   }
   return [...melhor.values()].sort((a, b) => a.ms - b.ms).map((l, i) => ({ ...l, pos: i + 1 }));
 }
-function tracadosComTempos(per: Periodo) {
+function tracadosComTempos(per: Periodo, itens?: Map<string, ItemRank[]>) {
   const conta = new Map<string, Set<string>>();
   const add = (t: string, k: string) => { const s = conta.get(t) ?? new Set<string>(); s.add(k); conta.set(t, s); };
-  for (const b of Object.values(indice)) {
+  if (itens) { for (const [t, l] of itens) for (const { p } of l) add(t, p.cid ? 'c' + p.cid : 'n' + chaveNome(p.nome)); }
+  else for (const b of Object.values(indice)) {
     if (b.chuva || (per.de && b.dia < per.de) || (per.ate && b.dia > per.ate)) continue;
     for (const p of b.pilotos) if (p.melhor && !p.dq && valeNoRanking(tk(b, p), p.melhor)) add(tk(b, p), p.cid ? 'c' + p.cid : 'n' + chaveNome(p.nome));
   }
@@ -753,10 +777,11 @@ export async function rankingPublicoParaApp() {
   const nomes = new Map<string, string>();
   const periodos: Record<string, { de: string | null; ate: string | null; tracados: { nome: string; pilotos: number; linhas: unknown[] }[] }> = {};
   for (const [nome, p] of Object.entries(per)) {
-    const tracados = tracadosComTempos(p).sort((a, b) => b.pilotos - a.pilotos);
+    const itens = await itensPorTracado(p);
+    const tracados = tracadosComTempos(p, itens).sort((a, b) => b.pilotos - a.pilotos);
     const listaTracados: { nome: string; pilotos: number; linhas: unknown[] }[] = [];
     for (const t of tracados) {
-      const todas = ranking(t.nome, p);
+      const todas = ranking(t.nome, p, itens);
       const doc: PosicoesTracado = { periodo: nome, tracado: t.nome, de: todas.length, pos: {} };
       for (const l of todas) if (l.cid) doc.pos[l.cid] = l.pos;
       posicoes[`posicoes:${nome}:${slugTracado(t.nome)}`] = doc;

@@ -76,6 +76,13 @@ const DEFAULT_SECTIONS: Array<{ titulo?: string; texto: (empresa: string) => str
       ', administradora do KARTÓDROMO, se exime de toda e qualquer responsabilidade civil ou penal, por infrações cometidas ou acidentes causados pelos participantes ou terceiros durante os treinos e as provas, sendo tais responsabilidades exclusivas daqueles que as tenham cometido ou ocasionado ou do Representante Legal.',
   },
   {
+    titulo: 'Termo de Consentimento para Tratamento de Dados Pessoais (LGPD):',
+    texto: (empresa) =>
+      'Em conformidade com a Lei nº 13.709/2018 (LGPD), o titular autoriza a ' +
+      empresa +
+      ' a tratar seus dados pessoais (nome, documento, contato, data de nascimento, peso e endereço) para identificar o piloto nas baterias, emitir este termo, registrar a cronometragem oficial e tempos, cumprir obrigações legais e entrar em contato sobre as reservas. Os dados não são comercializados a terceiros.',
+  },
+  {
     texto: () =>
       'Declaro ter lido, compreendido e aceito as condições supra mencionadas, não cabendo qualquer alegação de desconhecimento quanto ao seu teor.',
   },

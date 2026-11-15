@@ -332,6 +332,47 @@ describe('agenda e reservas do cliente', () => {
     expect(mockRouter.push).toHaveBeenCalledWith({ pathname: '/reservations/[id]', params: { id: order.id } });
   });
 
+  it('reserva com acompanhante exige e envia os mesmos campos do totem', async () => {
+    setSession(session);
+    mockUseLocalSearchParams.mockReturnValue({ bateriaId: '101' });
+    const user = userEvent.setup();
+    const view = await render(<ReservationsScreen />);
+    expect(await view.findByLabelText('Confirmar reserva')).toBeTruthy();
+    await user.press(view.getByRole('button', { name: 'Mais uma vaga' }));
+    await user.type(view.getByLabelText('Seu Instagram'), '@Maria.Silva');
+    await user.type(view.getByLabelText('Sua data de nascimento'), '15/05/1990');
+    await user.type(view.getByLabelText('Nome completo do piloto 2'), 'João Souza');
+    await user.type(view.getByLabelText('CPF do piloto 2'), '52998224725');
+    await user.type(view.getByLabelText('Data de nascimento do piloto 2'), '01/02/2000');
+    await user.type(view.getByLabelText('Instagram do piloto 2'), '@joao.souza');
+    await user.press(view.getByLabelText('Aceito a política de cancelamento'));
+    await user.press(view.getByRole('button', { name: 'Ir para o pagamento' }));
+    expect(await view.findByText('Informe um e-mail válido do piloto 2 (João Souza).')).toBeTruthy();
+    expect(requests('POST', '/api/mobile/v1/reservations')).toHaveLength(0);
+
+    await user.type(view.getByLabelText('E-mail do piloto 2'), 'Joao@Exemplo.com');
+    await user.type(view.getByLabelText('Celular do piloto 2'), '(31) 99999-0000');
+    await user.type(view.getByLabelText('Peso do piloto 2'), '300');
+    await user.press(view.getByRole('button', { name: 'Ir para o pagamento' }));
+    expect(await view.findByText('Informe o peso do piloto 2 (João Souza) (entre 20 e 250 kg).')).toBeTruthy();
+    await user.clear(view.getByLabelText('Peso do piloto 2'));
+    await user.type(view.getByLabelText('Peso do piloto 2'), '72,5');
+    await user.type(view.getByLabelText('Endereço do piloto 2'), 'Rua A, 10');
+    await user.type(view.getByLabelText('Bairro do piloto 2'), 'Centro');
+    await user.type(view.getByLabelText('Cidade do piloto 2'), 'Betim');
+    await user.press(view.getByRole('button', { name: 'Ir para o pagamento' }));
+
+    await waitFor(() => expect(requests('POST', '/api/mobile/v1/reservations')).toHaveLength(1));
+    const [req] = requests('POST', '/api/mobile/v1/reservations');
+    expect(JSON.parse(String(req[1]?.body))).toEqual(expect.objectContaining({
+      quantidade: 2, compradorPilota: true, pilotos: ['João Souza'],
+      acompanhantes: [{
+        nome: 'João Souza', documento: '529.982.247-25', nascimento: '2000-02-01', instagram: '@joao.souza',
+        email: 'joao@exemplo.com', telefone: '31999990000', peso: '72.5', endereco: 'Rua A, 10', bairro: 'Centro', cidade: 'Betim',
+      }],
+    }));
+  });
+
   it('copia o Pix retornado pelo servidor e lista apenas reservas da conta autenticada', async () => {
     setSession(session);
     listedOrders = [order];

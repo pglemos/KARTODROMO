@@ -8,7 +8,7 @@ import { Caixa, Desenho, Foto, LARGO, T, Toque, cor, fonte, fundos, useK, useTop
 import type { SessionTokens } from '../../api/contracts';
 
 import { reservationsApi } from '../../features/reservations/api';
-import type { AgendaResponse, CreateReservationInput, ReservationOrder } from '../../features/reservations/schemas';
+import { validarContatoAcompanhante, type AgendaResponse, type CreateReservationInput, type ReservationOrder } from '../../features/reservations/schemas';
 import { ActionButton, Field, formatBrl, formatDateTime, InlineError, LoadingMessage, Page, PageHeader, Panel, Notice, useUi } from '../../features/reservations/components';
 import { useSession } from '../../session/provider';
 import { useFloatingTabBarClearance } from '../../components/floating-tab-bar';
@@ -58,8 +58,14 @@ export function instagramNormalizado(value: string): string | null {
   return `@${u}`;
 }
 
-type OtherPilot = { nome: string; cpf: string; nascimento: string; instagram: string };
-const emptyPilot: OtherPilot = { nome: '', cpf: '', nascimento: '', instagram: '' };
+type OtherPilot = {
+  nome: string; cpf: string; nascimento: string; instagram: string; email: string; telefone: string; peso: string;
+  cep: string; endereco: string; complemento: string; bairro: string; cidade: string;
+};
+const emptyPilot: OtherPilot = {
+  nome: '', cpf: '', nascimento: '', instagram: '', email: '', telefone: '', peso: '',
+  cep: '', endereco: '', complemento: '', bairro: '', cidade: '',
+};
 
 function idempotencyKey() {
   return `mobile-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -237,9 +243,12 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
       if (!cpfValido(p.cpf)) { setError(`CPF inválido do piloto ${n} (${nome}).`); return; }
       const data = dateForServer(p.nascimento);
       if (!data) { setError(`Data de nascimento inválida do piloto ${n} (${nome}).`); return; }
+      const quem = `do piloto ${n} (${nome})`;
       const ig = instagramNormalizado(p.instagram);
-      if (ig === null) { setError(`Instagram inválido do piloto ${n} (${nome}). Informe o @usuário ou deixe em branco.`); return; }
-      acompanhantes.push({ nome, documento: p.cpf, nascimento: data, ...(ig ? { instagram: ig } : {}) });
+      if (!ig) { setError(ig === '' ? `Informe o Instagram ${quem}.` : `Instagram inválido ${quem}. Informe o @usuário (ex.: @andre.silva).`); return; }
+      const contato = validarContatoAcompanhante(p, quem);
+      if ('erro' in contato) { setError(contato.erro); return; }
+      acompanhantes.push({ nome, documento: p.cpf, nascimento: data, instagram: ig, ...contato.dados });
     }
     if (!policyAccepted) {
       setError('Aceite a política de cancelamento para continuar.');
@@ -413,10 +422,42 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
                   value={p.nascimento} keyboardType="number-pad" maxLength={10}
                   onChangeText={(value) => updatePilot(i, 'nascimento', maskDate(value))} style={styles.input} />
               </Field>
-              <Field label="Instagram (opcional)">
+              <Field label="Instagram">
                 <TextInput accessibilityLabel={`Instagram do piloto ${n}`} placeholder="@usuario" placeholderTextColor={palette.muted}
                   value={p.instagram} autoCapitalize="none" autoCorrect={false} maxLength={80}
                   onChangeText={(value) => updatePilot(i, 'instagram', value)} style={styles.input} />
+              </Field>
+              <Field label="E-mail">
+                <TextInput accessibilityLabel={`E-mail do piloto ${n}`} value={p.email} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} maxLength={120}
+                  onChangeText={(value) => updatePilot(i, 'email', value)} style={styles.input} />
+              </Field>
+              <Field label="Celular com DDD">
+                <TextInput accessibilityLabel={`Celular do piloto ${n}`} value={p.telefone} keyboardType="phone-pad" maxLength={20}
+                  onChangeText={(value) => updatePilot(i, 'telefone', value)} style={styles.input} />
+              </Field>
+              <Field label="Peso (kg)">
+                <TextInput accessibilityLabel={`Peso do piloto ${n}`} value={p.peso} keyboardType="decimal-pad" maxLength={6}
+                  onChangeText={(value) => updatePilot(i, 'peso', value)} style={styles.input} />
+              </Field>
+              <Field label="CEP (opcional)">
+                <TextInput accessibilityLabel={`CEP do piloto ${n}`} value={p.cep} keyboardType="number-pad" maxLength={9}
+                  onChangeText={(value) => updatePilot(i, 'cep', value)} style={styles.input} />
+              </Field>
+              <Field label="Endereço (rua e número)">
+                <TextInput accessibilityLabel={`Endereço do piloto ${n}`} value={p.endereco} maxLength={150}
+                  onChangeText={(value) => updatePilot(i, 'endereco', value)} style={styles.input} />
+              </Field>
+              <Field label="Complemento (opcional)">
+                <TextInput accessibilityLabel={`Complemento do piloto ${n}`} value={p.complemento} maxLength={80}
+                  onChangeText={(value) => updatePilot(i, 'complemento', value)} style={styles.input} />
+              </Field>
+              <Field label="Bairro">
+                <TextInput accessibilityLabel={`Bairro do piloto ${n}`} value={p.bairro} maxLength={80}
+                  onChangeText={(value) => updatePilot(i, 'bairro', value)} style={styles.input} />
+              </Field>
+              <Field label="Cidade">
+                <TextInput accessibilityLabel={`Cidade do piloto ${n}`} value={p.cidade} maxLength={80}
+                  onChangeText={(value) => updatePilot(i, 'cidade', value)} style={styles.input} />
               </Field>
             </Panel>
           );
