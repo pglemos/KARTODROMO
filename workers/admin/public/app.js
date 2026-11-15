@@ -48,18 +48,22 @@ const filtrarReservasMes = (lista, qRaw, hoje = hojeIso()) => {
   const qDig = so(q);
   const ehNumerica = !q.includes('@') && !/[a-zA-ZÀ-ÿ]/.test(q) && qDig.length >= 3;
   const termos = ehNumerica ? [] : normTxt(q).split(/\s+/).filter(Boolean);
+  const telCasa = (r, d) => {
+    const t = so(r.telefone);
+    return t.includes(d) || (d.length >= 12 && d.startsWith('55') && t.includes(d.slice(2)));
+  };
   const casa = (r) => {
     if (!r || typeof r !== 'object') return false;
     if (ehNumerica) {
       return so(r.documento).includes(qDig)
-        || so(r.telefone).includes(qDig)
+        || telCasa(r, qDig)
         || String(r.observacao || '').includes(q);
     }
     const alvo = [r.cliente, r.email, r.documento, r.telefone, r.responsavel, r.equipe, r.observacao].map(normTxt).join(' ');
     return termos.every((t) => {
       if (alvo.includes(t)) return true;
       const td = !/[a-zA-ZÀ-ÿ]/.test(t) ? so(t) : '';
-      return td.length >= 3 && (so(r.documento).includes(td) || so(r.telefone).includes(td));
+      return td.length >= 3 && (so(r.documento).includes(td) || telCasa(r, td));
     });
   };
   const rank = (r) => {
@@ -1250,6 +1254,7 @@ TELAS.agenda = async (tela) => {
     const t = e.target.closest('[data-tipo]'); if (t) { A.ocultos[t.dataset.tipo] = !A.ocultos[t.dataset.tipo]; pintar(); return; }
     const s = e.target.closest('[data-sel]');
     if (s) {
+      if (!+s.dataset.sel) return;
       const baseDest = s.dataset.base;
       const precisaCarregar = baseDest && (!bats.find((b) => b.id === +s.dataset.sel) || (A.vista === 'dia' && A.base !== baseDest) || (A.vista === 'lista' && baseDest < A.base));
       if (precisaCarregar) { A.base = baseDest; await carregar(); }

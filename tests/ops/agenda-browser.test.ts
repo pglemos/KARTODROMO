@@ -110,4 +110,23 @@ describe('Agenda: integração real do frontend sem dados de produção',{ timeo
   const run=()=>page.evaluate(async()=>{try{return await (window as unknown as {api:(p:string,o:unknown)=>Promise<unknown>}).api('/office/grupos/87/pagamentos',{method:'POST',body:{pilotoId:1,valorCentavos:14500,forma:'Pix'}});}catch{return 'falhou';}});
   await run();await run();await run();expect(keys).toHaveLength(3);expect(keys[0]).toBe(keys[1]);expect(keys[2]).not.toBe(keys[1]);await page.close();
  });
+ it('busca cliente do mês por nome, e-mail, CPF e telefone com +55 e abre a bateria ao clicar',async()=>{
+  await page.route(/\/api\/office\/reservas(\?.*)?$/,route=>json(route,[
+   {id:9001,clienteId:501,bateriaId:394,dataHora:'2026-11-05T19:20',reserva:'19:20',cliente:'Elizana Torrenes',email:'elizanatorrenes98734@gmail.com',documento:'130.707.146-50',telefone:'(31) 99888-7766',responsavel:'TESTE CODEX',status:'reservada',pago:false,total:14500,aprovada:true}
+  ]));
+  const inp = page.locator('#qClienteMes');
+  await inp.fill('elizana torrenes');
+  await page.locator('#buscaClienteMes [data-sel="394"]').waitFor();
+  await inp.fill('elizanatorrenes98734@gmail.com');
+  await page.locator('#buscaClienteMes [data-sel="394"]').waitFor();
+  await inp.fill('13070714650');
+  await page.locator('#buscaClienteMes [data-sel="394"]').waitFor();
+  await inp.fill('+55 31 99888-7766');
+  const item = page.locator('#buscaClienteMes [data-sel="394"]');
+  await item.waitFor();
+  expect(await item.innerText()).toContain('Elizana Torrenes');
+  await item.click();
+  await page.locator('#corpoBateria [data-grupo-abrir]').first().waitFor();
+  expect(errors).toEqual([]);await page.close();
+ });
 });
