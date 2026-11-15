@@ -103,7 +103,7 @@ public class FormCheckout : CartaoModal
     static Api Api => Sessao.Api;
     class ItemCarrinho
     {
-        public long K; public long? InscricaoId; public long? ProdutoId; public string Cliente, Produto; public int Qtd = 1; public long Unit, Desc, Acr; public decimal DescPct, AcrPct; public bool Voucher;
+        public long K; public long? InscricaoId; public long? ProdutoId; public long? ClienteId; public string Cliente, Produto, VoucherCodigo; public int Qtd = 1; public long Unit, Desc, Acr; public decimal DescPct, AcrPct; public bool Voucher;
     }
     readonly List<ItemCarrinho> _car = [];
     readonly List<(long forma, string nome, long valor)> _pags = [];
@@ -157,7 +157,7 @@ public class FormCheckout : CartaoModal
         var linha1 = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
         _bat.Width = 260;
         var bPesq = new BotaoPlano { Text = "🔍 Pesquisar Cliente", AutoSize = true };
-        bPesq.Click += (_, _) => { var cl = FormPesquisarCliente.Escolher(this); if (cl != null) { _cliente = cl; Atualizar(); } };
+        bPesq.Click += (_, _) => { var cl = FormPesquisarCliente.Escolher(this); if (cl != null) SelecionarCliente(cl); };
         linha1.Controls.AddRange([Lbl("Bateria"), _bat, Lbl("   Cliente:"), _cli, Lbl("   Documento:"), _doc, bPesq]);
         esq.Controls.Add(linha1, 0, 0); esq.SetColumnSpan(linha1, 3);
         var pObs = new Panel { Dock = DockStyle.Fill }; pObs.Controls.Add(_obs); pObs.Controls.Add(new Label { Text = "Observações", Dock = DockStyle.Top, Height = 18 });
@@ -302,7 +302,7 @@ public class FormCheckout : CartaoModal
         var blocoDoc = InfoCheckout("Documento", _doc, 150);
         linhaCab.Controls.Add(blocoBat); linhaCab.Controls.Add(blocoCli); linhaCab.Controls.Add(blocoDoc);
         var pesquisar = new BotaoPlano { Text = "  Pesquisar cliente", Image = LupaBmp(), ImageAlign = ContentAlignment.MiddleLeft, TextImageRelation = TextImageRelation.ImageBeforeText, AutoSize = true, Height = 36, MinimumSize = new Size(0, 36), Padding = new Padding(8, 0, 10, 0), FlatStyle = FlatStyle.Flat, BackColor = Tokens.Claro.CorAcaoSecundaria, ForeColor = texto, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right };
-        pesquisar.FlatAppearance.BorderSize = 0; pesquisar.Click += (_, _) => { var cl = FormPesquisarCliente.Escolher(this); if (cl != null) { _cliente = cl; Atualizar(); } };
+        pesquisar.FlatAppearance.BorderSize = 0; pesquisar.Click += (_, _) => { var cl = FormPesquisarCliente.Escolher(this); if (cl != null) SelecionarCliente(cl); };
         pesquisar.Resize += (_, _) => KitVisual.AplicarRaio(pesquisar, 10);
         cab.Controls.Add(linhaCab); cab.Controls.Add(pesquisar); pesquisar.BringToFront();
         void PosPesquisar()
@@ -578,12 +578,34 @@ public class FormCheckout : CartaoModal
         Atualizar();
     }
 
+    void SelecionarCliente(JsonObject cl)
+    {
+        _cliente = cl;
+        Atualizar();
+        if (_voucher == null && string.IsNullOrWhiteSpace(_codVoucher.Text) && cl?.L("id") is long cid && cid > 0)
+            Seguro.Rodar(this, () => SugerirVoucherClienteAsync(cid));
+    }
+
+    async Task SugerirVoucherClienteAsync(long clienteId)
+    {
+        var lista = await Api.ListaAsync("/api/office/vouchers/cliente?clienteId=" + clienteId);
+        if (IsDisposed || _voucher != null || !string.IsNullOrWhiteSpace(_codVoucher.Text) || lista.Count == 0) return;
+        _codVoucher.Text = lista[0].S("codigo");
+    }
+
     void Adicionar(List<JsonObject> rs)
     {
+        string voucherSugerido = null;
         foreach (var r in rs)
             if (!_car.Any(c => c.InscricaoId == r.L("id")))
-                _car.Add(new ItemCarrinho { K = _seq++, InscricaoId = r.L("id"), ProdutoId = r.L("produtoId"), Cliente = r.S("cliente"), Produto = r.S("produto"), Unit = r.L("preco") ?? 0, Desc = r.L("desconto") ?? 0 });
-        if (_cliente == null && rs.Count > 0) Seguro.Rodar(this, async () => { _cliente = (await Api.GetAsync($"/api/office/clientes/{rs[0].S("clienteId")}")).AsObject(); Atualizar(); });
+            {
+                var vCod = r.S("voucherCodigo");
+                if (string.IsNullOrEmpty(voucherSugerido) && !string.IsNullOrWhiteSpace(vCod)) voucherSugerido = vCod;
+                _car.Add(new ItemCarrinho { K = _seq++, InscricaoId = r.L("id"), ProdutoId = r.L("produtoId"), ClienteId = r.L("clienteId"), Cliente = r.S("cliente"), Produto = r.S("produto"), VoucherCodigo = vCod, Unit = r.L("preco") ?? 0, Desc = r.L("desconto") ?? 0 });
+            }
+        if (_voucher == null && string.IsNullOrWhiteSpace(_codVoucher.Text) && !string.IsNullOrWhiteSpace(voucherSugerido))
+            _codVoucher.Text = voucherSugerido;
+        if (_cliente == null && rs.Count > 0) Seguro.Rodar(this, async () => { var cl = (await Api.GetAsync($"/api/office/clientes/{rs[0].S("clienteId")}")).AsObject(); SelecionarCliente(cl); });
         Atualizar();
     }
 
@@ -736,7 +758,9 @@ public class FormCheckout : CartaoModal
         var cod = _codVoucher.Text.Trim();
         if (cod.Length == 0) { Msg.Aviso(this, "Informe o codigo do voucher."); return; }
         if (_voucher != null) { Msg.Aviso(this, "Já existe um voucher aplicado nesta venda. Remova-o primeiro."); return; }
-        var v = await Api.GetAsync("/api/office/vouchers/validar?codigo=" + Uri.EscapeDataString(cod));
+        var clienteId = _cliente?.L("id") ?? _car.Select(c => c.ClienteId).FirstOrDefault(id => id != null);
+        var qs = "/api/office/vouchers/validar?codigo=" + Uri.EscapeDataString(cod) + (clienteId is long cid && cid > 0 ? $"&clienteId={cid}" : "");
+        var v = await Api.GetAsync(qs);
         var alvo = _car.FirstOrDefault(c => (v.L("produtoId") == null || c.ProdutoId == v.L("produtoId")) && c.Desc == 0);
         if (alvo == null) { Msg.Aviso(this, v.L("produtoId") != null ? "O produto do voucher não está na venda." : "Nenhum produto na venda para aplicar o voucher."); return; }
         if (v.L("pedidoMinimo") is long min && Totais().sub < min) { Msg.Aviso(this, $"Valor do pedido insuficiente. Mínimo exigido: {Fmt.Brl(min)}."); return; }
@@ -746,7 +770,9 @@ public class FormCheckout : CartaoModal
         alvo.Desc = Math.Min(baseV, d); alvo.Voucher = true; alvo.DescPct = baseV > 0 ? Math.Round(alvo.Desc * 100m / baseV, 2) : 0;
         _voucher = v.S("codigo");
         Atualizar();
-        Msg.Info(this, $"Voucher aplicado! Desconto de {Fmt.Brl(alvo.Desc)} em {alvo.Produto}.");
+        var ben = v.S("beneficiarioNome");
+        var extra = v.L("restantes") is long rest && rest == 1 ? "\nEste é o último uso disponível: o voucher será esgotado ao concluir a venda." : "";
+        Msg.Info(this, $"Voucher aplicado{(string.IsNullOrWhiteSpace(ben) ? "" : $" ({ben})")}! Desconto de {Fmt.Brl(alvo.Desc)} em {alvo.Produto}.{extra}");
     });
 
     void RemoverVoucher()

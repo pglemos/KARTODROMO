@@ -15,14 +15,24 @@ export function cpfValido(v: string) {
   return true;
 }
 export const mascaraCpf = (v: string) => digitos(v).slice(0, 11).replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+export function nomeValido(v: string) {
+  const limpo = String(v ?? '').trim().replace(/\s+/g, ' ');
+  const partes = limpo.split(' ').filter(Boolean);
+  return partes.length >= 2 && limpo.replace(/\s+/g, '').length >= 4 && /\p{L}/u.test(limpo);
+}
 export function mascaraFone(v: string) {
-  const d = digitos(v).slice(0, 11);
+  const raw = digitos(v);
+  const d = (raw.length >= 12 && raw.startsWith('55') ? raw.slice(2) : raw).slice(0, 11);
   if (d.length <= 2) return d ? `(${d}` : '';
   if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
   if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
-export const mascaraData = (v: string) => digitos(v).slice(0, 8).replace(/(\d{2})(\d)/, '$1/$2').replace(/(\d{2})(\d)/, '$1/$2');
+export function mascaraData(v: string) {
+  const isoM = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v ?? '').trim());
+  if (isoM) return `${isoM[3]}/${isoM[2]}/${isoM[1]}`;
+  return digitos(v).slice(0, 8).replace(/(\d{2})(\d)/, '$1/$2').replace(/(\d{2})(\d)/, '$1/$2');
+}
 export const mascaraCep = (v: string) => digitos(v).slice(0, 8).replace(/(\d{5})(\d)/, '$1-$2');
 
 /** DD/MM/AAAA -> AAAA-MM-DD ('' se inválida). */
@@ -45,7 +55,7 @@ export const emailValido = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v
 export function erroInstagram(v: string) {
   const s = v.trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/.*$/, '');
   const u = s.replace(/^@/, '');
-  if (!/^[A-Za-z0-9._]{1,30}$/.test(u) || /^\.|\.$|\.\./.test(u)) return 'Confira o Instagram: só o @usuário (ex.: @andre.silva).';
+  if (!/^[A-Za-z0-9._]{1,30}$/.test(u) || /^\.|\.$|\.\./.test(u)) return 'Informe um @usuário válido do Instagram (ex.: @andre.silva).';
   return '';
 }
 

@@ -23,38 +23,54 @@ export class ErroApi extends Error {
   constructor(msg: string, public status = 0) { super(msg); }
 }
 
-async function chamar<T>(caminho: string, init?: RequestInit, tempoMs = 20000): Promise<T> {
+async function chamar<T>(caminho: string, init?: RequestInit & { signal?: AbortSignal }, tempoMs = 20000): Promise<T> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    throw new ErroApi('Você está sem internet no momento. Verifique sua conexão e tente novamente.');
+  }
   const ctl = new AbortController();
+  const ext = init?.signal;
+  if (ext?.aborted) throw new ErroApi('Solicitação cancelada.');
+  const onAbort = () => ctl.abort();
+  ext?.addEventListener('abort', onAbort, { once: true });
   const t = setTimeout(() => ctl.abort(), tempoMs);
   let r: Response;
   try {
     r = await fetch(caminho, { ...init, signal: ctl.signal, cache: 'no-store' });
   } catch (e) {
-    throw new ErroApi((e as Error).name === 'AbortError' ? 'O servidor demorou para responder. Confira a conexão e tente de novo.' : 'Sem conexão com o servidor. Confira a internet e tente de novo.');
-  } finally { clearTimeout(t); }
+    if (ext?.aborted) throw new ErroApi('Solicitação cancelada.');
+    throw new ErroApi((e as Error).name === 'AbortError' ? 'O servidor demorou para responder. Verifique sua conexão e tente novamente.' : 'Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.');
+  } finally {
+    clearTimeout(t);
+    ext?.removeEventListener('abort', onAbort);
+  }
   let corpo: unknown = null;
   try { corpo = await r.json(); } catch { /* resposta sem JSON */ }
   if (!r.ok) {
     const erro = (corpo as { erro?: string } | null)?.erro;
-    throw new ErroApi(erro || (r.status >= 500 ? 'O servidor está com instabilidade. Tente de novo em instantes.' : 'Não foi possível concluir agora.'), r.status);
+    const padrao = r.status === 429
+      ? 'Muitas tentativas em sequência. Aguarde alguns segundos e tente novamente.'
+      : r.status >= 500
+        ? 'Nossos servidores estão instáveis no momento. Tente novamente em instantes.'
+        : 'Não foi possível concluir a solicitação agora. Tente novamente ou fale com a recepção.';
+    throw new ErroApi(erro || padrao, r.status);
   }
   return corpo as T;
 }
 
 export const api = {
-  agenda: () => chamar<Agenda>('/api/agenda'),
-  politica: () => chamar<Politica>('/api/reservas/politica'),
-  termo: () => chamar<TermoResp>('/api/termo'),
+  agenda: (signal?: AbortSignal) => chamar<Agenda>('/api/agenda', { signal }),
+  politica: (signal?: AbortSignal) => chamar<Politica>('/api/reservas/politica', { signal }),
+  termo: (signal?: AbortSignal) => chamar<TermoResp>('/api/termo', { signal }),
   aviso: async (): Promise<Aviso> => { try { const a = await chamar<Aviso>('/api/aviso', undefined, 5000); return a && a.texto ? a : null; } catch { return null; } },
   criar: (corpo: unknown) => chamar<{ id: string; codigo: string }>('/api/reservas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) }, 30000),
-  pedido: (id: string) => chamar<Pedido>(`/api/reservas/${id}`),
-  corridas: (cpf: string, codigo: string) => chamar<{ corridas: Corrida[]; aviso?: string }>('/api/reservas/corridas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cpf, codigo }) }),
+  pedido: (id: string, signal?: AbortSignal) => chamar<Pedido>(`/api/reservas/${id}`, { signal }),
+  corridas: (cpf: string, codigo: string, signal?: AbortSignal) => chamar<{ corridas: Corrida[]; aviso?: string }>('/api/reservas/corridas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cpf, codigo }), signal }),
   checkin: (corpo: { cpf: string; codigo: string; pedidoId: string; lat: number; lng: number; precisao: number }) =>
     chamar<{ ok: boolean; checkinEm: string }>('/api/reservas/checkin', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) }),
-  minhas: (cpf: string, codigo: string) => chamar<{ nome: string; reservas: MinhaReserva[]; grupos?: MeuGrupo[] }>('/api/reservas/minhas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cpf, codigo }) }),
+  minhas: (cpf: string, codigo: string, signal?: AbortSignal) => chamar<{ nome: string; reservas: MinhaReserva[]; grupos?: MeuGrupo[] }>('/api/reservas/minhas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cpf, codigo }), signal }),
   cancelar: (corpo: { cpf: string; codigo: string; pedidoId: string; confirmo: true }) =>
     chamar<{ ok: boolean; reembolsoCentavos: number }>('/api/reservas/cancelar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) }, 30000),
-  cupom: (corpo: { codigo: string; bateriaId: number; quantidade: number; documento: string; documentos: string[] }) =>
-    chamar<{ requestId: string }>('/api/reservas/cupom', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) }),
-  cupomResultado: (id: string) => chamar<{ status: 'pending' | 'completed'; erro?: string; brutoCentavos?: number; descontoCentavos?: number; totalCentavos?: number }>(`/api/reservas/cupom/${id}`),
+  cupom: (corpo: { codigo: string; bateriaId: number; quantidade: number; documento: string; documentos: string[] }, signal?: AbortSignal) =>
+    chamar<{ requestId: string }>('/api/reservas/cupom', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo), signal }),
+  cupomResultado: (id: string, signal?: AbortSignal) => chamar<{ status: 'pending' | 'completed'; erro?: string; brutoCentavos?: number; descontoCentavos?: number; totalCentavos?: number }>(`/api/reservas/cupom/${id}`, { signal }),
 };

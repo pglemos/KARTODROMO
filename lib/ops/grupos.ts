@@ -179,8 +179,12 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
     const cliente = p.documento !== undefined && (p.clienteId || p.responsavel) ? { documento: p.documento, email: p.email, peso: p.peso, telefone: p.clienteTelefone } : null;
     const falta = faltaNoCadastro(cliente);
     const cadastro = (p.clienteId || p.responsavel) && !falta.length ? 'completo' : p.cadastroEm || p.clienteId ? 'incompleto' : p.linkEnviadoEm ? 'enviado' : 'pendente';
+    const telDig = (v: unknown) => String(v ?? '').replace(/\D/g, '');
+    const telLinha = p.clienteTelefone && telDig(p.clienteTelefone).length >= 11 && telDig(p.telefone).length < 11
+      ? p.clienteTelefone
+      : (p.telefone || p.clienteTelefone || null);
     return {
-      id: p.id, ordem: p.ordem, nome: nomeDaVaga(p), telefone: p.telefone || p.clienteTelefone || null, menor: Boolean(p.menor), responsavel: Boolean(p.responsavel),
+      id: p.id, ordem: p.ordem, nome: nomeDaVaga(p), telefone: telLinha, menor: Boolean(p.menor), responsavel: Boolean(p.responsavel),
       clienteId: p.clienteId ?? (p.responsavel ? g.responsavelId : null), inscricaoId: p.inscricaoId, kart: p.kart ?? null, termo: Boolean(p.termoEm) || Boolean(p.termoOnline), termoOnline: Boolean(p.termoOnline), termoImpresso: Boolean(p.termoEm),
       link: linkCadastro(String(p.token)), linkEnviadoEm: p.linkEnviadoEm, cadastroEm: p.cadastroEm, cadastro, falta: cadastro === 'completo' ? [] : falta,
       preco: precoP, aniversariante: Boolean(g.aniversario) && Boolean(p.responsavel),
@@ -285,7 +289,13 @@ export async function vincularCadastroDoLink(token: string, clienteId: number, l
         await query(`UPDATE dbo.Inscricao SET ClienteId = @c, AtualizadoEm = SYSDATETIME() WHERE ClienteId = @a AND Id IN (SELECT InscricaoId FROM dbo.ReservaGrupoPiloto WHERE GrupoId = @g AND InscricaoId IS NOT NULL)`, { c: clienteId, a: antigo, g: p.grupoId });
         await query(`UPDATE dbo.Inscricao SET ResponsavelId = @c WHERE ResponsavelId = @a AND Id IN (SELECT InscricaoId FROM dbo.ReservaGrupoPiloto WHERE GrupoId = @g AND InscricaoId IS NOT NULL)`, { c: clienteId, a: antigo, g: p.grupoId }).catch(() => undefined);
         await query(`UPDATE dbo.ReservaGrupo SET ResponsavelId = @c, AtualizadoEm = SYSDATETIME() WHERE Id = @g`, { c: clienteId, g: p.grupoId });
-        await query(`UPDATE dbo.ReservaGrupoPiloto SET ClienteId = @c, CadastroEm = SYSDATETIME() WHERE Id = @id`, { c: clienteId, id: p.id });
+        await query(
+          `UPDATE p SET ClienteId = @c, CadastroEm = SYSDATETIME(),
+                        Nome = COALESCE(NULLIF(c.Nome, ''), p.Nome),
+                        Telefone = COALESCE(NULLIF(c.Telefone, ''), p.Telefone)
+             FROM dbo.ReservaGrupoPiloto p JOIN dbo.Cliente c ON c.Id = @c WHERE p.Id = @id`,
+          { c: clienteId, id: p.id },
+        );
         await query(
           `DELETE FROM dbo.Cliente WHERE Id = @a AND Documento IS NULL
              AND NOT EXISTS (SELECT 1 FROM dbo.Inscricao WHERE ClienteId = @a) AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupo WHERE ResponsavelId = @a)
@@ -314,7 +324,9 @@ export async function vincularCadastroDoLink(token: string, clienteId: number, l
     await limparProvisorios();
   }
   await query(
-    `UPDATE p SET ClienteId = @c, CadastroEm = SYSDATETIME(), Nome = COALESCE(NULLIF(p.Nome, ''), c.Nome), Telefone = COALESCE(NULLIF(p.Telefone, ''), c.Telefone)
+    `UPDATE p SET ClienteId = @c, CadastroEm = SYSDATETIME(),
+                  Nome = CASE WHEN p.Nome IS NULL OR LTRIM(RTRIM(p.Nome)) = '' OR LTRIM(RTRIM(p.Nome)) LIKE '% .' THEN COALESCE(NULLIF(c.Nome, ''), p.Nome) ELSE p.Nome END,
+                  Telefone = CASE WHEN p.Telefone IS NULL OR LTRIM(RTRIM(p.Telefone)) = '' OR (LEN(REPLACE(REPLACE(REPLACE(REPLACE(c.Telefone,'(',''),')',''),'-',''),' ','')) >= 11 AND LEN(REPLACE(REPLACE(REPLACE(REPLACE(p.Telefone,'(',''),')',''),'-',''),' ','')) < 11) THEN COALESCE(NULLIF(c.Telefone, ''), p.Telefone) ELSE p.Telefone END
        FROM dbo.ReservaGrupoPiloto p JOIN dbo.Cliente c ON c.Id = @c WHERE p.Id = @id`,
     { c: clienteId, id: p.id },
   );
@@ -1309,8 +1321,8 @@ export function resumoPainel(g: ReturnType<typeof montar>) {
  */
 export async function publicarGruposNoSite(log: Log) {
   if (!siteUrl() || !siteChave()) return 0;
-  const gs = await query<{ id: number; codigo: string; modo: string; preco: number; sinalPct: number; status: string; bateria: string; inicio: string; responsavel: string; respDoc: string | null; respFone: string | null }>(
-    `SELECT g.Id id, g.Codigo codigo, g.Modo modo, g.PrecoCentavos preco, g.SinalPct sinalPct, g.Status status, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio, r.Nome responsavel,
+  const gs = await query<{ id: number; codigo: string; modo: string; preco: number; sinalPct: number; aniversario: boolean | number; precoAniv: number | null; status: string; bateria: string; inicio: string; responsavel: string; respDoc: string | null; respFone: string | null }>(
+    `SELECT g.Id id, g.Codigo codigo, g.Modo modo, g.PrecoCentavos preco, g.SinalPct sinalPct, g.Aniversario aniversario, g.PrecoAniversarianteCentavos precoAniv, g.Status status, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio, r.Nome responsavel,
             r.Documento respDoc, r.Telefone respFone
        FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente r ON r.Id = g.ResponsavelId
       WHERE g.Status = 'ativa' AND b.Inicio > DATEADD(hour, -2, SYSDATETIME())`,
@@ -1335,6 +1347,7 @@ export async function publicarGruposNoSite(log: Log) {
       // quem paga o grupo (modo único ou sinal): só o link do responsável cobra; os convidados só fazem o cadastro
       responsavelToken: dele.find((v) => Number(v.responsavel) === 1)?.token ?? null,
       tokens: dele.map((v) => v.token).filter(Boolean), codigo: g.codigo, status: g.status, modo: g.modo, precoCentavos: Number(g.preco) || 0,
+      aniversario: Boolean(g.aniversario), precoAniversarianteCentavos: g.aniversario ? (Number(g.precoAniv) || ANIVERSARIO_PRECO_PADRAO) : null,
       bateria: g.bateria, inicio: g.inicio, responsavel: primeiroNome(g.responsavel), livres: dele.reduce((s, v) => s + v.livre, 0),
       painel: c ? resumoPainel(c) : null,
       // o link do grupo é o do responsável e vai para todo mundo: o site só cobra o grupo inteiro de quem tem o CPF (ou o celular) dele

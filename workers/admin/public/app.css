@@ -835,3 +835,27 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
 
 /* celular: o botão do alerta ocupa a largura toda (alvo grande para o polegar) */
 @media (max-width: 520px) { .pendencia .btn { width: 100%; justify-content: center; min-height: 44px; } }
+
+/* ---------- vouchers */
+.vchToolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--kib-espaco-1); padding: 0 var(--kib-espaco-2) var(--kib-espaco-denso-12); }
+.vchGrade { min-width: 980px; }
+.vchCols { grid-template-columns: minmax(210px, 1.35fr) minmax(130px, .85fr) minmax(200px, 1.3fr) minmax(150px, 1fr) minmax(140px, .9fr) auto; }
+.vchUsoCols { grid-template-columns: 140px minmax(110px, .8fr) minmax(200px, 1.35fr) 120px 104px 104px 100px; }
+.vchCodRow { display: flex; align-items: center; flex-wrap: wrap; gap: var(--kib-espaco-meio); }
+.vchCod { display: inline-flex; align-items: center; padding: 2px var(--kib-espaco-1); border-radius: var(--kib-raio-chip); background: var(--cinzaFundo); color: var(--tinta); font-weight: var(--kib-fonte-peso-negrito); letter-spacing: .04em; }
+.vchCopiar { height: 28px; min-height: 28px; padding: 0 var(--kib-espaco-1); border: 0; border-radius: var(--kib-raio-chip); background: transparent; color: var(--mudo); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: var(--kib-fonte-peso-semibold); display: inline-flex; align-items: center; gap: 4px; }
+.vchCopiar:hover { background: var(--cinzaFundo); color: var(--tinta); }
+.vchProg { display: flex; flex-direction: column; gap: var(--kib-espaco-meio); min-width: 120px; }
+.vchAcoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--kib-espaco-meio); }
+.vchFormGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); gap: var(--kib-espaco-denso-12); }
+.vchBoxSec { display: flex; flex-direction: column; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12); border-radius: var(--kib-raio-cartao); background: var(--sup2); box-shadow: inset 0 0 0 1px var(--linha); }
+.vchPessoaLista { border-radius: var(--kib-raio-cartao); background: var(--kib-cor-superficie-padrao); box-shadow: inset 0 0 0 1px var(--linha); overflow: hidden; }
+.vchPessoaItem { display: flex; flex-wrap: wrap; align-items: center; gap: var(--kib-espaco-1); padding: var(--kib-espaco-1) var(--kib-espaco-denso-12); border-bottom: 1px solid var(--linha); }
+.vchPessoaItem:last-child { border-bottom: 0; }
+.vchResBusca { max-height: 210px; overflow-y: auto; border-radius: var(--kib-raio-botao); background: var(--kib-cor-superficie-padrao); box-shadow: inset 0 0 0 1px var(--linha); }
+.vchResItem { width: 100%; display: flex; align-items: center; gap: var(--kib-espaco-1); padding: var(--kib-espaco-1) var(--kib-espaco-denso-12); border: 0; border-bottom: 1px solid var(--linha); background: transparent; text-align: left; }
+.vchResItem:last-child { border-bottom: 0; }
+.vchResItem:hover { background: var(--sup2); }
+.vchCheckLinha { display: flex; align-items: flex-start; gap: var(--kib-espaco-1); padding: var(--kib-espaco-1) var(--kib-espaco-denso-12); border-radius: var(--kib-raio-botao); background: var(--sup2); cursor: pointer; }
+.vchCheckLinha input { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; }
+.chip.roxo { background: color-mix(in srgb, var(--roxo) 14%, transparent); color: var(--kib-cor-categoria-roxo-texto); }

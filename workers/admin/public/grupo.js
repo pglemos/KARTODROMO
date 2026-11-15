@@ -67,7 +67,25 @@ const Grupo = (() => {
     try { await navigator.clipboard.writeText(texto); toast(msg); }
     catch { const t = document.createElement('textarea'); t.value = texto; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); toast(msg); } catch { toast('Não deu para copiar. Selecione o texto e copie.', true); } t.remove(); }
   }
-  function destino(g, p) { return p.telefone || g.responsavelTelefone || ''; }
+  function nomePiloto(g, p) {
+    if (p && p.responsavel && g && g.responsavel && (!p.nome || /\s\.$/.test(String(p.nome).trim()) || String(p.nome).trim().length < String(g.responsavel).trim().length)) {
+      return g.responsavel;
+    }
+    return (p && p.nome) || (p && p.responsavel && g && g.responsavel) || '';
+  }
+  function fonePiloto(g, p) {
+    const dig = (v) => String(v || '').replace(/\D/g, '');
+    if (p && p.responsavel && g && g.responsavelTelefone) {
+      const dp = dig(p.telefone).length, dr = dig(g.responsavelTelefone).length;
+      if (dr >= 11 && dp < 11) return g.responsavelTelefone;
+    }
+    return (p && p.telefone) || (p && p.responsavel && g && g.responsavelTelefone) || '';
+  }
+  function destino(g, p) { return fonePiloto(g, p); }
+  function msgCobranca(g, p, r) {
+    const nomeAlvo = p ? nomePiloto(g, p) : g.responsavel;
+    return `Olá${nomeAlvo ? ', ' + primeiro(nomeAlvo) : ''}! Segue o link para pagar ${p ? 'sua vaga' : 'a reserva do grupo'} na bateria do Kartódromo de Betim (${quando(g.inicio)}): ${brl(r.valor)} por Pix ou cartão — ${r.link}`;
+  }
 
   // ---------------------------------------------------------------- cartões na gaveta da bateria
   function cartoes(grupos) {
@@ -365,8 +383,8 @@ const Grupo = (() => {
     const linhas = pilotos.map((p, i) => {
       const resp = i === 0;
       const respExistente = resp && novo && !!rasc.responsavel;
-      const rawNome = respExistente ? rasc.responsavel.nome : (p.nome || '');
-      const rawFone = respExistente ? (rasc.responsavel.telefone || '') : (p.telefone || '');
+      const rawNome = respExistente ? rasc.responsavel.nome : (novo ? (p.nome || '') : nomePiloto(g, p));
+      const rawFone = respExistente ? (rasc.responsavel.telefone || '') : (novo ? (p.telefone || '') : fonePiloto(g, p));
       const nomeVal = rawNome;
       const foneVal = formatarTelefone(rawFone);
       let cad = ['cinza', 'Link será gerado ao salvar'], pg = ['cinza', brl(preco)], acoesCad = '', acoesPg = '';
@@ -375,11 +393,13 @@ const Grupo = (() => {
         if (modo === 'unico') { pg = p.pago ? ['verde', 'Pago pelo grupo'] : resp ? ['laranja', 'Paga o grupo · falta ' + brlCurto(g.falta)] : ['cinza', 'Responsável paga']; }
         else if (modo === 'sinal') { pg = p.pago ? ['verde', p.pagoNoCaixa ? 'Pago no caixa' : 'Pago'] : ['laranja', 'Resto ' + brlCurto(p.falta_centavos) + ' na Recepção']; }
         else { pg = p.pago ? ['verde', p.pagoNoCaixa ? 'Pago no caixa' : 'Pago'] : p.valorPago > 0 ? ['laranja', `Pagou ${brlCurto(p.valorPago)} · falta ${brlCurto(p.falta_centavos)}`] : ['vermelho', 'Falta ' + brlCurto(p.falta_centavos)]; }
+        const cobExist = modo === 'unico' ? g.cobrancaGrupo : p.cobranca;
         if (!p.pago && (modo !== 'unico' || resp)) {
           acoesPg = `<details class="menuCobrar">
             <summary class="btnCobrarSumario" aria-haspopup="true" aria-expanded="false" title="Opções de cobrança">Cobrar</summary>
             <div class="menuCobrarLista" role="group" aria-label="Como cobrar ${esc(nomeVal || 'piloto ' + (i + 1))}">
               <button type="button" class="btn peq" data-cobrar="${modo === 'unico' ? '' : p.id}" title="Gera o link Asaas (Pix ou cartão) e abre o WhatsApp para enviar">${svg(IC.zap, 13, 'var(--kib-cor-marca-principal)')} Enviar link de pagamento</button>
+              ${cobExist && cobExist.link ? `<button type="button" class="btn peq" data-ver-cobranca="${modo === 'unico' ? '' : p.id}" title="Copia o link de pagamento (${brlCurto(cobExist.valor)}) e mostra o botão do WhatsApp">${svg(IC.reservas, 13, 'var(--kib-cor-estado-info-texto)')} Copiar link (${brlCurto(cobExist.valor)})</button>` : ''}
               <button type="button" class="btn peq" data-recebi="${modo === 'unico' ? '' : p.id}" title="O cliente já pagou por fora (Pix direto, dinheiro, maquininha)">${svg(IC.ok, 13, 'var(--kib-cor-status-ok)')} Marcar como pago</button>
             </div>
           </details>`;
@@ -391,11 +411,10 @@ const Grupo = (() => {
       return `<div class="linhaPilotoGrupo ${resp ? 'isResp' : ''}">
         <span class="avatar m" style="background: ${okVerde ? 'var(--kib-cor-estado-sucesso-texto)' : CORG[i % 6]}; color: var(--kib-branco); font-weight: 700;">${esc(iniciaisNome)}</span>
         <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
-          <div style="display: flex; align-items: center; gap: 6px; width: 100%;">
-            ${respExistente ? `<span class="entrada" style="height: 36px; display: flex; align-items: center; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${nomeVal ? '' : 'color: var(--mudo2)'}">${esc(nomeBonito(nomeVal) || 'Escolha o responsável')}</span>` : `<input class="entrada" style="height: 36px; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 500;" value="${esc(nomeBonito(nomeVal))}" placeholder="${resp ? 'Nome do responsável' : 'Nome (ou deixe para o link)'}" aria-label="Nome do piloto ${i + 1}" title="${esc(nomeBonito(nomeVal))}" aria-describedby="erroGrupo" data-campo="nome" data-i="${i}" ${!novo && resp ? 'readonly' : ''}>`}
-            ${resp ? `<span class="badgeRespTag" title="Responsável pela reserva">${svg(IC.ok, 10, 'currentColor')} RESPONSÁVEL</span>` : ''}
+          <div style="display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0;">
+            ${respExistente ? `<span class="entrada" style="height: 36px; flex: 1; min-width: 0; display: flex; align-items: center; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${nomeVal ? '' : 'color: var(--mudo2)'}">${esc(nomeBonito(nomeVal) || 'Escolha o responsável')}</span>` : `<input class="entrada" style="height: 36px; flex: 1; min-width: 0; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 500;" value="${esc(nomeBonito(nomeVal))}" placeholder="${resp ? 'Nome do responsável' : 'Nome (ou deixe para o link)'}" aria-label="Nome do piloto ${i + 1}" title="${esc(nomeBonito(nomeVal))}" aria-describedby="erroGrupo" data-campo="nome" data-i="${i}" ${!novo && resp ? 'readonly' : ''}>`}
           </div>
-          ${resp && respExistente ? '<span class="peq cor-apoio" style="font-size: 12px; line-height: 1.35">cliente já cadastrado · <button type="button" class="btn link peq" data-trocar-resp="1" style="font-size: 12px; padding: 0">Trocar</button></span>' : resp && novo ? '<span class="peq cor-apoio" style="font-size: 12px; line-height: 1.35">cliente novo: só nome e WhatsApp</span>' : ''}
+          ${resp ? `<div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"><span class="badgeRespTag" title="Responsável pela reserva">${svg(IC.ok, 10, 'currentColor')} RESPONSÁVEL</span>${respExistente ? '<span class="peq cor-apoio" style="font-size: 12px; line-height: 1.35">cliente já cadastrado · <button type="button" class="btn link peq" data-trocar-resp="1" style="font-size: 12px; padding: 0">Trocar</button></span>' : novo ? '<span class="peq cor-apoio" style="font-size: 12px; line-height: 1.35">cliente novo: só nome e WhatsApp</span>' : ''}</div>` : ''}
           ${!resp && !p.clienteId ? `<button type="button" class="btn link peq" style="font-size: 12px; line-height: 1.35; padding: 0; justify-content: flex-start; min-height: 0" data-buscar-vaga="${i}" aria-label="Buscar cadastro do piloto ${i + 1} por CPF, nome ou telefone">${svg(IC.busca, 11)} Buscar cadastro (CPF, nome ou telefone)</button>` : !resp && p.clienteId ? '<span class="peq cor-apoio" style="font-size: 12px; line-height: 1.35">cadastro puxado do banco</span>' : ''}
         </div>
         ${respExistente ? `<span class="mono peq" style="font-size: 12.5px; color: var(--kib-cor-texto-principal);">${esc(foneVal || '—')}</span>` : `<input class="entrada mono" style="height: 36px; font-size: 12.5px;" value="${esc(foneVal)}" placeholder="(31) 9 0000-0000" inputmode="tel" aria-label="WhatsApp do piloto ${i + 1}" aria-describedby="erroGrupo" data-campo="telefone" data-i="${i}" ${!novo && resp ? 'readonly' : ''}>`}
@@ -468,6 +487,7 @@ const Grupo = (() => {
               <label class="buscaCampo" style="height: 38px">${svg(IC.busca, 14, 'var(--kib-cor-borda-campo)')}<input id="qResp" value="${esc(estado.busca)}" placeholder="Já é cliente? Busque por nome, CPF ou telefone" autocomplete="off" aria-label="Buscar o responsável"></label>
               <div id="achados">${estado.achados.length ? `<div class="resultadoBusca">${estado.achados.slice(0, 10).map((x) => `<button type="button" class="hov" data-resp="${esc(JSON.stringify({ id: x.id, nome: x.nome, telefone: x.telefone, documento: x.documento }))}"><span class="avatar p" style="background: ${CORG[x.id % 6]}">${esc(iniciais(x.nome))}</span><span class="col"><b class="trunc">${esc(nomeBonito(x.nome))}</b><span class="peq">${esc(x.documento || 'sem CPF')} · ${esc(formatarTelefone(x.telefone) || 'sem telefone')}</span></span></button>`).join('')}</div>` : ''}</div>
               <span style="display: flex; flex-wrap: wrap; align-items: center; gap: var(--kib-espaco-1)"><span class="peq peso-semibold">Chegou por</span><span class="seg">${ORIGENS.map(([v, t]) => `<button type="button" data-origem="${v}" class="${rasc.origem === v ? 'sel' : ''}">${t}</button>`).join('')}</span><span class="peq">Não é cliente ainda? Sem problema: preencha nome e WhatsApp na linha 1.</span></span></div>` : ''}
+            <div id="listaLinks"></div>
             <div class="rolagemX">
               <div style="min-width: 860px">
                 <div class="cabTabelaGrupo">
@@ -487,7 +507,6 @@ const Grupo = (() => {
               <span class="peq cresce" style="flex: 1 1 220px; line-height: 1.4; color: var(--kib-cor-texto-secundario);">${novo ? 'Um link só para o grupo inteiro: aparece logo depois de salvar. Cada pessoa abre e se cadastra.' : 'Um link só para o grupo inteiro: cada pessoa que abrir ocupa uma vaga livre.'}</span>
             </div>
             ${blocoLinks}
-            <div id="listaLinks"></div>
           </section>
           ${!novo ? `<section class="secao" style="padding: var(--kib-espaco-denso-12) var(--kib-espaco-2)"><div style="display: flex; align-items: center; justify-content: space-between; gap: var(--kib-espaco-1); margin-bottom: var(--kib-espaco-1)"><span class="titulo t-subtitulo" style="font-size: var(--kib-fonte-tamanho-subtitulo); margin: 0">Pagamentos recebidos<span class="peq" style="margin-left: 8px; font-weight: 500">${pagamentos.length || ''}</span></span><button type="button" class="btn peq sec" data-conferir-asaas="1" style="display: inline-flex; align-items: center; gap: 5px; height: 28px; font-size: var(--kib-fonte-tamanho-pequeno);" title="Verifica pagamentos Pix e cartão diretamente no Asaas">${svg(IC.sync, 12, 'currentColor')} Conferir no Asaas</button></div>
             ${pagamentos.map((pg) => `<div style="display: flex; align-items: center; gap: var(--kib-espaco-1); padding: var(--kib-espaco-1) 0; border-top: 1px solid var(--linha)"><span style="width: 28px; height: 28px; border-radius: var(--kib-raio-botao); display: flex; align-items: center; justify-content: center; color: var(--kib-cor-acao-sobre-principal); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700; background: ${pg.pilotoId ? CORG[pg.pilotoId % 6] : 'var(--kib-cor-texto-principal)'}">${esc(pg.pilotoId ? iniciais(nomeBonito(nomeDe(pg.pilotoId))) : 'G')}</span><span class="col cresce"><b class="trunc">${esc(nomeBonito(pg.pilotoNome || nomeDe(pg.pilotoId)))}${pg.pilotoCancelado ? ' · vaga cancelada' : ''}</b><span class="peq">${esc(pg.forma)} · ${esc((pg.criadoEm || '').slice(8, 10) + '/' + (pg.criadoEm || '').slice(5, 7) + ' ' + (pg.criadoEm || '').slice(11, 16))}${pg.usuario ? ' · ' + esc(pg.usuario) : ''}</span></span><b class="mono cor-ok">${brl(pg.valor)}</b>${pg.origem === 'manual' ? `<button class="btn peq" style="background: transparent; color: var(--erroTxt)" data-estornar="${pg.id}">Estornar</button>` : ''}</div>`).join('') || '<span class="peq" style="color: var(--kib-cor-texto-secundario);">Nenhum pagamento ainda.</span>'}
@@ -659,9 +678,33 @@ const Grupo = (() => {
     finally { ctx.ocupado = false; }
   }
 
-  function mostrarLinks(lista, titulo) {
+  function mostrarLinks(lista, titulo, extras) {
     const el = $('#listaLinks'); if (!el) return;
-    el.innerHTML = `<div style="padding: var(--kib-espaco-denso-12) var(--kib-espaco-2) var(--kib-espaco-denso-12); display: flex; flex-direction: column; gap: var(--kib-espaco-meio); border-top: 1px solid var(--linha); background: color-mix(in srgb, var(--kib-cor-status-ok) 5%, transparent)"><b>${esc(titulo)}</b><span class="peq">Toque em cada um: abre o WhatsApp com a mensagem pronta.</span>${lista.map(([rot, href]) => `<a class="btn verdeClaro peq" style="justify-content: flex-start" target="_blank" rel="noopener" href="${esc(href)}">${svg(IC.zap, 13, 'var(--kib-cor-estado-sucesso-texto)')} ${esc(rot)}</a>`).join('')}</div>`;
+    const url = extras && extras.url ? String(extras.url) : '';
+    const texto = extras && extras.texto ? String(extras.texto) : '';
+    const copia = url ? `<div class="linha-quebra gap-1" style="align-items: center">
+      <input class="entrada peq mono cresce" style="flex: 1 1 260px; min-width: 0; height: 34px" readonly value="${esc(url)}" aria-label="Link de pagamento gerado" onfocus="this.select()">
+      <button type="button" class="btn peq branco" data-copiar-txt="${esc(url)}">Copiar link</button>
+      ${texto ? `<button type="button" class="btn peq branco" data-copiar-txt="${esc(texto)}">Copiar mensagem</button>` : ''}
+    </div>` : '';
+    const botoesZap = (lista || []).map(([rot, href]) => `<a class="btn verdeClaro peq" style="justify-content: flex-start" target="_blank" rel="noopener" href="${esc(href)}">${svg(IC.zap, 13, 'var(--kib-cor-estado-sucesso-texto)')} ${esc(rot)}</a>`).join('');
+    const dica = extras && extras.semFone
+      ? 'Sem WhatsApp cadastrado nesta linha: copie o link ou a mensagem acima para enviar.'
+      : (lista && lista.length ? 'Copie o link/mensagem acima ou toque abaixo para abrir o WhatsApp com tudo pronto.' : '');
+    el.innerHTML = `<div style="padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); display: flex; flex-direction: column; gap: var(--kib-espaco-meio); border-top: 1px solid var(--linha); border-bottom: 1px solid var(--linha); background: color-mix(in srgb, var(--kib-cor-status-ok) 7%, transparent)">
+      <div class="linha gap-1" style="align-items: center; justify-content: space-between"><b>${esc(titulo)}</b><button type="button" class="btn link peq" data-fechar-links="1" aria-label="Fechar aviso de link">Fechar</button></div>
+      ${dica ? `<span class="peq">${esc(dica)}</span>` : ''}
+      ${copia}
+      ${botoesZap}
+    </div>`;
+    if (el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function mostrarCobrancaPronta(g, p, cob) {
+    const fone = p ? destino(g, p) : g.responsavelTelefone;
+    const nomeAlvo = p ? (nomePiloto(g, p) || 'piloto ' + p.ordem) : g.responsavel;
+    const texto = msgCobranca(g, p, cob);
+    const botoes = fone ? [[`Mandar o link de ${brl(cob.valor)} para ${nomeBonito(nomeAlvo)}${formatarTelefone(fone) ? ' · ' + formatarTelefone(fone) : ''}`, zap(fone, texto)]] : [];
+    mostrarLinks(botoes, `Link de pagamento pronto · ${brl(cob.valor)} (Asaas)`, { url: cob.link, texto, semFone: !fone });
   }
 
   // ---------------------------------------------------------------- eventos da janela
@@ -902,6 +945,18 @@ const Grupo = (() => {
       await atualizar(() => office(`/grupos/${g.id}/links`, { method: 'POST', body: { pilotoIds: [p.id] } }));
       return;
     }
+    if ((x = el('[data-copiar-txt]'))) return copiar(x.dataset.copiarTxt || '', 'Copiado');
+    if (el('[data-fechar-links]')) { const lk = $('#listaLinks'); if (lk) lk.innerHTML = ''; return; }
+    if ((x = el('[data-ver-cobranca]'))) {
+      { const d = x.closest('details.menuCobrar'); if (d) d.removeAttribute('open'); }
+      const pid = x.dataset.verCobranca ? +x.dataset.verCobranca : null;
+      const p = pid ? g.pilotos.find((y) => y.id === pid) : null;
+      const cob = p ? p.cobranca : g.cobrancaGrupo;
+      if (!cob || !cob.link) return toast('Link de pagamento ainda não foi gerado.', true);
+      mostrarCobrancaPronta(g, p, cob);
+      copiar(cob.link, `Link de ${brl(cob.valor)} copiado`);
+      return;
+    }
     if ((x = el('[data-cobrar]'))) {
       { const d = x.closest('details.menuCobrar'); if (d) d.removeAttribute('open'); }
       const pid = x.dataset.cobrar ? +x.dataset.cobrar : null;
@@ -912,10 +967,8 @@ const Grupo = (() => {
         if (!ativo(ctx)) return;
         estado.g = r.grupo; pintar();
         const p = pid ? estado.g.pilotos.find((y) => y.id === pid) : null;
-        const fone = p ? destino(estado.g, p) : estado.g.responsavelTelefone;
-        const texto = `Olá${p && p.nome ? ', ' + primeiro(p.nome) : ', ' + primeiro(estado.g.responsavel)}! Segue o link para pagar ${p ? 'sua vaga' : 'a reserva do grupo'} na bateria do Kartódromo de Betim (${quando(estado.g.inicio)}): ${brl(r.valor)} por Pix ou cartão — ${r.link}`;
-        if (fone) mostrarLinks([[`Mandar o link de ${brl(r.valor)} para ${p ? (p.nome || 'piloto ' + p.ordem) : estado.g.responsavel}`, zap(fone, texto)]], 'Link de pagamento pronto (Asaas)');
-        toast(r.reaproveitada ? 'Link de pagamento já existia · pode reenviar' : 'Link de pagamento criado no Asaas');
+        mostrarCobrancaPronta(estado.g, p, r);
+        toast(r.reaproveitada ? 'Link de pagamento já existia · pronto para copiar ou enviar' : 'Link de pagamento criado no Asaas');
         if (ativo(ctx)) ctx.aoMudar && ctx.aoMudar();
       } catch (er) {
         if (!ativo(ctx)) return;

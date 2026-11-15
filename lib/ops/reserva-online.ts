@@ -14,6 +14,7 @@
  */
 import { isValidCpf, one, onlyDigits, query, tx } from './db';
 import { HttpError, inscreverN } from './office';
+import { avaliarElegibilidadeVoucher } from './vouchers';
 import { grupoDaReservaOnline } from './grupos';
 import { emCurso } from './andamento';
 import { gravarAcompanhante, gravarPreCadastro, preCadastroLigado, type AcompanhanteSite, type PreCadastro } from './pre-cadastro';
@@ -163,8 +164,9 @@ const brl = (centavos: number) => (centavos / 100).toLocaleString('pt-BR', { sty
 type CouponInput = { codigo: string; documento: string; bateriaId: number; quantidade: number; documentos?: string[] };
 type CouponQuote = { brutoCentavos: number; descontoCentavos: number; totalCentavos: number; voucherId: number | null; clienteId: number; produtoId: number; precos: number[] };
 type ReadOne = (text: string, params?: Record<string, unknown>) => Promise<Record<string, unknown> | null>;
+type ReadList = (text: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>[]>;
 
-async function calcularPedidoOnline(input: CouponInput, read: ReadOne, lock: boolean, clienteId?: number): Promise<CouponQuote & { nome: string; inicio: string }> {
+async function calcularPedidoOnline(input: CouponInput, read: ReadOne, lock: boolean, clienteId?: number, readList?: ReadList): Promise<CouponQuote & { nome: string; inicio: string }> {
   const c = configOnline();
   const quantidade = Math.trunc(Number(input.quantidade));
   const codigo = String(input.codigo ?? '').trim().toUpperCase();
@@ -198,16 +200,20 @@ async function calcularPedidoOnline(input: CouponInput, read: ReadOne, lock: boo
   const base = { voucherId: null, clienteId: clienteId ?? 0, produtoId, precos, nome: String(bateria.nome), inicio: String(bateria.inicio) };
   if (!codigo) return { ...base, brutoCentavos, descontoCentavos: 0, totalCentavos: brutoCentavos };
 
-  const v = await avaliarVoucher({ codigo, documento, clienteId, produtoId, brutoCentavos }, read, lock);
+  const v = await avaliarVoucher({ codigo, documento, clienteId, produtoId, brutoCentavos }, read, lock, readList);
   return { ...base, brutoCentavos, descontoCentavos: v.descontoCentavos, totalCentavos: brutoCentavos - v.descontoCentavos, voucherId: v.voucherId, clienteId: v.clienteId };
 }
 
 /**
  * Regras do cupom (as mesmas da reserva online e do link do grupo): ativo, parceiro/fidelidade ativos, vigência, produto,
- * limite de uso total e por cliente (recepção + site + link do grupo) e pedido mínimo. Devolve o desconto em centavos.
+ * limite de uso total (UsoUnico / UsoMaxTotal), lista nominal de pessoas (RestritoClientes) e limite por cliente
+ * (recepção + site + link do grupo) e pedido mínimo. Devolve o desconto em centavos.
  */
 export async function avaliarVoucher(
-  e: { codigo: string; documento: string; clienteId?: number; produtoId: number; brutoCentavos: number }, read: ReadOne, lock: boolean,
+  e: { codigo: string; documento: string; clienteId?: number; produtoId: number; brutoCentavos: number },
+  read: ReadOne,
+  lock: boolean,
+  readList?: ReadList,
 ): Promise<{ voucherId: number; descontoCentavos: number; clienteId: number }> {
   const { codigo, documento, produtoId, brutoCentavos } = e;
   const cliente = e.clienteId ?? Number((await read(
@@ -238,8 +244,19 @@ export async function avaliarVoucher(
        + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso gv WHERE gv.VoucherId = @voucher AND gv.ClienteId = @cliente AND gv.Estado IN ('reservado', 'consumido')) doCliente`,
     { voucher: voucher.Id, cliente },
   );
-  if (voucher.UsoUnico && Number(usos?.n ?? 0) > 0) throw new HttpError(400, 'Voucher já utilizado.');
-  if (Number(usos?.doCliente ?? 0) >= Number(voucher.UsoMaxCliente ?? 1)) throw new HttpError(400, 'Limite de usos deste voucher para este cliente já atingido.');
+  const eleg = await avaliarElegibilidadeVoucher({
+    voucherId: Number(voucher.Id),
+    usoUnico: Boolean(voucher.UsoUnico),
+    usoMaxTotal: voucher.UsoMaxTotal == null ? null : Number(voucher.UsoMaxTotal),
+    usoMaxCliente: Number(voucher.UsoMaxCliente ?? 1),
+    restritoClientes: Boolean(voucher.RestritoClientes),
+    usosTotais: Number(usos?.n ?? 0),
+    usosClienteDirecto: Number(usos?.doCliente ?? 0),
+    clienteId: cliente > 0 ? cliente : null,
+    documento,
+    reader: readList ?? ((sql, params) => query(sql, params)),
+  });
+  if (!eleg.ok) throw new HttpError(400, eleg.motivo);
   if (voucher.PedidoMinimoCentavos && brutoCentavos < Number(voucher.PedidoMinimoCentavos)) {
     throw new HttpError(400, `Valor do pedido insuficiente. Mínimo exigido: ${brl(Number(voucher.PedidoMinimoCentavos))}.`);
   }
@@ -321,12 +338,13 @@ export async function reservarPedido(p: PedidoSite, log: Log): Promise<Resultado
       // cada um paga o seu: agora só 1 vaga (a de quem organiza, com primeira vez e cupom dele; ou a garantia, preço cheio);
       // as outras vagas ficam seguras pelo preço cheio e cada amigo paga a sua pelo link do grupo
       const quote = individual
-        ? await calcularPedidoOnline({ codigo: p.cupom ?? '', documento: p.cliente.documento, bateriaId: Number(p.bateriaId), quantidade: 1, documentos: eu ? [p.cliente.documento] : [] }, read, true, clienteId)
+        ? await calcularPedidoOnline({ codigo: p.cupom ?? '', documento: p.cliente.documento, bateriaId: Number(p.bateriaId), quantidade: 1, documentos: eu ? [p.cliente.documento] : [] }, read, true, clienteId, run)
         : await calcularPedidoOnline(
           { codigo: p.cupom ?? '', documento: p.cliente.documento, bateriaId: Number(p.bateriaId), quantidade: n, documentos },
           read,
           true,
           clienteId,
+          run,
         );
       if (individual) {
         const cheio = await calcularPedidoOnline({ codigo: '', documento: p.cliente.documento, bateriaId: Number(p.bateriaId), quantidade: n, documentos: [] }, read, false);
@@ -606,17 +624,27 @@ export async function sincronizarReservasOnline(log: Log) {
 export async function precoDaVagaPeloLink(token: string, cpf: string, cupom = ''): Promise<{ precoCentavos: number; primeiraVez: boolean; cupom?: { codigo: string; descontoCentavos: number } | null; erroCupom?: string } | null> {
   if (!/^[A-Za-z0-9]{10,24}$/.test(token) || !isValidCpf(onlyDigits(cpf))) return null;
   const c = configOnline();
-  const g = await one<{ preco: number; produtoId: number | null }>(
-    `SELECT g.PrecoCentavos preco, b.ProdutoId produtoId FROM dbo.ReservaGrupoPiloto t
-       JOIN dbo.ReservaGrupo g ON g.Id = t.GrupoId AND g.Status = 'ativa' JOIN dbo.Bateria b ON b.Id = g.BateriaId
+  const g = await one<{ preco: number; produtoId: number | null; aniversario: boolean | number; precoAniv: number | null; respDoc: string | null; respDocNum: string | null; ativos: number }>(
+    `SELECT g.PrecoCentavos preco, b.ProdutoId produtoId, g.Aniversario aniversario, g.PrecoAniversarianteCentavos precoAniv,
+            r.Documento respDoc, r.DocumentoNum respDocNum,
+            (SELECT COUNT(*) FROM dbo.ReservaGrupoPiloto vp LEFT JOIN dbo.Inscricao ip ON ip.Id = vp.InscricaoId
+              WHERE vp.GrupoId = g.Id AND (ip.Id IS NULL OR ip.Status <> 'cancelada')) ativos
+       FROM dbo.ReservaGrupoPiloto t
+       JOIN dbo.ReservaGrupo g ON g.Id = t.GrupoId AND g.Status = 'ativa'
+       JOIN dbo.Bateria b ON b.Id = g.BateriaId
+       JOIN dbo.Cliente r ON r.Id = g.ResponsavelId
       WHERE t.Token = @token`, { token },
   );
   if (!g) return null;
   const cheio = Number(g.preco) || 0;
+  const cpfNum = onlyDigits(cpf);
+  const respNum = onlyDigits(g.respDoc ?? g.respDocNum ?? '');
+  const ehRespAniv = Boolean(g.aniversario) && !!cpfNum && cpfNum === respNum && Math.max(0, (Number(g.ativos) || 0) - 1) >= 10;
+  const valorAniv = ehRespAniv && Number(g.precoAniv) > 0 && Number(g.precoAniv) < cheio ? Number(g.precoAniv) : cheio;
   const produto = produtoDaBateria(Number(g.produtoId), c);
   const pv = c.primeiraVez[produto];
-  const novo = pv && pv < cheio ? (await primeiraVez([cpf], (sql, params) => one(sql, params)))[0] : false;
-  const base = novo ? pv : cheio;
+  const novo = pv && pv < valorAniv ? (await primeiraVez([cpf], (sql, params) => one(sql, params)))[0] : false;
+  const base = novo ? Math.min(pv, valorAniv) : valorAniv;
   const codigo = String(cupom ?? '').trim().toUpperCase();
   if (!/^[A-Z0-9_-]{1,40}$/.test(codigo)) return { precoCentavos: base, primeiraVez: Boolean(novo) };
   // cupom do amigo (12/11/2026): mesmas regras da reserva online, sobre o preço da vaga dele
@@ -645,7 +673,7 @@ export async function reservarCupomDoLink(o: { asaasId: string; grupoId: number;
     return await tx(async (run) => {
       const read: ReadOne = async (sql, params) => (await run(sql, params))[0] ?? null;
       for (const base of bases) {
-        const v = await avaliarVoucher({ codigo: o.codigo, documento: o.documento, clienteId: o.clienteId, produtoId: produto, brutoCentavos: base }, read, true);
+        const v = await avaliarVoucher({ codigo: o.codigo, documento: o.documento, clienteId: o.clienteId, produtoId: produto, brutoCentavos: base }, read, true, run);
         if (base - v.descontoCentavos !== o.valorCobrado) continue;
         await run(`INSERT INTO dbo.ReservaGrupoVoucherUso (AsaasId, GrupoId, PilotoId, VoucherId, ClienteId, DescontoCentavos, Estado) VALUES (@a, @g, @p, @v, @c, @d, 'reservado')`,
           { a: o.asaasId, g: o.grupoId, p: o.pilotoId, v: v.voucherId, c: o.clienteId, d: v.descontoCentavos });

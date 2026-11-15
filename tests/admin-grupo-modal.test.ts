@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 
 describe('Admin - Modal de Reserva em Grupo (UI/UX Pro Max)', () => {
@@ -94,5 +96,14 @@ describe('Admin - Modal de Reserva em Grupo (UI/UX Pro Max)', () => {
     expect(chipCad({ cadastro: 'enviado' })).toEqual(['laranja', 'Aguardando cadastro']);
     expect(chipCad({ cadastro: 'pendente' })).toEqual(['laranja', 'Aguardando cadastro']);
     expect(chipCad({ cadastro: '' })).toEqual(['laranja', 'Aguardando cadastro']);
+  });
+
+  it('deve posicionar #listaLinks acima da lista de pilotos e expor cópia rápida e telefone do responsável completo', () => {
+    const src = readFileSync(resolve(process.cwd(), 'workers/admin/public/grupo.js'), 'utf8');
+    expect(src).toContain('function fonePiloto(g, p)');
+    expect(src).toContain('data-ver-cobranca=');
+    expect(src).toContain('data-copiar-txt=');
+    expect(src.indexOf('<div id="listaLinks"></div>')).toBeGreaterThan(-1);
+    expect(src.indexOf('<div id="listaLinks"></div>')).toBeLessThan(src.indexOf('<div class="rolagemX">'));
   });
 });

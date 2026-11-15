@@ -430,6 +430,7 @@
     const isEmail = raw.includes('@');
     if (isEmail ? raw.length < 5 : (d.length < 5 && raw.length < 5)) return;
     if (!isEmail && tipo === 'CPF' && !cpfOk(raw)) return;
+    if (!isEmail && tipo === 'CPF' && tokenReserva && d.length === 11) atualizarPrecoGrupo(d);
     const chaveCache = isEmail ? raw.toLowerCase() : (d || raw.toUpperCase());
     if (cacheClientes.has(chaveCache)) {
       aplicarCliente(cacheClientes.get(chaveCache));
@@ -633,12 +634,18 @@
     for (const id of campos) { const el = $(id); if (el.classList.contains('campo-animado') && val(id) && document.activeElement !== el && !regras[id][0]() && !$('m-' + id)) conferir(id); }
   }, 1000);
   // CPF apagado ou alterado: some o aviso de cadastro localizado
-  $('documento').addEventListener('input', () => { const b = $('statusBusca'); if (tipo === 'CPF' && b.classList.contains('sucesso') && !cpfOk($('documento').value)) b.style.display = 'none'; });
+  $('documento').addEventListener('input', () => {
+    const b = $('statusBusca');
+    if (tipo === 'CPF' && b.classList.contains('sucesso') && !cpfOk($('documento').value)) b.style.display = 'none';
+    if (tipo === 'CPF' && tokenReserva && grupo && !cpfOk($('documento').value) && grupoBase) aplicarGrupo(Object.assign({}, grupoBase));
+  });
   // 'Não sou eu': limpa o que foi preenchido pela busca
   $('statusBusca').addEventListener('click', (e) => {
     if (!e.target.closest('.nao-sou')) return;
     for (const id of campos) if (id !== 'documento') { $(id).value = ''; mostrarMsg(id, ''); }
-    $('menores').innerHTML = ''; $('statusBusca').style.display = 'none'; cadastroEncontrado = false; atualizarProgresso(); $('nome').focus();
+    $('menores').innerHTML = ''; $('statusBusca').style.display = 'none'; cadastroEncontrado = false;
+    if (tokenReserva && grupoBase) aplicarGrupo(Object.assign({}, grupoBase));
+    atualizarProgresso(); $('nome').focus();
   });
   // teclado do celular
   for (const id of ['email', 'instagram']) { const el = $(id); el.setAttribute('autocapitalize', 'none'); el.setAttribute('autocorrect', 'off'); el.setAttribute('spellcheck', 'false'); }
@@ -660,10 +667,13 @@
   $('tipoDoc').addEventListener('click', pressionar); pressionar();
 
   // ---- grupo ----
-  const aplicarGrupo = (g) => {
+  let grupoBase = null;
+  let seqPrecoGrupo = 0;
+  const aplicarGrupo = (g, salvarBase = false) => {
+    if (salvarBase || !grupoBase) grupoBase = Object.assign({}, g);
     grupo = g;
     const paga = g.aCobrarCentavos > 0;
-    if (paga) $('cupomGrupo').hidden = false;
+    $('cupomGrupo').hidden = !paga;
     const sou = g.souResponsavel;
     $('grupoTitulo').textContent = sou ? 'Você é o responsável pelo grupo' : 'Você está no grupo de ' + g.responsavel;
     const t = $('grupoTexto');
@@ -675,17 +685,39 @@
         : g.livres <= 0 ? 'Todas as vagas do grupo já têm dono. Faça o cadastro e fale com quem reservou.'
         : 'Preencha seu cadastro. Sua vaga já está reservada.') +
       (sou ? '' : ' Não é o(a) ' + esc(g.responsavel) + '? Peça o link certo a quem reservou.');
+    const previaAnt = $('pagarPrevia');
     if (paga) {
       rotuloEnviar = 'Concluir e ir para o pagamento';
       $('enviar').textContent = rotuloEnviar;
-      const previa = document.createElement('div');
+      const previa = previaAnt || document.createElement('div');
       previa.className = 'pagar previa'; previa.id = 'pagarPrevia';
       previa.innerHTML = '<p><b>Etapa final · Pagamento ' + de(g) + ': ' + brl(g.aCobrarCentavos) + (g.modo === 'individual' ? ' por piloto' : '') + '</b></p><p class="estado">Na próxima tela você escolhe Pix ou cartão. Use o seu CPF no cadastro.</p>';
-      $('enviar').parentNode.insertBefore(previa, $('enviar'));
-      topoFormulario();
+      if (!previaAnt) $('enviar').parentNode.insertBefore(previa, $('enviar'));
+    } else {
+      rotuloEnviar = 'Concluir cadastro';
+      if (previaAnt) previaAnt.remove();
     }
+    topoFormulario();
+    atualizarProgresso();
   };
-  if (tokenReserva) fetch('/api/grupo?r=' + encodeURIComponent(tokenReserva)).then((r) => r.ok ? r.json() : null).then((g) => { if (g && g.responsavel) aplicarGrupo(g); }).catch(() => {});
+  const atualizarPrecoGrupo = async (cpf) => {
+    if (!tokenReserva || !cpfOk(cpf)) return;
+    const seq = ++seqPrecoGrupo;
+    try {
+      const r = await fetch('/api/grupo/preco', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ r: tokenReserva, cpf: dig(cpf), cupom: $('cupom') ? $('cupom').value : '' }) });
+      if (!r.ok || seq !== seqPrecoGrupo) return;
+      const j = await r.json();
+      if (seq !== seqPrecoGrupo || !grupo) return;
+      aplicarGrupo(Object.assign({}, grupo, { souResponsavel: !!j.souResponsavel, aCobrarCentavos: Number(j.aCobrarCentavos) || 0 }));
+    } catch {}
+  };
+  if (tokenReserva) fetch('/api/grupo?r=' + encodeURIComponent(tokenReserva)).then((r) => r.ok ? r.json() : null).then((g) => {
+    if (g && g.responsavel) {
+      aplicarGrupo(g, true);
+      const d = dig($('documento').value);
+      if (tipo === 'CPF' && cpfOk(d)) atualizarPrecoGrupo(d);
+    }
+  }).catch(() => {});
   // check-in pelo celular de quem entrou pelo link do grupo (abre 2 h antes da largada, até 15 min depois)
   const mostrarCheckin = (g) => {
     const ini = Date.parse(String(g.inicio).slice(0, 16) + ':00-03:00'), agora = Date.now();

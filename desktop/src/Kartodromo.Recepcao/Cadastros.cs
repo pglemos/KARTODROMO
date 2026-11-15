@@ -803,11 +803,13 @@ static class VoucherRegras
     public static string NovoCodigo() => "KB" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
 
     public static Task<bool> Salvar(Form dono, string origem, long? vinculoId, string referencia, string codigo, bool percentual, string valor,
-        DateTime ini, DateTime fim, long? produtoId, string usoMax, bool unico, string minimo, string maximo, long? editarId = null, bool? ativo = null) =>
-        SalvarAsync(dono, origem, vinculoId, referencia, codigo, percentual, valor, ini, fim, produtoId, usoMax, unico, minimo, maximo, editarId, ativo);
+        DateTime ini, DateTime fim, long? produtoId, string usoMax, bool unico, string minimo, string maximo, long? editarId = null, bool? ativo = null,
+        string usoMaxTotal = null, bool restritoClientes = false, JsonArray clientes = null) =>
+        SalvarAsync(dono, origem, vinculoId, referencia, codigo, percentual, valor, ini, fim, produtoId, usoMax, unico, minimo, maximo, editarId, ativo, usoMaxTotal, restritoClientes, clientes);
 
     public static async Task<bool> SalvarAsync(Form dono, string origem, long? vinculoId, string referencia, string codigo, bool percentual, string valor,
-        DateTime ini, DateTime fim, long? produtoId, string usoMax, bool unico, string minimo, string maximo, long? editarId = null, bool? ativo = null)
+        DateTime ini, DateTime fim, long? produtoId, string usoMax, bool unico, string minimo, string maximo, long? editarId = null, bool? ativo = null,
+        string usoMaxTotal = null, bool restritoClientes = false, JsonArray clientes = null)
     {
         if (editarId == null && origem is "fidelidade" or "parceiro" && (vinculoId is not long vid || vid <= 0)) { Msg.Aviso(dono, origem == "fidelidade" ? "Escolha a conta de fidelidade." : "Escolha o parceiro."); return false; }
         if (string.IsNullOrWhiteSpace(codigo)) { Msg.Aviso(dono, "Informe o código do voucher (ou toque em Gerar)."); return false; }
@@ -817,28 +819,43 @@ static class VoucherRegras
         else { if (Fmt.Centavos(txt) is not long c || c <= 0) { Msg.Aviso(dono, "Informe o valor do desconto."); return false; } v = c; }
         if (fim.Date < ini.Date) { Msg.Aviso(dono, "A data final deve ser igual ou depois da inicial."); return false; }
         var uso = int.TryParse(usoMax, out var u) && u > 0 ? u : 1;
+        int? usoTot = unico ? 1 : (int.TryParse((usoMaxTotal ?? "").Trim(), out var ut) && ut > 0 ? ut : null);
         if (editarId is long idEd)
         {
             var corpo = new JsonObject
             {
                 ["codigo"] = codigo.Trim().ToUpperInvariant(), ["tipo"] = percentual ? "percentual" : "valor", ["valor"] = v, ["inicio"] = Fmt.Iso(ini), ["fim"] = Fmt.Iso(fim),
-                ["produtoId"] = produtoId is long p2 && p2 > 0 ? p2 : null, ["usoMaxCliente"] = uso, ["usoUnico"] = unico,
+                ["produtoId"] = produtoId is long p2 && p2 > 0 ? p2 : null, ["usoMaxCliente"] = uso, ["usoMaxTotal"] = usoTot, ["usoUnico"] = unico, ["restritoClientes"] = restritoClientes,
                 ["pedidoMinimo"] = Fmt.Centavos(minimo) is long mn2 && mn2 > 0 ? mn2 : null, ["descontoMaximo"] = Fmt.Centavos(maximo) is long mx2 && mx2 > 0 ? mx2 : null,
             };
             if (origem is not ("fidelidade" or "parceiro")) corpo["referencia"] = string.IsNullOrWhiteSpace(referencia) ? null : referencia.Trim();
             if (ativo is bool at) corpo["ativo"] = at;
+            if (clientes != null) corpo["clientes"] = clientes;
             await Sessao.Api.PutAsync("/api/office/vouchers/" + idEd, corpo);
             Msg.Info(dono, "Voucher alterado.");
             return true;
         }
-        await Sessao.Api.PostAsync("/api/office/vouchers", new
+        var post = new JsonObject
         {
-            origem, referencia = origem is "fidelidade" or "parceiro" ? null : referencia?.Trim(),
-            fidelidadeContaId = origem == "fidelidade" ? vinculoId : null, parceiroId = origem == "parceiro" ? vinculoId : null,
-            codigo = codigo.Trim().ToUpperInvariant(), tipo = percentual ? "percentual" : "valor", valor = v, inicio = Fmt.Iso(ini), fim = Fmt.Iso(fim),
-            produtoId = produtoId is long pid && pid > 0 ? pid : (long?)null, usoMaxCliente = uso, usoUnico = unico,
-            pedidoMinimo = Fmt.Centavos(minimo) is long mn && mn > 0 ? mn : (long?)null, descontoMaximo = Fmt.Centavos(maximo) is long mx && mx > 0 ? mx : (long?)null,
-        });
+            ["origem"] = origem,
+            ["referencia"] = origem is "fidelidade" or "parceiro" || string.IsNullOrWhiteSpace(referencia) ? null : referencia.Trim(),
+            ["fidelidadeContaId"] = origem == "fidelidade" ? vinculoId : null,
+            ["parceiroId"] = origem == "parceiro" ? vinculoId : null,
+            ["codigo"] = codigo.Trim().ToUpperInvariant(),
+            ["tipo"] = percentual ? "percentual" : "valor",
+            ["valor"] = v,
+            ["inicio"] = Fmt.Iso(ini),
+            ["fim"] = Fmt.Iso(fim),
+            ["produtoId"] = produtoId is long pid && pid > 0 ? pid : null,
+            ["usoMaxCliente"] = uso,
+            ["usoMaxTotal"] = usoTot,
+            ["usoUnico"] = unico,
+            ["restritoClientes"] = restritoClientes,
+            ["pedidoMinimo"] = Fmt.Centavos(minimo) is long mn && mn > 0 ? mn : null,
+            ["descontoMaximo"] = Fmt.Centavos(maximo) is long mx && mx > 0 ? mx : null,
+        };
+        if (clientes != null) post["clientes"] = clientes;
+        await Sessao.Api.PostAsync("/api/office/vouchers", post);
         Msg.Info(dono, "Voucher criado com sucesso.");
         return true;
     }
@@ -888,7 +905,7 @@ public class FormVoucher : CartaoModal
     string _valorCartao = "10% OFF", _codigoCartao = "";
     readonly string _selo;
 
-    public FormVoucher(string origem, JsonObject vinculo = null, JsonObject editar = null) : base(820, 660)
+    public FormVoucher(string origem, JsonObject vinculo = null, JsonObject editar = null) : base(860, 740)
     {
         var fidelidade = origem == "fidelidade" && editar == null;
         Text = editar != null ? "Editar voucher" : fidelidade ? "Criar voucher por fidelidade" : "Criar voucher";
@@ -921,7 +938,7 @@ public class FormVoucher : CartaoModal
         cab.Controls.Add(x);
 
         // ---------- formulário: 2 colunas, espaço 12 × 14
-        var form = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, BackColor = DialogoDesign.Fundo, Padding = new Padding(20, 16, 6, 0), AutoScroll = false };
+        var form = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, BackColor = DialogoDesign.Fundo, Padding = new Padding(20, 16, 16, 12), AutoScroll = true };
         form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         void Campo(string rotulo, Control ctl, int span, Button acao = null)
         {
@@ -961,10 +978,23 @@ public class FormVoucher : CartaoModal
         var ini = new DataDesign(DateTime.Today); var fim = new DataDesign(DateTime.Today.AddDays(30));
         var prod = VoucherRegras.Produtos();
         var uso = PecasDesign.Numero(1, 4);
+        var usoTotal = PecasDesign.Texto("1", 6); usoTotal.PlaceholderText = "Sem limite"; usoTotal.Enabled = false;
         var min = PecasDesign.Texto("", 14); min.PlaceholderText = "Sem mínimo";
         var max = PecasDesign.Texto("", 14); max.PlaceholderText = "Sem limite";
-        var unico = new CheckBox { Text = "Uso único (vale uma vez só)", Checked = true, AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo), BackColor = DialogoDesign.Fundo, Padding = new Padding(4, 0, 0, 0), Cursor = Cursors.Hand, Margin = new Padding(0, 0, 0, 0) };
+        var unico = new CheckBox { Text = "Uso único (1 uso total)", Checked = true, AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo), BackColor = DialogoDesign.Fundo, Padding = new Padding(4, 0, 0, 0), Cursor = Cursors.Hand, Margin = new Padding(0, 0, 0, 0) };
+        var restrito = new CheckBox { Text = "Restringir a pessoas / grupo", Checked = false, AutoSize = true, Font = unico.Font, BackColor = DialogoDesign.Fundo, Padding = unico.Padding, Cursor = Cursors.Hand, Margin = new Padding(0, 0, 0, 0) };
         Forma.CheckVerde(unico);
+        Forma.CheckVerde(restrito);
+        List<JsonObject> clientesNovos = [];
+        var infoPessoas = PecasDesign.Texto("Qualquer cliente (sem lista)", 120); infoPessoas.ReadOnly = true;
+        var btnPessoas = DialogoDesign.AcaoCampo("Gerenciar…");
+
+        void SyncUnico()
+        {
+            if (unico.Checked) { usoTotal.Text = "1"; usoTotal.Enabled = false; }
+            else { if (usoTotal.Text == "1" && editar == null && clientesNovos.Count == 0) usoTotal.Text = ""; usoTotal.Enabled = true; }
+        }
+        unico.CheckedChanged += (_, _) => SyncUnico();
 
         CheckBox ativo = null;
         if (editar != null)
@@ -988,8 +1018,13 @@ public class FormVoucher : CartaoModal
             min.Text = editar.L("pedidoMinimo") is long mn and > 0 ? Fmt.Brl(mn).Replace("R$", "").Trim() : "";
             max.Text = editar.L("descontoMaximo") is long mx and > 0 ? Fmt.Brl(mx).Replace("R$", "").Trim() : "";
             unico.Checked = editar.B("usoUnico");
+            usoTotal.Text = editar.L("usoMaxTotal") is long ut && ut > 0 ? ut.ToString() : (unico.Checked ? "1" : "");
+            restrito.Checked = editar.B("restritoClientes");
+            var nBen = editar.I("beneficiariosTotal");
+            infoPessoas.Text = nBen > 0 ? $"{nBen} pessoa(s) na lista ({editar.I("beneficiariosUsaram")} já usaram)" : "Qualquer cliente (sem lista)";
             ativo = new CheckBox { Text = "Ativo (vale no caixa)", Checked = editar.B("ativo"), AutoSize = true, Font = unico.Font, BackColor = DialogoDesign.Fundo, Padding = unico.Padding, Cursor = Cursors.Hand, Margin = Padding.Empty };
             Forma.CheckVerde(ativo);
+            SyncUnico();
         }
         else if (fidelidade)
         {
@@ -998,14 +1033,39 @@ public class FormVoucher : CartaoModal
             Load += (_, _) => Seguro.Rodar(this, () => VoucherRegras.CarregarVinculos(lista, origem, vinculo));
         }
         else Campo("Referência (opcional)", refe, 2);
+        btnPessoas.Click += (_, _) =>
+        {
+            if (editar != null)
+            {
+                using var fc = new FormVoucherClientes(editar);
+                fc.ShowDialog(this);
+                restrito.Checked = fc.RestritoClientes;
+                infoPessoas.Text = fc.TotalClientes > 0 ? $"{fc.TotalClientes} pessoa(s) na lista" : "Qualquer cliente (sem lista)";
+                if (fc.UsoMaxTotalAtual is int ut && ut > 0) { if (ut > 1) unico.Checked = false; usoTotal.Text = ut.ToString(); }
+            }
+            else
+            {
+                using var fc = new FormVoucherClientes(clientesNovos);
+                fc.ShowDialog(this);
+                infoPessoas.Text = clientesNovos.Count > 0 ? $"{clientesNovos.Count} pessoa(s) pré-cadastrada(s)" : "Qualquer cliente (sem lista)";
+                if (clientesNovos.Count > 0)
+                {
+                    restrito.Checked = true;
+                    if (clientesNovos.Count > 1 && unico.Checked) unico.Checked = false;
+                    usoTotal.Text = clientesNovos.Count.ToString();
+                }
+            }
+        };
         Campo("Código", cod, 2, gerar);
         Campo("Tipo de desconto", tipo, 1); Campo("Valor", valor, 1);
         Campo("Válido de", ini, 1); Campo("Válido até", fim, 1);
         Campo("Produto", prod, 2);
-        Campo("Uso máximo por cliente", uso, 1); Campo("Pedido mínimo (R$)", min, 1);
-        Campo("Desconto máximo (R$)", max, 2);
-        form.Controls.Add(unico); form.SetColumnSpan(unico, ativo == null ? 2 : 1);
-        if (ativo != null) form.Controls.Add(ativo);
+        Campo("Uso máx/cliente", uso, 1); Campo("Limite total de usos", usoTotal, 1);
+        Campo("Pedido mínimo (R$)", min, 1); Campo("Desconto máximo (R$)", max, 1);
+        Campo("Pessoas e grupos autorizados", infoPessoas, 2, btnPessoas);
+        form.Controls.Add(unico); form.SetColumnSpan(unico, 1);
+        form.Controls.Add(restrito);
+        if (ativo != null) { form.Controls.Add(ativo); form.SetColumnSpan(ativo, 2); }
 
         void Previa()
         {
@@ -1028,8 +1088,14 @@ public class FormVoucher : CartaoModal
         cancelar.Click += (_, _) => Close();
         salvar.Click += (_, _) => Seguro.Rodar(this, async () =>
         {
+            JsonArray cls = null;
+            if (editar == null && clientesNovos.Count > 0)
+            {
+                cls = new JsonArray();
+                foreach (var c in clientesNovos) cls.Add(JsonNode.Parse(c.ToJsonString()));
+            }
             if (await VoucherRegras.Salvar(this, origem, fidelidade ? Campos.IdDe(lista) : null, refe.Text, cod.Text, tipo.SelectedIndex == 0, valor.Text,
-                ini.Value, fim.Value, Campos.IdDe(prod), uso.Text, unico.Checked, min.Text, max.Text, editar?.L("id"), ativo?.Checked)) { DialogResult = DialogResult.OK; Close(); }
+                ini.Value, fim.Value, Campos.IdDe(prod), uso.Text, unico.Checked, min.Text, max.Text, editar?.L("id"), ativo?.Checked, usoTotal.Text, restrito.Checked, cls)) { DialogResult = DialogResult.OK; Close(); }
         });
         rod.Controls.AddRange([cancelar, salvar]);
 
@@ -1103,19 +1169,206 @@ public class FormVoucherParceiro : DialogoDesign
         var prod = VoucherRegras.Produtos();
         var ini = new DataDesign(DateTime.Today); var fim = new DataDesign(DateTime.Today.AddMonths(3));
         var uso = PecasDesign.Numero(1, 4);
-        var unico = new CheckBox { Text = "Uso único", Checked = true };
+        var usoTotal = PecasDesign.Texto("1", 6); usoTotal.Enabled = false; usoTotal.PlaceholderText = "Sem limite";
+        var unico = new CheckBox { Text = "Uso único (1 uso total)", Checked = true };
+        unico.CheckedChanged += (_, _) =>
+        {
+            if (unico.Checked) { usoTotal.Text = "1"; usoTotal.Enabled = false; }
+            else { if (usoTotal.Text == "1") usoTotal.Text = ""; usoTotal.Enabled = true; }
+        };
         var min = PecasDesign.Texto("0,00", 14); var max = PecasDesign.Texto("0,00", 14);
         var d = Secao("Desconto");
         Campo(d, "Tipo de desconto", tipo, 2); Campo(d, "Valor do desconto", valor, 2); Campo(d, "Produto", prod, 2);
-        Campo(d, "Data inicial", ini, 2); Campo(d, "Data final", fim, 2); Campo(d, "Uso máx/cliente", uso, 1); Marca(d, unico, 1);
+        Campo(d, "Data inicial", ini, 2); Campo(d, "Data final", fim, 2); Campo(d, "Uso máx/cliente", uso, 1); Campo(d, "Limite total", usoTotal, 1);
+        Marca(d, unico, 6);
         Campo(d, "Pedido mínimo (R$)", min, 3); Campo(d, "Desconto máximo (R$)", max, 3);
 
         BotaoRodape("Salvar e fechar", true, () => Seguro.Rodar(this, async () =>
         {
             if (await VoucherRegras.Salvar(this, "parceiro", Campos.IdDe(lista), null, cod.Text, tipo.SelectedIndex == 0, valor.Text,
-                ini.Value, fim.Value, Campos.IdDe(prod), uso.Text, unico.Checked, min.Text, max.Text)) { DialogResult = DialogResult.OK; Close(); }
+                ini.Value, fim.Value, Campos.IdDe(prod), uso.Text, unico.Checked, min.Text, max.Text, usoMaxTotal: usoTotal.Text)) { DialogResult = DialogResult.OK; Close(); }
         }));
         BotaoRodape("Cancelar", false, Close);
         Load += (_, _) => Seguro.Rodar(this, () => VoucherRegras.CarregarVinculos(lista, "parceiro", vinculo));
+    }
+}
+
+/// <summary>Gerenciador de pessoas e grupos autorizados a usar um voucher específico.</summary>
+public class FormVoucherClientes : DialogoDesign
+{
+    readonly long? _voucherId;
+    readonly List<JsonObject> _rascunho;
+    readonly Grade _grade;
+    readonly CheckBox _restrito;
+    readonly CheckBox _ajustarTeto;
+    readonly Label _resumo;
+
+    public bool RestritoClientes => _restrito.Checked;
+    public int TotalClientes { get; private set; }
+    public int? UsoMaxTotalAtual { get; private set; }
+
+    public FormVoucherClientes(JsonObject voucher) : this(voucher, null) { }
+    public FormVoucherClientes(List<JsonObject> rascunho) : this(null, rascunho) { }
+
+    FormVoucherClientes(JsonObject voucher, List<JsonObject> rascunho)
+        : base(
+            voucher != null ? $"Pessoas do voucher {voucher.S("codigo")}" : "Pessoas / grupo do novo voucher",
+            "Cadastre quem pode utilizar este voucher (identificado automaticamente pelo CPF)",
+            "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87",
+            "linear-gradient(180deg, #8C89FF, #4B47D6)")
+    {
+        _voucherId = voucher?.L("id");
+        _rascunho = rascunho;
+        UsoMaxTotalAtual = voucher?.L("usoMaxTotal") is long ut && ut > 0 ? (int)ut : null;
+
+        var secCfg = Secao("Regra e resumo");
+        _resumo = new Label { AutoSize = true, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, Margin = new Padding(0, 0, 14, 6) };
+        secCfg.Controls.Add(_resumo); secCfg.SetColumnSpan(_resumo, 6);
+        _restrito = new CheckBox { Text = "Restringir voucher às pessoas cadastradas nesta lista", Checked = voucher?.B("restritoClientes") ?? true };
+        Marca(secCfg, _restrito, _voucherId != null ? 3 : 6);
+        _ajustarTeto = new CheckBox { Text = "Ajustar limite total ao adicionar/remover", Checked = UsoMaxTotalAtual != null };
+        if (_voucherId != null) Marca(secCfg, _ajustarTeto, 3);
+
+        var secAdd = Secao("Adicionar pessoa ao voucher", "Use \"Buscar cliente…\" para puxar do cadastro ou digite Nome + CPF manualmente.");
+        var manNome = PecasDesign.Texto("", 120); manNome.PlaceholderText = "Nome completo";
+        var manCpf = PecasDesign.Texto("", 18); manCpf.PlaceholderText = "CPF (000.000.000-00)";
+        var manFone = PecasDesign.Texto("", 20); manFone.PlaceholderText = "WhatsApp (opcional)";
+        var manUsos = PecasDesign.Numero(1, 3);
+        var btnIncluir = AcaoCampo("Incluir");
+        Campo(secAdd, "Nome completo", manNome, 3);
+        Campo(secAdd, "CPF *", manCpf, 3);
+        Campo(secAdd, "WhatsApp", manFone, 3);
+        Campo(secAdd, "Usos/pessoa", manUsos, 3, btnIncluir);
+
+        _grade = SecaoTabela("Pessoas / grupo autorizados", 220);
+        _grade.Colunas([
+            new("nome", "Nome", Largura: 210),
+            new("documento", "CPF", Largura: 120),
+            new("telefone", "Telefone", Largura: 110),
+            new("usosLabel", "Usos", Largura: 76),
+            new("situacao", "Situação", Largura: 96),
+        ]);
+
+        if (_voucherId != null)
+        {
+            _restrito.CheckedChanged += (_, _) => Seguro.Rodar(this, async () =>
+            {
+                await Sessao.Api.PutAsync($"/api/office/vouchers/{_voucherId}", new JsonObject { ["restritoClientes"] = _restrito.Checked });
+            });
+        }
+
+        btnIncluir.Click += (_, _) => Seguro.Rodar(this, async () =>
+        {
+            var nome = manNome.Text.Trim();
+            var doc = new string(manCpf.Text.Where(char.IsDigit).ToArray());
+            var usos = int.TryParse(manUsos.Text, out var u) && u > 0 ? u : 1;
+            if (nome.Length < 2) { Msg.Aviso(this, "Informe o nome da pessoa."); return; }
+            if (doc.Length != 11 && doc.Length != 14) { Msg.Aviso(this, "Informe o CPF com 11 dígitos."); return; }
+            await IncluirPessoaAsync(null, nome, doc, manFone.Text.Trim(), usos);
+            manNome.Text = ""; manCpf.Text = ""; manFone.Text = ""; manNome.Focus();
+        });
+
+        BotaoRodape("Fechar", true, Close);
+        BotaoRodape("Remover selecionada", false, () => Seguro.Rodar(this, RemoverSelecionadaAsync));
+        BotaoRodape("Buscar cliente…", false, () => Seguro.Rodar(this, async () =>
+        {
+            var cl = FormPesquisarCliente.Escolher(this, "Selecionar cliente para o voucher");
+            if (cl == null) return;
+            var usos = int.TryParse(manUsos.Text, out var u) && u > 0 ? u : 1;
+            await IncluirPessoaAsync(cl.L("id"), cl.S("nome"), cl.S("documento"), cl.S("telefone"), usos);
+        }));
+
+        if (_voucherId != null) Load += (_, _) => Seguro.Rodar(this, CarregarAsync);
+        else RenderizarLista(_rascunho ?? []);
+    }
+
+    async Task CarregarAsync()
+    {
+        var det = (await Sessao.Api.GetAsync($"/api/office/vouchers/{_voucherId}")).AsObject();
+        UsoMaxTotalAtual = det.L("usoMaxTotal") is long ut && ut > 0 ? (int)ut : null;
+        var usos = det.I("usos");
+        var lim = det.L("limiteTotal") is long lt ? lt.ToString() : "sem limite";
+        var sit = det.B("esgotado") ? "ESGOTADO" : det.B("expirado") ? "Expirado" : det.B("ativo") ? "Ativo" : "Inativo";
+        _resumo.Text = $"{det.S("codigo")} · Situação: {sit} · Utilizações: {usos} / {lim}";
+        var lista = det["clientes"] is JsonArray arr ? arr.OfType<JsonObject>().ToList() : [];
+        RenderizarLista(lista);
+    }
+
+    void RenderizarLista(List<JsonObject> lista)
+    {
+        TotalClientes = lista.Count;
+        if (_voucherId == null) _resumo.Text = $"{TotalClientes} pessoa(s) na lista inicial do novo voucher";
+        var linhas = lista.Select(c => new JsonObject
+        {
+            ["id"] = c["id"]?.DeepClone(),
+            ["clienteId"] = c["clienteId"]?.DeepClone(),
+            ["nome"] = c.S("nome"),
+            ["documento"] = c.S("documento"),
+            ["telefone"] = c.S("telefone"),
+            ["usosMax"] = Math.Max(1, c.I("usosMax")),
+            ["usosLabel"] = $"{c.I("usosFeitos")}/{Math.Max(1, c.I("usosMax"))}",
+            ["situacao"] = c.B("esgotado") ? "Esgotado" : "Disponível",
+        }).ToList();
+        _grade.Carregar(linhas);
+    }
+
+    async Task IncluirPessoaAsync(long? clienteId, string nome, string doc, string fone, int usos)
+    {
+        var docDig = new string((doc ?? "").Where(char.IsDigit).ToArray());
+        if (_voucherId != null)
+        {
+            await Sessao.Api.PostAsync($"/api/office/vouchers/{_voucherId}/clientes", new JsonObject
+            {
+                ["clientes"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["clienteId"] = clienteId,
+                        ["nome"] = nome,
+                        ["documento"] = docDig.Length > 0 ? docDig : null,
+                        ["telefone"] = string.IsNullOrWhiteSpace(fone) ? null : fone,
+                        ["usosMax"] = usos,
+                    }
+                },
+                ["ajustarLimiteTotal"] = _ajustarTeto.Checked,
+            });
+            await CarregarAsync();
+            return;
+        }
+        var dup = _rascunho.Any(x => (clienteId != null && x.L("clienteId") == clienteId) || (docDig.Length > 0 && new string(x.S("documento").Where(char.IsDigit).ToArray()) == docDig));
+        if (dup) { Msg.Aviso(this, "Essa pessoa já está na lista."); return; }
+        _rascunho.Add(new JsonObject
+        {
+            ["id"] = -(_rascunho.Count + 1),
+            ["clienteId"] = clienteId,
+            ["nome"] = nome,
+            ["documento"] = docDig.Length > 0 ? docDig : null,
+            ["telefone"] = string.IsNullOrWhiteSpace(fone) ? null : fone,
+            ["usosMax"] = usos,
+            ["usosFeitos"] = 0,
+        });
+        RenderizarLista(_rascunho);
+    }
+
+    async Task RemoverSelecionadaAsync()
+    {
+        var sel = _grade.Selecionados;
+        if (sel.Count == 0) { Msg.Aviso(this, "Selecione uma pessoa na lista para remover."); return; }
+        if (_voucherId != null)
+        {
+            foreach (var item in sel)
+            {
+                var cid = item.L("id");
+                if (cid is long id && id > 0) await Sessao.Api.DeleteAsync($"/api/office/vouchers/{_voucherId}/clientes/{id}");
+            }
+            await CarregarAsync();
+            return;
+        }
+        foreach (var item in sel)
+        {
+            var id = item.L("id");
+            _rascunho.RemoveAll(x => x.L("id") == id);
+        }
+        RenderizarLista(_rascunho);
     }
 }

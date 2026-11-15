@@ -104,12 +104,13 @@ const IC = {
   pilotos: 'M16 19v-1a4 4 0 0 0-8 0v1M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', ranking: 'M3 20h18M5 20v-5h4v5M10 20V9h4v11M15 20v-7h4v7',
   sync: 'M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16M16 16h5v5',
   estrela: 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z',
+  voucher: 'M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4V7zM15 5v2M15 11v2M15 17v2',
 };
 const svg = (d, tam = 14, cor = 'currentColor', larg = 2.2) => `<svg width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="${larg}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"></path></svg>`;
 
 const NAV = [
   { t: 'Operação', itens: [['visao', 'Visão geral', IC.inicio, G('var(--kib-cor-borda-campo)', 'var(--kib-cor-texto-corpo)')], ['agenda', 'Agenda', IC.agenda, G('var(--kib-cor-categoria-laranja-topo)', 'var(--kib-cor-categoria-laranja-base)')], ['recepcao', 'Recepção', IC.recepcao, G('var(--kib-cor-categoria-verde-topo)', 'var(--kib-cor-categoria-verde-base)')]] },
-  { t: 'Clientes', itens: [['pilotos', 'Pilotos', IC.pilotos, G('var(--kib-cor-categoria-azul-topo)', 'var(--kib-cor-estado-info-solido)')], ['ranking', 'Ranking', IC.ranking, G('var(--kib-cor-categoria-amarelo-topo)', 'var(--kib-cor-categoria-amarelo-base)')], ['reservas', 'Reservas online', IC.reservas, G('var(--kib-cor-categoria-ciano-topo)', 'var(--kib-cor-agenda-livre-cheio)')]] },
+  { t: 'Clientes', itens: [['pilotos', 'Pilotos', IC.pilotos, G('var(--kib-cor-categoria-azul-topo)', 'var(--kib-cor-estado-info-solido)')], ['ranking', 'Ranking', IC.ranking, G('var(--kib-cor-categoria-amarelo-topo)', 'var(--kib-cor-categoria-amarelo-base)')], ['reservas', 'Reservas online', IC.reservas, G('var(--kib-cor-categoria-ciano-topo)', 'var(--kib-cor-agenda-livre-cheio)')], ['vouchers', 'Vouchers', IC.voucher, G('var(--kib-cor-categoria-roxo-topo)', 'var(--kib-cor-categoria-roxo-base)')]] },
   { t: 'Competições', itens: [['campeonatos', 'Campeonatos', IC.camp, G('var(--kib-cor-categoria-ambar-topo)', 'var(--kib-cor-categoria-ambar-base)')]] },
   { t: 'Sistema', itens: [['sistema', 'PCs e sistema', IC.sistema, G('var(--kib-cor-borda-campo)', 'var(--kib-cor-texto-corpo)')], ['usuarios', 'Usuários e acessos', IC.pilotos, G('var(--kib-cor-categoria-roxo-topo)', 'var(--kib-cor-categoria-roxo-base)')]] },
 ];

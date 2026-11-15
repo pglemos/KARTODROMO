@@ -1059,16 +1059,21 @@ public class FormPrincipal : Form
                 break;
             case "vouchers":
                 if (_status == "uso")
-                    _grade.Colunas([new("dataHora", "Data/Hora", TipoCol.DataHora), new("voucher", "Voucher"), new("cliente", "Cliente", Largura: 220), new("desconto", "Desconto (R$)", TipoCol.Dinheiro), new("vendaId", "Venda", TipoCol.Inteiro), new("estornado", "Estornado", TipoCol.Bool)]);
+                    _grade.Colunas([new("dataHora", "Data/Hora", TipoCol.DataHora), new("voucher", "Voucher"), new("cliente", "Cliente", Largura: 210), new("canalLabel", "Canal", Largura: 110), new("desconto", "Desconto (R$)", TipoCol.Dinheiro), new("vendaId", "Venda", TipoCol.Inteiro), new("estornado", "Estornado", TipoCol.Bool)]);
                 else
                     _grade.Colunas([new("codigo", "Código"), new("origem", "Origem", Largura: 90), new("referencia", "Conta/Parceiro"), new("tipo", "Tipo desconto", Largura: 100),
                         new("valor", "Valor", Largura: 90, Valor: r => r.S("tipo") == "percentual" ? r.S("valor") + "%" : Fmt.Brl(r.L("valor"))), new("inicio", "Data inicial", TipoCol.Data), new("fim", "Data final", TipoCol.Data),
-                        new("produto", "Produto"), new("usoMaxCliente", "Uso máx/cliente", TipoCol.Inteiro, 100), new("usoUnico", "Uso único", TipoCol.Bool), new("usos", "Usos", TipoCol.Inteiro, 60),
+                        new("produto", "Produto"),
+                        new("pessoas", "Pessoas / Grupo", Largura: 120, Valor: r => r.B("restritoClientes") ? $"{r.I("beneficiariosUsaram")}/{r.I("beneficiariosTotal")} rest." : r.I("beneficiariosTotal") > 0 ? $"{r.I("beneficiariosTotal")} ind." : "Aberto"),
+                        new("usoMaxCliente", "Máx/cli", TipoCol.Inteiro, 70), new("usoUnico", "Uso único", TipoCol.Bool),
+                        new("usos", "Usos / Limite", Largura: 96, Valor: r => r.L("limiteTotal") is long lt ? $"{r.I("usos")} / {lt}" : r.I("usos").ToString()),
+                        new("status", "Situação", Largura: 86, Valor: r => r.S("status") switch { "esgotado" => "Esgotado", "expirado" => "Expirado", "inativo" => "Inativo", _ => "Ativo" }),
                         new("ativo", "Ativo", TipoCol.Bool)]);
-                if (_status != "uso") _grade.CorLinha = r => r.B("ativo") ? null : Color.Gray;
+                if (_status != "uso") _grade.CorLinha = r => !r.B("ativo") ? Color.Gray : r.B("esgotado") ? Tokens.Claro.CorEstadoPerigoTexto : null;
                 _menuAtual = sel => _status == "uso" ? [Exportar("vouchers-uso")] : [
                     Item("Criar voucher", () => { FormVoucher.Criar("manual").ShowDialog(this); Recarregar(); }),
                     Item("Editar voucher", () => Seguro.Rodar(this, async () => { if (await FormVoucher.Editar(this, sel[0])) Recarregar(); }), sel.Count == 1, "Enter"),
+                    Item("Gerenciar pessoas / grupo…", () => { using var f = new FormVoucherClientes(sel[0]); f.ShowDialog(this); Recarregar(); }, sel.Count == 1),
                     Item(sel.Count == 1 && !sel[0].B("ativo") ? "Reativar voucher" : "Desativar voucher", () => AtivarVoucher(sel[0]), sel.Count == 1),
                     new ToolStripSeparator(), Exportar("vouchers")];
                 rows = await Sessao.Api.ListaAsync(_status == "uso" ? "/api/office/vouchers/uso" : "/api/office/vouchers");

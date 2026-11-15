@@ -908,13 +908,17 @@ public class FormTotem : Form, IMessageFilter
     async Task TelaBaterias()
     {
         var grupo = string.Join(",", _participantes.Select(p => $"{p.Id}.{p.Token}"));
-        var todas = await _api.ListaAsync("/api/totem/baterias?grupo=" + Uri.EscapeDataString(grupo));
+        var qs = Uri.EscapeDataString(grupo);
+        var tBaterias = _api.ListaAsync("/api/totem/baterias?grupo=" + qs);
+        List<JsonObject> vouchers = [];
+        try { vouchers = await _api.ListaAsync("/api/totem/vouchers-cliente?grupo=" + qs); } catch { }
+        var todas = await tBaterias;
         var n = _participantes.Count;
         var lista = todas.Where(b => b.I("livres") >= n).ToList();
-        MontarBaterias(lista, n);
+        MontarBaterias(lista, n, vouchers);
     }
 
-    void MontarBaterias(List<JsonObject> baterias, int n)
+    void MontarBaterias(List<JsonObject> baterias, int n, List<JsonObject> vouchers = null)
     {
         var c = NovaTela(etapa: 3);
         c.Controls.Add(Rot("Escolha sua bateria", 150, 108, F(44, false, FontStyle.Bold), Estilo.Texto));
@@ -922,8 +926,22 @@ public class FormTotem : Form, IMessageFilter
         var selecionadas = Rot("Nenhuma selecionada", 1000, 164, F(17, false, FontStyle.Bold), Estilo.VerdeSuave, 216, 28, ContentAlignment.MiddleRight);
         c.Controls.Add(selecionadas);
         Botao(c, "Atualizar", 820, 154, 150, false, TelaBaterias, 42, 16);
-        var painel = CartaoEm(c, 150, 215, 1066, 426);
-        var lista = new ListaOpcoes(_k) { Bounds = new Rectangle(0, 0, P(1066), P(426)) };
+        var painelY = 215;
+        var painelH = 426;
+        if (vouchers is { Count: > 0 })
+        {
+            var codigos = string.Join(", ", vouchers.Select(v =>
+            {
+                var desc = v.S("tipo") == "percentual" ? $"{v.I("valor")}%" : Fmt.Brl(v.L("valor") ?? 0);
+                return $"{v.S("codigo")} ({desc})";
+            }).Distinct());
+            var banner = CartaoEm(c, 150, 204, 1066, 52);
+            banner.Controls.Add(Rot($"Voucher reconhecido pelo seu CPF: {codigos} — será validado no caixa da recepção", 20, 12, F(17, false, FontStyle.Bold), Estilo.VerdeSuave, 1026, 28));
+            painelY = 268;
+            painelH = 373;
+        }
+        var painel = CartaoEm(c, 150, painelY, 1066, painelH);
+        var lista = new ListaOpcoes(_k) { Bounds = new Rectangle(0, 0, P(1066), P(painelH)) };
         var totalMarcadas = 0;
         Pilula proximo = null;
         foreach (var b in baterias)
@@ -963,7 +981,7 @@ public class FormTotem : Form, IMessageFilter
         });
         proximo.Enabled = totalMarcadas > 0;
         voltar.BringToFront(); proximo.BringToFront();
-        Mostrar("baterias", c, () => MontarBaterias(baterias, n));
+        Mostrar("baterias", c, () => MontarBaterias(baterias, n, vouchers));
     }
 
     string ObterImpressoraTotem() => Relatorio.ObterImpressoraTermoTotem(Config.Impressora);
@@ -1006,7 +1024,8 @@ public class FormTotem : Form, IMessageFilter
         var r = await _api.PostAsync("/api/totem/inscrever", corpo);
         var qtd = r?["inscricoes"] is JsonArray ins ? ins.Count : 1;
         var pulseiras = r?["pulseiras"] is JsonArray pul ? pul.OfType<JsonObject>().ToList() : [];
-        TelaSucesso(Fmt.Hm(r.S("inicio")), qtd, pulseiras);
+        var vouchersRec = r?["vouchersReconhecidos"] is JsonArray vr ? vr.OfType<JsonObject>().ToList() : [];
+        TelaSucesso(Fmt.Hm(r.S("inicio")), qtd, pulseiras, vouchersRec);
         // A impressora configurada nesta máquina recebe um trabalho por participante.
         if (r["termoNaRecepcao"]?.GetValue<bool>() == true) Program.Log("termo enviado para a impressora da recepção");
         else
@@ -1077,7 +1096,7 @@ public class FormTotem : Form, IMessageFilter
 
     // ------------------------------------------------------------------ 5. sucesso
 
-    void TelaSucesso(string hora, int n, List<JsonObject> pulseiras = null)
+    void TelaSucesso(string hora, int n, List<JsonObject> pulseiras = null, List<JsonObject> vouchers = null)
     {
         if (pulseiras is { Count: > 0 }) { TelaPulseira(pulseiras); return; }
         var c = NovaTela(etapa: 3);
@@ -1087,10 +1106,19 @@ public class FormTotem : Form, IMessageFilter
         c.Controls.Add(Rot($"Dirija-se até a recepção para concluir o atendimento e assinar {(n > 1 ? "os termos" : "seu termo")} de responsabilidade.", 120, 384, F(22), Estilo.Suave, 1126, 40, ContentAlignment.MiddleCenter));
         c.Controls.Add(Rot("Sua bateria começa às", 440, 438, F(22), Estilo.Suave, 340, 36, ContentAlignment.MiddleRight));
         c.Controls.Add(Rot(hora, 786, 434, Estilo.Mono(P(28), FontStyle.Bold), Estilo.Texto, 140, 40, ContentAlignment.MiddleLeft));
-        c.Controls.Add(Rot("Atenção às informações passadas no briefing e divirta-se!", 170, 494, F(19), Estilo.Suave, 1026, 34, ContentAlignment.MiddleCenter));
+        if (vouchers is { Count: > 0 })
+        {
+            var cods = string.Join(", ", vouchers.Select(v => v.S("codigo")).Distinct());
+            c.Controls.Add(Rot($"Voucher {cods} reconhecido e vinculado ao seu atendimento.", 120, 486, F(18, false, FontStyle.Bold), Estilo.VerdeSuave, 1126, 30, ContentAlignment.MiddleCenter));
+            c.Controls.Add(Rot("Atenção às informações passadas no briefing e divirta-se!", 170, 518, F(18), Estilo.Suave, 1026, 28, ContentAlignment.MiddleCenter));
+        }
+        else
+        {
+            c.Controls.Add(Rot("Atenção às informações passadas no briefing e divirta-se!", 170, 494, F(19), Estilo.Suave, 1026, 34, ContentAlignment.MiddleCenter));
+        }
         Botao(c, "Concluir", 500, 560, 180, true, () => { Reiniciar(); return Task.CompletedTask; }, 64, 19);
         c.Controls.Add(Rot("Volta para o início após 90 segundos sem interação", 700, 560, F(16), Estilo.MuitoSuave, 380, 64, ContentAlignment.MiddleLeft));
-        Mostrar("fim", c, () => TelaSucesso(hora, n));
+        Mostrar("fim", c, () => TelaSucesso(hora, n, pulseiras, vouchers));
         _fim.Stop(); _fim.Start();
     }
 

@@ -9,6 +9,16 @@ import { confereSenha, hashSenha, type Sessao } from './auth';
 import { erroCadastroObrigatorio, erroPesoCliente } from './cadastro-obrigatorio';
 import { mobileApiEndpoint } from '../mobile-api-url';
 import { ENDURANCE_VINCULO_SQL } from './endurance-vinculo';
+import {
+  avaliarElegibilidadeVoucher,
+  garantirSchemaVouchers,
+  listarBeneficiariosVoucher,
+  normalizarBeneficiariosInput,
+  normalizarDocVoucher,
+  resumirStatusVoucher,
+  sincronizarBeneficiariosVoucher,
+  vouchersDisponiveisParaCliente,
+} from './vouchers';
 
 /** Libera a vaga preservando pagamento, venda e vínculos para consulta e estorno separado. */
 export async function cancelarReserva(id: number) {
@@ -252,11 +262,13 @@ const RESERVA_SELECT = `SELECT TOP 5000 i.Id id, i.Pago pago, CONVERT(varchar(16
   r.Nome responsavel, p.Id produtoId, p.Nome produto, p.Categoria categoria, ISNULL(i.PrecoCentavos, p.PrecoCentavos) preco, i.DescontoCentavos desconto,
   CASE WHEN i.Pago = 1 THEN i.ValorCentavos ELSE ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos END total,
   i.Observacao observacao, i.Aprovada aprovada, CASE WHEN i.TermoImpressoEm IS NULL THEN 0 ELSE 1 END termo, i.Status status, i.Origem origem, i.Kart kart, i.VendaId vendaId,
+  i.VoucherId voucherId, vSug.Codigo voucherCodigo,
   CONVERT(varchar(16), i.TermoImpressoEm, 126) termoImpressoEm, CONVERT(varchar(16), i.CriadoEm, 126) criadoEm, CONVERT(varchar(16), i.CheckinEm, 126) checkinEm, i.CheckinOrigem checkinOrigem,
   CASE WHEN i.Pago = 1 THEN ISNULL(onl.forma, cx.formas) END formaPagamento
   FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId JOIN dbo.Cliente c ON c.Id = i.ClienteId
   ${ENDURANCE_VINCULO_SQL}
   LEFT JOIN dbo.Cliente r ON r.Id = ISNULL(i.ResponsavelId, c.ResponsavelId) LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
+  LEFT JOIN dbo.Voucher vSug ON vSug.Id = i.VoucherId
   OUTER APPLY (SELECT TOP 1 CASE ro.Forma WHEN 'pix' THEN 'Pix' WHEN 'debito' THEN 'Débito' WHEN 'credito' THEN 'Crédito' ELSE 'Cartão' END + ' (site)' forma
     FROM dbo.ReservaOnline ro WHERE i.Origem = 'site' AND ro.Status = 'pago' AND ',' + ro.InscricaoIds + ',' LIKE '%,' + CAST(i.Id AS varchar(12)) + ',%') onl
   OUTER APPLY (SELECT STUFF((SELECT DISTINCT ' + ' + fp.Nome FROM dbo.VendaPagamento vp JOIN dbo.FormaPagamento fp ON fp.Id = vp.FormaPagamentoId
@@ -668,6 +680,8 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
     // voucher
     let voucher: Record<string, unknown> | null = null;
     let voucherDesconto = 0;
+    let clienteVoucherId: number | null = clienteId;
+    let voucherAutoLink: { vcId: number; clienteId: number } | null = null;
     if (voucherCodigo) {
       const [v] = await run(
         `SELECT v.*, p.Ativo parceiroAtivo, fc.Ativo fidelidadeAtiva FROM dbo.Voucher v WITH (UPDLOCK, HOLDLOCK)
@@ -679,6 +693,20 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
       if (v.FidelidadeContaId && !v.fidelidadeAtiva) throw new HttpError(400, 'A conta de fidelidade vinculada ao voucher está inativa.');
       const [hoje] = await run(`SELECT CAST(SYSDATETIME() AS date) d`);
       if ((hoje.d as Date) < (v.InicioEm as Date) || (hoje.d as Date) > (v.FimEm as Date)) throw new HttpError(400, 'Voucher expirado.');
+      let clienteVoucherDoc: string | null = null;
+      if (v.RestritoClientes) {
+        if (!clienteVoucherId) {
+          const primeiraIns = itens.find((i) => i.inscricaoId)?.inscricaoId;
+          if (primeiraIns) {
+            const [insCli] = await run(`SELECT ClienteId clienteId FROM dbo.Inscricao WHERE Id = @insId`, { insId: primeiraIns });
+            if (insCli?.clienteId) clienteVoucherId = Number(insCli.clienteId);
+          }
+        }
+        if (clienteVoucherId) {
+          const [cli] = await run(`SELECT Documento, DocumentoNum FROM dbo.Cliente WHERE Id = @cid`, { cid: clienteVoucherId });
+          clienteVoucherDoc = normalizarDocVoucher(cli?.DocumentoNum ?? cli?.Documento);
+        }
+      }
       const [usos] = await run(
         `SELECT
            (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @id AND Estornado = 0)
@@ -687,10 +715,24 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
            (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estornado = 0)
            + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
            + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estado IN ('reservado', 'consumido')) doCliente`,
-        { id: v.Id, cli: clienteId },
+        { id: v.Id, cli: clienteVoucherId },
       );
-      if (v.UsoUnico && (usos.n as number) > 0) throw new HttpError(400, 'Voucher já utilizado.');
-      if ((usos.doCliente as number) >= (v.UsoMaxCliente as number)) throw new HttpError(400, 'Limite de usos deste voucher para este cliente já atingido.');
+      const eleg = await avaliarElegibilidadeVoucher({
+        voucherId: Number(v.Id),
+        usoUnico: Boolean(v.UsoUnico),
+        usoMaxTotal: v.UsoMaxTotal == null ? null : Number(v.UsoMaxTotal),
+        usoMaxCliente: Number(v.UsoMaxCliente ?? 1),
+        restritoClientes: Boolean(v.RestritoClientes),
+        usosTotais: Number(usos?.n ?? 0),
+        usosClienteDirecto: Number(usos?.doCliente ?? 0),
+        clienteId: clienteVoucherId,
+        documento: clienteVoucherDoc,
+        reader: run,
+      });
+      if (!eleg.ok) throw new HttpError(400, eleg.motivo);
+      if (eleg.autoLinkClienteId && eleg.matchedVcId) {
+        voucherAutoLink = { vcId: eleg.matchedVcId, clienteId: eleg.autoLinkClienteId };
+      }
       const totalPedido = itens.reduce((s, i) => s + i.liquido, 0);
       if (v.PedidoMinimoCentavos && totalPedido < (v.PedidoMinimoCentavos as number)) throw new HttpError(400, `Valor do pedido insuficiente. Mínimo exigido: ${brl(v.PedidoMinimoCentavos as number)}.`);
       const alvo = itens.find((i) => (!v.ProdutoId || i.produtoId === v.ProdutoId) && i.descontoCentavos === 0);
@@ -751,7 +793,10 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
       await run(`INSERT INTO dbo.VendaPagamento (VendaId, FormaPagamentoId, ValorCentavos) VALUES (@vendaId, @f, @v)`, { vendaId, f: pg.formaPagamentoId, v: pg.valor });
     }
     if (voucher) {
-      await run(`INSERT INTO dbo.VoucherUso (VoucherId, VendaId, ClienteId, DescontoCentavos) VALUES (@v, @vendaId, @cli, @d)`, { v: voucher.Id, vendaId, cli: clienteId, d: voucherDesconto });
+      await run(`INSERT INTO dbo.VoucherUso (VoucherId, VendaId, ClienteId, DescontoCentavos) VALUES (@v, @vendaId, @cli, @d)`, { v: voucher.Id, vendaId, cli: clienteId ?? clienteVoucherId, d: voucherDesconto });
+      if (voucherAutoLink) {
+        await run(`UPDATE dbo.VoucherCliente SET ClienteId = @cid WHERE Id = @vcId AND ClienteId IS NULL`, { cid: voucherAutoLink.clienteId, vcId: voucherAutoLink.vcId });
+      }
       if (voucher.Origem === 'parceiro' && voucher.ParceiroId) {
         const base = itens.filter((i) => i.voucherId === Number(voucher!.Id)).reduce((total, i) => total + i.liquido, 0);
         if (base > 0) {
@@ -1322,44 +1367,174 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     return true;
   }
   if (path === '/vouchers' && method === 'GET') {
-    send(
-      200,
-      await query(
+    await garantirSchemaVouchers();
+    const [vouchers, todosBens, todosUsos] = await Promise.all([
+      query<Record<string, unknown>>(
         `SELECT v.Id id, v.Codigo codigo, v.Origem origem, v.Referencia referencia, v.ParceiroId parceiroId, ppar.Nome parceiro,
                 v.FidelidadeContaId fidelidadeContaId, c.Nome conta, v.Tipo tipo, v.Valor valor, CONVERT(varchar(10), v.InicioEm, 126) inicio,
-                CONVERT(varchar(10), v.FimEm, 126) fim, p.Nome produto, v.UsoMaxCliente usoMaxCliente, v.UsoUnico usoUnico, v.PedidoMinimoCentavos pedidoMinimo,
-                v.DescontoMaximoCentavos descontoMaximo, v.Ativo ativo, (SELECT COUNT(*) FROM dbo.VoucherUso u WHERE u.VoucherId = v.Id AND u.Estornado = 0) usos
+                CONVERT(varchar(10), v.FimEm, 126) fim, v.ProdutoId produtoId, p.Nome produto, v.UsoMaxCliente usoMaxCliente,
+                v.UsoMaxTotal usoMaxTotal, v.UsoUnico usoUnico, v.RestritoClientes restritoClientes,
+                v.PedidoMinimoCentavos pedidoMinimo, v.DescontoMaximoCentavos descontoMaximo, v.Ativo ativo,
+                CONVERT(varchar(10), SYSDATETIME(), 126) hoje,
+                (SELECT COUNT(*) FROM dbo.VoucherUso u WHERE u.VoucherId = v.Id AND u.Estornado = 0) usosRecepcao,
+                (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso o WHERE o.VoucherId = v.Id AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente')) usosOnline,
+                (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso gv WHERE gv.VoucherId = v.Id AND gv.Estado IN ('reservado', 'consumido')) usosGrupo
          FROM dbo.Voucher v LEFT JOIN dbo.Produto p ON p.Id = v.ProdutoId LEFT JOIN dbo.Parceiro ppar ON ppar.Id = v.ParceiroId
          LEFT JOIN dbo.FidelidadeConta fc ON fc.Id = v.FidelidadeContaId LEFT JOIN dbo.Cliente c ON c.Id = fc.ClienteId ORDER BY v.Id DESC`,
       ),
-    );
+      query<{ voucherId: number; clienteId: number | null; nome: string; documento: string | null; usosMax: number }>(
+        `SELECT vc.VoucherId voucherId, vc.ClienteId clienteId,
+                COALESCE(NULLIF(LTRIM(RTRIM(c.Nome)), N''), vc.Nome) nome,
+                COALESCE(NULLIF(vc.Documento, ''), NULLIF(c.DocumentoNum, ''), REPLACE(REPLACE(REPLACE(c.Documento, '.', ''), '-', ''), '/', '')) documento,
+                vc.UsosMax usosMax
+         FROM dbo.VoucherCliente vc LEFT JOIN dbo.Cliente c ON c.Id = vc.ClienteId`,
+      ),
+      query<{ voucherId: number; clienteId: number | null; documento: string | null }>(
+        `SELECT u.VoucherId voucherId, u.ClienteId clienteId,
+                COALESCE(NULLIF(c.DocumentoNum, ''), REPLACE(REPLACE(REPLACE(c.Documento, '.', ''), '-', ''), '/', '')) documento
+         FROM (
+           SELECT VoucherId, ClienteId FROM dbo.VoucherUso WHERE Estornado = 0
+           UNION ALL
+           SELECT VoucherId, ClienteId FROM dbo.ReservaOnlineVoucherUso WHERE Estado IN ('reservado', 'consumido', 'reembolso_pendente')
+           UNION ALL
+           SELECT VoucherId, ClienteId FROM dbo.ReservaGrupoVoucherUso WHERE Estado IN ('reservado', 'consumido')
+         ) u LEFT JOIN dbo.Cliente c ON c.Id = u.ClienteId`,
+      ),
+    ]);
+    const bensPorVoucher = new Map<number, typeof todosBens>();
+    for (const b of todosBens) {
+      const vid = Number(b.voucherId);
+      const arr = bensPorVoucher.get(vid) ?? [];
+      arr.push(b);
+      bensPorVoucher.set(vid, arr);
+    }
+    const usosPorVoucher = new Map<number, typeof todosUsos>();
+    for (const u of todosUsos) {
+      const vid = Number(u.voucherId);
+      const arr = usosPorVoucher.get(vid) ?? [];
+      arr.push(u);
+      usosPorVoucher.set(vid, arr);
+    }
+    const lista = vouchers.map((v) => {
+      const id = Number(v.id);
+      const usosRec = Number(v.usosRecepcao ?? 0);
+      const usosOnl = Number(v.usosOnline ?? 0);
+      const usosGrp = Number(v.usosGrupo ?? 0);
+      const usos = usosRec + usosOnl + usosGrp;
+      const bens = bensPorVoucher.get(id) ?? [];
+      const uList = usosPorVoucher.get(id) ?? [];
+      const bensComUso = bens.map((b) => {
+        const docB = normalizarDocVoucher(b.documento);
+        const feitos = uList.filter((u) =>
+          (b.clienteId && u.clienteId === b.clienteId)
+          || (docB && normalizarDocVoucher(u.documento) === docB),
+        ).length;
+        return { nome: b.nome, documento: docB, usosMax: Math.max(1, Number(b.usosMax || 1)), usosFeitos: feitos };
+      });
+      const resumo = resumirStatusVoucher({
+        ativo: Boolean(v.ativo),
+        usoUnico: Boolean(v.usoUnico),
+        usoMaxTotal: v.usoMaxTotal == null ? null : Number(v.usoMaxTotal),
+        restritoClientes: Boolean(v.restritoClientes),
+        usos,
+        fim: String(v.fim ?? ''),
+        hoje: String(v.hoje ?? ''),
+        beneficiarios: bensComUso,
+      });
+      return {
+        ...v,
+        usoMaxTotal: v.usoMaxTotal == null ? null : Number(v.usoMaxTotal),
+        restritoClientes: Boolean(v.restritoClientes),
+        usos,
+        usosRecepcao: usosRec,
+        usosOnline: usosOnl,
+        usosGrupo: usosGrp,
+        beneficiariosTotal: bensComUso.length,
+        beneficiariosUsaram: bensComUso.filter((b) => b.usosFeitos >= b.usosMax).length,
+        beneficiarios: bensComUso,
+        ...resumo,
+      };
+    });
+    send(200, lista);
     return true;
   }
   if (path === '/vouchers/uso' && method === 'GET') {
+    await garantirSchemaVouchers();
+    const vid = url.searchParams.get('voucherId') ? int(url.searchParams.get('voucherId'), 'Voucher') : null;
     send(
       200,
       await query(
-        `SELECT u.Id id, v.Codigo voucher, c.Nome cliente, u.DescontoCentavos desconto, u.VendaId vendaId, CONVERT(varchar(16), u.CriadoEm, 126) dataHora, u.Estornado estornado
-         FROM dbo.VoucherUso u JOIN dbo.Voucher v ON v.Id = u.VoucherId LEFT JOIN dbo.Cliente c ON c.Id = u.ClienteId ORDER BY u.Id DESC`,
+        `SELECT * FROM (
+           SELECT u.Id id, v.Id voucherId, v.Codigo voucher, c.Id clienteId, COALESCE(c.Nome, N'Cliente balcão') cliente,
+                  c.Documento documento, u.DescontoCentavos desconto, u.VendaId vendaId, CONVERT(varchar(16), u.CriadoEm, 126) dataHora,
+                  u.Estornado estornado, 'recepcao' canal, 'Recepção' canalLabel
+           FROM dbo.VoucherUso u JOIN dbo.Voucher v ON v.Id = u.VoucherId LEFT JOIN dbo.Cliente c ON c.Id = u.ClienteId
+           UNION ALL
+           SELECT o.Id + 1000000 id, v.Id voucherId, v.Codigo voucher, c.Id clienteId, COALESCE(c.Nome, N'Site') cliente,
+                  c.Documento documento, o.DescontoCentavos desconto, NULL vendaId, CONVERT(varchar(16), o.CriadoEm, 126) dataHora,
+                  CASE WHEN o.Estado = 'liberado' THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END estornado, 'site' canal, 'Reserva online' canalLabel
+           FROM dbo.ReservaOnlineVoucherUso o JOIN dbo.Voucher v ON v.Id = o.VoucherId LEFT JOIN dbo.Cliente c ON c.Id = o.ClienteId
+           UNION ALL
+           SELECT gv.Id + 2000000 id, v.Id voucherId, v.Codigo voucher, c.Id clienteId, COALESCE(c.Nome, N'Grupo') cliente,
+                  c.Documento documento, gv.DescontoCentavos desconto, NULL vendaId, CONVERT(varchar(16), gv.CriadoEm, 126) dataHora,
+                  CASE WHEN gv.Estado = 'liberado' THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END estornado, 'grupo' canal, 'Link de grupo' canalLabel
+           FROM dbo.ReservaGrupoVoucherUso gv JOIN dbo.Voucher v ON v.Id = gv.VoucherId LEFT JOIN dbo.Cliente c ON c.Id = gv.ClienteId
+         ) t
+         ${vid ? 'WHERE t.voucherId = @vid' : ''}
+         ORDER BY t.dataHora DESC, t.id DESC`,
+        vid ? { vid } : {},
       ),
     );
     return true;
   }
+  if (path === '/vouchers/cliente' && method === 'GET') {
+    const clienteId = url.searchParams.get('clienteId') ? int(url.searchParams.get('clienteId'), 'Cliente') : null;
+    const documento = url.searchParams.get('documento');
+    const produtoId = url.searchParams.get('produtoId') ? int(url.searchParams.get('produtoId'), 'Produto') : null;
+    send(200, await vouchersDisponiveisParaCliente({ clienteId, documento, produtoId }));
+    return true;
+  }
   if ((m = path.match(/^\/vouchers\/(\d+)$/)) && method === 'GET') {
+    await garantirSchemaVouchers();
     const id = int(m[1], 'Voucher');
-    const v = await one(
+    const v = await one<Record<string, unknown>>(
       `SELECT v.Id id, v.Codigo codigo, v.Origem origem, v.Referencia referencia, v.ParceiroId parceiroId, v.FidelidadeContaId fidelidadeContaId,
               v.Tipo tipo, v.Valor valor, CONVERT(varchar(10), v.InicioEm, 126) inicio, CONVERT(varchar(10), v.FimEm, 126) fim,
-              v.ProdutoId produtoId, v.UsoMaxCliente usoMaxCliente, v.UsoUnico usoUnico, v.PedidoMinimoCentavos pedidoMinimo,
-              v.DescontoMaximoCentavos descontoMaximo, v.Ativo ativo,
-              (SELECT COUNT(*) FROM dbo.VoucherUso u WHERE u.VoucherId = v.Id AND u.Estornado = 0) usos
+              v.ProdutoId produtoId, v.UsoMaxCliente usoMaxCliente, v.UsoMaxTotal usoMaxTotal, v.UsoUnico usoUnico,
+              v.RestritoClientes restritoClientes, v.PedidoMinimoCentavos pedidoMinimo, v.DescontoMaximoCentavos descontoMaximo, v.Ativo ativo,
+              CONVERT(varchar(10), SYSDATETIME(), 126) hoje,
+              (SELECT COUNT(*) FROM dbo.VoucherUso u WHERE u.VoucherId = v.Id AND u.Estornado = 0) usosRecepcao,
+              (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso o WHERE o.VoucherId = v.Id AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente')) usosOnline,
+              (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso gv WHERE gv.VoucherId = v.Id AND gv.Estado IN ('reservado', 'consumido')) usosGrupo
        FROM dbo.Voucher v WHERE v.Id = @id`, { id },
     );
     if (!v) throw new HttpError(404, 'Voucher não encontrado.');
-    send(200, v);
+    const clientes = await listarBeneficiariosVoucher(id);
+    const usos = Number(v.usosRecepcao ?? 0) + Number(v.usosOnline ?? 0) + Number(v.usosGrupo ?? 0);
+    const resumo = resumirStatusVoucher({
+      ativo: Boolean(v.ativo),
+      usoUnico: Boolean(v.usoUnico),
+      usoMaxTotal: v.usoMaxTotal == null ? null : Number(v.usoMaxTotal),
+      restritoClientes: Boolean(v.restritoClientes),
+      usos,
+      fim: String(v.fim ?? ''),
+      hoje: String(v.hoje ?? ''),
+      beneficiarios: clientes,
+    });
+    send(200, {
+      ...v,
+      usoMaxTotal: v.usoMaxTotal == null ? null : Number(v.usoMaxTotal),
+      restritoClientes: Boolean(v.restritoClientes),
+      usos,
+      clientes,
+      beneficiariosTotal: clientes.length,
+      beneficiariosUsaram: clientes.filter((c) => c.esgotado).length,
+      ...resumo,
+    });
     return true;
   }
   if (path === '/vouchers' && method === 'POST') {
+    await garantirSchemaVouchers();
     const b = await req.body();
     const codigo = (str(b.codigo, 40) ?? '').toUpperCase();
     if (!codigo) throw new HttpError(400, 'Informe ou gere o código.');
@@ -1371,15 +1546,24 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const inicio = isoDate(b.inicio);
     const fim = isoDate(b.fim);
     if (inicio > fim) throw new HttpError(400, 'A data final deve ser igual ou posterior à data inicial.');
-    const r = await one<{ id: number }>(
-      `INSERT INTO dbo.Voucher (Codigo, Origem, Referencia, ParceiroId, FidelidadeContaId, Tipo, Valor, InicioEm, FimEm, ProdutoId, UsoMaxCliente, UsoUnico, PedidoMinimoCentavos, DescontoMaximoCentavos)
-       OUTPUT inserted.Id id VALUES (@codigo, @origem, @ref, @parceiroId, @fidelidadeContaId, @tipo, @valor, @ini, @fim, @prod, @usoMax, @unico, @min, @max)`,
-      {
-        codigo, origem, ref: links.referencia, parceiroId: links.parceiroId, fidelidadeContaId: links.fidelidadeContaId, tipo, valor,
-        ini: inicio, fim, prod: b.produtoId ? int(b.produtoId, 'Produto') : null, usoMax: int(b.usoMaxCliente ?? 1, 'Uso máx/cliente'),
-        unico: b.usoUnico ? 1 : 0, min: b.pedidoMinimo ? cents(b.pedidoMinimo) : null, max: b.descontoMaximo ? cents(b.descontoMaximo) : null,
-      },
-    ).catch((e: Error) => {
+    const clientes = normalizarBeneficiariosInput(b.clientes);
+    const usoMaxTotal = b.usoMaxTotal != null && b.usoMaxTotal !== '' && Number(b.usoMaxTotal) > 0 ? int(b.usoMaxTotal, 'Limite total de usos') : null;
+    const restritoClientes = Boolean(b.restritoClientes) || clientes.length > 0;
+    const unico = Boolean(b.usoUnico) && !(usoMaxTotal != null && usoMaxTotal > 1) && clientes.length <= 1 ? 1 : 0;
+    const r = await tx(async (run) => {
+      const [criado] = await run(
+        `INSERT INTO dbo.Voucher (Codigo, Origem, Referencia, ParceiroId, FidelidadeContaId, Tipo, Valor, InicioEm, FimEm, ProdutoId, UsoMaxCliente, UsoMaxTotal, UsoUnico, RestritoClientes, PedidoMinimoCentavos, DescontoMaximoCentavos)
+         OUTPUT inserted.Id id VALUES (@codigo, @origem, @ref, @parceiroId, @fidelidadeContaId, @tipo, @valor, @ini, @fim, @prod, @usoMax, @usoMaxTotal, @unico, @restrito, @min, @max)`,
+        {
+          codigo, origem, ref: links.referencia, parceiroId: links.parceiroId, fidelidadeContaId: links.fidelidadeContaId, tipo, valor,
+          ini: inicio, fim, prod: b.produtoId ? int(b.produtoId, 'Produto') : null, usoMax: int(b.usoMaxCliente ?? 1, 'Uso máx/cliente'),
+          usoMaxTotal, unico, restrito: restritoClientes ? 1 : 0, min: b.pedidoMinimo ? cents(b.pedidoMinimo) : null, max: b.descontoMaximo ? cents(b.descontoMaximo) : null,
+        },
+      );
+      const vid = Number(criado.id);
+      if (clientes.length > 0) await sincronizarBeneficiariosVoucher(vid, clientes, 'replace', run);
+      return { id: vid };
+    }).catch((e: Error) => {
       if (duplicateSql(e)) throw new HttpError(409, 'Já existe um voucher com esse código.');
       throw e;
     });
@@ -1389,6 +1573,8 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   if ((m = path.match(/^\/vouchers\/(\d+)$/)) && method === 'PUT') {
     const id = int(m[1], 'Voucher');
     const b = await req.body();
+    const temNovosCampos = 'usoMaxTotal' in b || 'restritoClientes' in b || 'clientes' in b;
+    if (temNovosCampos) await garantirSchemaVouchers();
     const current = await one<Record<string, unknown>>(
       `SELECT Id, Origem, Referencia, ParceiroId, FidelidadeContaId, Tipo, Valor,
               CONVERT(varchar(10), InicioEm, 126) InicioEm, CONVERT(varchar(10), FimEm, 126) FimEm
@@ -1411,7 +1597,17 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if ('fim' in b) vals.FimEm = isoDate(b.fim);
     if ('produtoId' in b) vals.ProdutoId = b.produtoId ? int(b.produtoId, 'Produto') : null;
     if ('usoMaxCliente' in b) vals.UsoMaxCliente = int(b.usoMaxCliente, 'Uso máx/cliente');
+    if ('usoMaxTotal' in b) vals.UsoMaxTotal = b.usoMaxTotal != null && b.usoMaxTotal !== '' && Number(b.usoMaxTotal) > 0 ? int(b.usoMaxTotal, 'Limite total de usos') : null;
     if ('usoUnico' in b) vals.UsoUnico = bit(b.usoUnico);
+    if ('restritoClientes' in b) vals.RestritoClientes = bit(b.restritoClientes);
+    if ('clientes' in b) {
+      const lista = normalizarBeneficiariosInput(b.clientes);
+      if (lista.length > 0 && !('restritoClientes' in b)) vals.RestritoClientes = 1;
+      if (vals.UsoMaxTotal != null && Number(vals.UsoMaxTotal) > 1) vals.UsoUnico = 0;
+      if (lista.length > 1) vals.UsoUnico = 0;
+    } else if (vals.UsoMaxTotal != null && Number(vals.UsoMaxTotal) > 1) {
+      vals.UsoUnico = 0;
+    }
     if ('pedidoMinimo' in b) vals.PedidoMinimoCentavos = b.pedidoMinimo ? cents(b.pedidoMinimo) : null;
     if ('descontoMaximo' in b) vals.DescontoMaximoCentavos = b.descontoMaximo ? cents(b.descontoMaximo) : null;
     if ('ativo' in b) vals.Ativo = bit(b.ativo);
@@ -1420,11 +1616,43 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (inicio > fim) throw new HttpError(400, 'A data final deve ser igual ou posterior à data inicial.');
     try {
       await query(`UPDATE dbo.Voucher SET ${Object.keys(vals).map((c) => `${c} = @${c}`).join(', ')} WHERE Id = @id`, { ...vals, id });
+      if ('clientes' in b) {
+        const lista = normalizarBeneficiariosInput(b.clientes);
+        await sincronizarBeneficiariosVoucher(id, lista, 'replace');
+      }
     } catch (e) {
       if (duplicateSql(e)) throw new HttpError(409, 'Já existe um voucher com esse código.');
       throw e;
     }
     send(200, { id, ok: true });
+    return true;
+  }
+  if ((m = path.match(/^\/vouchers\/(\d+)\/clientes$/)) && method === 'POST') {
+    await garantirSchemaVouchers();
+    const id = int(m[1], 'Voucher');
+    const exists = await one<{ id: number; restrito: boolean; usoMaxTotal: number | null }>(`SELECT Id id, RestritoClientes restrito, UsoMaxTotal usoMaxTotal FROM dbo.Voucher WHERE Id = @id`, { id });
+    if (!exists) throw new HttpError(404, 'Voucher não encontrado.');
+    const b = await req.body();
+    const rawLista = Array.isArray(b.clientes) ? b.clientes : [b];
+    const lista = normalizarBeneficiariosInput(rawLista);
+    if (!lista.length) throw new HttpError(400, 'Informe pelo menos uma pessoa com nome ou CPF.');
+    const mode = b.substituir === true ? 'replace' : 'merge';
+    const { total } = await sincronizarBeneficiariosVoucher(id, lista, mode);
+    const sets = ['RestritoClientes = 1', 'UsoUnico = CASE WHEN @total > 1 THEN 0 ELSE UsoUnico END'];
+    const p: Record<string, unknown> = { id, total };
+    if (b.ajustarLimiteTotal === true && total > 0) {
+      sets.push('UsoMaxTotal = @total');
+    }
+    await query(`UPDATE dbo.Voucher SET ${sets.join(', ')} WHERE Id = @id`, p);
+    send(200, { ok: true, id, total, clientes: await listarBeneficiariosVoucher(id) });
+    return true;
+  }
+  if ((m = path.match(/^\/vouchers\/(\d+)\/clientes\/(\d+)$/)) && method === 'DELETE') {
+    await garantirSchemaVouchers();
+    const id = int(m[1], 'Voucher');
+    const cid = int(m[2], 'Beneficiário');
+    await query(`DELETE FROM dbo.VoucherCliente WHERE Id = @cid AND VoucherId = @id`, { cid, id });
+    send(200, { ok: true, clientes: await listarBeneficiariosVoucher(id) });
     return true;
   }
   if ((m = path.match(/^\/vouchers\/(\d+)$/)) && method === 'DELETE') {
@@ -1436,15 +1664,66 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     return true;
   }
   if (path === '/vouchers/validar' && method === 'GET') {
+    await garantirSchemaVouchers();
+    const codigo = (url.searchParams.get('codigo') || '').trim().toUpperCase();
+    const clienteId = url.searchParams.get('clienteId') ? int(url.searchParams.get('clienteId'), 'Cliente') : null;
+    const documentoParam = normalizarDocVoucher(url.searchParams.get('documento'));
     const v = await one<Record<string, unknown>>(
-      `SELECT v.*, p.Nome produto FROM dbo.Voucher v LEFT JOIN dbo.Produto p ON p.Id = v.ProdutoId
+      `SELECT v.*, p.Nome produto, pr.Ativo parceiroAtivo, fc.Ativo fidelidadeAtiva,
+              CASE WHEN CAST(SYSDATETIME() AS date) BETWEEN v.InicioEm AND v.FimEm THEN 1 ELSE 0 END vigenciaOk
+       FROM dbo.Voucher v LEFT JOIN dbo.Produto p ON p.Id = v.ProdutoId
        LEFT JOIN dbo.Parceiro pr ON pr.Id = v.ParceiroId LEFT JOIN dbo.FidelidadeConta fc ON fc.Id = v.FidelidadeContaId
-       WHERE v.Codigo = @c AND v.Ativo = 1 AND CAST(SYSDATETIME() AS date) BETWEEN v.InicioEm AND v.FimEm
-         AND (v.ParceiroId IS NULL OR pr.Ativo = 1) AND (v.FidelidadeContaId IS NULL OR fc.Ativo = 1)`,
-      { c: (url.searchParams.get('codigo') || '').toUpperCase() },
+       WHERE v.Codigo = @c`,
+      { c: codigo },
     );
-    if (!v) throw new HttpError(404, 'Voucher não encontrado ou expirado.');
-    send(200, { codigo: v.Codigo, tipo: v.Tipo, valor: v.Valor, produtoId: v.ProdutoId, produto: v.produto, descontoMaximo: v.DescontoMaximoCentavos, pedidoMinimo: v.PedidoMinimoCentavos });
+    if (!v || !v.Ativo) throw new HttpError(404, 'Voucher não encontrado ou inativo.');
+    if (v.ParceiroId && !v.parceiroAtivo) throw new HttpError(400, 'O parceiro vinculado ao voucher está inativo.');
+    if (v.FidelidadeContaId && !v.fidelidadeAtiva) throw new HttpError(400, 'A conta de fidelidade vinculada ao voucher está inativa.');
+    if (!v.vigenciaOk) throw new HttpError(400, 'Voucher expirado.');
+    let docEfetivo = documentoParam;
+    if (!docEfetivo && clienteId) {
+      const cli = await one<{ doc: string | null; docNum: string | null }>(`SELECT Documento doc, DocumentoNum docNum FROM dbo.Cliente WHERE Id = @id`, { id: clienteId });
+      docEfetivo = normalizarDocVoucher(cli?.docNum ?? cli?.doc);
+    }
+    const usos = await one<{ n: number; doCliente: number }>(
+      `SELECT
+         (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @vid AND Estornado = 0)
+         + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @vid AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+         + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @vid AND Estado IN ('reservado', 'consumido')) n,
+         (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @vid AND ClienteId = @cli AND Estornado = 0)
+         + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @vid AND ClienteId = @cli AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+         + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @vid AND ClienteId = @cli AND Estado IN ('reservado', 'consumido')) doCliente`,
+      { vid: v.Id, cli: clienteId ?? 0 },
+    );
+    const usosTotais = Number(usos?.n ?? 0);
+    const eleg = await avaliarElegibilidadeVoucher({
+      voucherId: Number(v.Id),
+      usoUnico: Boolean(v.UsoUnico),
+      usoMaxTotal: v.UsoMaxTotal == null ? null : Number(v.UsoMaxTotal),
+      usoMaxCliente: Number(v.UsoMaxCliente ?? 1),
+      restritoClientes: Boolean(v.RestritoClientes),
+      usosTotais,
+      usosClienteDirecto: Number(usos?.doCliente ?? 0),
+      clienteId,
+      documento: docEfetivo,
+    });
+    if (!eleg.ok) throw new HttpError(400, eleg.motivo);
+    const limiteTotal = v.UsoUnico ? 1 : (v.UsoMaxTotal != null && Number(v.UsoMaxTotal) > 0 ? Number(v.UsoMaxTotal) : null);
+    send(200, {
+      id: v.Id,
+      codigo: v.Codigo,
+      tipo: v.Tipo,
+      valor: v.Valor,
+      produtoId: v.ProdutoId,
+      produto: v.produto,
+      descontoMaximo: v.DescontoMaximoCentavos,
+      pedidoMinimo: v.PedidoMinimoCentavos,
+      usoMaxTotal: v.UsoMaxTotal == null ? null : Number(v.UsoMaxTotal),
+      restritoClientes: Boolean(v.RestritoClientes),
+      usos: usosTotais,
+      restantes: limiteTotal != null ? Math.max(0, limiteTotal - usosTotais) : null,
+      beneficiarioNome: eleg.beneficiarioNome ?? null,
+    });
     return true;
   }
 

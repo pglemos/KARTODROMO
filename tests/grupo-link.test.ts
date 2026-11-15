@@ -357,3 +357,59 @@ describe('cupom do amigo no link do grupo', () => {
     f.mockRestore();
   });
 });
+
+describe('aniversariante no link do grupo (?r=TOKEN) e reaproveitamento da cobrança aberta', () => {
+  async function hashCpf(cpf: string) {
+    const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`cpf:${cpf}`)));
+    return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  const corpoBase = {
+    tipoDocumento: 'CPF', documento: '529.982.247-25', nome: 'Maria da Silva', email: 'maria@exemplo.com', instagram: '@maria.silva', telefone: '(31) 99358-5421',
+    nascimento: '1990-05-20', peso: '62', cep: '32600000', endereco: 'Rua A', numero: '10', bairro: 'Centro', cidade: 'Betim', estado: 'MG', lgpd: true, reserva: 'TOKENRESP123',
+  };
+
+  it('POST /api/grupo/preco calcula R$ 90,00 para o CPF do aniversariante com 10+ convidados e R$ 145,00 para convidado', async () => {
+    const respHash = await hashCpf('52998224725');
+    await publicar([grupo({
+      id: 111, codigo: 'G47DD99A', precoCentavos: 14500, livres: 9, respDocHash: respHash,
+      // mesmo sem aniversario explícito ainda publicado pelo SRVKART, total = 14 * 14500 + 9000 = 212000
+      painel: { chave: CHAVE, n: 15, total: 212000, pago: 14500, falta: 197500, pagos: 1, cadastrados: 6, prontos: 1, vagas: [{ ordem: 1, nome: 'Rhuan', responsavel: true, menor: false, cadastro: 'completo', falta: [], pago: false, termo: false, link: '' }] },
+    })]);
+    const f = vi.spyOn(globalThis, 'fetch').mockImplementation(async (u) => {
+      if (String(u).includes('/api/totem/grupo-preco')) return new Response(JSON.stringify({ precoCentavos: 14500, primeiraVez: false }), { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
+
+    const respRes = await (await chamar('/api/grupo/preco', { method: 'POST', body: JSON.stringify({ r: 'TOKENRESP123', cpf: '529.982.247-25' }) })).json() as { souResponsavel: boolean; aCobrarCentavos: number };
+    expect(respRes).toMatchObject({ souResponsavel: true, aCobrarCentavos: 9000 });
+
+    const amigoRes = await (await chamar('/api/grupo/preco', { method: 'POST', body: JSON.stringify({ r: 'TOKENRESP123', cpf: '111.444.777-35' }) })).json() as { souResponsavel: boolean; aCobrarCentavos: number };
+    expect(amigoRes).toMatchObject({ souResponsavel: false, aCobrarCentavos: 14500 });
+    f.mockRestore();
+  });
+
+  it('reaproveita cobrança aberta do admin (R$ 90,00) pelo externalReference mesmo quando livres=0 para o aniversariante', async () => {
+    const respHash = await hashCpf('52998224725');
+    await publicar([grupo({
+      id: 111, codigo: 'G47DD99A', precoCentavos: 14500, livres: 0, respDocHash: respHash, aniversario: true, precoAniversarianteCentavos: 9000,
+      painel: { chave: CHAVE, n: 15, total: 212000, pago: 0, falta: 212000, pagos: 0, cadastrados: 15, prontos: 0, vagas: [{ ordem: 1, nome: 'Rhuan', responsavel: true, menor: false, cadastro: 'completo', falta: [], pago: false, termo: false, link: '' }] },
+    })]);
+    env.ASAAS_API_KEY = 'x';
+    let postPayments = 0;
+    const f = vi.spyOn(globalThis, 'fetch').mockImplementation(async (u, init) => {
+      const url = String(u);
+      if (url.includes('/api/totem/grupo-preco')) return new Response(JSON.stringify({ precoCentavos: 14500, primeiraVez: false }), { status: 200 });
+      if (url.includes('/customers?')) return new Response(JSON.stringify({ data: [{ id: 'cus_rhuan' }] }), { status: 200 });
+      if (url.includes('/payments?customer=cus_rhuan')) {
+        return new Response(JSON.stringify({ data: [{ id: 'pay_2lu76hdo0hlymcdk', invoiceUrl: 'https://www.asaas.com/i/2lu76hdo0hlymcdk', value: 90, externalReference: 'grupo-111-1205' }] }), { status: 200 });
+      }
+      if (url.endsWith('/payments') && init?.method === 'POST') { postPayments++; }
+      return new Response('{}', { status: 200 });
+    });
+
+    const res = await (await chamar('/api/pre-cadastro', { method: 'POST', body: JSON.stringify({ ...corpoBase, t: Date.now() - 10_000 }) })).json() as { pagamento?: { id: string; valorCentavos: number } };
+    expect(postPayments).toBe(0);
+    expect(res.pagamento).toMatchObject({ id: 'pay_2lu76hdo0hlymcdk', valorCentavos: 9000 });
+    f.mockRestore();
+  });
+});

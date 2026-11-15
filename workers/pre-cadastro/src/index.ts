@@ -71,7 +71,9 @@ async function receber(req: Request, env: Env) {
   const grupo = reserva ? await grupoDoLink(env, reserva) : null;
   let pagamento: CobrancaDoLink | null = null;
   let pagamentoFalhou = false;
-  if (grupo && grupo.modo === 'individual' && grupo.precoCentavos > 0 && grupo.livres > 0) {
+  const ehResp = grupo ? await ehCpfResponsavelGrupo(grupo, v.dados.documento) : false;
+  const respPago = ehResp && Boolean(grupo?.painel?.vagas?.some((x) => x.responsavel && x.pago));
+  if (grupo && grupo.modo === 'individual' && grupo.precoCentavos > 0 && !respPago && (grupo.livres > 0 || ehResp)) {
     if (v.dados.tipoDocumento !== 'CPF') return json(400, { erro: 'Para pagar a vaga pelo link do grupo, use o CPF.' });
     // sem o Asaas (fora do ar ou cota estourada, 12/11/2026) o cadastro não pode se perder: salva e a vaga é paga depois
     try { pagamento = await cobrancaDoLink(env, reserva!, chave, v.dados, grupo, String((corpo as Record<string, unknown>).cupom ?? '').trim().toUpperCase().slice(0, 40)); }
@@ -101,8 +103,49 @@ function faltaNoCadastro(d: PreCadastro) {
   return null;
 }
 
-type GrupoDoLink = { tokens: string[]; status: string; codigo: string; responsavel: string; bateria: string; inicio: string; modo: string; precoCentavos: number; livres: number };
+type GrupoDoLink = {
+  id?: number;
+  tokens: string[];
+  status: string;
+  codigo: string;
+  responsavel: string;
+  responsavelToken?: string | null;
+  bateria: string;
+  inicio: string;
+  modo: string;
+  precoCentavos: number;
+  livres: number;
+  respDocHash?: string | null;
+  aniversario?: boolean;
+  precoAniversarianteCentavos?: number | null;
+  painel?: { n?: number; total?: number; vagas?: { responsavel?: boolean; pago?: boolean }[] } | null;
+};
 type CobrancaDoLink = { id: string; link: string; valorCentavos: number; pago?: boolean; cupom?: { codigo: string; descontoCentavos: number } | null; erroCupom?: string };
+
+async function ehCpfResponsavelGrupo(g: Pick<GrupoDoLink, 'respDocHash'>, cpf: string): Promise<boolean> {
+  const d = digitos(cpf);
+  if (!g.respDocHash || d.length !== 11) return false;
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`cpf:${d}`)));
+  const hash = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return hash === g.respDocHash;
+}
+
+function descontoAniversarianteGrupo(g: Pick<GrupoDoLink, 'aniversario' | 'precoAniversarianteCentavos' | 'painel'>, cheio: number, ehResp: boolean): number {
+  if (!ehResp) return cheio;
+  const n = Number(g.painel?.n ?? 0);
+  if (n < 11) return cheio;
+  if (typeof g.aniversario === 'boolean') {
+    if (!g.aniversario) return cheio;
+    const pa = Number(g.precoAniversarianteCentavos ?? 9000);
+    return pa > 0 && pa < cheio ? pa : cheio;
+  }
+  if (typeof g.painel?.total === 'number') {
+    const diff = Math.round(n * cheio - g.painel.total);
+    const inferred = cheio - diff;
+    if (diff > 0 && inferred >= 5000 && inferred < cheio) return inferred;
+  }
+  return cheio;
+}
 let cacheGrupos: { em: number; lista: GrupoDoLink[] } | null = null;
 /** Resumo das reservas em grupo ativas (o SRVKART manda a cada minuto em /api/sync/grupos). */
 async function grupoDoLink(env: Env, token: string) {
@@ -137,28 +180,32 @@ async function situacaoCobranca(env: Env, id: string): Promise<{ pago: boolean; 
 }
 
 /**
- * Preço da vaga de quem entra pelo link (estreante paga o de primeira vez da bateria, 12/11/2026): o SRVKART sabe se o
- * CPF já correu. Sem resposta em 3,5 s, vale o preço do grupo (nunca cobra a mais; o desconto só é aceito se for menor).
+ * Preço da vaga de quem entra pelo link (estreante ou aniversariante): o SRVKART sabe se o CPF já correu ou é o
+ * aniversariante. Sem resposta em 3,5 s, mantém o desconto do aniversariante detectado pelo resumo do grupo.
  */
-async function precoDaVaga(env: Env, token: string, cpf: string, cheio: number, cupom = ''): Promise<{ valor: number; cupom: { codigo: string; descontoCentavos: number } | null; erroCupom?: string }> {
+async function precoDaVaga(env: Env, token: string, cpf: string, g: Omit<GrupoDoLink, 'tokens'>, cupom = ''): Promise<{ valor: number; cupom: { codigo: string; descontoCentavos: number } | null; erroCupom?: string }> {
+  const cheio = Number(g.precoCentavos) || 0;
+  const ehResp = await ehCpfResponsavelGrupo(g, cpf);
+  const valorAniv = descontoAniversarianteGrupo(g, cheio, ehResp);
   try {
     const ops = ((env as { OPS_URL?: string }).OPS_URL || 'https://ops.kartodromodebetim.com.br').replace(/\/+$/, '');
     const r = await fetch(`${ops}/api/totem/grupo-preco`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, cpf: digitos(cpf), ...(cupom ? { cupom } : {}) }), signal: AbortSignal.timeout(3500) });
-    if (!r.ok) return { valor: cheio, cupom: null, ...(cupom ? { erroCupom: 'Não deu para conferir o cupom agora. A vaga ficou pelo preço normal.' } : {}) };
+    if (!r.ok) return { valor: valorAniv, cupom: null, ...(cupom ? { erroCupom: 'Não deu para conferir o cupom agora. A vaga ficou sem cupom.' } : {}) };
     const j = (await r.json()) as { precoCentavos?: number; cupom?: { codigo?: string; descontoCentavos?: number } | null; erroCupom?: string };
     const v = Math.round(Number(j.precoCentavos));
-    if (!(v >= 0 && v <= cheio)) return { valor: cheio, cupom: null };
+    if (!(v >= 0 && v <= cheio)) return { valor: valorAniv, cupom: null };
     // a Asaas não cobra R$ 0: cupom que zera a vaga é usado na recepção
-    if (v === 0) return { valor: cheio, cupom: null, erroCupom: 'Este cupom cobre a vaga toda: use-o na recepção. Aqui a vaga ficou pelo preço normal.' };
+    if (v === 0) return { valor: valorAniv, cupom: null, erroCupom: 'Este cupom cobre a vaga toda: use-o na recepção. Aqui a vaga ficou sem cupom.' };
     const cup = j.cupom && /^[A-Z0-9_-]{1,40}$/.test(String(j.cupom.codigo)) ? { codigo: String(j.cupom.codigo), descontoCentavos: Math.round(Number(j.cupom.descontoCentavos) || 0) } : null;
-    return { valor: v, cupom: cup, ...(j.erroCupom ? { erroCupom: String(j.erroCupom).slice(0, 160) } : {}) };
-  } catch { return { valor: cheio, cupom: null, ...(cupom ? { erroCupom: 'Não deu para conferir o cupom agora. A vaga ficou pelo preço normal.' } : {}) }; }
+    const valorFinal = cup ? v : Math.min(v, valorAniv);
+    return { valor: valorFinal, cupom: cup, ...(j.erroCupom ? { erroCupom: String(j.erroCupom).slice(0, 160) } : {}) };
+  } catch { return { valor: valorAniv, cupom: null, ...(cupom ? { erroCupom: 'Não deu para conferir o cupom agora. A vaga ficou sem cupom.' } : {}) }; }
 }
 
 /** Uma cobrança por pessoa no grupo (o mesmo CPF reenviando reaproveita a que está aberta). */
 async function cobrancaDoLink(env: Env, token: string, chave: string, d: PreCadastro, g: NonNullable<Awaited<ReturnType<typeof grupoDoLink>>>, cupom = ''): Promise<CobrancaDoLink> {
   const k = `grupo-pag/${token}/${chave}.json`;
-  const preco = await precoDaVaga(env, token, d.documento, Number(g.precoCentavos), cupom);
+  const preco = await precoDaVaga(env, token, d.documento, g, cupom);
   const valor = preco.valor;
   const extra = { cupom: preco.cupom, ...(preco.erroCupom ? { erroCupom: preco.erroCupom } : {}) };
   const antiga = await env.PRE.get(k);
@@ -176,6 +223,25 @@ async function cobrancaDoLink(env: Env, token: string, chave: string, d: PreCada
     if (!/celular|mobilePhone/i.test((e as Error).message)) throw e;
     cliente = await garantirCliente(env, { ...dados, celular: '' });
   }
+  // Reaproveita cobrança aberta no Asaas (ex.: gerada pelo painel admin ou tentativa anterior com o mesmo valor)
+  try {
+    const abertas = await chamar<{ data?: { id: string; invoiceUrl: string; value: number; externalReference?: string | null }[] }>(
+      env,
+      `/payments?customer=${encodeURIComponent(cliente)}&status=PENDING&limit=20`,
+    );
+    const refGrupoId = g.id ? `grupo-${g.id}` : '';
+    const refGrupoCod = `grupo-${g.codigo}-`;
+    const existente = (abertas.data ?? []).find((c) => {
+      const ref = String(c.externalReference ?? '');
+      const mesmoGrupo = (refGrupoId && (ref === refGrupoId || ref.startsWith(refGrupoId + '-'))) || ref.startsWith(refGrupoCod);
+      return mesmoGrupo && Math.round(Number(c.value) * 100) === valor;
+    });
+    if (existente?.id && existente.invoiceUrl) {
+      const r: CobrancaDoLink = { id: existente.id, link: existente.invoiceUrl, valorCentavos: valor, pago: false, ...extra };
+      await env.PRE.put(k, JSON.stringify(r), { httpMetadata: { contentType: 'application/json' } });
+      return r;
+    }
+  } catch { /* consulta opcional: se falhar, cria cobrança normalmente abaixo */ }
   const hoje = hojeBrasilia();
   const dia = String(g.inicio).slice(0, 10);
   const cob = await chamar<{ id: string; invoiceUrl: string }>(env, '/payments', {
@@ -236,6 +302,22 @@ export default {
         return json(g ? 200 : 404, g ? { responsavel: g.responsavel, bateria: g.bateria, inicio: g.inicio, modo: g.modo, precoCentavos: g.precoCentavos, livres: g.livres,
           // a página do cadastro avisa a cobrança só no modo 'cada um paga o seu' (o responsável paga o grupo pelo admin)
           souResponsavel: false, aCobrarCentavos: g.modo === 'individual' && g.livres > 0 ? g.precoCentavos : 0 } : { erro: 'Reserva não encontrada.' });
+      }
+      if (p === '/api/grupo/preco' && req.method === 'POST') {
+        const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+        const token = String(b.r ?? '').replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
+        const cpf = digitos(String(b.cpf ?? ''));
+        const g = await grupoDoLink(env, token);
+        if (!g) return json(404, { erro: 'Reserva não encontrada.' });
+        const ehResp = cpf.length === 11 ? await ehCpfResponsavelGrupo(g, cpf) : false;
+        const respPago = ehResp && Boolean(g.painel?.vagas?.some((v) => v.responsavel && v.pago));
+        if (g.modo !== 'individual' || g.precoCentavos <= 0 || respPago || (!ehResp && g.livres <= 0)) {
+          return json(200, { souResponsavel: ehResp, pago: respPago, aCobrarCentavos: 0 });
+        }
+        const preco = cpf.length === 11
+          ? await precoDaVaga(env, token, cpf, g, String(b.cupom ?? '').trim().toUpperCase().slice(0, 40))
+          : { valor: g.precoCentavos, cupom: null };
+        return json(200, { souResponsavel: ehResp, pago: false, aCobrarCentavos: preco.valor, ...(preco.cupom ? { cupom: preco.cupom } : {}), ...(preco.erroCupom ? { erroCupom: preco.erroCupom } : {}) });
       }
       // Pix ou cartão da mesma cobrança, nunca boleto (dono, 12/11/2026): troca a forma na Asaas se precisar e abre a fatura
       if (p === '/api/pagar' && req.method === 'GET') {

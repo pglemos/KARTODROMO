@@ -25,6 +25,7 @@ import { corrigeEmail } from '../lib/ops/email-dominio';
 import { erroCadastroObrigatorio } from '../lib/ops/cadastro-obrigatorio';
 import { acrescentarInstagramRelatorio, idsClientesRelatorio, prepararRelatorioRecepcao, type SessaoRelatorio } from '../lib/ops/relatorio-crono';
 import { HttpError, inscreverN, officeRoutes } from '../lib/ops/office';
+import { garantirSchemaVouchers, vouchersDisponiveisParaCliente } from '../lib/ops/vouchers';
 import { garantirColunasEventos } from '../lib/ops/eventos-schema';
 import { bateriaDisponivelNoTotem, type TotemBateriaCandidate, TOTEM_BATERIAS_SQL } from '../lib/ops/totem-baterias';
 import { relatorio } from '../lib/ops/relatorios';
@@ -544,6 +545,29 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     return true;
   }
 
+  if (path === '/api/totem/vouchers-cliente' && method === 'GET') {
+    const rawGrupo = String(new URL(req.url ?? '/', 'http://totem').searchParams.get('grupo') ?? '');
+    const idsVerificados = rawGrupo
+      .split(',')
+      .map((x) => x.split('.'))
+      .filter(([id, tk]) => Number(id) > 0 && tk === sign(`cli:${Number(id)}`))
+      .map(([id]) => Number(id));
+    if (!idsVerificados.length) {
+      const sp = new URL(req.url ?? '/', 'http://totem').searchParams;
+      const cid = Number(sp.get('clienteId') || 0);
+      const tk = String(sp.get('token') ?? '');
+      if (cid > 0 && tk === sign(`cli:${cid}`)) idsVerificados.push(cid);
+    }
+    if (!idsVerificados.length) return send(res, 200, []), true;
+    const encontrados: Array<Record<string, unknown>> = [];
+    for (const cid of idsVerificados) {
+      const lista = await vouchersDisponiveisParaCliente({ clienteId: cid });
+      for (const v of lista) encontrados.push({ clienteId: cid, ...v });
+    }
+    send(res, 200, encontrados);
+    return true;
+  }
+
   if (path === '/api/totem/baterias' && method === 'GET') {
     await garantirColunasEventos();
     const rows = await query<TotemBateriaCandidate>(TOTEM_BATERIAS_SQL);
@@ -599,6 +623,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     const participantes = Array.isArray(body.participantes) ? body.participantes : [];
     if (!participantes.length) throw new HttpError(400, 'Selecione quem vai correr.');
     const ids: number[] = [];
+    const vouchersReconhecidos: Array<{ clienteId: number; codigo: string; tipo: string; valor: number }> = [];
     // um termo por piloto (mesmo que ele corra em mais de uma bateria): a 1ª inscrição de cada um
     const termoDoPiloto = new Map<number, number>();
     const grupo: number[] = [];
@@ -649,6 +674,17 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
         // pre-reserva: aparece em Reservas > Aprovar na recepcao
         const novas = await inscreverN(bateriaId, cid, 1, 'totem', null, null, false);
         ids.push(...novas);
+        if (novas.length) {
+          const batProd = await one<{ produtoId: number | null }>(`SELECT ProdutoId produtoId FROM dbo.Bateria WHERE Id = @id`, { id: bateriaId }).catch(() => null);
+          const vchs = await vouchersDisponiveisParaCliente({ clienteId: cid, produtoId: batProd?.produtoId ?? null }).catch(() => []);
+          if (vchs.length) {
+            const v0 = vchs[0];
+            for (const insId of novas) {
+              await query(`UPDATE dbo.Inscricao SET VoucherId = @vid WHERE Id = @id`, { vid: v0.id, id: insId }).catch(() => undefined);
+            }
+            vouchersReconhecidos.push({ clienteId: cid, codigo: v0.codigo, tipo: v0.tipo, valor: v0.valor });
+          }
+        }
         if (!termoDoPiloto.has(cid) && novas.length) termoDoPiloto.set(cid, novas[0]);
       }
     }
@@ -668,7 +704,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
       const pmap = Object.fromEntries(ids.map((id, n) => ['id' + n, id]));
       await query(`UPDATE dbo.Inscricao SET TermoImpressoEm = COALESCE(TermoImpressoEm, SYSDATETIME()), AtualizadoEm = SYSDATETIME() WHERE Id IN (${ids.map((_, n) => '@id' + n).join(',')})`, pmap).catch(() => undefined);
     }
-    send(res, 201, { inscricoes: ids, inicio: primeira?.inicio, termoUrl: imprimir ? termoLink(ids) : null, termoUrls: imprimir ? [...termoDoPiloto.values()].map((id) => termoLink([id])) : [], termoNaRecepcao: naRecepcao, pulseiras });
+    send(res, 201, { inscricoes: ids, inicio: primeira?.inicio, termoUrl: imprimir ? termoLink(ids) : null, termoUrls: imprimir ? [...termoDoPiloto.values()].map((id) => termoLink([id])) : [], termoNaRecepcao: naRecepcao, pulseiras, vouchersReconhecidos });
     return true;
   }
 
@@ -963,6 +999,7 @@ function paginaDeErro(msg: string) {
 server.listen(PORT, '0.0.0.0', () => {
   log(`Servidor da operacao em http://0.0.0.0:${PORT} (recepcao /recepcao, totem /totem)`);
   garantirColunasEventos().catch((e) => log(`colunas de aniversario/campeonato: ${(e as Error).message}`));
+  garantirSchemaVouchers().catch((e) => log(`schema de vouchers: ${(e as Error).message}`));
 });
 
 // pré-cadastro online (QR code): traz os cadastros do site a cada 30 s
