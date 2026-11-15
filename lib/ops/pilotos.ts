@@ -323,7 +323,14 @@ async function carregarCalxpro(log?: (m: string) => void) {
 
 /** Primeiro dia com corrida detalhada (LapTime ou cronometragem nova): antes disso, só o ranking antigo do LapTime. */
 // CalXPro (cx-) e reservas do LapTime (lr-) não contam: o ranking antigo do LapTime (2025-2026) cobre esse período
-const inicioDetalhado = () => Object.values(indice).reduce((a, b) => (/^(cx|lr)-/.test(b.id) || (a && b.dia >= a) ? a : b.dia), '' as string) || '9999-12-31';
+let inicioDetalhadoCache: { versao: number; valor: string } | null = null;
+// varre o índice inteiro (regex por bateria): guarda por versão do índice — o ranking chamava isso centenas de vezes por ciclo
+const inicioDetalhado = () => {
+  if (inicioDetalhadoCache && inicioDetalhadoCache.versao === indiceVersao) return inicioDetalhadoCache.valor;
+  const valor = Object.values(indice).reduce((a, b) => (/^(cx|lr)-/.test(b.id) || (a && b.dia >= a) ? a : b.dia), '' as string) || '9999-12-31';
+  inicioDetalhadoCache = { versao: indiceVersao, valor };
+  return valor;
+};
 
 type Resumo = { baterias: number; voltas: number; vitorias: number; podios: number; ultima: string | null; primeira: string | null; melhor: { ms: number; tracado: string } | null };
 /** Resumo da carreira de cada cliente (cid), calculado do índice. */
