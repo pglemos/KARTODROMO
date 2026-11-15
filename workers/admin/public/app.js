@@ -26,8 +26,8 @@ const pad = (n) => String(n).padStart(2, '0');
 const deIso = (s) => { const [a, m, d] = s.slice(0, 10).split('-').map(Number); return new Date(a, m - 1, d); };
 const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const somaDias = (s, n) => { const d = deIso(s); d.setDate(d.getDate() + n); return iso(d); };
-const hm = (s) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
-const fmtHm = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+const hm = (s) => { const m = /^(\d{1,2}):(\d{2})/.exec(String(s || '')); return m ? (+m[1] * 60) + +m[2] : NaN; };
+const fmtHm = (m) => { if (!Number.isFinite(m)) return '--:--'; const mm = ((Math.round(m) % 1440) + 1440) % 1440; return `${pad(Math.floor(mm / 60))}:${pad(mm % 60)}`; };
 const horaDe = (dt) => String(dt || '').slice(11, 16);
 const brl = (c) => ((+c || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const brlCurto = (c) => brl(c).replace(',00', '');
@@ -35,6 +35,45 @@ const DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sáb
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 const iniciais = (n) => { const p = String(n || '').trim().split(/\s+/).filter(Boolean); return p.length ? (p[0][0] + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase() : '?'; };
 const so = (s) => String(s || '').replace(/\D/g, '');
+const normTxt = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const buscarClienteQueryValida = (qRaw) => {
+  const q = String(qRaw || '').trim();
+  if (!q) return false;
+  if (!q.includes('@') && !/[a-zA-ZÀ-ÿ]/.test(q)) return so(q).length >= 3;
+  return normTxt(q).length >= 2;
+};
+const filtrarReservasMes = (lista, qRaw, hoje = hojeIso()) => {
+  if (!Array.isArray(lista) || !buscarClienteQueryValida(qRaw)) return [];
+  const q = String(qRaw).trim();
+  const qDig = so(q);
+  const ehNumerica = !q.includes('@') && !/[a-zA-ZÀ-ÿ]/.test(q) && qDig.length >= 3;
+  const termos = ehNumerica ? [] : normTxt(q).split(/\s+/).filter(Boolean);
+  const casa = (r) => {
+    if (!r || typeof r !== 'object') return false;
+    if (ehNumerica) {
+      return so(r.documento).includes(qDig)
+        || so(r.telefone).includes(qDig)
+        || String(r.observacao || '').includes(q);
+    }
+    const alvo = [r.cliente, r.email, r.documento, r.telefone, r.responsavel, r.equipe, r.observacao].map(normTxt).join(' ');
+    return termos.every((t) => {
+      if (alvo.includes(t)) return true;
+      const td = !/[a-zA-ZÀ-ÿ]/.test(t) ? so(t) : '';
+      return td.length >= 3 && (so(r.documento).includes(td) || so(r.telefone).includes(td));
+    });
+  };
+  const rank = (r) => {
+    if (r.status === 'cancelada') return 2;
+    return String(r.dataHora || '').slice(0, 10) >= hoje ? 0 : 1;
+  };
+  return lista.filter(casa).sort((a, b) => {
+    const ra = rank(a), rb = rank(b);
+    if (ra !== rb) return ra - rb;
+    const da = String(a.dataHora || ''), db = String(b.dataHora || '');
+    if (ra === 0) return da.localeCompare(db) || ((+a.id || 0) - (+b.id || 0));
+    return db.localeCompare(da) || ((+b.id || 0) - (+a.id || 0));
+  });
+};
 const zap = (fone, texto) => { let d = so(fone); if (!d) return ''; if (d.length <= 11) d = '55' + d; return `https://wa.me/${d}?text=${encodeURIComponent(texto)}`; };
 // lê um design token em tempo de execução (canvas não aceita var())
 const tk = (nome) => getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
@@ -379,174 +418,233 @@ const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 TELAS.visao = async (tela) => {
   const hoje = hojeIso();
   const d = deIso(hoje);
-  const nomeU = (S.usuario?.nome || '').split(' ')[0];
+  const nomeU = (S.usuario?.nome || '').trim().split(/\s+/)[0] || '';
   const h = agoraMin();
   const saud = h < 5 * 60 ? 'Boa noite' : h < 12 * 60 ? 'Bom dia' : h < 18 * 60 ? 'Boa tarde' : 'Boa noite';
-  tela.innerHTML = `${cabecalho(`${DIAS[d.getDay()][0].toUpperCase() + DIAS[d.getDay()].slice(1)}, ${d.getDate()} de ${MESES[d.getMonth()]}<span id="atualizadoV" style="color: var(--mudo2); font-weight: 500"></span>`, nomeU ? `${saud}, ${esc(nomeU)}` : saud, `<a href="#/agenda" class="btn branco">Abrir agenda</a><button class="btn prim" data-nova-reserva="1">${svg(IC.mais, 14, 'var(--kib-cor-acao-sobre-principal)', 2.6)}Nova reserva</button>`)}
+  const podeAgenda = podeTela('agenda');
+  const podeNova = podeAgenda && podeTela('agenda', 'alterar');
+  const podeRecepcao = podeTela('recepcao');
+  const podeReservas = podeTela('reservas');
+  const podeSistema = podeTela('sistema');
+  const acoesTopo = [
+    podeAgenda ? '<a href="#/agenda" class="btn branco">Abrir agenda</a>' : '',
+    podeNova ? `<button type="button" class="btn prim" data-nova-reserva="1">${svg(IC.mais, 14, 'var(--kib-cor-acao-sobre-principal)', 2.6)}Nova reserva</button>` : '',
+  ].filter(Boolean).join('');
+  tela.innerHTML = `${cabecalho(`${DIAS[d.getDay()][0].toUpperCase() + DIAS[d.getDay()].slice(1)}, ${d.getDate()} de ${MESES[d.getMonth()]}<span id="atualizadoV" style="color: var(--mudo2); font-weight: 500"></span>`, nomeU ? `${saud}, ${esc(nomeU)}` : saud, acoesTopo)}
   <main class="principal">
-    <section id="pendencias" aria-live="polite"><div class="esqueleto" style="height: 56px"></div></section>
-    <section class="kpis kpis4" id="kpis">${'<div class="esqueleto" style="height: 112px"></div>'.repeat(4)}</section>
+    <section id="pendencias" aria-live="polite" aria-label="Pendências"><div class="esqueleto" style="height: 56px"></div></section>
+    <section class="kpis kpis4" id="kpis" aria-label="Indicadores de hoje">${'<div class="esqueleto" style="height: 112px"></div>'.repeat(4)}</section>
     <div class="linhaFlex" style="align-items: stretch">
-      <section class="cartao" id="agoraSeguir" style="flex: 999 1 540px; min-width: 0"><div class="esqueleto" style="height: 220px; margin: var(--kib-espaco-2)"></div></section>
-      <section class="placar" id="emPista" style="flex: 1 1 360px; min-width: 0"><div style="padding: var(--kib-espaco-2); color: var(--kib-cor-icone-suave)">Carregando a cronometragem…</div></section>
+      <section class="cartao" id="agoraSeguir" aria-label="Agora e a seguir" style="flex: 999 1 540px; min-width: 0"><div class="esqueleto" style="height: 220px; margin: var(--kib-espaco-2)"></div></section>
+      <section class="placar" id="emPista" aria-label="Placar ao vivo" style="flex: 1 1 360px; min-width: 0"><div style="padding: var(--kib-espaco-2); color: var(--kib-cor-icone-suave)">Carregando a cronometragem…</div></section>
     </div>
-    <section class="cartao" id="linhaDia"><div class="esqueleto" style="height: 150px; margin: var(--kib-espaco-2)"></div></section>
+    <section class="cartao" id="linhaDia" aria-label="Linha do dia"><div class="esqueleto" style="height: 150px; margin: var(--kib-espaco-2)"></div></section>
     <p class="peq" style="margin: 0; text-align: center"><a href="#/ajuda" data-ajuda-visao="1">Como ler esta tela</a></p>
   </main>`;
+  const q = (s) => $(s, tela);
   const irAgenda = (b) => { S.irAgenda = { dia: b.dataHora.slice(0, 10), id: b.id }; location.hash = '#/agenda'; };
-  const prontoTotem = (r) => !!(r.documento && r.email && r.peso && r.telefone);
-  let bats = [];
+  const prontoTotem = (r) => !!(r && r.documento && r.email && r.peso && r.telefone);
+  let bats = [], cargaSeq = 0, carregarOcupado = false;
+
+  const acaoPendencia = (nivel, botao, alvo, permitido = true) => {
+    if (!permitido || !alvo) return '';
+    if (alvo === 'lista') return `<button type="button" class="btn sec peq" data-ir-lista="1">${esc(botao)}</button>`;
+    if (alvo.startsWith('bat:')) return `<button type="button" class="btn ${nivel === 'vermelho' ? 'perigo' : 'sec'} peq" data-ir-bat="${esc(alvo.slice(4))}">${esc(botao)}</button>`;
+    return `<a class="btn ${nivel === 'vermelho' ? 'perigo' : 'sec'} peq" href="${esc(alvo)}">${esc(botao)}</a>`;
+  };
 
   const pintarPendencias = (online, aprovar, abertos) => {
     const restantes = bats.filter((b) => situacaoBateria(b) !== 'fim');
     const itens = [];
-    const atencao = online.filter((o) => o.status === 'pago_sem_vaga');
-    if (atencao.length) itens.push(['vermelho', `${plural(atencao.length, 'reserva do site paga', 'reservas do site pagas')} sem vaga`, 'O horário lotou depois do pagamento. Devolva o dinheiro ou remarque com o cliente.', 'Ver reservas', '#/reservas']);
-    if (S.saude && S.saude.ops && !S.saude.ops.ok) itens.push(['vermelho', 'Servidor da operação sem resposta', 'A Recepção, os totens e o site podem não estar gravando. Confira o SRVKART na tela Sistema.', 'Ver estado dos PCs', '#/sistema']);
-    if (S.saude && S.saude.crono && !S.saude.crono.ok) itens.push(['vermelho', 'Cronometragem sem resposta', 'O placar e os resultados não estão chegando do ORBITS. Confira a conexão na tela Sistema.', 'Ver estado dos PCs', '#/sistema']);
-    if (aprovar.length) itens.push(['laranja', `${plural(aprovar.length, 'pré-reserva do totem', 'pré-reservas do totem')} para aprovar`, 'Os pilotos estão esperando a Recepção confirmar.', 'Aprovar na Recepção', '#/recepcao']);
-    if (!abertos.length && restantes.length) itens.push(['laranja', 'Nenhum caixa aberto', `Abra o caixa no programa da Recepção antes da bateria das ${horaDe(restantes[0].dataHora)}.`, 'Ver Recepção', '#/recepcao']);
+    const atencao = online.filter((o) => o && o.status === 'pago_sem_vaga');
+    if (atencao.length) itens.push(['vermelho', `${plural(atencao.length, 'reserva do site paga', 'reservas do site pagas')} sem vaga`, 'O horário lotou depois do pagamento. Devolva o dinheiro ou remarque com o cliente.', 'Ver reservas', '#/reservas', podeReservas]);
+    if (S.saude && S.saude.ops && !S.saude.ops.ok) itens.push(['vermelho', 'Servidor da operação sem resposta', 'A Recepção, os totens e o site podem não estar gravando. Confira o SRVKART na tela Sistema.', 'Ver estado dos PCs', '#/sistema', podeSistema]);
+    if (S.saude && S.saude.crono && !S.saude.crono.ok) itens.push(['vermelho', 'Cronometragem sem resposta', 'O placar e os resultados não estão chegando do ORBITS. Confira a conexão na tela Sistema.', 'Ver estado dos PCs', '#/sistema', podeSistema]);
+    if (aprovar.length) itens.push(['laranja', `${plural(aprovar.length, 'pré-reserva do totem', 'pré-reservas do totem')} para aprovar`, 'Os pilotos estão esperando a Recepção confirmar.', 'Aprovar na Recepção', '#/recepcao', podeRecepcao]);
+    if (!abertos.length && restantes.length) itens.push(['laranja', 'Nenhum caixa aberto', `Abra o caixa no programa da Recepção antes da bateria das ${horaDe(restantes[0].dataHora)}.`, 'Ver Recepção', '#/recepcao', podeRecepcao]);
     const devendo = restantes.filter((b) => falta(b) > 0 && urgente(b));
-    if (devendo.length === 1) { const b = devendo[0]; itens.push(['laranja', `${tituloBat(b)} · ${horaDe(b.dataHora)} ainda não pagou tudo`, `${plural(falta(b), 'piloto sem pagar', 'pilotos sem pagar')}${+b.preco ? ' · falta ' + brl(faltaValor(b)) : ''}`, 'Ver na agenda', `bat:${b.id}`]); }
-    else if (devendo.length > 1) itens.push(['laranja', `${devendo.length} baterias das próximas 3 horas com piloto sem pagar`, `${devendo.map((b) => `${horaDe(b.dataHora)} ${tituloBat(b)}`).join(' · ')}${devendo.some((b) => +b.preco) ? ' · falta ' + brl(devendo.reduce((x, b) => x + faltaValor(b), 0)) : ''}`, 'Ver lista na agenda', 'lista']);
-    const el = $('#pendencias');
+    if (devendo.length === 1) { const b = devendo[0]; itens.push(['laranja', `${tituloBat(b)} · ${horaDe(b.dataHora)} ainda não pagou tudo`, `${plural(falta(b), 'piloto sem pagar', 'pilotos sem pagar')}${+b.preco ? ' · falta ' + brl(faltaValor(b)) : ''}`, 'Ver na agenda', `bat:${b.id}`, podeAgenda]); }
+    else if (devendo.length > 1) itens.push(['laranja', `${devendo.length} baterias das próximas 3 horas com piloto sem pagar`, `${devendo.map((b) => `${horaDe(b.dataHora)} ${tituloBat(b)}`).join(' · ')}${devendo.some((b) => +b.preco) ? ' · falta ' + brl(devendo.reduce((x, b) => x + faltaValor(b), 0)) : ''}`, 'Ver lista na agenda', 'lista', podeAgenda]);
+    const el = q('#pendencias'); if (!el) return;
     if (!itens.length) { el.innerHTML = `<div class="tudoEmDia">${svg(IC.ok, 16, 'var(--kib-cor-estado-sucesso-texto)', 2.8)}<b>Tudo em dia</b><span>bandeira verde: nenhuma pendência agora</span></div>`; return; }
     el.innerHTML = `<div class="cartao pendencias"><div class="cartaoCab"><h2>Precisa de você agora</h2><span class="selo ${itens.some((i) => i[0] === 'vermelho') ? 'vermelho' : 'laranjaS'}" style="margin-left: 0">${itens.length}</span></div>
-      ${itens.map(([nivel, t, dd, botao, alvo]) => `<div class="pendencia ${nivel}"><span class="col" style="flex: 1 1 260px; gap: 2px"><b>${esc(t)}</b><span class="peq" style="line-height: 1.45">${esc(dd)}</span></span>${alvo === 'lista' ? `<button class="btn sec peq" data-ir-lista="1">${botao}</button>` : alvo.startsWith('bat:') ? `<button class="btn ${nivel === 'vermelho' ? 'perigo' : 'sec'} peq" data-ir-bat="${alvo.slice(4)}">${botao}</button>` : `<a class="btn ${nivel === 'vermelho' ? 'perigo' : 'sec'} peq" href="${alvo}">${botao}</a>`}</div>`).join('')}</div>`;
+      ${itens.map(([nivel, t, dd, botao, alvo, perm]) => `<div class="pendencia ${nivel}"><span class="sinalPend ${nivel}" aria-hidden="true"></span><span class="col" style="flex: 1 1 200px; min-width: 0; gap: 2px"><b>${esc(t)}</b><span class="peq" style="line-height: 1.45">${esc(dd)}</span></span>${acaoPendencia(nivel, botao, alvo, perm)}</div>`).join('')}</div>`;
   };
 
   const pintarKpis = (online, movs) => {
-    const vagas = bats.reduce((a, b) => a + (+b.vagas || 0), 0), insc = bats.reduce((a, b) => a + (+b.inscritos || 0), 0), oc = vagas ? insc / vagas : 0;
-    const pagasOnline = online.filter((o) => o.status === 'pago' || o.status === 'resolvido');
-    const recebidoCaixa = movs.filter((m) => (m.abertoEm || '').slice(0, 10) === hoje || !m.fechadoEm).reduce((a, m) => a + (+m.recebido || 0), 0);
-    const recebidoOnline = pagasOnline.reduce((a, o) => a + (+o.valor || 0), 0);
+    const el = q('#kpis'); if (!el) return;
+    const vagas = bats.reduce((a, b) => a + Math.max(0, +b.vagas || 0), 0);
+    const insc = bats.reduce((a, b) => a + Math.max(0, +b.inscritos || 0), 0);
+    const oc = vagas > 0 ? Math.max(0, insc / vagas) : 0;
+    const pagasOnline = online.filter((o) => o && (o.status === 'pago' || o.status === 'resolvido'));
+    const recebidoCaixa = movs.filter((m) => m && ((m.abertoEm || '').slice(0, 10) === hoje || !m.fechadoEm)).reduce((a, m) => a + Math.max(0, +m.recebido || 0), 0);
+    const recebidoOnline = pagasOnline.reduce((a, o) => a + Math.max(0, +o.valor || 0), 0);
     // o dia inteiro: quem já correu sem pagar também é dinheiro a receber
     const devendo = bats.filter((b) => falta(b) > 0), aReceber = devendo.reduce((a, b) => a + faltaValor(b), 0), temUrgente = devendo.some((b) => situacaoBateria(b) !== 'fim' && urgente(b));
     const jaCorreram = devendo.filter((b) => situacaoBateria(b) === 'fim').length;
     const feitas = bats.filter((b) => situacaoBateria(b) === 'fim').length, naPista = bats.find((b) => situacaoBateria(b) === 'prevista'), prox = bats.find((b) => situacaoBateria(b) === 'futura');
-    const kpi = (t, v, nota, link, extra = '', estiloV = '') => `<a href="${link}" class="kpi ergue"><span class="rot">${t}</span><span class="col gap-meio"><span class="val" style="${estiloV}">${v}</span><span class="peq">${nota}</span></span>${extra}</a>`;
+    const kpi = (t, v, nota, link, permitido, extra = '', estiloV = '') => {
+      const tag = permitido ? `a href="${link}" class="kpi ergue"` : 'div class="kpi"';
+      const fim = permitido ? '</a>' : '</div>';
+      return `<${tag}><span class="rot">${t}</span><span class="col gap-meio"><span class="val" style="${estiloV}">${v}</span><span class="peq">${nota}</span></span>${extra}${fim}`;
+    };
     const segmentos = `<span class="segmentos" role="img" aria-label="${feitas} baterias terminadas de ${bats.length}">${bats.map((b) => { const st = situacaoBateria(b); return `<span class="${st}"></span>`; }).join('')}</span>`;
-    $('#kpis').innerHTML = [
-      kpi('Pilotos hoje', insc, `de ${vagas} vagas · ${Math.round(oc * 100)}% ocupado`, '#/agenda', `<span class="barra" role="img" aria-label="${Math.round(oc * 100)}% das vagas ocupadas"><span style="width: ${Math.min(100, Math.round(oc * 100))}%; background: ${oc > .8 ? 'var(--kib-cor-estado-perigo-solido)' : oc > .5 ? 'var(--kib-cor-agenda-reserva-cheio)' : 'var(--kib-cor-categoria-verde-base)'}"></span></span>`),
-      kpi('Recebido hoje', brlCurto(recebidoCaixa + recebidoOnline), `caixa ${brlCurto(recebidoCaixa)} · site ${brlCurto(recebidoOnline)} (${plural(pagasOnline.length, 'reserva', 'reservas')})`, '#/reservas', '', recebidoCaixa + recebidoOnline > 0 ? 'color: var(--okTxt)' : ''),
-      kpi('A receber hoje', devendo.length ? brlCurto(aReceber) : 'Nada', devendo.length ? `${plural(devendo.length, 'bateria', 'baterias')} com piloto sem pagar${jaCorreram ? ` (${jaCorreram} já ${jaCorreram === 1 ? 'passou do horário' : 'passaram do horário'})` : ''}` : 'todos os pilotos de hoje pagaram', '#/agenda', '', !devendo.length ? 'color: var(--okTxt)' : temUrgente ? 'color: var(--avisoTxt)' : ''),
-      kpi('Baterias encerradas', bats.length ? `${feitas} de ${bats.length}` : '—', naPista ? `${esc(tituloBat(naPista))} no horário previsto` : prox ? `próxima às ${horaDe(prox.dataHora)}` : bats.length ? 'horários previstos encerrados' : 'sem baterias hoje', '#/recepcao', bats.length ? segmentos : ''),
+    el.innerHTML = [
+      kpi('Pilotos hoje', insc, `de ${vagas} vagas · ${Math.round(oc * 100)}% ocupado`, '#/agenda', podeAgenda, `<span class="barra" role="img" aria-label="${Math.round(oc * 100)}% das vagas ocupadas"><span style="width: ${Math.min(100, Math.round(oc * 100))}%; background: ${oc > .8 ? 'var(--kib-cor-estado-perigo-solido)' : oc > .5 ? 'var(--kib-cor-agenda-reserva-cheio)' : 'var(--kib-cor-categoria-verde-base)'}"></span></span>`),
+      kpi('Recebido hoje', brlCurto(recebidoCaixa + recebidoOnline), `caixa ${brlCurto(recebidoCaixa)} · site ${brlCurto(recebidoOnline)} (${plural(pagasOnline.length, 'reserva', 'reservas')})`, '#/reservas', podeReservas, '', recebidoCaixa + recebidoOnline > 0 ? 'color: var(--okTxt)' : ''),
+      kpi('A receber hoje', devendo.length ? brlCurto(aReceber) : 'Nada', devendo.length ? `${plural(devendo.length, 'bateria', 'baterias')} com piloto sem pagar${jaCorreram ? ` (${jaCorreram} já ${jaCorreram === 1 ? 'passou do horário' : 'passaram do horário'})` : ''}` : 'todos os pilotos de hoje pagaram', '#/agenda', podeAgenda, '', !devendo.length ? 'color: var(--okTxt)' : temUrgente ? 'color: var(--avisoTxt)' : ''),
+      kpi('Baterias encerradas', bats.length ? `${feitas} de ${bats.length}` : '—', naPista ? `${esc(tituloBat(naPista))} no horário previsto` : prox ? `próxima às ${esc(horaDe(prox.dataHora))}` : bats.length ? 'horários previstos encerrados' : 'sem baterias hoje', '#/recepcao', podeRecepcao, bats.length ? segmentos : ''),
     ].join('');
   };
 
   const painelBateria = (b, rotulo, rs) => {
-    const tp = tipoDe(b), T = TIPOS[tp], n = +b.inscritos || 0, vagas = +b.vagas || 0, pagos = +b.pagos || 0;
-    const prontos = rs ? rs.filter((r) => r.status !== 'cancelada' && prontoTotem(r)).length : null;
-    const ini = hm(horaDe(b.dataHora)), falt = ini - agoraMin();
-    const quando = situacaoBateria(b) === 'prevista' ? '<span class="chip solido-ok sem-sinal">Horário previsto agora</span>' : `<span class="chip cinza">${rotulo}${falt > 0 && falt < 180 ? ` · em ${falt} min` : ''}</span>`;
+    const tp = tipoDe(b), n = Math.max(0, +b.inscritos || 0), vagas = Math.max(0, +b.vagas || 0), pagos = Math.max(0, +b.pagos || 0);
+    const prontos = Array.isArray(rs) ? rs.filter((r) => r && r.status !== 'cancelada' && prontoTotem(r)).length : null;
+    const ini = hm(horaDe(b.dataHora)), falt = Number.isFinite(ini) ? ini - agoraMin() : 0;
+    const quando = situacaoBateria(b) === 'prevista' ? '<span class="chip solido-ok sem-sinal">Horário previsto agora</span>' : `<span class="chip cinza">${esc(rotulo)}${falt > 0 && falt < 180 ? ` · em ${falt} min` : ''}</span>`;
     const sub = [generico(b.nome) ? '' : b.nome, b.produto, kartTxt(b.tipoKart)].filter(Boolean).filter((x) => x !== tituloBat(b, tp)).map(esc).join(' · ');
+    const acoes = [
+      podeRecepcao ? `<a class="btn sec peq" href="#/recepcao" data-ir-recepcao="${b.id}">Ver pilotos</a>` : '',
+      podeAgenda ? `<button type="button" class="btn sec peq" data-ir-bat="${b.id}">Abrir na agenda</button>` : '',
+    ].filter(Boolean).join('');
     return `<div class="painelBat">
-      <span style="display: flex; align-items: center; gap: var(--kib-espaco-1); flex-wrap: wrap">${quando}<span class="mono peq cor-corpo">${horaDe(b.dataHora)}–${fmtHm(ini + 35)}</span></span>
-      <span class="col" style="gap: 2px; min-width: 0; overflow-wrap: anywhere"><b style="font-size: var(--kib-fonte-tamanho-titulo); letter-spacing: -0.01em">${esc(tp === 'livre' ? 'Horário livre' : tituloBat(b, tp))}</b>${sub ? `<span class="peq">${sub}</span>` : ''}</span>
+      <div class="painelBatCab">
+        <span style="display: flex; align-items: center; gap: var(--kib-espaco-1); flex-wrap: wrap">${quando}<span class="mono peq cor-corpo">${esc(horaDe(b.dataHora) || '--:--')}–${Number.isFinite(ini) ? fmtHm(ini + 35) : '--:--'}</span></span>
+        <span class="col" style="gap: 2px; min-width: 0; overflow-wrap: anywhere"><b style="font-size: var(--kib-fonte-tamanho-titulo); letter-spacing: -0.01em; line-height: 1.25">${esc(tp === 'livre' ? 'Horário livre' : tituloBat(b, tp))}</b>${sub ? `<span class="peq">${sub}</span>` : ''}</span>
+      </div>
       <span class="numerosBat">
         <span><b>${n}</b><span>de ${vagas} pilotos</span></span>
         <span><b style="color: ${n && pagos < n ? 'var(--avisoTxt)' : n ? 'var(--okTxt)' : 'var(--tinta)'}">${pagos}</b><span>pagos${n && pagos < n && +b.preco ? ` · faltam ${brlCurto(faltaValor(b))}` : ''}</span></span>
         <span><b style="color: ${prontos !== null && prontos < n ? 'var(--avisoTxt)' : prontos !== null && n ? 'var(--okTxt)' : 'var(--tinta)'}">${prontos === null ? '—' : prontos}</b><span title="Documento, e-mail, peso e telefone preenchidos">com cadastro completo para o totem</span></span>
       </span>
-      <span style="display: flex; gap: var(--kib-espaco-1); flex-wrap: wrap; margin-top: auto"><a class="btn sec peq" href="#/recepcao" data-ir-recepcao="${b.id}">Ver pilotos</a><button class="btn sec peq" data-ir-bat="${b.id}">Abrir na agenda</button></span>
+      ${acoes ? `<span style="display: flex; gap: var(--kib-espaco-1); flex-wrap: wrap; margin-top: auto">${acoes}</span>` : ''}
     </div>`;
   };
-  const pintarAgora = async () => {
+  const pintarAgora = async (seq) => {
     const naPista = bats.find((b) => situacaoBateria(b) === 'prevista'), futuras = bats.filter((b) => situacaoBateria(b) === 'futura');
     const foco = (naPista ? [[naPista, 'Horário previsto'], futuras[0] && [futuras[0], 'Próxima']] : [futuras[0] && [futuras[0], 'Próxima'], futuras[1] && [futuras[1], 'Depois']]).filter(Boolean);
-    const el = $('#agoraSeguir');
+    const el = q('#agoraSeguir'); if (!el) return;
     if (!foco.length) {
-      const inscritos = bats.reduce((a, b) => a + (+b.inscritos || 0), 0), amanha = somaDias(hoje, deIso(somaDias(hoje, 1)).getDay() === 1 ? 2 : 1);
-      el.innerHTML = `<div class="cartaoCab"><h2>Agora e a seguir</h2></div><div class="fimDoDia"><b>${bats.length ? 'Bandeirada final: os horários previstos de hoje terminaram' : 'Sem baterias hoje'}</b><span class="peq t-corpo">${bats.length ? `${plural(inscritos, 'piloto inscrito', 'pilotos inscritos')} em ${plural(bats.length, 'bateria', 'baterias')}.` : d.getDay() === 1 ? 'Segunda o kartódromo não abre.' : 'Dia fechado ou grade ainda não gerada.'}</span><span style="display: flex; gap: var(--kib-espaco-1); flex-wrap: wrap; margin-top: var(--kib-espaco-meio)"><button class="btn sec peq" data-ir-dia="${amanha}">Ver ${amanha === somaDias(hoje, 1) ? 'amanhã' : 'terça'} na agenda</button><button class="btn sec peq" data-nova-reserva="1">Nova reserva</button></span></div>`;
+      const inscritos = bats.reduce((a, b) => a + Math.max(0, +b.inscritos || 0), 0), amanha = somaDias(hoje, deIso(somaDias(hoje, 1)).getDay() === 1 ? 2 : 1);
+      const acoesFim = [
+        podeAgenda ? `<button type="button" class="btn sec peq" data-ir-dia="${amanha}">Ver ${amanha === somaDias(hoje, 1) ? 'amanhã' : 'terça'} na agenda</button>` : '',
+        podeNova ? '<button type="button" class="btn sec peq" data-nova-reserva="1">Nova reserva</button>' : '',
+      ].filter(Boolean).join('');
+      el.innerHTML = `<div class="cartaoCab"><h2>Agora e a seguir</h2></div><div class="fimDoDia"><b>${bats.length ? 'Bandeirada final: os horários previstos de hoje terminaram' : 'Sem baterias hoje'}</b><span class="peq t-corpo">${bats.length ? `${plural(inscritos, 'piloto inscrito', 'pilotos inscritos')} em ${plural(bats.length, 'bateria', 'baterias')}.` : d.getDay() === 1 ? 'Segunda o kartódromo não abre.' : 'Dia fechado ou grade ainda não gerada.'}</span>${acoesFim ? `<span style="display: flex; gap: var(--kib-espaco-1); flex-wrap: wrap; margin-top: var(--kib-espaco-meio)">${acoesFim}</span>` : ''}</div>`;
       return;
     }
     const rs = await Promise.all(foco.map(([b]) => (+b.inscritos ? office(`/reservas?bateriaId=${b.id}&status=todas`).catch(() => null) : Promise.resolve([]))));
-    if (!$('#agoraSeguir')) return;
-    el.innerHTML = `<div class="cartaoCab"><h2>Agora e a seguir</h2><a class="dir" href="#/agenda" style="font-size: var(--kib-fonte-tamanho-corpo); font-weight: 600; text-decoration: none">Agenda do dia</a></div><div class="agoraGrade">${foco.map(([b, r], i) => painelBateria(b, r, rs[i])).join('')}</div>`;
+    if (!tela.isConnected || seq !== cargaSeq || !q('#agoraSeguir')) return;
+    el.innerHTML = `<div class="cartaoCab"><h2>Agora e a seguir</h2>${podeAgenda ? `<a class="dir linkAgendaDia" href="#/agenda">Agenda do dia${svg(IC.dir, 14, 'currentColor', 2.4)}</a>` : ''}</div><div class="agoraGrade">${foco.map(([b, r], i) => painelBateria(b, r, rs[i])).join('')}</div>`;
   };
 
   const blocoDia = (b) => {
-    const tp = tipoDe(b), T = TIPOS[tp], st = situacaoBateria(b), n = +b.inscritos || 0, vagas = Math.max(1, +b.vagas || 0);
+    const tp = tipoDe(b), T = TIPOS[tp], st = situacaoBateria(b), n = Math.max(0, +b.inscritos || 0), vagas = Math.max(1, +b.vagas || 0);
     const cls = ['bloco2', tp === 'livre' ? 'livre' : tp === 'bloq' ? 'bloq' : '', st === 'fim' ? 'passou' : '', st === 'prevista' ? 'pista' : ''].filter(Boolean).join(' ');
-    const titulo = tituloBat(b, tp, true), dir = livresTxt(b, st, tp);
-    return `<button class="${cls}" data-ir-bat="${b.id}" style="${tp === 'livre' || tp === 'bloq' ? '' : `${T.fundo}; --faixa: ${T.cor}`}" aria-label="${esc(`${horaDe(b.dataHora)}, ${titulo}, ${T.t}, ${dir}`)}">
-      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${st === 'prevista' ? `<span class="naPista" title="Bateria prevista para agora${dir ? ' · ' + esc(dir) : ''}">PREVISTA AGORA</span>` : `<span class="dirB">${dir}</span>`}</span>
-      <span class="tituloB trunc">${esc(tp === 'livre' ? 'Livre' : titulo)}</span>${st !== 'fim' && falta(b) && tp !== 'livre' ? `<span class="aPagarB">${pagCurto(b)}</span>` : ''}${tp === 'livre' ? '' : `<span class="barraB" style="width: ${Math.round(Math.min(1, n / vagas) * 100)}%; background: ${T.cheio}"></span>`}</button>`;
+    const titulo = tituloBat(b, tp, true), dir = livresTxt(b, st, tp), pend = st !== 'fim' && falta(b) && tp !== 'livre' ? pagCurto(b) : '';
+    return `<button type="button" class="${cls}" ${podeAgenda ? `data-ir-bat="${b.id}"` : 'disabled aria-disabled="true"'} style="${tp === 'livre' || tp === 'bloq' ? '' : `${T.fundo}; --faixa: ${T.cor}`}" aria-label="${esc(`${horaDe(b.dataHora)}, ${titulo}, ${T.t}, ${dir}${pend ? ', ' + pend : ''}`)}">
+      <span class="linha1"><span class="mono hora">${esc(horaDe(b.dataHora))}</span>${st === 'prevista' ? `<span class="naPista" title="Bateria prevista para agora${dir ? ' · ' + esc(dir) : ''}">PREVISTA AGORA</span>` : `<span class="dirB">${esc(dir)}</span>`}</span>
+      <span class="tituloB trunc">${esc(tp === 'livre' ? 'Livre' : titulo)}</span>${pend ? `<span class="aPagarB">${esc(pend)}</span>` : ''}${tp === 'livre' ? '' : `<span class="barraB" style="width: ${Math.round(Math.min(1, n / vagas) * 100)}%; background: ${T.cheio}"></span>`}</button>`;
   };
   const pintarLinha = () => {
-    const el = $('#linhaDia');
+    const el = q('#linhaDia'); if (!el) return;
     if (!bats.length) { el.innerHTML = `<div class="cartaoCab"><h2>Linha do dia</h2></div><div class="vazio"><b>Sem baterias hoje</b><span>${d.getDay() === 1 ? 'Segunda o kartódromo não abre.' : 'Dia fechado ou grade ainda não gerada.'}</span></div>`; return; }
-    el.innerHTML = `<div class="cartaoCab"><span class="col"><h2>Linha do dia</h2><span class="sub">selecione uma bateria para abrir na agenda</span></span><span class="dir legendaCurta"><span><span class="amostra" style="${amostra('livre', true)}"></span>livre</span><span><span class="amostra" style="background: var(--kib-cor-agenda-reserva-fundo); box-shadow: inset 3px 0 0 var(--kib-cor-estado-aviso-solido)"></span>com reserva ou evento</span><span><span class="amostra" style="box-shadow: inset 0 0 0 2px var(--kib-cor-estado-perigo-solido)"></span>prevista para agora</span></span></div>
+    el.innerHTML = `<div class="cartaoCab"><span class="col"><h2>Linha do dia</h2><span class="sub">${podeAgenda ? 'selecione uma bateria para abrir na agenda' : 'programação de baterias do dia'}</span></span><span class="dir legendaCurta"><span><span class="amostra" style="${amostra('livre', true)}"></span>livre</span><span><span class="amostra" style="background: var(--kib-cor-agenda-reserva-fundo); box-shadow: inset 3px 0 0 var(--kib-cor-estado-aviso-solido), inset 0 0 0 1px var(--linha2)"></span>com reserva ou evento</span><span><span class="amostra" style="box-shadow: inset 0 0 0 2px var(--kib-cor-estado-perigo-solido)"></span>prevista para agora</span></span></div>
       <div class="rolagemX cartao-corpo" id="rolaLinha"><div class="linhaBlocos">${bats.map(blocoDia).join('')}</div></div>`;
-    const foco = el.querySelector('.bloco2.pista') || el.querySelector('.bloco2:not(.passou)'), rola = $('#rolaLinha');
-    if (foco && rola) rola.scrollLeft = Math.max(0, foco.offsetLeft - rola.offsetLeft - 160);
+    const foco = el.querySelector('.bloco2.pista') || el.querySelector('.bloco2:not(.passou)'), rola = q('#rolaLinha');
+    if (foco && rola) rola.scrollLeft = Math.max(0, foco.offsetLeft - rola.offsetLeft - Math.max(16, Math.round((rola.clientWidth - foco.offsetWidth) / 2)));
   };
 
   let ultimaOk = '';
   const carregar = async () => {
+    if (carregarOcupado) return;
+    if (hojeIso() !== hoje) { if (tela.isConnected) abrirTela('visao'); return; }
+    carregarOcupado = true;
+    const seq = ++cargaSeq;
     let bs, online, aprovar, movs;
     try {
+      const saudeP = atualizarConexao().catch(() => {});
       [bs, online, aprovar, movs] = await Promise.all([
         office(`/baterias?status=todas&data=${hoje}`),
         office(`/reservas-online?status=todas&data=${hoje}`).catch(() => []),
         office(`/reservas?status=aprovar&filtro=apartir&data=${hoje}`).catch(() => []),
         office('/movimentos').catch(() => []),
+        saudeP,
       ]);
+      if (!tela.isConnected || seq !== cargaSeq || !q('#kpis')) return;
+      online = Array.isArray(online) ? online : [];
+      aprovar = Array.isArray(aprovar) ? aprovar : [];
+      movs = Array.isArray(movs) ? movs : [];
+      ['#kpis', '#agoraSeguir', '#linhaDia'].forEach((s) => { const x = q(s); if (x) x.hidden = false; });
+      bats = (Array.isArray(bs) ? bs : []).filter((b) => b && typeof b.dataHora === 'string' && b.dataHora.startsWith(hoje) && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(b.dataHora)).sort((x, y) => x.dataHora.localeCompare(y.dataHora));
+      ultimaOk = new Date().toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
+      const at = q('#atualizadoV'); if (at) at.textContent = ` · atualizado às ${ultimaOk}`;
+      const abertos = movs.filter((m) => m && !m.fechadoEm);
+      selo('recepcao', aprovar.length ? String(aprovar.length) : '', 'vermelho');
+      const nAt = online.filter((o) => o && o.status === 'pago_sem_vaga').length; selo('reservas', nAt ? String(nAt) : '', 'vermelho');
+      pintarPendencias(online, aprovar, abertos);
+      pintarKpis(online, movs);
+      pintarLinha();
+      carregarOcupado = false;
+      await pintarAgora(seq);
     } catch (e) {
-      if (!tela.isConnected || !$('#kpis')) return;
-      const at = $('#atualizadoV');
+      carregarOcupado = false;
+      if (!tela.isConnected || seq !== cargaSeq || !q('#kpis')) return;
+      const at = q('#atualizadoV');
       // já tinha dados na tela: mantém e avisa que estão velhos
       if (ultimaOk) { if (at) at.textContent = ` · sem conexão, dados das ${ultimaOk}`; return; }
-      // primeira carga falhou: tira os esqueletos e mostra como tentar de novo
-      $('#pendencias').innerHTML = `<div class="cartao pendencias"><div class="pendencia vermelho"><span class="col" style="flex: 1 1 260px; gap: 2px"><b>Não consegui carregar as baterias de hoje</b><span class="peq" style="line-height: 1.45">Confira a internet do computador. Detalhe: ${esc(e.message)}</span></span><button class="btn perigo peq" data-recarregar="1">Tentar de novo</button></div></div>`;
-      ['#kpis', '#agoraSeguir', '#linhaDia'].forEach((s) => { const x = $(s); if (x) x.innerHTML = ''; });
-      return;
+      // primeira carga falhou: tira os esqueletos, esconde contêineres vazios e mostra como tentar de novo
+      const p = q('#pendencias');
+      if (p) p.innerHTML = `<div class="cartao pendencias" role="alert"><div class="pendencia vermelho"><span class="sinalPend vermelho" aria-hidden="true"></span><span class="col" style="flex: 1 1 200px; min-width: 0; gap: 2px"><b>Não consegui carregar as baterias de hoje</b><span class="peq" style="line-height: 1.45">Confira a internet do computador. Detalhe: ${esc((e && e.message) || 'falha de rede')}</span></span><button type="button" class="btn perigo peq" data-recarregar="1">Tentar de novo</button></div></div>`;
+      ['#kpis', '#agoraSeguir', '#linhaDia'].forEach((s) => { const x = q(s); if (x) { x.innerHTML = ''; x.hidden = true; } });
     }
-    bats = (Array.isArray(bs) ? bs : []).filter((b) => b && typeof b.dataHora === 'string' && b.dataHora.startsWith(hoje)).sort((x, y) => x.dataHora.localeCompare(y.dataHora));
-    if (!$('#kpis')) return;
-    ultimaOk = new Date().toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
-    const at = $('#atualizadoV'); if (at) at.textContent = ` · atualizado às ${ultimaOk}`;
-    const abertos = movs.filter((m) => !m.fechadoEm);
-    selo('recepcao', aprovar.length ? String(aprovar.length) : '', 'vermelho');
-    const nAt = online.filter((o) => o.status === 'pago_sem_vaga').length; selo('reservas', nAt ? String(nAt) : '', 'vermelho');
-    pintarPendencias(online, aprovar, abertos);
-    pintarKpis(online, movs);
-    pintarLinha();
-    await pintarAgora();
   };
 
   let vivoOcupado = false;
   const vivo = async () => {
-    const el = $('#emPista', tela); if (!el || vivoOcupado) return;
+    const el = q('#emPista'); if (!el || vivoOcupado) return;
     vivoOcupado = true;
     try {
       const s = await api('/crono/ao-vivo');
       if (!tela.isConnected) return;
+      if (!s || typeof s !== 'object') throw new Error('Resposta inválida da cronometragem.');
       const corre = s.status === 'live' || s.status === 'running';
       selo('crono', corre ? 'ao vivo' : '', 'vivo');
-      const pil = (s.drivers || []).filter((p) => +p.position < 900).slice(0, 5);
-      const largou = s.race && s.race.startedAt ? new Date(s.race.startedAt) : null;
+      const drivers = Array.isArray(s.drivers) ? s.drivers : [];
+      const pil = drivers.filter((p) => p && +p.position < 900).slice(0, 5);
+      const largouBruto = s.race && s.race.startedAt ? new Date(s.race.startedAt) : null;
+      const largou = largouBruto && Number.isFinite(largouBruto.getTime()) ? largouBruto : null;
       const min = largou ? Math.max(0, Math.round((Date.now() - largou.getTime()) / 60000)) : null;
       if (!corre && !pil.length) { el.innerHTML = `<div class="placarVazio"><span class="chip" style="background: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 10%, transparent); color: var(--kib-cor-borda-sutil)">CRONOMETRAGEM</span><b>Nenhuma bateria no horário previsto</b><span>O placar aparece aqui quando a próxima largar.</span></div>`; return; }
       el.innerHTML = `<div style="display: flex; flex-direction: column; gap: var(--kib-espaco-meio); padding: var(--kib-espaco-2) var(--kib-espaco-2) var(--kib-espaco-1)">
           <span style="display: flex; align-items: center; flex-wrap: wrap; gap: var(--kib-espaco-1)"><span class="chip" style="background: ${corre ? 'color-mix(in srgb, var(--kib-cor-status-ok) 20%, transparent)' : 'color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 10%, transparent)'}; color: ${corre ? 'var(--kib-cor-categoria-verde-topo)' : 'var(--kib-cor-borda-sutil)'}; letter-spacing: .05em">${corre ? '<span class="ponto pulso" style="background: var(--kib-cor-categoria-verde-topo)"></span>AO VIVO' : 'ÚLTIMA BATERIA'}</span>${largou ? `<span style="font-size: var(--kib-fonte-tamanho-pequeno); color: var(--kib-cor-icone-suave)">${corre ? `largou às ${largou.toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })} · há ${min} min` : `largou às ${largou.toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })}`}</span>` : ''}</span>
-          <h2 style="margin: 0; font-size: var(--kib-fonte-tamanho-subtitulo); font-weight: 700">${esc(s.eventName || 'Bateria')}</h2></div>
+          <h2 style="margin: 0; font-size: var(--kib-fonte-tamanho-subtitulo); font-weight: 700; overflow-wrap: anywhere">${esc(s.eventName || 'Bateria')}</h2></div>
         <div class="linha cabPlacar"><span>Pos</span><span>Kart</span><span>Piloto</span><span class="t-dir">Melhor volta</span></div>
         ${pil.map((p, i) => `<div class="linha"><span style="font-size: var(--kib-fonte-tamanho-subtitulo); font-weight: 700; color: ${i < 3 ? 'var(--kib-cor-categoria-amarelo-topo)' : 'var(--kib-cor-acao-sobre-principal)'}">${esc(p.position)}</span><span class="kartE">${esc(p.kart)}</span><span class="trunc peso-semibold">${esc(p.name)}</span><span class="mono" style="text-align: right; font-size: var(--kib-fonte-tamanho-corpo)">${esc(p.time || '—')}</span></div>`).join('') || '<div style="padding: var(--kib-espaco-denso-12) var(--kib-espaco-denso-20); color: var(--kib-cor-icone-suave)">Largou agora: ninguém completou volta ainda.</div>'}`;
-    } catch (e) { if (!tela.isConnected) return; el.innerHTML = `<div class="placarVazio"><b>Cronometragem sem resposta</b><span>O placar tenta de novo a cada 5 segundos. Detalhe: ${esc(e.message)}</span><a href="#/sistema">Ver estado dos PCs${svg(IC.dir, 14, 'var(--kib-cor-categoria-verde-topo)', 2.4)}</a></div>`; }
+    } catch (e) { if (!tela.isConnected) return; el.innerHTML = `<div class="placarVazio" role="alert"><b>Cronometragem sem resposta</b><span>O placar tenta de novo a cada 5 segundos. Detalhe: ${esc((e && e.message) || 'falha de rede')}</span>${podeSistema ? `<a href="#/sistema">Ver estado dos PCs${svg(IC.dir, 14, 'var(--kib-cor-categoria-verde-topo)', 2.4)}</a>` : ''}</div>`; }
     finally { vivoOcupado = false; }
   };
 
   tela.addEventListener('click', (e) => {
     if (e.target.closest('[data-ajuda-visao]')) { S.ajuda = { guia: 'visao' }; return; }
-    if (e.target.closest('[data-recarregar]')) { $('#pendencias').innerHTML = '<div class="esqueleto" style="height: 56px"></div>'; carregar(); return; }
+    const recBtn = e.target.closest('[data-recarregar]');
+    if (recBtn) {
+      if (carregarOcupado || recBtn.disabled) return;
+      recBtn.disabled = true; recBtn.textContent = 'Tentando…';
+      const p = q('#pendencias'); if (p) p.innerHTML = '<div class="esqueleto" style="height: 56px"></div>';
+      const k = q('#kpis'), ag = q('#agoraSeguir'), ld = q('#linhaDia');
+      if (k) { k.hidden = false; k.innerHTML = '<div class="esqueleto" style="height: 112px"></div>'.repeat(4); }
+      if (ag) { ag.hidden = false; ag.innerHTML = '<div class="esqueleto" style="height: 220px; margin: var(--kib-espaco-2)"></div>'; }
+      if (ld) { ld.hidden = false; ld.innerHTML = '<div class="esqueleto" style="height: 150px; margin: var(--kib-espaco-2)"></div>'; }
+      carregar();
+      return;
+    }
     if (e.target.closest('[data-nova-reserva]')) { S.irAgendaNova = true; location.hash = '#/agenda'; return; }
     const dd = e.target.closest('[data-ir-dia]'); if (dd) { S.agenda = { ...(S.agenda || { ocultos: {}, q: '' }), vista: 'dia', base: dd.dataset.irDia, sel: null }; location.hash = '#/agenda'; return; }
     if (e.target.closest('[data-ir-lista]')) { S.agenda = { ...(S.agenda || { ocultos: {}, q: '' }), vista: 'lista', base: hoje, sel: null }; location.hash = '#/agenda'; return; }
     const b = e.target.closest('[data-ir-bat]'); if (b) { const x = bats.find((y) => y.id === +b.dataset.irBat); if (x) irAgenda(x); return; }
     const rc = e.target.closest('[data-ir-recepcao]'); if (rc) S.irBateria = +rc.dataset.irRecepcao;
   });
-  await atualizarConexao().catch(() => {});
   await carregar();
   vivo();
   repetir(carregar, 30_000); repetir(vivo, 5_000); repetir(atualizarConexao, 60_000);
@@ -555,13 +653,29 @@ TELAS.visao = async (tela) => {
 // ---------- Agenda
 TELAS.agenda = async (tela) => {
   const celular = () => window.matchMedia('(max-width: 760px)').matches;
-  const A = S.agenda || (S.agenda = { vista: celular() ? 'dia' : 'semana', base: hojeIso(), ocultos: {}, q: '' });
+  const A = S.agenda || (S.agenda = { vista: celular() ? 'dia' : 'semana', base: hojeIso(), ocultos: {}, q: '', qCli: '' });
+  if (typeof A.qCli !== 'string') A.qCli = '';
   if (S.irAgenda) { A.base = S.irAgenda.dia; A.sel = S.irAgenda.id; A.vista = celular() ? 'dia' : 'semana'; S.irAgenda = null; }
   tela.innerHTML = `${cabecalho('<span class="ponto pulso" style="background: var(--kib-cor-status-ok)"></span><span class="cor-ok">Mesma agenda da Recepção, do site e dos totens</span><span id="atualizado" style="color: var(--mudo2); font-weight: 500"></span>', 'Agenda <span id="periodo" style="font-size: var(--kib-fonte-tamanho-titulo); font-weight: 600; color: var(--mudo); letter-spacing: 0"></span>', `
     <button type="button" class="btn prim" data-nova="1" title="Nova reserva (tecla N)">${svg(IC.mais, 14, 'var(--kib-cor-acao-sobre-principal)', 2.6)}Nova reserva<kbd class="atalho" aria-hidden="true">N</kbd></button>
     <div style="display: flex; align-items: center; gap: 2px; min-height: 40px; box-sizing: border-box; padding: 2px var(--kib-espaco-meio); border-radius: var(--kib-raio-botao); background: var(--kib-cor-superficie-padrao); box-shadow: 0 0 0 1px var(--linha2)"><button type="button" class="btn sec peq hov icone peq mudo" data-nav="-1" aria-label="Anterior" title="Anterior (seta para a esquerda)">${svg(IC.esq, 15)}</button><button type="button" class="btn sec peq" data-nav="0" title="Voltar para hoje (tecla T)">Hoje</button><button type="button" class="btn sec peq hov icone peq mudo" data-nav="1" aria-label="Próximo" title="Próximo (seta para a direita)">${svg(IC.dir, 15)}</button></div>
     <div class="seg" role="tablist" aria-label="Vista">${[['dia', 'Dia', 'D'], ['semana', 'Semana', 'S'], ['lista', 'Lista', 'L']].map(([v, t, k]) => `<button type="button" role="tab" data-vista="${v}" aria-selected="${A.vista === v}" tabindex="${A.vista === v ? '0' : '-1'}" title="${t} (tecla ${k})" class="${A.vista === v ? 'sel' : ''}">${t}</button>`).join('')}</div><button type="button" class="btn sec icone" data-ajuda-ag aria-haspopup="dialog" aria-label="Atalhos e legenda" title="Atalhos e legenda (tecla ?)">?</button>`)}
   <main class="principal agendaLayout">
+    <section class="cartao leve buscaCliMes" id="buscaClienteMes" aria-label="Buscar cliente no mês">
+      <div class="cabLado buscaCliCab">
+        <label class="t-corpo peso-semibold" for="qClienteMes">Cliente no mês</label>
+        <span class="chip cinza" id="buscaCliMesBadge"></span>
+      </div>
+      <div class="buscaCliCampoWrap">
+        <label class="buscaCampo">
+          ${svg(IC.busca, 14, 'var(--kib-cor-texto-apoio)')}
+          <input id="qClienteMes" type="search" autocomplete="off" spellcheck="false" value="${esc(A.qCli)}" placeholder="Nome, e-mail, CPF ou telefone…" aria-describedby="buscaCliDica">
+          <button type="button" class="btn sec peq icone" data-limpar-cli-mes aria-label="Limpar busca de cliente" title="Limpar busca" ${A.qCli ? '' : 'hidden'}>${svg(IC.fechar, 13)}</button>
+        </label>
+        <span id="buscaCliDica" class="sr-only">Procura em todas as baterias do mês selecionado por nome, e-mail, CPF ou telefone.</span>
+      </div>
+      <div id="resBuscaCliente" class="buscaCliRes" role="region" aria-live="polite" hidden></div>
+    </section>
     <div class="agendaLado">
       <section class="cartao leve" style="padding: var(--kib-espaco-denso-12)" id="miniCal"></section>
       <section class="cartao leve" style="padding: var(--kib-espaco-1)" id="filtrosTipo"></section>
@@ -574,6 +688,9 @@ TELAS.agenda = async (tela) => {
   let ultimaPista = null, offlineDesde = null, consulta = 0, periodoCarregado = null, detalhe = 0;
   let faixaDados = null, ultimaCargaTs = 0;
   const miniCache = new Map();
+  const mesReservasCache = new Map();
+  const mesPromessas = new Map();
+  let buscaCliSeq = 0, ultimoMesBadge = '';
   let cacheFHtml = '', cacheCalHtml = '', cacheMcHtml = '', cacheApHtml = '';
   tela.addEventListener('toggle', (e) => { if (e.target.matches && e.target.matches('.filtroDet')) A.filtroAberto = e.target.open; }, true);
   const semanaIni = () => { const d = deIso(A.base); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return iso(d); };
@@ -661,10 +778,126 @@ TELAS.agenda = async (tela) => {
       return false;
     } finally { if (pedido === consulta) cal.removeAttribute('aria-busy'); }
   };
+  const carregarReservasMes = async (mes, forcar = false) => {
+    const agora = Date.now();
+    const cached = mesReservasCache.get(mes);
+    if (!forcar && cached && agora - cached.ts < 30_000) return cached.dados;
+    if (!forcar && mesPromessas.has(mes)) return mesPromessas.get(mes);
+    const buscarFaixa = async (ini, ate) => {
+      const dados = await office(`/reservas?status=todas&filtro=entre&data=${ini}&ate=${ate}`);
+      return Array.isArray(dados) ? dados : [];
+    };
+    const promessa = (async () => {
+      let lista = await office(`/reservas?status=todas&filtro=mes&data=${mes}-01`);
+      if (!Array.isArray(lista)) lista = [];
+      if (lista.length >= 5000) {
+        const [ano, mm] = mes.split('-').map(Number);
+        const ult = new Date(ano, mm, 0).getDate();
+        const porId = new Map();
+        const acumular = (arr) => arr.forEach((r) => { if (r && r.id != null) porId.set(r.id, r); });
+        for (let diaIni = 1; diaIni <= ult; diaIni += 7) {
+          const d0 = `${mes}-${pad(diaIni)}`, d1 = `${mes}-${pad(Math.min(ult, diaIni + 6))}`;
+          const parte = await buscarFaixa(d0, d1);
+          if (parte.length >= 5000) {
+            for (let d = diaIni; d <= Math.min(ult, diaIni + 6); d++) acumular(await buscarFaixa(`${mes}-${pad(d)}`, `${mes}-${pad(d)}`));
+          } else acumular(parte);
+        }
+        lista = [...porId.values()];
+      }
+      mesReservasCache.set(mes, { ts: Date.now(), dados: lista });
+      return lista;
+    })();
+    mesPromessas.set(mes, promessa);
+    try { return await promessa; } finally { if (mesPromessas.get(mes) === promessa) mesPromessas.delete(mes); }
+  };
+
+  const atualizarCabCliMes = () => {
+    const mes = String(A.base || hojeIso()).slice(0, 7);
+    const d = deIso(`${mes}-01`);
+    const nomeMes = MESES[d.getMonth()] || '';
+    const badge = $('#buscaCliMesBadge', tela);
+    if (badge) badge.textContent = nomeMes ? `${nomeMes[0].toUpperCase()}${nomeMes.slice(1)} ${d.getFullYear()}` : mes;
+    const btLimpar = tela.querySelector('[data-limpar-cli-mes]');
+    if (btLimpar) btLimpar.hidden = !(A.qCli || '');
+    const mudouMes = ultimoMesBadge && ultimoMesBadge !== mes;
+    ultimoMesBadge = mes;
+    return { mes, nomeMes, d, mudouMes };
+  };
+
+  const atualizarBuscaCliMes = async ({ forcar = false } = {}) => {
+    const { mes, nomeMes, d, mudouMes } = atualizarCabCliMes();
+    const resEl = $('#resBuscaCliente', tela);
+    if (!resEl) return;
+    const qRaw = String(A.qCli || '');
+    const qTrim = qRaw.trim();
+    const seq = ++buscaCliSeq;
+    if (!qTrim) {
+      resEl.hidden = true;
+      resEl.innerHTML = '';
+      return;
+    }
+    resEl.hidden = false;
+    if (!buscarClienteQueryValida(qRaw)) {
+      resEl.innerHTML = '<div class="buscaCliVazio"><span>Digite ao menos 2 letras ou 3 dígitos (CPF ou telefone).</span></div>';
+      return;
+    }
+    const cached = mesReservasCache.get(mes);
+    if (forcar || !cached || Date.now() - cached.ts >= 30_000) {
+      resEl.innerHTML = `<div class="buscaCliVazio"><span>Buscando em ${esc(nomeMes)}…</span></div>`;
+    }
+    let lista;
+    try {
+      lista = await carregarReservasMes(mes, forcar);
+    } catch (er) {
+      if (seq !== buscaCliSeq || !tela.isConnected || String(A.base || hojeIso()).slice(0, 7) !== mes) return;
+      resEl.innerHTML = `<div class="vazio erro" role="alert" style="padding: var(--kib-espaco-denso-12)"><b>Não foi possível buscar clientes</b><span>${esc(er && er.message || 'Erro ao consultar reservas do mês.')}</span><button type="button" class="btn sec peq" data-cli-mes-repetir>Tentar novamente</button></div>`;
+      return;
+    }
+    if (seq !== buscaCliSeq || !tela.isConnected || String(A.base || hojeIso()).slice(0, 7) !== mes) return;
+    const hoje = hojeIso();
+    const achados = filtrarReservasMes(lista, qRaw, hoje);
+    if (!achados.length) {
+      const mAnt = MESES[(d.getMonth() + 11) % 12], mProx = MESES[(d.getMonth() + 1) % 12];
+      resEl.innerHTML = `<div class="buscaCliVazio"><span>Nenhum cliente encontrado em ${esc(nomeMes)} para “${esc(qTrim)}”.</span><div class="buscaCliAcoesMes"><button type="button" class="btn sec peq" data-cli-mes-nav="-1">Ver ${esc(mAnt)}</button><button type="button" class="btn sec peq" data-cli-mes-nav="1">Ver ${esc(mProx)}</button></div></div>`;
+      return;
+    }
+    const LIMITE = 25;
+    const visiveis = achados.slice(0, LIMITE);
+    const resumo = `${plural(achados.length, 'reserva', 'reservas')} em ${esc(nomeMes)}${achados.length > LIMITE ? ` · mostrando ${LIMITE}` : ''}`;
+    const itensHtml = visiveis.map((r) => {
+      const dia = String(r.dataHora || '').slice(0, 10);
+      const dd = /^\d{4}-\d{2}-\d{2}$/.test(dia) ? deIso(dia) : null;
+      const quandoDia = dia === hoje ? 'hoje' : dd && !Number.isNaN(dd.getTime()) ? `${DIAS[dd.getDay()].slice(0, 3)} ${dd.getDate()}/${pad(dd.getMonth() + 1)}` : '--';
+      const hora = horaDe(r.dataHora) || '--:--';
+      const canc = r.status === 'cancelada';
+      const semResp = r.responsavel && normTxt(r.responsavel) !== normTxt(r.cliente);
+      const contatos = [r.documento, r.telefone, r.email].filter(Boolean).map(esc).join(' · ');
+      const batNome = esc(r.reserva || 'Bateria');
+      const estadoChip = canc
+        ? '<span class="chip cinza">cancelada</span>'
+        : r.pago
+          ? '<span class="chip verde">pago</span>'
+          : `<span class="chip laranja">${+r.total ? brlCurto(r.total) : 'a pagar'}</span>`;
+      const pre = !canc && !r.aprovada ? ' · pré-reserva' : '';
+      return `<button type="button" class="hov linhaLado buscaCliItem" data-sel="${+r.bateriaId || 0}" data-base="${esc(dia)}">
+        <span class="quando${!canc && dia === hoje ? ' urgente' : ''}"><span>${esc(quandoDia)}</span><b class="mono">${esc(hora)}</b></span>
+        <span class="col cresce">
+          <span class="buscaCliTopo"><b class="trunc">${esc(r.cliente || 'Cliente sem nome')}</b>${estadoChip}</span>
+          <span class="peq">${batNome}${pre}${semResp ? ` · resp. ${esc(r.responsavel)}` : ''}</span>
+          ${contatos ? `<span class="peq buscaCliContatos">${contatos}</span>` : ''}
+        </span>
+      </button>`;
+    }).join('');
+    resEl.innerHTML = `<div class="buscaCliResumo"><span>${resumo}</span></div>${itensHtml}`;
+    if (mudouMes) { const i = $('#qClienteMes', tela); if (i && i.value !== A.qCli) i.value = A.qCli; }
+  };
+
   const recarregar = async () => {
     if (document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+    mesReservasCache.clear();
     const sel = A.sel, g = $('#camada .gaveta');
     if (await carregar(true) && sel && A.sel === sel && g && g.isConnected && !$('#camada .modal')) await abrirBateria(sel, { silencioso: true });
+    if ((A.qCli || '').trim()) atualizarBuscaCliMes({ forcar: true });
   };
   if (typeof AgendaAcoes !== 'undefined') AgendaAcoes.montar({ tela, A, recarregar, carregar, bats: () => bats, abrir: (id) => abrirBateria(id) });
   const filtrar = (lista) => {
@@ -766,6 +999,8 @@ TELAS.agenda = async (tela) => {
       if (window.scrollY !== sWinY) window.scrollTo({ top: sWinY, behavior: 'instant' });
     }
     pintarAPagar();
+    const cabCli = atualizarCabCliMes();
+    if (cabCli.mudouMes && (A.qCli || '').trim()) atualizarBuscaCliMes();
   };
 
   const pintarMini = async (forcar = true) => {
@@ -1003,14 +1238,53 @@ TELAS.agenda = async (tela) => {
     if (e.target.closest('[data-vista-lista]')) return mudarVista('lista');
     const dia = e.target.closest('[data-dia]'); if (dia) { A.base = dia.dataset.dia; A.vista = 'dia'; marcarSel(null); fecharCamada(); carregar(false, true); return; }
     const mes = e.target.closest('[data-mes]'); if (mes) { const d = deIso(A.base); d.setMonth(d.getMonth() + +mes.dataset.mes, 1); A.base = iso(d); carregar(); return; }
+    const cm = e.target.closest('[data-cli-mes-nav]'); if (cm) { const d = deIso(A.base); d.setMonth(d.getMonth() + +cm.dataset.cliMesNav, 1); A.base = iso(d); carregar(); return; }
+    if (e.target.closest('[data-cli-mes-repetir]')) { atualizarBuscaCliMes({ forcar: true }); return; }
+    if (e.target.closest('[data-limpar-cli-mes]')) {
+      A.qCli = '';
+      const i = $('#qClienteMes', tela);
+      if (i) { i.value = ''; i.focus(); }
+      atualizarBuscaCliMes();
+      return;
+    }
     const t = e.target.closest('[data-tipo]'); if (t) { A.ocultos[t.dataset.tipo] = !A.ocultos[t.dataset.tipo]; pintar(); return; }
     const s = e.target.closest('[data-sel]');
     if (s) {
-      if (s.dataset.base && !bats.find((b) => b.id === +s.dataset.sel)) { A.base = s.dataset.base; await carregar(); }
-      marcarSel(+s.dataset.sel); abrirBateria(A.sel);
+      const baseDest = s.dataset.base;
+      const precisaCarregar = baseDest && (!bats.find((b) => b.id === +s.dataset.sel) || (A.vista === 'dia' && A.base !== baseDest) || (A.vista === 'lista' && baseDest < A.base));
+      if (precisaCarregar) { A.base = baseDest; await carregar(); }
+      marcarSel(+s.dataset.sel);
+      const cel = tela.querySelector(`#calendario [data-sel="${A.sel}"]`);
+      if (cel && typeof cel.scrollIntoView === 'function') cel.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      abrirBateria(A.sel);
     }
   });
-  tela.addEventListener('input', (e) => { if (e.target.id === 'qAg') { A.q = e.target.value; clearTimeout(S.tela.tq); S.tela.tq = setTimeout(() => { pintar(); const i = $('#qAg'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 300); } });
+  tela.addEventListener('input', (e) => {
+    if (e.target.id === 'qAg') { A.q = e.target.value; clearTimeout(S.tela.tq); S.tela.tq = setTimeout(() => { pintar(); const i = $('#qAg'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 300); return; }
+    if (e.target.id === 'qClienteMes') {
+      A.qCli = e.target.value;
+      const btLimpar = tela.querySelector('[data-limpar-cli-mes]');
+      if (btLimpar) btLimpar.hidden = !A.qCli;
+      clearTimeout(S.tela.tCli);
+      const mesAtual = String(A.base || hojeIso()).slice(0, 7);
+      const c = mesReservasCache.get(mesAtual);
+      const emCache = !!(c && Date.now() - c.ts < 30_000);
+      S.tela.tCli = setTimeout(() => atualizarBuscaCliMes(), emCache ? 60 : 220);
+    }
+  });
+  tela.addEventListener('keydown', (e) => {
+    if (e.target.id !== 'qClienteMes') return;
+    if (e.key === 'Enter') {
+      const primeiro = tela.querySelector('#resBuscaCliente [data-sel]');
+      if (primeiro) { e.preventDefault(); primeiro.click(); }
+    } else if (e.key === 'Escape' && e.target.value) {
+      e.preventDefault();
+      e.stopPropagation();
+      A.qCli = '';
+      e.target.value = '';
+      atualizarBuscaCliMes();
+    }
+  });
   $('#camada').onclick = async (e) => {
     if (e.target.closest('[data-acao="fecharGaveta"]') || e.target.closest('[data-acao="fechar"]')) { fecharComAviso(() => { marcarSel(null); fecharCamada(); }); return; }
     const re = e.target.closest('[data-reabrir]'); if (re) { abrirBateria(+re.dataset.reabrir); return; }
@@ -1103,6 +1377,8 @@ TELAS.agenda = async (tela) => {
     else if (k === 'l') mudarVista('lista');
   };
   await carregar();
+  atualizarCabCliMes();
+  if ((A.qCli || '').trim()) atualizarBuscaCliMes();
   if (A.sel) abrirBateria(A.sel);
   if (S.irAgendaNova) { S.irAgendaNova = false; escolherHorario(); }
   repetir(async () => { if ($('#camada .modal')) { if (typeof Grupo !== 'undefined') await Grupo.refrescar(); } else await recarregar(); }, 30_000);
