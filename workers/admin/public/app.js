@@ -212,7 +212,19 @@ function dialogo({ titulo, texto = '', botoes, semFoco = false }) {
   });
 }
 const confirmar = (titulo, texto, ok = 'Confirmar', perigo = false) => dialogo({ titulo, texto, botoes: [{ rotulo: ok, valor: true, classe: perigo ? 'perigo-solido' : 'prim' }] }).then((v) => v === true);
-const escolherForma = (titulo, texto) => dialogo({ titulo, texto, botoes: [{ rotulo: 'Pix', valor: 'Pix', classe: 'sec' }, { rotulo: 'Cartão', valor: 'Cartão', classe: 'sec' }, { rotulo: 'Dinheiro', valor: 'Dinheiro', classe: 'sec' }], semFoco: true });
+const escolherForma = (titulo, texto) => dialogo({ titulo, texto, botoes: [{ rotulo: 'Pix', valor: 'Pix', classe: 'sec' }, { rotulo: 'Cartão', valor: 'Cartão', classe: 'sec' }, { rotulo: 'Dinheiro', valor: 'Dinheiro', classe: 'sec' }, { rotulo: 'Voucher', valor: 'Voucher', classe: 'sec' }], semFoco: true });
+const pedirVoucher = (titulo, texto, padrao = '') => new Promise((resolve) => {
+  const antes = document.activeElement;
+  const veu = document.createElement('div'); veu.className = 'veu veuTopo';
+  veu.innerHTML = `<div class="modal dialogoCaixa" role="alertdialog" aria-modal="true"><div class="dialogoCorpo"><h2 class="t-titulo peso-negrito">${esc(titulo)}</h2><p class="t-corpo cor-corpo">${esc(texto)}</p><input class="entrada num" id="dlgVchCod" style="text-transform:uppercase; letter-spacing: 2px; font-weight:700; font-size: 16px; margin: 10px 0" placeholder="Ex.: KB2KB5NX" value="${esc(padrao)}"><div class="linha-quebra gap-1 dialogoBotoes"><button type="button" class="btn prim" id="dlgVchOk">Aplicar voucher</button><button type="button" class="btn link" id="dlgVchCanc">Cancelar</button></div></div></div>`;
+  document.body.appendChild(veu);
+  const inp = veu.querySelector('#dlgVchCod');
+  const fim = (v) => { veu.remove(); try { antes && antes.focus(); } catch {} resolve(v); };
+  veu.querySelector('#dlgVchOk').onclick = () => { const c = inp.value.trim().toUpperCase(); if (!c) return toast('Digite o código do voucher'); fim(c); };
+  veu.querySelector('#dlgVchCanc').onclick = () => fim(null);
+  inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); veu.querySelector('#dlgVchOk').click(); } if (e.key === 'Escape') { e.preventDefault(); fim(null); } };
+  inp.focus(); inp.select();
+});
 const nomeBonito = (n) => { const t = String(n || ''); if (!t || t !== t.toUpperCase()) return t; return t.toLowerCase().replace(/(^|\s)([a-zà-ú])/g, (m, a, b) => a + b.toUpperCase()).replace(/\s(De|Da|Do|Das|Dos|E)(?=\s)/g, (m) => m.toLowerCase()); };
 // ajuda curta: um "?" que abre uma frase logo abaixo (funciona com teclado e leitor de tela, sem JS)
 const dica = (texto, nome = 'isto') => `<details class="dicaDet"><summary aria-label="Ajuda: ${esc(nome)}" title="Ajuda: ${esc(nome)}">?</summary><span>${esc(texto)}</span></details>`;

@@ -347,13 +347,15 @@ describe('cupom do amigo no link do grupo', () => {
     f.mockRestore();
   });
 
-  it('cupom que zera a vaga: preço normal (a Asaas não cobra R$ 0), usar na recepção', async () => {
+  it('cupom que zera a vaga (100% de desconto): quita diretamente com voucher sem cobrança financeira no Asaas', async () => {
     await publicar([grupo({ precoCentavos: 14500 })]);
     env.ASAAS_API_KEY = 'x';
     const { pagamentos, f } = simular({ precoCentavos: 0, primeiraVez: false, cupom: { codigo: 'CORTESIA', descontoCentavos: 14500 } });
-    const b = await (await enviar('CORTESIA')).json() as { pagamento?: { erroCupom?: string } };
-    expect(pagamentos[0].value).toBe(145);
-    expect(b.pagamento?.erroCupom).toMatch(/recepção/);
+    const b = await (await enviar('CORTESIA')).json() as { pagamento?: { valorCentavos?: number; pago?: boolean; cupom?: { codigo: string } } };
+    expect(pagamentos.length).toBe(0);
+    expect(b.pagamento?.valorCentavos).toBe(0);
+    expect(b.pagamento?.pago).toBe(true);
+    expect(b.pagamento?.cupom?.codigo).toBe('CORTESIA');
     f.mockRestore();
   });
 });

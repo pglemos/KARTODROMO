@@ -528,12 +528,13 @@ TELAS.vouchers = async (tela) => {
                 if (!c) return;
                 btn.disabled = true;
                 try {
+                  const cotaTotal = Number($('#fVchUsoMaxTotal')?.value) || Number($('#vchManUsos', host)?.value) || 1;
                   const ok = await incluirPessoa({
                     clienteId: c.id,
                     nome: c.nome,
                     documento: so(c.documento) || null,
                     telefone: c.telefone || null,
-                    usosMax: Math.max(1, Number($('#vchManUsos', host)?.value) || 1),
+                    usosMax: Math.max(1, cotaTotal),
                     usosFeitos: 0,
                   });
                   if (ok && !modoDireto) {

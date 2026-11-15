@@ -217,6 +217,12 @@ export async function webhookAsaas(req: Request, env: EnvReservas) {
 /** Servidor segurou as vagas: cria a cobrança (cliente Asaas pelo CPF + cobrança + QR do Pix). */
 async function cobrar(env: EnvReservas, p: Pedido) {
   try {
+    // Pedido coberto 100% por voucher (valor zero): quita diretamente sem gerar fatura Asaas
+    if (p.servidor && Number(p.servidor.valorCentavos) === 0) {
+      p.status = 'pago';
+      p.pagamento = { asaasId: 'VOUCHER_' + p.codigo, billingType: 'VOUCHER', pagoEm: new Date().toISOString(), valorCentavos: 0 };
+      return;
+    }
     const cliente = await garantirCliente(env, {
       nome: p.cliente.nome, cpf: digitos(p.cliente.documento), email: p.cliente.email, celular: digitos(p.cliente.telefone), referencia: p.cliente.chave,
     });

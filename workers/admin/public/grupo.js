@@ -400,6 +400,7 @@ const Grupo = (() => {
             <div class="menuCobrarLista" role="group" aria-label="Como cobrar ${esc(nomeVal || 'piloto ' + (i + 1))}">
               <button type="button" class="btn peq" data-cobrar="${modo === 'unico' ? '' : p.id}" title="Gera o link Asaas (Pix ou cartão) e abre o WhatsApp para enviar">${svg(IC.zap, 13, 'var(--kib-cor-marca-principal)')} Enviar link de pagamento</button>
               ${cobExist && cobExist.link ? `<button type="button" class="btn peq" data-ver-cobranca="${modo === 'unico' ? '' : p.id}" title="Copia o link de pagamento (${brlCurto(cobExist.valor)}) e mostra o botão do WhatsApp">${svg(IC.reservas, 13, 'var(--kib-cor-estado-info-texto)')} Copiar link (${brlCurto(cobExist.valor)})</button>` : ''}
+              <button type="button" class="btn peq" data-quitar-voucher="${modo === 'unico' ? '' : p.id}" title="Quita a vaga do piloto com um voucher de pagamento">${svg(IC.ticket || IC.ok, 13, 'var(--kib-cor-marca-principal)')} Quitar com voucher</button>
               <button type="button" class="btn peq" data-recebi="${modo === 'unico' ? '' : p.id}" title="O cliente já pagou por fora (Pix direto, dinheiro, maquininha)">${svg(IC.ok, 13, 'var(--kib-cor-status-ok)')} Marcar como pago</button>
             </div>
           </details>`;
@@ -509,13 +510,15 @@ const Grupo = (() => {
             ${blocoLinks}
           </section>
           ${!novo ? `<section class="secao" style="padding: var(--kib-espaco-denso-12) var(--kib-espaco-2)"><div style="display: flex; align-items: center; justify-content: space-between; gap: var(--kib-espaco-1); margin-bottom: var(--kib-espaco-1)"><span class="titulo t-subtitulo" style="font-size: var(--kib-fonte-tamanho-subtitulo); margin: 0">Pagamentos recebidos<span class="peq" style="margin-left: 8px; font-weight: 500">${pagamentos.length || ''}</span></span><button type="button" class="btn peq sec" data-conferir-asaas="1" style="display: inline-flex; align-items: center; gap: 5px; height: 28px; font-size: var(--kib-fonte-tamanho-pequeno);" title="Verifica pagamentos Pix e cartão diretamente no Asaas">${svg(IC.sync, 12, 'currentColor')} Conferir no Asaas</button></div>
-            ${pagamentos.map((pg) => `<div style="display: flex; align-items: center; gap: var(--kib-espaco-1); padding: var(--kib-espaco-1) 0; border-top: 1px solid var(--linha)"><span style="width: 28px; height: 28px; border-radius: var(--kib-raio-botao); display: flex; align-items: center; justify-content: center; color: var(--kib-cor-acao-sobre-principal); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700; background: ${pg.pilotoId ? CORG[pg.pilotoId % 6] : 'var(--kib-cor-texto-principal)'}">${esc(pg.pilotoId ? iniciais(nomeBonito(nomeDe(pg.pilotoId))) : 'G')}</span><span class="col cresce"><b class="trunc">${esc(nomeBonito(pg.pilotoNome || nomeDe(pg.pilotoId)))}${pg.pilotoCancelado ? ' · vaga cancelada' : ''}</b><span class="peq">${esc(pg.forma)} · ${esc((pg.criadoEm || '').slice(8, 10) + '/' + (pg.criadoEm || '').slice(5, 7) + ' ' + (pg.criadoEm || '').slice(11, 16))}${pg.usuario ? ' · ' + esc(pg.usuario) : ''}</span></span><b class="mono cor-ok">${brl(pg.valor)}</b>${pg.origem === 'manual' ? `<button class="btn peq" style="background: transparent; color: var(--erroTxt)" data-estornar="${pg.id}">Estornar</button>` : ''}</div>`).join('') || '<span class="peq" style="color: var(--kib-cor-texto-secundario);">Nenhum pagamento ainda.</span>'}
+            ${modo === 'individual' && pagamentos.some((pg) => !pg.pilotoId) ? `<div class="aviso-faixa" role="alert" style="margin-bottom: 6px">Há pagamento(s) sem piloto definido (${brl(g.pagamentosSemPiloto || pagamentos.filter((pg) => !pg.pilotoId).reduce((a, pg) => a + (+pg.valor || 0), 0))}). No modo individual ele não é dividido entre as vagas — vincule a um piloto abaixo ou estorne.</div>` : ''}
+            ${pagamentos.map((pg) => `<div style="display: flex; align-items: center; flex-wrap: wrap; gap: var(--kib-espaco-1); padding: var(--kib-espaco-1) 0; border-top: 1px solid var(--linha)"><span style="width: 28px; height: 28px; border-radius: var(--kib-raio-botao); display: flex; align-items: center; justify-content: center; color: var(--kib-cor-acao-sobre-principal); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700; background: ${pg.pilotoId ? CORG[pg.pilotoId % 6] : 'var(--kib-cor-texto-principal)'}">${esc(pg.pilotoId ? iniciais(nomeBonito(nomeDe(pg.pilotoId))) : 'G')}</span><span class="col cresce"><b class="trunc">${esc(nomeBonito(pg.pilotoNome || nomeDe(pg.pilotoId)))}${pg.pilotoCancelado ? ' · vaga cancelada' : ''}${modo === 'individual' && !pg.pilotoId ? ' · sem piloto' : ''}</b><span class="peq">${esc(pg.forma)} · ${esc((pg.criadoEm || '').slice(8, 10) + '/' + (pg.criadoEm || '').slice(5, 7) + ' ' + (pg.criadoEm || '').slice(11, 16))}${pg.usuario ? ' · ' + esc(pg.usuario) : ''}</span></span><b class="mono cor-ok">${brl(pg.valor)}</b>${modo === 'individual' && !pg.pilotoId ? `<select class="entrada peq" style="max-width: 170px; height: 28px; font-size: var(--kib-fonte-tamanho-pequeno); padding: 0 6px" aria-label="Vincular pagamento a piloto" data-vincular-pg="${pg.id}"><option value="">Vincular a piloto…</option>${g.pilotos.map((p) => `<option value="${p.id}">${esc(nomeBonito(p.nome) || 'Piloto ' + p.ordem)}</option>`).join('')}</select>` : ''}${pg.origem === 'manual' ? `<button class="btn peq" style="background: transparent; color: var(--erroTxt)" data-estornar="${pg.id}">Estornar</button>` : ''}</div>`).join('') || '<span class="peq" style="color: var(--kib-cor-texto-secundario);">Nenhum pagamento ainda.</span>'}
             ${g.falta && g.pilotos.filter((p) => !p.pago).length > 1 && modo === 'individual' ? `<button type="button" class="btn sec peq" data-todos-pagos="1" style="width: fit-content; display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;" title="Registra de uma vez o pagamento de todos que faltam">${svg(IC.ok, 13, 'currentColor')} Marcar todos como pagos</button>` : ''}
             <details class="maisOpcoes" ${estado.reg.valor ? 'open' : ''}><summary>Registrar outro valor recebido</summary>
             <div style="display: grid; grid-template-columns: 92px minmax(0, 1fr) 92px; gap: var(--kib-espaco-meio); padding-top: var(--kib-espaco-1)">
               <input class="entrada" style="height: 34px; font-size: var(--kib-fonte-tamanho-corpo)" type="number" min="0" step="0.01" placeholder="R$" aria-label="Valor recebido" data-reg="valor" value="${esc(estado.reg.valor)}">
-              <select class="entrada" style="height: 34px; font-size: var(--kib-fonte-tamanho-pequeno); padding: 0 var(--kib-espaco-meio)" aria-label="Quem pagou" data-reg="quem"><option value="">Grupo (responsável)</option>${g.pilotos.map((p) => `<option value="${p.id}" ${String(estado.reg.quem) === String(p.id) ? 'selected' : ''}>${esc(nomeBonito(p.nome) || 'Piloto ' + p.ordem)}</option>`).join('')}</select>
-              <select class="entrada" style="height: 34px; font-size: var(--kib-fonte-tamanho-pequeno); padding: 0 var(--kib-espaco-meio)" aria-label="Forma" data-reg="forma">${['Pix', 'Cartão', 'Dinheiro'].map((f) => `<option ${estado.reg.forma === f ? 'selected' : ''}>${f}</option>`).join('')}</select>
+              <select class="entrada" style="height: 34px; font-size: var(--kib-fonte-tamanho-pequeno); padding: 0 var(--kib-espaco-meio)" aria-label="Quem pagou" data-reg="quem"><option value="">${modo === 'individual' ? 'Escolha o piloto…' : 'Grupo (responsável)'}</option>${g.pilotos.map((p) => `<option value="${p.id}" ${String(estado.reg.quem) === String(p.id) ? 'selected' : ''}>${esc(nomeBonito(p.nome) || 'Piloto ' + p.ordem)}</option>`).join('')}</select>
+              <select class="entrada" style="height: 34px; font-size: var(--kib-fonte-tamanho-pequeno); padding: 0 var(--kib-espaco-meio)" aria-label="Forma" data-reg="forma">${['Pix', 'Cartão', 'Dinheiro', 'Voucher'].map((f) => `<option ${estado.reg.forma === f ? 'selected' : ''}>${f}</option>`).join('')}</select>
+              ${estado.reg.forma === 'Voucher' ? `<input class="entrada num" style="grid-column: span 3; height: 34px; font-size: 13px; text-transform: uppercase" placeholder="Código do voucher (ex.: KB2KB5NX)" data-reg="voucherCodigo" value="${esc(estado.reg.voucherCodigo || '')}">` : ''}
               <button class="btn escuro peq" style="grid-column: span 3; height: 34px" data-registrar="1">Registrar pagamento</button>
             </div></details></section>
           <details class="secao maisOpcoes"><summary class="titulo t-subtitulo">O que acontece sozinho (totem, Asaas, Recepção, sorteio e cronometragem)</summary>${integra.map(([t, d, st, ok, ic, cor]) => `<div style="display: flex; align-items: flex-start; gap: var(--kib-espaco-1)"><span class="tile" style="width: 28px; height: 28px; border-radius: var(--kib-raio-botao); background: ${cor}">${svg(ic, 14, 'var(--kib-cor-superficie-padrao)')}</span><span class="col" style="gap: 1px; flex-grow: 1"><b>${t}</b><span class="peq" style="line-height: 1.4">${d}</span></span><span class="chip ${ok ? 'verde' : 'laranja'}">${st}</span></div>`).join('')}</details>` : ''}
@@ -785,6 +788,12 @@ const Grupo = (() => {
       else { estado.rasc.sinalPct = v; pintar(); }
       return;
     }
+    if (t.dataset.vincularPg && estado.g) {
+      const pgId = +t.dataset.vincularPg, pilotoId = +t.value;
+      if (!pgId || !pilotoId) return;
+      await atualizar(() => office(`/grupos/${estado.g.id}/pagamentos/${pgId}`, { method: 'PATCH', body: { pilotoId } }), 'Pagamento vinculado ao piloto');
+      return;
+    }
     if (t.dataset.campo && estado.g) {
       const p = estado.g.pilotos[+t.dataset.i]; if (!p || p.responsavel) return;
       let val = t.value;
@@ -921,7 +930,9 @@ const Grupo = (() => {
       try {
         for (const p of faltam) {
           if (!ativo(ctx)) { if (pagosAgora > 0) ctx.aoMudar && ctx.aoMudar(); return; }
-          ctx.g = await office(`/grupos/${g.id}/pagamentos`, { method: 'POST', body: { pilotoId: p.id, valorCentavos: p.falta_centavos, forma: forma.trim() } });
+          const atualP = (ctx.g && ctx.g.pilotos.find((x) => x.id === p.id)) || p;
+          if (atualP.pago || !atualP.falta_centavos) continue;
+          ctx.g = await office(`/grupos/${g.id}/pagamentos`, { method: 'POST', body: { pilotoId: p.id, valorCentavos: atualP.falta_centavos, forma: forma.trim() } });
           pagosAgora++;
         }
         if (!ativo(ctx)) { if (pagosAgora > 0) ctx.aoMudar && ctx.aoMudar(); return; }
@@ -979,6 +990,27 @@ const Grupo = (() => {
       } finally { ctx.ocupado = false; }
       return;
     }
+    if ((x = el('[data-quitar-voucher]'))) {
+      { const d = x.closest('details.menuCobrar'); if (d) d.removeAttribute('open'); }
+      const pid = x.dataset.quitarVoucher ? +x.dataset.quitarVoucher : null;
+      const p = pid ? g.pilotos.find((y) => y.id === pid) : null;
+      const valor = p ? p.falta_centavos : g.falta;
+      if (!valor) return toast('Esta vaga já está paga.');
+      let sugerido = '';
+      try {
+        if (p && p.clienteId) {
+          const vchs = await office('/vouchers/cliente?clienteId=' + p.clienteId);
+          if (vchs.length) sugerido = vchs[0].codigo;
+        }
+      } catch {}
+      const cod = await pedirVoucher(`Quitar vaga de ${esc(p ? (p.nome || 'Piloto ' + p.ordem) : g.responsavel)}`, `Valor da vaga: ${brl(valor)}. Digite o código do voucher:`, sugerido);
+      if (!cod || !ativo(ctx)) return;
+      const recebido = await atualizar(() => office(`/grupos/${g.id}/pagamentos`, {
+        method: 'POST',
+        body: { pilotoId: pid, valorCentavos: valor, forma: 'Voucher', voucherCodigo: cod, idempotencyKey: 'vch_' + g.id + '_' + (pid || 'g') + '_' + Date.now() },
+      }), 'Vaga quitada com voucher');
+      return;
+    }
     if ((x = el('[data-recebi]'))) {
       { const d = x.closest('details.menuCobrar'); if (d) d.removeAttribute('open'); }
       const pid = x.dataset.recebi ? +x.dataset.recebi : null;
@@ -987,20 +1019,39 @@ const Grupo = (() => {
       if (!valor) return toast('Não há valor a receber nesta cobrança.');
       const forma = await escolherForma(`Marcar ${brl(valor)} como pago?`, `${p ? (p.nome || 'Piloto ' + p.ordem) : g.responsavel} pagou por fora. Como foi o pagamento?`);
       if (!forma || !ativo(ctx)) return;
-      const recebido = await atualizar(() => office(`/grupos/${g.id}/pagamentos`, { method: 'POST', body: { pilotoId: pid, valorCentavos: valor, forma: forma.trim() } }));
+      let voucherCodigo = null;
+      if (forma === 'Voucher') {
+        let sugerido = '';
+        try {
+          if (p && p.clienteId) {
+            const vchs = await office('/vouchers/cliente?clienteId=' + p.clienteId);
+            if (vchs.length) sugerido = vchs[0].codigo;
+          }
+        } catch {}
+        voucherCodigo = await pedirVoucher(`Quitar com voucher`, `Digite o código do voucher para ${esc(p ? (p.nome || 'Piloto ' + p.ordem) : g.responsavel)}:`, sugerido);
+        if (!voucherCodigo || !ativo(ctx)) return;
+      }
+      const corpoPg = { pilotoId: pid, valorCentavos: valor, forma: forma.trim(), ...(voucherCodigo ? { voucherCodigo } : {}) };
+      const recebido = await atualizar(() => office(`/grupos/${g.id}/pagamentos`, { method: 'POST', body: corpoPg }));
       if (!recebido) return;
       if (!ativo(ctx)) return;
       { const ult = estado.g && estado.g.pagamentos.slice(-1)[0], gid = g.id; if (ult) toastAcao(`${brl(valor)} registrado · aparece pago na Recepção`, 'Desfazer', async () => { const atualizado = await office(`/grupos/${gid}/pagamentos/${ult.id}`, { method: 'DELETE' }); if (ativo(ctx)) { ctx.g = atualizado; pintar(); ctx.aoMudar && ctx.aoMudar(); } toast('Pagamento desfeito'); }); }
       return;
     }
     if (el('[data-registrar]')) {
+      if (g.modo === 'individual' && !ctx.reg.quem) return toast('Neste grupo cada um paga o seu: escolha de qual piloto é o pagamento.', true);
       const v = Math.round(parseFloat(String(estado.reg.valor).replace(',', '.')) * 100);
       if (!Number.isFinite(v) || v <= 0) return toast('Informe o valor recebido, maior que zero.', true);
       if (v > g.falta && !(await confirmar('Valor maior do que falta receber', `Você digitou ${brl(v)} e faltam ${brl(g.falta)}. Registrar mesmo assim?`, 'Registrar mesmo assim'))) return;
       if (!ativo(ctx)) return;
-      const corpo = { pilotoId: ctx.reg.quem ? +ctx.reg.quem : null, valorCentavos: v, forma: ctx.reg.forma };
+      let vchCod = ctx.reg.voucherCodigo ? String(ctx.reg.voucherCodigo).trim().toUpperCase() : null;
+      if (ctx.reg.forma === 'Voucher' && !vchCod) {
+        vchCod = await pedirVoucher('Código do voucher', 'Digite o código do voucher:');
+        if (!vchCod || !ativo(ctx)) return;
+      }
+      const corpo = { pilotoId: ctx.reg.quem ? +ctx.reg.quem : null, valorCentavos: v, forma: ctx.reg.forma, ...(vchCod ? { voucherCodigo: vchCod } : {}) };
       if (!await atualizar(() => office(`/grupos/${g.id}/pagamentos`, { method: 'POST', body: corpo }), `${brl(v)} registrado`)) return;
-      if (!ativo(ctx)) return; estado.reg = { valor: '', quem: '', forma: 'Pix' }; pintar();
+      if (!ativo(ctx)) return; estado.reg = { valor: '', quem: '', forma: 'Pix', voucherCodigo: '' }; pintar();
       return;
     }
     if ((x = el('[data-estornar]'))) {

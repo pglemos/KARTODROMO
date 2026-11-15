@@ -14,6 +14,7 @@ import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { precoPrimeiraVezDoGrupo, reservarCupomDoLink } from './reserva-online';
 import { insertCliente, one, onlyDigits, query, tx, type ClienteInput } from './db';
 import { HttpError, cancelarReserva, exigePodeFecharBateria, exigePermissaoOffice, inscreverN, moverReservas } from './office';
+import { avaliarElegibilidadeVoucher, normalizarDocVoucher, vouchersDisponiveisParaCliente } from './vouchers';
 import type { Sessao } from './auth';
 import { ANIVERSARIO_MIN_CONVIDADOS, ANIVERSARIO_PRECO_PADRAO } from './eventos-schema';
 
@@ -154,6 +155,7 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
   const idsAtivos = new Set(ativos.map((p) => Number(p.id)));
   const pagamentosAtivos = pagamentos.filter((pg) => !pg.pilotoId || idsAtivos.has(Number(pg.pilotoId)));
   const unico = g.modo === 'unico';
+  const individual = g.modo === 'individual';
   let doGrupo = 0;
   const porPiloto = new Map<number, number>();
   for (const pg of pagamentosAtivos) {
@@ -166,14 +168,17 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
   const precoDe = (p: Linha) => (p.precoProprio != null && Number(p.precoProprio) > 0 ? Number(p.precoProprio) : precoDoPiloto(g, Boolean(p.responsavel), n));
   const fora_ = (p: Linha) => Boolean(p.inscricaoPaga && !p.pagoPeloGrupo);
   const pagosForaValor = ativos.filter(fora_).reduce((a, p) => a + precoDe(p), 0);
-  // o pagamento "do grupo" se divide proporcionalmente ao preço de cada vaga (a do aniversariante custa menos)
+  // o pagamento "do grupo" (modos unico/sinal) se divide proporcionalmente ao preço de cada vaga (a do aniversariante custa menos).
+  // No modo "individual" ("cada um paga o seu"), um pagamento sem PilotoId NUNCA pode ser rateado entre os pilotos
+  // (caso contrário dilui cada vaga em centavos quebrados, ex.: R$ 145,00 -> R$ 140,91).
+  const doGrupoRateado = individual ? 0 : doGrupo;
   const somaRestantes = ativos.filter((p) => !fora_(p)).reduce((a, p) => a + precoDe(p), 0);
   const restantes = Math.max(1, ativos.filter((p) => !fora_(p)).length);
   const pagoPainel = pagamentosAtivos.reduce((a, pg) => a + (Number(pg.valor) || 0), 0);
   const lista = ativos.map((p) => {
     const fora = fora_(p);
     const precoP = precoDe(p);
-    const parteDoGrupo = somaRestantes > 0 ? doGrupo * precoP / somaRestantes : doGrupo / restantes;
+    const parteDoGrupo = somaRestantes > 0 ? doGrupoRateado * precoP / somaRestantes : doGrupoRateado / restantes;
     const dela = fora ? precoP : (porPiloto.get(Number(p.id)) ?? 0) + parteDoGrupo;
     const ok = precoP <= 0 || dela >= precoP - 0.5;
     const cliente = p.documento !== undefined && (p.clienteId || p.responsavel) ? { documento: p.documento, email: p.email, peso: p.peso, telefone: p.clienteTelefone } : null;
@@ -193,7 +198,8 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
     };
   });
   const total = lista.reduce((a, p) => a + p.preco, 0);
-  const pago = Math.min(total, pagoPainel + pagosForaValor);
+  const faltaCalculada = individual ? lista.reduce((a, p) => a + p.falta_centavos, 0) : Math.max(0, total - Math.min(total, pagoPainel + pagosForaValor));
+  const pago = individual ? Math.max(0, total - faltaCalculada) : Math.min(total, pagoPainel + pagosForaValor);
   const convidados = Math.max(0, n - 1);
   const promocao = g.aniversario ? {
     ativa: convidados >= ANIVERSARIO_MIN_CONVIDADOS, convidados, minimo: ANIVERSARIO_MIN_CONVIDADOS,
@@ -205,7 +211,7 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
     ...g, linkGrupo: responsavel?.token ? linkCadastro(String(responsavel.token)) : null, linkPainel: linkPainel(String(g.codigo)), pilotos: lista, pagamentos: pagamentos.map((pg) => {
       const p = pilotos.find((p) => Number(p.id) === Number(pg.pilotoId));
       return { ...pg, pilotoNome: p ? nomeDaVaga(p) : null, pilotoCancelado: p?.inscricaoStatus === 'cancelada' };
-    }), n, total, pago, falta: Math.max(0, total - pago), sinal, aniversario: Boolean(g.aniversario), campeonato: Boolean(g.campeonato), promocao,
+    }), n, total, pago, falta: faltaCalculada, pagamentosSemPiloto: individual ? doGrupo : 0, sinal, aniversario: Boolean(g.aniversario), campeonato: Boolean(g.campeonato), promocao,
     pagos: lista.filter((p) => p.pago).length, cadastrados: lista.filter((p) => p.cadastro === 'completo').length,
     prontos: lista.filter((p) => p.pago && p.cadastro === 'completo').length,
     cobrancaGrupo: cobrancas.find((c) => !c.pilotoId && c.status === 'aguardando') ?? null,
@@ -483,6 +489,7 @@ async function site(caminho: string, init: RequestInit = {}) {
 
 async function criarCobranca(grupoId: number, pilotoId: number | null) {
   const g = await grupo(grupoId);
+  if (!pilotoId && g.modo === 'individual') throw new HttpError(400, 'Neste grupo cada um paga o seu: escolha de qual piloto é a cobrança.');
   const p = pilotoId ? g.pilotos.find((x) => x.id === pilotoId) : null;
   if (pilotoId && !p) throw new HttpError(404, 'Piloto não encontrado no grupo.');
   const valor = p ? p.falta_centavos : g.modo === 'sinal' ? Math.max(0, g.sinal - g.pago) : g.falta;
@@ -594,6 +601,63 @@ function conferirEmSegundoPlano(id: number): void {
   void puxarPagamentosDiretoDoAsaas(console.log, id, true).catch(() => 0);
 }
 
+/** Resolve grupo e piloto de um pagamento Asaas a partir de cobrança salva, externalReference ou descrição. */
+async function resolverGrupoEPilotoAsaas(asaasId: string, externalReference?: string | null, description?: string | null) {
+  let gid: number | null = null;
+  let pid: number | null = null;
+  let modo: string | null = null;
+
+  const mNum = String(externalReference ?? '').match(/^grupo-(\d+)-(\d+|g)$/);
+  if (mNum) {
+    gid = Number(mNum[1]);
+    pid = mNum[2] === 'g' ? null : Number(mNum[2]);
+  } else {
+    const mCod = String(externalReference ?? '').match(/^grupo-([A-Z0-9]{8})-(.+)$/);
+    if (mCod) {
+      const grp = await one<{ Id: number; Modo: string }>(`SELECT Id, Modo FROM dbo.ReservaGrupo WHERE Codigo = @c`, { c: mCod[1] });
+      if (grp) {
+        gid = Number(grp.Id);
+        modo = grp.Modo;
+        const cpfDig = onlyDigits(mCod[2]);
+        if (cpfDig.length >= 11) {
+          const pil = await one<{ Id: number }>(
+            `SELECT TOP 1 p.Id
+               FROM dbo.ReservaGrupoPiloto p
+               JOIN dbo.ReservaGrupo rg ON rg.Id = p.GrupoId
+               JOIN dbo.Cliente c ON c.Id = COALESCE(p.ClienteId, CASE WHEN p.Responsavel = 1 THEN rg.ResponsavelId END)
+               LEFT JOIN dbo.Inscricao i ON i.Id = p.InscricaoId
+              WHERE p.GrupoId = @g AND (c.DocumentoNum = @cpf OR c.Documento LIKE '%' + @cpf + '%')
+              ORDER BY CASE WHEN i.Status IS NULL OR i.Status <> 'cancelada' THEN 0 ELSE 1 END, p.Responsavel DESC, p.Ordem`,
+            { g: gid, cpf: cpfDig },
+          );
+          if (pil) pid = Number(pil.Id);
+        }
+      }
+    } else if (description) {
+      const mDesc = String(description).match(/\breserva\s+(G[A-Z0-9]{7})\b/i);
+      if (mDesc) {
+        const grp = await one<{ Id: number; Modo: string }>(`SELECT Id, Modo FROM dbo.ReservaGrupo WHERE Codigo = @c`, { c: mDesc[1] });
+        if (grp) {
+          gid = Number(grp.Id);
+          modo = grp.Modo;
+        }
+      }
+    }
+  }
+
+  // a cobrança do piloto manda: o CPF da referência pode não bater (piloto ainda sem cadastro ligado)
+  const cobDoPiloto = await pilotoDaCobranca(asaasId);
+  if (cobDoPiloto) {
+    gid = cobDoPiloto.grupoId;
+    pid = cobDoPiloto.pilotoId ?? pid;
+  }
+  if (gid && !modo) {
+    const grp = await one<{ Modo: string }>(`SELECT Modo FROM dbo.ReservaGrupo WHERE Id = @g`, { g: gid });
+    modo = grp?.Modo ?? null;
+  }
+  return { gid, pid, modo };
+}
+
 /** Puxa pagamentos recebidos diretamente da API do Asaas e notificações de webhook. */
 export async function puxarPagamentosDiretoDoAsaas(log: Log, grupoId?: number, soWebhook = false): Promise<number> {
   if (!siteUrl() || !siteChave()) return 0;
@@ -615,42 +679,35 @@ export async function puxarPagamentosDiretoDoAsaas(log: Log, grupoId?: number, s
           continue;
         }
 
-        let gid: number | null = null;
-        let pid: number | null = null;
+        const valorCentavos = Math.round(Number(n.value) * 100);
+        if (!Number.isFinite(valorCentavos) || (valorCentavos <= 0 && n.billingType !== 'VOUCHER')) continue;
 
-        const mNum = String(n.externalReference).match(/^grupo-(\d+)-(\d+|g)$/);
-        if (mNum) {
-          gid = Number(mNum[1]);
-          pid = mNum[2] === 'g' ? null : Number(mNum[2]);
-        } else {
-          const mCod = String(n.externalReference).match(/^grupo-([A-Z0-9]{8})-(.+)$/);
-          if (mCod) {
-            const [grp] = await query<{ Id: number }>(`SELECT Id FROM dbo.ReservaGrupo WHERE Codigo = @c`, { c: mCod[1] });
-            if (grp) {
-              gid = grp.Id;
-              const cpfDig = onlyDigits(mCod[2]);
-              if (cpfDig.length >= 11) {
-                const [pil] = await query<{ Id: number }>(
-                  `SELECT p.Id FROM dbo.ReservaGrupoPiloto p JOIN dbo.Cliente c ON c.Id = p.ClienteId WHERE p.GrupoId = @g AND (c.DocumentoNum = @cpf OR c.Documento LIKE '%' + @cpf + '%')`,
-                  { g: gid, cpf: cpfDig },
-                );
-                if (pil) pid = pil.Id;
+        const { gid, pid, modo } = await resolverGrupoEPilotoAsaas(n.asaasId, n.externalReference);
+        if (gid) {
+          const isVoucher = n.billingType === 'VOUCHER';
+          const forma = isVoucher ? 'Voucher' : n.billingType === 'PIX' ? 'Pix (Asaas)' : n.billingType === 'CREDIT_CARD' ? 'Cartão (Asaas)' : 'Asaas';
+          if (modo === 'individual' && !pid) {
+            log(`grupo ${gid}: aviso — pagamento webhook ${n.asaasId} sem piloto vinculado no modo individual (não será rateado)`);
+          }
+          await query(
+            `INSERT INTO dbo.ReservaGrupoPagamento (GrupoId, PilotoId, ValorCentavos, Forma, Origem, AsaasId) VALUES (@g, @p, @v, @f, @origem, @a)`,
+            { g: gid, p: pid, v: valorCentavos, f: forma, origem: isVoucher ? 'voucher' : 'asaas', a: n.asaasId },
+          );
+          if (isVoucher && (n as Record<string, unknown>).cupom) {
+            const codCupom = String((n as Record<string, unknown>).cupom).trim().toUpperCase();
+            const [vch] = await query<{ Id: number }>(`SELECT Id FROM dbo.Voucher WHERE Codigo = @c`, { c: codCupom });
+            if (vch && pid) {
+              const [pil] = await query<{ ClienteId: number | null; InscricaoId: number | null }>(`SELECT ClienteId, InscricaoId FROM dbo.ReservaGrupoPiloto WHERE Id = @pid`, { pid });
+              await query(
+                `INSERT INTO dbo.ReservaGrupoVoucherUso (AsaasId, GrupoId, PilotoId, VoucherId, ClienteId, DescontoCentavos, Estado)
+                 VALUES (@a, @g, @p, @vid, @cid, @d, 'consumido')`,
+                { a: n.asaasId, g: gid, p: pid, vid: vch.Id, cid: pil?.ClienteId ?? null, d: valorCentavos },
+              ).catch(() => undefined);
+              if (pil?.InscricaoId) {
+                await query(`UPDATE dbo.Inscricao SET VoucherId = @vid WHERE Id = @insId`, { vid: vch.Id, insId: pil.InscricaoId }).catch(() => undefined);
               }
             }
           }
-        }
-
-        // a cobrança do piloto manda: o CPF da referência pode não bater (piloto ainda sem cadastro ligado)
-        // e o pagamento caía como "do grupo", dividido entre todos (12/11/2026: "pagou R$ 29 · falta R$ 116")
-        const cobDoPiloto = await pilotoDaCobranca(n.asaasId);
-        if (cobDoPiloto) { gid = cobDoPiloto.grupoId; pid = cobDoPiloto.pilotoId ?? pid; }
-        if (gid) {
-          const valorCentavos = Math.round(Number(n.value ?? 145) * 100);
-          const forma = n.billingType === 'PIX' ? 'Pix (Asaas)' : n.billingType === 'CREDIT_CARD' ? 'Cartão (Asaas)' : 'Asaas';
-          await query(
-            `INSERT INTO dbo.ReservaGrupoPagamento (GrupoId, PilotoId, ValorCentavos, Forma, Origem, AsaasId) VALUES (@g, @p, @v, @f, 'asaas', @a)`,
-            { g: gid, p: pid, v: valorCentavos, f: forma, a: n.asaasId },
-          );
           await query(`UPDATE dbo.ReservaGrupoCobranca SET Status = 'pago', PagoEm = SYSDATETIME() WHERE AsaasId = @a AND Status = 'aguardando'`, { a: n.asaasId });
           gruposAfetados.add(gid);
           novos++;
@@ -698,44 +755,16 @@ export async function puxarPagamentosDiretoDoAsaas(log: Log, grupoId?: number, s
           continue;
         }
 
-        // Bate por externalReference grupo-ID-PILOTO ou grupo-CODIGO-CPF
-        let gid: number | null = null;
-        let pid: number | null = null;
-        const mNum = String(p.externalReference ?? '').match(/^grupo-(\d+)-(\d+|g)$/);
-        if (mNum) {
-          gid = Number(mNum[1]);
-          pid = mNum[2] === 'g' ? null : Number(mNum[2]);
-        } else {
-          const mCod = String(p.externalReference ?? '').match(/^grupo-([A-Z0-9]{8})-(.+)$/);
-          if (mCod) {
-            const [grp] = await query<{ Id: number }>(`SELECT Id FROM dbo.ReservaGrupo WHERE Codigo = @c`, { c: mCod[1] });
-            if (grp) {
-              gid = grp.Id;
-              const cpfDig = onlyDigits(mCod[2]);
-              if (cpfDig.length >= 11) {
-                const [pil] = await query<{ Id: number }>(
-                  `SELECT p.Id FROM dbo.ReservaGrupoPiloto p JOIN dbo.Cliente c ON c.Id = p.ClienteId WHERE p.GrupoId = @g AND (c.DocumentoNum = @cpf OR c.Documento LIKE '%' + @cpf + '%')`,
-                  { g: gid, cpf: cpfDig },
-                );
-                if (pil) pid = pil.Id;
-              }
-            }
-          } else {
-            const mDesc = String(p.description ?? '').match(/\breserva\s+(G[A-Z0-9]{7})\b/i);
-            if (mDesc) {
-              const [grp] = await query<{ Id: number }>(`SELECT Id FROM dbo.ReservaGrupo WHERE Codigo = @c`, { c: mDesc[1] });
-              if (grp) gid = grp.Id;
-            }
-          }
-        }
+        const valorCentavos = Math.round(Number(p.value) * 100);
+        if (!Number.isFinite(valorCentavos) || valorCentavos <= 0) continue;
 
-        const cobDoPiloto = await pilotoDaCobranca(p.id);
-        if (cobDoPiloto) { gid = cobDoPiloto.grupoId; pid = cobDoPiloto.pilotoId ?? pid; }
+        const { gid, pid, modo } = await resolverGrupoEPilotoAsaas(p.id, p.externalReference, p.description);
         if (gid) {
           if (grupoId && gid !== grupoId) continue;
-
-          const valorCentavos = Math.round(Number(p.value) * 100);
           const forma = p.billingType === 'PIX' ? 'Pix (Asaas)' : p.billingType === 'CREDIT_CARD' ? 'Cartão (Asaas)' : 'Asaas';
+          if (modo === 'individual' && !pid) {
+            log(`grupo ${gid}: aviso — pagamento Asaas ${p.id} sem piloto vinculado no modo individual (não será rateado)`);
+          }
           await query(
             `INSERT INTO dbo.ReservaGrupoPagamento (GrupoId, PilotoId, ValorCentavos, Forma, Origem, AsaasId) VALUES (@g, @p, @v, @f, 'asaas', @a)`,
             { g: gid, p: pid, v: valorCentavos, f: forma, a: p.id },
@@ -1243,22 +1272,112 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     if (pilotoId && !g.pilotos.some((p) => p.id === pilotoId)) throw new HttpError(404, 'Piloto não encontrado no grupo.');
     // "cada um paga o seu": recebimento sem piloto era dividido entre todos e mostrava "pagou R$ 29 · falta R$ 116" (12/11/2026)
     if (!pilotoId && g.modo === 'individual') throw new HttpError(400, 'Neste grupo cada um paga o seu: escolha de qual piloto é o pagamento.');
-    const valor = cents(b.valorCentavos, 'Valor recebido');
     const forma = txt(b.forma, 40) ?? 'Pix';
+    const isVoucher = forma.toLowerCase() === 'voucher' || Boolean(b.voucherCodigo);
+    let valor = isVoucher && b.valorCentavos == null
+      ? (pilotoId ? (g.pilotos.find((p) => p.id === pilotoId)?.falta_centavos ?? 0) : g.falta)
+      : cents(b.valorCentavos, 'Valor recebido');
+
+    let voucherAplicado: { id: number; codigo: string; descontoCentavos: number } | null = null;
+    let pilDb: { clienteId: number | null; doc: string | null; inscricaoId: number | null } | null = null;
+
+    if (isVoucher) {
+      if (pilotoId) {
+        const [row] = await query<{ clienteId: number | null; doc: string | null; inscricaoId: number | null }>(
+          `SELECT p.ClienteId clienteId, COALESCE(c.DocumentoNum, c.Documento) doc, p.InscricaoId inscricaoId
+           FROM dbo.ReservaGrupoPiloto p
+           LEFT JOIN dbo.Cliente c ON c.Id = p.ClienteId
+           WHERE p.Id = @pid`,
+          { pid: pilotoId },
+        );
+        pilDb = row ?? null;
+      }
+      let codVch = String(b.voucherCodigo ?? '').trim().toUpperCase();
+      if (!codVch && pilDb && (pilDb.clienteId || pilDb.doc)) {
+        const disponiveis = await vouchersDisponiveisParaCliente({ clienteId: pilDb.clienteId, documento: pilDb.doc });
+        if (disponiveis.length) codVch = disponiveis[0].codigo;
+      }
+      if (!codVch) throw new HttpError(400, 'Informe o código do voucher.');
+      const [v] = await query<{
+        Id: number; Codigo: string; Tipo: string; Valor: number; Ativo: boolean;
+        InicioEm: string; FimEm: string; DescontoMaximoCentavos: number | null; PedidoMinimoCentavos: number | null;
+        UsoUnico: boolean | number; UsoMaxTotal: number | null; UsoMaxCliente: number; RestritoClientes: boolean | number;
+      }>(`SELECT * FROM dbo.Voucher WHERE Codigo = @c`, { c: codVch });
+      if (!v || !v.Ativo) throw new HttpError(400, 'Voucher não encontrado ou inativo.');
+      const hoje = new Date().toISOString().slice(0, 10);
+      if (String(v.InicioEm).slice(0, 10) > hoje || String(v.FimEm).slice(0, 10) < hoje) throw new HttpError(400, 'Voucher expirado.');
+
+      const usosTotaisRow = await one<{ n: number; doCli: number }>(
+        `SELECT
+          (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @vid AND Estornado = 0)
+          + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @vid AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+          + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @vid AND Estado IN ('reservado', 'consumido')) n,
+          (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @vid AND ClienteId = @cid AND Estornado = 0)
+          + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @vid AND ClienteId = @cid AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+          + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @vid AND ClienteId = @cid AND Estado IN ('reservado', 'consumido')) doCli`,
+        { vid: v.Id, cid: pilDb?.clienteId ?? null },
+      );
+
+      const eleg = await avaliarElegibilidadeVoucher({
+        voucherId: v.Id,
+        usoUnico: Boolean(v.UsoUnico),
+        usoMaxTotal: v.UsoMaxTotal == null ? null : Number(v.UsoMaxTotal),
+        usoMaxCliente: Number(v.UsoMaxCliente ?? 1),
+        restritoClientes: Boolean(v.RestritoClientes),
+        usosTotais: Number(usosTotaisRow?.n ?? 0),
+        usosClienteDirecto: Number(usosTotaisRow?.doCli ?? 0),
+        clienteId: pilDb?.clienteId ?? null,
+        documento: pilDb?.doc ?? null,
+      });
+      if (!eleg.ok) throw new HttpError(400, eleg.motivo);
+
+      let d = v.Tipo === 'percentual'
+        ? Math.round((valor * Number(v.Valor)) / 100)
+        : Number(v.Valor);
+      if (v.DescontoMaximoCentavos) d = Math.min(d, Number(v.DescontoMaximoCentavos));
+      d = Math.min(valor, d);
+      voucherAplicado = { id: v.Id, codigo: v.Codigo, descontoCentavos: d };
+    }
+
     await tx(async (run) => {
       const [ativo] = await run(`SELECT Id FROM dbo.ReservaGrupo WITH (UPDLOCK, HOLDLOCK) WHERE Id = @g AND Status = 'ativa'`, { g: id });
       if (!ativo) throw new HttpError(409, 'Esta reserva não está ativa.');
       const [anterior] = await run(`SELECT PilotoId pilotoId, ValorCentavos valor, Forma forma, Cancelado cancelado FROM dbo.ReservaGrupoPagamento WHERE GrupoId = @g AND IdempotencyKey = @key`, { g: id, key });
       if (anterior) {
-        if (anterior.cancelado || Number(anterior.valor) !== valor || (anterior.pilotoId ?? null) !== pilotoId || anterior.forma !== forma)
+        if (anterior.cancelado || Number(anterior.valor) !== valor || (anterior.pilotoId ?? null) !== pilotoId || anterior.forma !== (isVoucher ? 'Voucher' : forma))
           throw new HttpError(409, 'Esta chave já pertence a outro recebimento.');
         return;
       }
       await run(`INSERT INTO dbo.ReservaGrupoPagamento (GrupoId, PilotoId, ValorCentavos, Forma, Origem, UsuarioId, IdempotencyKey)
-        VALUES (@g, @p, @v, @f, 'manual', @u, @key)`, { g: id, p: pilotoId, v: valor, f: forma, u: sessao.uid, key });
+        VALUES (@g, @p, @v, @f, 'manual', @u, @key)`, { g: id, p: pilotoId, v: valor, f: isVoucher ? 'Voucher' : forma, u: sessao.uid, key });
+
+      if (voucherAplicado) {
+        await run(
+          `INSERT INTO dbo.ReservaGrupoVoucherUso (GrupoId, PilotoId, VoucherId, ClienteId, DescontoCentavos, Estado)
+           VALUES (@g, @p, @vid, @cid, @d, 'consumido')`,
+          { g: id, p: pilotoId, vid: voucherAplicado.id, cid: pilDb?.clienteId ?? null, d: voucherAplicado.descontoCentavos },
+        );
+        if (pilDb?.inscricaoId) {
+          await run(`UPDATE dbo.Inscricao SET VoucherId = @vid WHERE Id = @insId`, { vid: voucherAplicado.id, insId: pilDb.inscricaoId });
+        }
+      }
     });
     await aplicarPagos(id);
     send(201, await grupo(id));
+    return true;
+  }
+
+  if ((m = path.match(/^\/grupos\/(\d+)\/pagamentos\/(\d+)$/)) && method === 'PATCH') {
+    const id = Number(m[1]), pgId = Number(m[2]);
+    const b = await req.body();
+    const g = await grupo(id);
+    const pilotoId = b.pilotoId ? int(b.pilotoId, 'Piloto') : null;
+    if (!pilotoId && g.modo === 'individual') throw new HttpError(400, 'Neste grupo cada um paga o seu: escolha a qual piloto vincular.');
+    if (pilotoId && !g.pilotos.some((p) => p.id === pilotoId)) throw new HttpError(404, 'Piloto não encontrado no grupo.');
+    const r = await one<{ Id: number }>(`UPDATE dbo.ReservaGrupoPagamento SET PilotoId = @p OUTPUT inserted.Id WHERE Id = @pg AND GrupoId = @g AND Cancelado = 0`, { p: pilotoId, pg: pgId, g: id });
+    if (!r) throw new HttpError(404, 'Pagamento não encontrado neste grupo.');
+    await aplicarPagos(id);
+    send(200, await grupo(id));
     return true;
   }
 

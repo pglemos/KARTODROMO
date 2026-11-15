@@ -357,12 +357,16 @@ export async function avaliarElegibilidadeVoucher(opts: {
     if (usosPessoa >= limitePessoa) {
       return { ok: false, motivo: `${matched.nome} já utilizou o máximo permitido (${limitePessoa} uso${limitePessoa > 1 ? 's' : ''}) deste voucher.`, esgotado: true };
     }
+    const saldoGlobal = usoMaxTotal != null && Number(usoMaxTotal) > 0 ? Math.max(0, Number(usoMaxTotal) - usosTotais) : null;
+    const restantesEfetivos = saldoGlobal != null
+      ? Math.min(Math.max(0, limitePessoa - usosPessoa), saldoGlobal)
+      : Math.max(0, limitePessoa - usosPessoa);
     return {
       ok: true,
       matchedVcId: matched.id,
       autoLinkClienteId: !matched.clienteId && clienteId ? Number(clienteId) : null,
       beneficiarioNome: matched.nome,
-      restantesPessoa: Math.max(0, limitePessoa - usosPessoa),
+      restantesPessoa: restantesEfetivos,
     };
   }
 
@@ -472,6 +476,12 @@ export async function vouchersDisponiveisParaCliente(params: {
     const usosFeitos = Number(usosPessoaRow?.n ?? 0);
     const usosMax = Math.max(1, Number(r.vcUsosMax ?? r.usoMaxCliente ?? 1));
     if (usosFeitos >= usosMax) continue;
+
+    const saldoGlobal = limiteTotal !== null ? Math.max(0, limiteTotal - usosTotais) : null;
+    const restantesPessoa = saldoGlobal !== null
+      ? Math.min(Math.max(0, usosMax - usosFeitos), saldoGlobal)
+      : Math.max(0, usosMax - usosFeitos);
+    if (restantesPessoa <= 0) continue;
 
     out.push({
       id: Number(r.id),

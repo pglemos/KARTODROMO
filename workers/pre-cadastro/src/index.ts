@@ -194,9 +194,11 @@ async function precoDaVaga(env: Env, token: string, cpf: string, g: Omit<GrupoDo
     const j = (await r.json()) as { precoCentavos?: number; cupom?: { codigo?: string; descontoCentavos?: number } | null; erroCupom?: string };
     const v = Math.round(Number(j.precoCentavos));
     if (!(v >= 0 && v <= cheio)) return { valor: valorAniv, cupom: null };
-    // a Asaas não cobra R$ 0: cupom que zera a vaga é usado na recepção
-    if (v === 0) return { valor: valorAniv, cupom: null, erroCupom: 'Este cupom cobre a vaga toda: use-o na recepção. Aqui a vaga ficou sem cupom.' };
     const cup = j.cupom && /^[A-Z0-9_-]{1,40}$/.test(String(j.cupom.codigo)) ? { codigo: String(j.cupom.codigo), descontoCentavos: Math.round(Number(j.cupom.descontoCentavos) || 0) } : null;
+    // Se o cupom cobrir a vaga toda (100% de desconto), quita a vaga sem gerar cobrança financeira
+    if (v === 0 && cup) {
+      return { valor: 0, cupom: cup };
+    }
     const valorFinal = cup ? v : Math.min(v, valorAniv);
     return { valor: valorFinal, cupom: cup, ...(j.erroCupom ? { erroCupom: String(j.erroCupom).slice(0, 160) } : {}) };
   } catch { return { valor: valorAniv, cupom: null, ...(cupom ? { erroCupom: 'Não deu para conferir o cupom agora. A vaga ficou sem cupom.' } : {}) }; }
@@ -208,6 +210,22 @@ async function cobrancaDoLink(env: Env, token: string, chave: string, d: PreCada
   const preco = await precoDaVaga(env, token, d.documento, g, cupom);
   const valor = preco.valor;
   const extra = { cupom: preco.cupom, ...(preco.erroCupom ? { erroCupom: preco.erroCupom } : {}) };
+
+  // Vaga quitada integralmente por voucher (desconto de 100%): confirma direto sem cobrança Asaas
+  if (valor === 0 && preco.cupom) {
+    const payId = `pay_voucher_${token}_${chave}`;
+    const r: CobrancaDoLink = { id: payId, link: '', valorCentavos: 0, pago: true, ...extra };
+    await env.PRE.put(k, JSON.stringify(r), { httpMetadata: { contentType: 'application/json' } });
+    await env.PRE.put(`grupos/pagos/${payId}.json`, JSON.stringify({
+      asaasId: payId,
+      externalReference: `grupo-${g.codigo}-${chave}`,
+      billingType: 'VOUCHER',
+      value: 0,
+      pagoEm: new Date().toISOString(),
+      cupom: preco.cupom.codigo,
+    }));
+    return r;
+  }
   const antiga = await env.PRE.get(k);
   if (antiga) {
     const a = await antiga.json<CobrancaDoLink>();
