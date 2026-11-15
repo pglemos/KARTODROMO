@@ -9,11 +9,26 @@ const Grupo = (() => {
     ['sinal', 'Sinal agora, resto na recepção', 'O responsável paga uma parte e cada um acerta o resto ao chegar.'],
   ];
   const ORIGENS = [['whatsapp', 'WhatsApp'], ['instagram', 'Instagram'], ['telefone', 'Telefone'], ['site', 'Site'], ['recepcao', 'Recepção']];
-  // pagamento antecipado (WhatsApp, Instagram, telefone, site) = R$ 145; no balcão vale o preço da bateria (R$ 175)
+  // pagamento antecipado padrão = R$ 145; no balcão (ou bateria promocional como Happy Hour R$ 99,90) vale o menor preço da bateria
   const PRECO_ANTECIPADO = 14500;
+  const HAPPY_NORMAL = 9990;
+  const HAPPY_PRIMEIRA_VEZ = 8990;
+  const ehHH = (b) => (typeof ehHappyHour === 'function' ? ehHappyHour(b) : (+(b && b.produtoId) === 67 || /happy\s*hour/i.test(String((b && b.produto) || ''))));
+  const durBatDe = (b) => {
+    if (typeof duracaoBat === 'function') return duracaoBat(b);
+    const m = +(b && b.duracaoMin);
+    if (Number.isFinite(m) && m > 0) return m;
+    const tx = /\b(\d+)\s*MIN\b/i.exec(String((b && b.produto) || ''));
+    return tx ? +tx[1] : (+(b && b.produtoId) === 67 ? 15 : 35);
+  };
   const lembrado = (k, validos, padrao) => { try { const v = localStorage.getItem('kib-grupo-' + k); return validos.includes(v) ? v : padrao; } catch (e) { return padrao; } };
   const lembrar = (k, v) => { try { localStorage.setItem('kib-grupo-' + k, v); } catch (e) { /* sem armazenamento: segue sem lembrar */ } };
-  const precoPara = (origem, b) => (origem === 'recepcao' ? (+b.preco || PRECO_ANTECIPADO) : PRECO_ANTECIPADO);
+  const precoPara = (origem, b) => {
+    const pb = +(b && b.preco) || 0;
+    if (origem === 'recepcao') return pb || PRECO_ANTECIPADO;
+    if (ehHH(b)) return pb > 0 ? Math.min(pb, PRECO_ANTECIPADO) : HAPPY_NORMAL;
+    return pb > 0 ? Math.min(pb, PRECO_ANTECIPADO) : PRECO_ANTECIPADO;
+  };
   const nomeBonito = (n) => String(n || '').split(/\s+/).filter((t) => /[\p{L}\p{N}]/u.test(t)).join(' ').toLowerCase().replace(/(^|[\s'\(\[\-])([\p{L}])/gu, (_, a, b) => a + b.toUpperCase()).replace(/\s(Da|De|Do|Das|Dos|E)(?=\s)/g, (x) => x.toLowerCase());
   const formatarTelefone = (v) => {
     let d = String(v || '').replace(/\D/g, '');
@@ -97,9 +112,10 @@ const Grupo = (() => {
   function nova(b, aoMudar, qtd, voltar, rascAnt) {
     let recuperado = false;
     if (!rascAnt) { rascAnt = lerRascunho(b); recuperado = !!rascAnt; if (rascAnt) qtd = rascAnt.pilotos.length; }
+    if (rascAnt && !rascAnt.precoManual) rascAnt = { ...rascAnt, preco: precoPara(rascAnt.origem || 'whatsapp', b) };
     const n = Math.min(qtd || 2, Math.max(1, +b.disponiveis || 1));
     estado = {
-      b, g: null, aoMudar, voltar, reg: { valor: '', quem: '', forma: 'Pix' }, enviarAgora: true, busca: '', achados: [],
+      b, g: null, aoMudar, voltar, reg: { valor: '', quem: '', forma: 'Pix' }, enviarAgora: true, pagAberto: ehHH(b), busca: '', achados: [],
       rasc: rascAnt ? { ...rascAnt, pilotos: Array.from({ length: n }, (_, i) => rascAnt.pilotos[i] || { nome: '', telefone: '', menor: false }) } : { responsavel: null, origem: lembrado('origem', ORIGENS.map((o) => o[0]), 'whatsapp'), modo: lembrado('modo', MODOS.map((m) => m[0]), 'individual'), preco: precoPara(lembrado('origem', ORIGENS.map((o) => o[0]), 'whatsapp'), b), precoManual: false, sinalPct: 30, pilotos: Array.from({ length: n }, () => ({ nome: '', telefone: '', menor: false })) },
     };
     estado.janela = modal('', 'Nova reserva'); estado.janela.style.maxWidth = '1140px';
@@ -329,6 +345,9 @@ const Grupo = (() => {
     const preco = novo ? rasc.preco : g.preco;
     const sinalPct = novo ? rasc.sinalPct : g.sinalPct;
     const aniv = novo ? !!rasc.aniversario : !!g.aniversario;
+    const isHappy = ehHH(b) || ehHH(g);
+    const durMin = durBatDe(b || g);
+    const podeTrocarPreco = novo || (!((g.pagamentos || []).length) && !g.pago && !g.cobrancaGrupo && !(g.pilotos || []).some((p) => p.pago));
     const nAniv = novo ? rasc.pilotos.length : g.n;
     const convidadosAniv = Math.max(0, nAniv - 1), promoOk = aniv && convidadosAniv >= ANIV_MIN;
     const max = Math.max(0, +(novo ? b.disponiveis : g.disponiveis) || 0) + (novo ? 0 : g.n);
@@ -423,7 +442,7 @@ const Grupo = (() => {
           <div class="modalGrupoBadges">
             ${novo ? '' : `<span class="badgeCodigoReserva">Reserva ${esc(g.codigo)}</span>`}
             <span class="badgeDataBateria">${svg(IC.agenda, 14, 'var(--kib-cor-texto-secundario)')} ${quando(b.dataHora)}</span>
-            <span class="badgeNomeBateria">${esc(b.nome || 'Bateria')}</span>
+            <span class="badgeNomeBateria">${esc(b.nome || 'Bateria')}${b.produto ? ' · ' + esc(b.produto) : ''} · ${durMin} min</span>
             ${novo && estado.voltar ? '<button type="button" class="btn link peq" data-voltar-horario="1" style="font-size: var(--kib-fonte-tamanho-pequeno);">‹ Trocar horário</button>' : ''}
           </div>
         </div>
@@ -502,7 +521,7 @@ const Grupo = (() => {
             </div>
             <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--kib-espaco-1)">
               <div class="cardMetricaFinanceira">
-                <span class="cardMetricaFinanceiraLabel">Preço por piloto${novo ? (rasc.origem === 'recepcao' ? ' · balcão' : ' · antecipado') : ''}</span>
+                <span class="cardMetricaFinanceiraLabel">Preço por piloto${novo ? (isHappy ? ' · Happy Hour' : rasc.origem === 'recepcao' ? ' · balcão' : ' · antecipado') : ''}</span>
                 <div style="display: flex; align-items: center; gap: 4px; height: 32px; min-width: 0">
                   <span style="flex-shrink: 0; white-space: nowrap; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 600; color: var(--kib-cor-texto-secundario);">R$</span>
                   <input type="number" min="0" step="0.01" value="${(preco / 100).toFixed(2)}" data-preco="1" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: var(--kib-fonte-tamanho-titulo); font-weight: 700; color: var(--kib-cor-texto-principal); font-family: var(--kib-fonte-familia-numero);">
@@ -525,6 +544,22 @@ const Grupo = (() => {
                 </div>
               `}
             </div>
+            ${isHappy ? `
+              <div data-hh-banner="1" style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: var(--kib-raio-cartao); background: color-mix(in srgb, var(--kib-cor-estado-aviso-solido) 10%, var(--kib-cor-superficie-padrao)); border: 1px solid color-mix(in srgb, var(--kib-cor-estado-aviso-solido) 35%, transparent);">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                  <b class="t-pequeno" style="color: var(--kib-cor-texto-principal); letter-spacing: 0.02em;">PROMOÇÃO HAPPY HOUR (De Terça a Quinta)</b>
+                  <span class="chip laranja">Duração: ${durMin} minutos de corrida</span>
+                </div>
+                <span class="peq" style="line-height: 1.4; color: var(--kib-cor-texto-secundario);">Valor especial para sua 1ª vez: <b style="color: var(--kib-cor-texto-principal);">${brl(HAPPY_PRIMEIRA_VEZ)}</b> (valor normal promocional: <b style="color: var(--kib-cor-texto-principal);">${brl(HAPPY_NORMAL)}</b>).</span>
+                ${podeTrocarPreco ? `
+                  <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px;">
+                    <button type="button" class="btn peq ${preco === HAPPY_PRIMEIRA_VEZ ? 'prim' : 'sec'}" data-preco-preset="${HAPPY_PRIMEIRA_VEZ}" aria-pressed="${preco === HAPPY_PRIMEIRA_VEZ}">1ª vez · ${brl(HAPPY_PRIMEIRA_VEZ)}</button>
+                    <button type="button" class="btn peq ${preco === HAPPY_NORMAL ? 'prim' : 'sec'}" data-preco-preset="${HAPPY_NORMAL}" aria-pressed="${preco === HAPPY_NORMAL}">Normal promocional · ${brl(HAPPY_NORMAL)}</button>
+                  </div>
+                ` : ''}
+                <span class="peq" style="line-height: 1.35; color: var(--kib-cor-texto-secundario);">Pelo link individual, o sistema confere o CPF e cobra ${brl(HAPPY_PRIMEIRA_VEZ)} automaticamente para quem corre pela 1ª vez.</span>
+              </div>
+            ` : ''}
             <button type="button" role="switch" aria-checked="${aniv}" data-aniv="1" class="cardModoPagamento ${aniv ? 'selecionado' : ''}" title="Promoção do site: o aniversariante que traz pelo menos ${ANIV_MIN} convidados pagantes corre por ${brl(ANIV_PRECO)}">
               <span class="radioCirculoIndicador"></span>
               <span class="col" style="gap: 2px">
@@ -667,8 +702,9 @@ const Grupo = (() => {
       if (!estado.g) {
         estado.rasc.pilotos[+t.dataset.i][t.dataset.campo] = t.value;
         guardarRascunho();
-        const er = $('#erroGrupo'), f = faltaResp(estado.rasc);
+        const er = $('#erroGrupo'), f = faltaResp(estado.rasc), sb = $('#camada [data-salvar-grupo]'), ok = !f;
         if (er) er.textContent = estado.tentou ? f : (f ? 'Para salvar: ' + f.replace(/^Falta /, 'falta ') : '');
+        if (sb) { sb.classList.toggle('quase', !ok); if (ok) sb.removeAttribute('aria-disabled'); else sb.setAttribute('aria-disabled', 'true'); }
         if (t.getAttribute('aria-invalid')) t.removeAttribute('aria-invalid');
       }
     }
@@ -768,6 +804,13 @@ const Grupo = (() => {
     let x;
     if ((x = el('[data-resp]'))) { rasc.responsavel = JSON.parse(x.dataset.resp); rasc.pilotos[0].nome = rasc.responsavel.nome; rasc.pilotos[0].telefone = rasc.responsavel.telefone || ''; estado.achados = []; estado.busca = ''; pintar(); return; }
     if ((x = el('[data-origem]'))) { rasc.origem = x.dataset.origem; lembrar('origem', rasc.origem); if (!rasc.precoManual) rasc.preco = precoPara(rasc.origem, estado.b); pintar(); return; }
+    if ((x = el('[data-preco-preset]'))) {
+      const v = +x.dataset.precoPreset;
+      if (!Number.isFinite(v) || v <= 0) return;
+      if (g) await atualizar(() => office(`/grupos/${g.id}`, { method: 'PUT', body: { precoCentavos: v } }), `Valor ajustado para ${brl(v)}`);
+      else { rasc.preco = v; rasc.precoManual = true; pintar(); }
+      return;
+    }
     if (el('[data-trocar-resp]')) { rasc.responsavel = null; rasc.pilotos[0].nome = ''; rasc.pilotos[0].telefone = ''; pintar(); return; }
     if ((x = el('[data-enviar-agora]'))) { estado.enviarAgora = !estado.enviarAgora; pintar(); return; }
     if (el('[data-aniv]')) { if (g) await atualizar(() => office(`/grupos/${g.id}`, { method: 'PUT', body: { aniversario: !g.aniversario } }), g.aniversario ? 'Promoção de aniversário removida' : 'Marcado como aniversariante'); else { rasc.aniversario = !rasc.aniversario; pintar(); } return; }

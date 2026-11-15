@@ -15,7 +15,7 @@ const AgendaAcoes = (() => {
   const carregarApoio = async () => (apoio ||= await office('/apoio'));
   const agoraLocal = () => `${hojeIso()}T${fmtHm(agoraMin())}`;
   // já correu = o horário passou; "fechada" é outra coisa (o app trata as duas como "fim")
-  const passou = (b) => { const dia = b.dataHora.slice(0, 10), hoje = hojeIso(); return dia < hoje || (dia === hoje && hm(horaDe(b.dataHora)) + 35 <= agoraMin()); };
+  const passou = (b) => { const dia = b.dataHora.slice(0, 10), hoje = hojeIso(), dMin = typeof duracaoBat === 'function' ? duracaoBat(b) : 35; return dia < hoje || (dia === hoje && hm(horaDe(b.dataHora)) + dMin <= agoraMin()); };
   const dataBr = (iso) => { const [a, m, d] = String(iso).slice(0, 10).split('-'); return `${d}/${m}/${a}`; };
   const diaExtenso = (iso) => { const d = deIso(iso); return `${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}`; };
   const voltar = (id) => { if (id) C.abrir(id); else fecharCamada(); };

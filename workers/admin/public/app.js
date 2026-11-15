@@ -29,6 +29,14 @@ const somaDias = (s, n) => { const d = deIso(s); d.setDate(d.getDate() + n); ret
 const hm = (s) => { const m = /^(\d{1,2}):(\d{2})/.exec(String(s || '')); return m ? (+m[1] * 60) + +m[2] : NaN; };
 const fmtHm = (m) => { if (!Number.isFinite(m)) return '--:--'; const mm = ((Math.round(m) % 1440) + 1440) % 1440; return `${pad(Math.floor(mm / 60))}:${pad(mm % 60)}`; };
 const horaDe = (dt) => String(dt || '').slice(11, 16);
+const ehHappyHour = (b) => +(b && b.produtoId) === 67 || /happy\s*hour/i.test(String((b && b.produto) || ''));
+const duracaoBat = (b) => {
+  const m = +(b && b.duracaoMin);
+  if (Number.isFinite(m) && m > 0) return m;
+  const tx = /\b(\d+)\s*MIN\b/i.exec(String((b && b.produto) || ''));
+  if (tx) return +tx[1];
+  return +(b && b.produtoId) === 67 ? 15 : 35;
+};
 const brl = (c) => ((+c || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const brlCurto = (c) => brl(c).replace(',00', '');
 const DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
@@ -350,9 +358,9 @@ function tipoDe(b) {
   return (+b.inscritos || 0) > 0 ? 'reserva' : 'livre';
 }
 function situacaoBateria(b) {
-  const dia = b.dataHora.slice(0, 10), hoje = hojeIso(), ini = hm(horaDe(b.dataHora)), agora = agoraMin();
-  if (dia < hoje || (dia === hoje && ini + 35 <= agora)) return 'fim';
-  if (dia === hoje && ini <= agora && agora < ini + 35) return 'prevista';
+  const dia = b.dataHora.slice(0, 10), hoje = hojeIso(), ini = hm(horaDe(b.dataHora)), fim = ini + duracaoBat(b), agora = agoraMin();
+  if (dia < hoje || (dia === hoje && fim <= agora)) return 'fim';
+  if (dia === hoje && ini <= agora && agora < fim) return 'prevista';
   return 'futura';
 }
 
@@ -513,7 +521,7 @@ TELAS.visao = async (tela) => {
     ].filter(Boolean).join('');
     return `<div class="painelBat">
       <div class="painelBatCab">
-        <span style="display: flex; align-items: center; gap: var(--kib-espaco-1); flex-wrap: wrap">${quando}<span class="mono peq cor-corpo">${esc(horaDe(b.dataHora) || '--:--')}–${Number.isFinite(ini) ? fmtHm(ini + 35) : '--:--'}</span></span>
+        <span style="display: flex; align-items: center; gap: var(--kib-espaco-1); flex-wrap: wrap">${quando}<span class="mono peq cor-corpo">${esc(horaDe(b.dataHora) || '--:--')}–${Number.isFinite(ini) ? fmtHm(ini + duracaoBat(b)) : '--:--'}</span></span>
         <span class="col" style="gap: 2px; min-width: 0; overflow-wrap: anywhere"><b style="font-size: var(--kib-fonte-tamanho-titulo); letter-spacing: -0.01em; line-height: 1.25">${esc(tp === 'livre' ? 'Horário livre' : tituloBat(b, tp))}</b>${sub ? `<span class="peq">${sub}</span>` : ''}</span>
       </div>
       <span class="numerosBat">
@@ -917,7 +925,7 @@ TELAS.agenda = async (tela) => {
     const noAr = doDia.find((b) => situacaoBateria(b) === 'prevista');
     const fila = doDia.filter((b) => b.status === 'aberta' && situacaoBateria(b) === 'futura' && !b.reservaFechada && tipoDe(b) !== 'bloq').slice(0, 4);
     if (!noAr && !fila.length) return '';
-    const fim = (b) => fmtHm(hm(horaDe(b.dataHora)) + 35);
+    const fim = (b) => fmtHm(hm(horaDe(b.dataHora)) + duracaoBat(b));
     const atual = noAr ? `<button type="button" class="pistaAgora hov" data-sel="${noAr.id}" aria-label="Bateria no horário previsto, ${horaDe(noAr.dataHora)}: ${esc(tituloBat(noAr, tipoDe(noAr)))}"><span class="pistaHora mono">${horaDe(noAr.dataHora)}</span><span class="col gap-meio cresce" style="min-width: 0"><b class="trunc t-subtitulo">${esc(tituloBat(noAr, tipoDe(noAr)) === 'Livre' ? 'Bateria sem reserva' : tituloBat(noAr, tipoDe(noAr)))}</b><span class="t-pequeno">previsão até ${fim(noAr)} · ${plural(+noAr.inscritos || 0, 'piloto', 'pilotos')}${falta(noAr) ? ' · ' + pagLongo(noAr) : ''}</span></span></button>`
       : `<span class="pistaAgora vazia"><span class="pistaHora mono">——</span><span class="col gap-meio"><b class="t-subtitulo">Nenhum horário previsto agora</b><span class="t-pequeno">Confira a corrida real na Cronometragem</span></span></span>`;
     const proximas = fila.length ? `<span class="pistaFila" role="list" aria-label="Próximas baterias">${fila.map((b) => `<button type="button" class="pistaProx hov" role="listitem" data-sel="${b.id}"><b class="mono">${horaDe(b.dataHora)}</b><span class="t-pequeno">${(+b.inscritos || 0) ? esc(tituloBat(b, tipoDe(b), true)) : livresTxt(b)}</span></button>`).join('')}</span>` : '';
@@ -964,7 +972,8 @@ TELAS.agenda = async (tela) => {
       const colunas = dias.map((dia) => {
         const todos = bats.filter((b) => b.dataHora.startsWith(dia)), doDia = filtrar(todos);
         if (!todos.length) return `<div class="colDia2 fechadoDia"><span>Fechado</span></div>`;
-        let html = '', marcou = dia !== hoje || agora < hm(horaDe(todos[0].dataHora)) || agora >= hm(horaDe(todos[todos.length - 1].dataHora)) + 35;
+        const ultB = todos[todos.length - 1];
+        let html = '', marcou = dia !== hoje || agora < hm(horaDe(todos[0].dataHora)) || agora >= hm(horaDe(ultB.dataHora)) + duracaoBat(ultB);
         for (const b of doDia) {
           if (!marcou && hm(horaDe(b.dataHora)) > agora) { html += `<div class="agoraMarca"><span>agora · ${fmtHm(agora)}</span></div>`; marcou = true; }
           html += blocoSemana(b);
@@ -978,12 +987,12 @@ TELAS.agenda = async (tela) => {
         <div class="legendaAg">${ORDEM_TIPOS.map((t) => `<span><span class="amostra" style="${amostra(t, true)}"></span>${TIPOS[t].t}</span>`).join('')}<span><span class="amostra" style="box-shadow: inset 0 0 0 2px var(--kib-cor-estado-perigo-solido)"></span>Horário previsto agora</span><span class="atalhos">Atalhos: <kbd>N</kbd> nova reserva · <kbd>T</kbd> hoje · <kbd>←</kbd><kbd>→</kbd> semana · <kbd>D</kbd><kbd>S</kbd><kbd>L</kbd> vista · <kbd>?</kbd> ajuda · <kbd>Esc</kbd> fechar</span></div>`;
     } else if (A.vista === 'dia') {
       const todos = bats.filter((b) => b.dataHora.startsWith(A.base)), doDia = filtrar(todos);
-      const d = deIso(A.base), ins = todos.reduce((a, b) => a + (+b.inscritos || 0), 0);
-      novoHtml = `${faixaPista()}<div class="cartaoCab"><h2 class="t-titulo-grande">${A.base === hoje ? 'Hoje, ' : ''}${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}</h2><span class="sub">${todos.length ? `${todos.length} baterias de 35 min · ${ins} pilotos` : ''}</span></div>
+      const d = deIso(A.base), ins = todos.reduce((a, b) => a + (+b.inscritos || 0), 0), durs = [...new Set(todos.map(duracaoBat))];
+      novoHtml = `${faixaPista()}<div class="cartaoCab"><h2 class="t-titulo-grande">${A.base === hoje ? 'Hoje, ' : ''}${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}</h2><span class="sub">${todos.length ? `${todos.length} baterias${durs.length === 1 ? ` de ${durs[0]} min` : ''} · ${ins} pilotos` : ''}</span></div>
         ${doDia.length ? doDia.map((b) => {
           const tp = tipoDe(b), T = TIPOS[tp], st = situacaoBateria(b), n = +b.inscritos || 0, vagas = Math.min(20, +b.vagas || 0), f = falta(b);
           const extra = [generico(b.nome) || tituloBat(b, tp) === b.nome ? '' : b.nome, b.produto, b.observacao].filter(Boolean).map(esc).join(' · ');
-          return `<button type="button" class="hov linhaDia ${A.sel === b.id ? 'sel' : ''} ${st === 'fim' ? 'passou' : ''} ${estaFechada(b) ? 'agFechada' : ''}" data-sel="${b.id}"><span class="col" style="width: 58px"><span class="mono" style="font-size: var(--kib-fonte-tamanho-subtitulo); font-weight: 600">${horaDe(b.dataHora)}</span><span class="mono peq">${fmtHm(hm(horaDe(b.dataHora)) + 35)}</span></span><span class="faixaDia" style="${tp === 'livre' ? 'background: var(--kib-cor-superficie-padrao); box-shadow: inset 0 0 0 1.5px var(--kib-cor-icone-suave)' : tp === 'bloq' ? TIPOS.bloq.fundo : 'background: ' + T.cor}"></span><span class="col" style="flex: 1 1 220px; gap: var(--kib-espaco-meio)"><span style="display: flex; align-items: center; gap: var(--kib-espaco-1); flex-wrap: wrap"><b class="trunc" style="font-size: var(--kib-fonte-tamanho-corpo); ${tp === 'livre' ? 'color: var(--mudo); font-weight: 600' : ''}">${esc(tituloBat(b, tp))}</b>${tp === 'livre' ? '' : `<span class="chip" style="${T.fundo}">${T.curto}</span>`}${st === 'prevista' ? '<span class="chip solido-perigo sem-sinal">no horário previsto</span>' : ''}${st !== 'fim' && f ? `<span class="chip ${urgente(b) ? 'laranja' : 'cinza'}">${pagCurto(b)}</span>` : ''}</span>${extra ? `<span class="peq">${extra}</span>` : ''}</span><span class="vagasDia" role="img" aria-label="${n} de ${+b.vagas || 0} vagas ocupadas">${Array.from({ length: vagas }, (_, k) => `<span style="background: ${k < n ? (tp === 'livre' ? 'var(--kib-cor-borda-campo)' : T.cheio) : 'color-mix(in srgb, var(--kib-cor-texto-discreto) 14%, transparent)'}"></span>`).join('')}</span><span class="livresDia" style="color: ${st === 'fim' || tp === 'bloq' ? 'var(--mudo)' : tp === 'fechada' ? 'var(--erroTxt)' : +b.disponiveis ? 'var(--okTxt)' : 'var(--erroTxt)'}">${livresTxt(b, st, tp)}</span></button>`;
+          return `<button type="button" class="hov linhaDia ${A.sel === b.id ? 'sel' : ''} ${st === 'fim' ? 'passou' : ''} ${estaFechada(b) ? 'agFechada' : ''}" data-sel="${b.id}"><span class="col" style="width: 58px"><span class="mono" style="font-size: var(--kib-fonte-tamanho-subtitulo); font-weight: 600">${horaDe(b.dataHora)}</span><span class="mono peq">${fmtHm(hm(horaDe(b.dataHora)) + duracaoBat(b))}</span></span><span class="faixaDia" style="${tp === 'livre' ? 'background: var(--kib-cor-superficie-padrao); box-shadow: inset 0 0 0 1.5px var(--kib-cor-icone-suave)' : tp === 'bloq' ? TIPOS.bloq.fundo : 'background: ' + T.cor}"></span><span class="col" style="flex: 1 1 220px; gap: var(--kib-espaco-meio)"><span style="display: flex; align-items: center; gap: var(--kib-espaco-1); flex-wrap: wrap"><b class="trunc" style="font-size: var(--kib-fonte-tamanho-corpo); ${tp === 'livre' ? 'color: var(--mudo); font-weight: 600' : ''}">${esc(tituloBat(b, tp))}</b>${tp === 'livre' ? '' : `<span class="chip" style="${T.fundo}">${T.curto}</span>`}${st === 'prevista' ? '<span class="chip solido-perigo sem-sinal">no horário previsto</span>' : ''}${st !== 'fim' && f ? `<span class="chip ${urgente(b) ? 'laranja' : 'cinza'}">${pagCurto(b)}</span>` : ''}</span>${extra ? `<span class="peq">${extra}</span>` : ''}</span><span class="vagasDia" role="img" aria-label="${n} de ${+b.vagas || 0} vagas ocupadas">${Array.from({ length: vagas }, (_, k) => `<span style="background: ${k < n ? (tp === 'livre' ? 'var(--kib-cor-borda-campo)' : T.cheio) : 'color-mix(in srgb, var(--kib-cor-texto-discreto) 14%, transparent)'}"></span>`).join('')}</span><span class="livresDia" style="color: ${st === 'fim' || tp === 'bloq' ? 'var(--mudo)' : tp === 'fechada' ? 'var(--erroTxt)' : +b.disponiveis ? 'var(--okTxt)' : 'var(--erroTxt)'}">${livresTxt(b, st, tp)}</span></button>`;
         }).join('') : todos.length ? '<div class="vazio"><b>Nada com esse filtro</b><span>Ative os tipos em “Filtrar” ou limpe a busca.</span></div>' : `<div class="vazio"><b>Sem baterias neste dia</b><span>${d.getDay() === 1 ? 'Segunda o kartódromo não abre.' : 'Sem bateria, ninguém reserva este dia no site, no totem nem na Recepção.'}</span>${d.getDay() !== 1 && podeTela('agenda', 'alterar') ? '<span class="acoesVazio"><button type="button" class="btn prim peq" data-ag-nova-bat>Criar bateria neste dia</button><button type="button" class="btn sec peq" data-ag-gerar>Gerar baterias do mês…</button></span>' : ''}</div>`}`;
     } else {
       const comPiloto = filtrar(bats).filter((b) => +b.inscritos > 0);
@@ -1077,7 +1086,7 @@ TELAS.agenda = async (tela) => {
       g = gaveta(`<div class="gavetaTopo" style="${T.topo}"><button type="button" class="fechar hov" data-acao="fecharGaveta" aria-label="Fechar (Esc)">${svg(IC.fechar, 14, 'var(--kib-cor-texto-principal)', 2.4)}</button>
         <span style="display: flex; align-items: center; gap: var(--kib-espaco-meio); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700; letter-spacing: .05em; text-transform: uppercase"><span class="amostra" style="${amostra(tp, true)}"></span>${T.t}</span>
         <span style="padding-right: var(--kib-espaco-5); font-size: var(--kib-fonte-tamanho-titulo-grande); font-weight: 700; letter-spacing: -0.015em">${esc(titulo === 'Livre' ? 'Horário livre' : titulo)}</span>
-        <span style="font-size: var(--kib-fonte-tamanho-corpo); opacity: .85">${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]} · ${horaDe(b.dataHora)} às ${fmtHm(hm(horaDe(b.dataHora)) + 35)}${st === 'prevista' ? ' · no horário previsto' : st === 'fim' ? ' · horário encerrado' : ''}</span>
+        <span style="font-size: var(--kib-fonte-tamanho-corpo); opacity: .85">${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]} · ${horaDe(b.dataHora)} às ${fmtHm(hm(horaDe(b.dataHora)) + duracaoBat(b))} (${duracaoBat(b)} min)${st === 'prevista' ? ' · no horário previsto' : st === 'fim' ? ' · horário encerrado' : ''}</span>
         <span style="font-size: var(--kib-fonte-tamanho-pequeno); opacity: .8">${[b.nome, b.produto, tracadoTxt(b.tracado), kartTxt(b.tipoKart)].filter(Boolean).map(esc).join(' · ')}</span></div>
         <div class="gavetaCorpo" id="corpoBateria"><div class="esqueleto" style="height: 120px"></div><div class="esqueleto" style="height: 200px"></div></div>
         <div style="display: flex; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); background: var(--kib-cor-superficie-padrao); border-top: 1px solid var(--linha2)">${st !== 'fim' && +b.disponiveis > 0 && tp !== 'bloq' && !b.reservaFechada && b.status === 'aberta' ? `<button type="button" class="btn prim cresce" data-acao="novaReserva">${svg(IC.mais, 14, 'var(--kib-cor-acao-sobre-principal)', 2.6)}Nova reserva · ${b.disponiveis} ${+b.disponiveis === 1 ? 'vaga' : 'vagas'}</button>` : `<a class="btn sec cresce" href="#/recepcao">Abrir na Recepção</a>`}</div>`, `Bateria das ${horaDe(b.dataHora)}: ${titulo}`);
@@ -1190,7 +1199,7 @@ TELAS.agenda = async (tela) => {
         <div style="display: flex; flex-direction: column; gap: var(--kib-espaco-denso-12); padding: var(--kib-espaco-2) var(--kib-espaco-2) var(--kib-espaco-2)">
           <label class="campo"><span>Data da reserva</span><input class="entrada" type="date" min="${hojeIso()}" value="${E.dia}" data-escolher-data></label><div class="diasEscolha" role="listbox" aria-label="Dia">${dias.map((dia) => { const d = deIso(dia); return `<button type="button" class="hov ${dia === E.dia ? 'sel' : ''}" data-escolher-dia="${dia}" role="option" aria-selected="${dia === E.dia}" ><span>${dia === hojeIso() ? 'hoje' : DIAS[d.getDay()].slice(0, 3)}</span><b>${d.getDate()}</b></button>`; }).join('')}</div>
           <span style="display: flex; align-items: center; gap: var(--kib-espaco-denso-12); flex-wrap: wrap"><b class="t-corpo">Quantos pilotos vão correr?</b><span class="passo"><button type="button" data-escolher-n="-1" aria-label="Um a menos">−</button><span>${E.n}</span><button type="button" data-escolher-n="1" aria-label="Um a mais">+</button></span><span class="peq">dá para mudar depois, na reserva</span></span>
-          <div class="horariosEscolha">${E.carregando ? '<div class="esqueleto" style="height: 180px"></div>' : E.erro ? `<div class="vazio erro" role="alert"><b>Não foi possível carregar os horários</b><span>${esc(E.erro)}</span><button type="button" class="btn sec peq" data-escolher-repetir>Tentar novamente</button></div>` : validas.length ? validas.map((b) => { const l = +b.disponiveis || 0, cabe = l >= E.n, tp = tipoDe(b); return `<button type="button" class="hov" data-escolher="${b.id}" ${cabe ? '' : 'disabled'}><b class="mono">${horaDe(b.dataHora)}</b><span class="col" style="flex-grow: 1; min-width: 0"><span class="trunc peso-semibold">${esc(tp === 'livre' ? 'Livre' : tituloBat(b, tp))}</span><span class="peq">${esc(b.produto || b.nome)}${situacaoBateria(b) === 'prevista' ? ' · no horário previsto' : ''}</span></span><span style="font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700; color: ${cabe ? 'var(--okTxt)' : 'var(--erroTxt)'}">${cabe ? `${l} ${l === 1 ? 'livre' : 'livres'}` : `só ${l} ${l === 1 ? 'livre' : 'livres'}`}</span></button>`; }).join('') : '<div class="vazio"><b>Nenhum horário com vaga neste dia</b><span>Escolha outro dia acima.</span></div>'}</div>
+          <div class="horariosEscolha">${E.carregando ? '<div class="esqueleto" style="height: 180px"></div>' : E.erro ? `<div class="vazio erro" role="alert"><b>Não foi possível carregar os horários</b><span>${esc(E.erro)}</span><button type="button" class="btn sec peq" data-escolher-repetir>Tentar novamente</button></div>` : validas.length ? validas.map((b) => { const l = +b.disponiveis || 0, cabe = l >= E.n, tp = tipoDe(b), hh = ehHappyHour(b); return `<button type="button" class="hov" data-escolher="${b.id}" ${cabe ? '' : 'disabled'}><b class="mono">${horaDe(b.dataHora)}</b><span class="col" style="flex-grow: 1; min-width: 0"><span class="trunc peso-semibold">${esc(tp === 'livre' ? 'Livre' : tituloBat(b, tp))}</span><span class="peq">${esc(b.produto || b.nome)} · ${duracaoBat(b)} min${hh ? ' · Happy Hour: 1ª vez R$ 89,90 · normal R$ 99,90' : ''}${situacaoBateria(b) === 'prevista' ? ' · no horário previsto' : ''}</span></span><span style="font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700; color: ${cabe ? 'var(--okTxt)' : 'var(--erroTxt)'}">${cabe ? `${l} ${l === 1 ? 'livre' : 'livres'}` : `só ${l} ${l === 1 ? 'livre' : 'livres'}`}</span></button>`; }).join('') : '<div class="vazio"><b>Nenhum horário com vaga neste dia</b><span>Escolha outro dia acima.</span></div>'}</div>
         </div>`;
     };
     const buscar = async () => {
