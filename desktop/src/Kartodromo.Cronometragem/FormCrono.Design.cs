@@ -41,10 +41,10 @@ public partial class FormCrono
         menu.Renderer = new MenuDesignRenderer(Color.FromArgb(251, 251, 252));
         menu.Padding = new Padding(0); menu.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
         foreach (ToolStripMenuItem it in menu.Items) { it.Padding = new Padding(8, 4, 8, 4); it.Margin = new Padding(1, 0, 1, 0); }
-        _passos = new PassosSegmento(["1–3 · Configuração de eventos", "4–5 · Registro de competidores", "Cronometragem", "Ranking dos karts", "Equalização"],
-            ["1–3 · Eventos", "4–5 · Competidores", "Cronometragem", "Ranking", "Equalização"],
-            ["1–3", "4–5", "Cronometragem", "Ranking", "Equalização"],
-            ["1–3", "4–5", "Crono", "Ranking", "Equal."]) { Anchor = AnchorStyles.Top | AnchorStyles.Right, IndiceAoVivo = 2 };
+        _passos = new PassosSegmento(["1–3 · Configuração de eventos", "4–5 · Registro de competidores", "Cronometragem", "Ranking dos karts", "Equalização", "Painel de LED"],
+            ["1–3 · Eventos", "4–5 · Competidores", "Cronometragem", "Ranking", "Equalização", "Painel de LED"],
+            ["1–3", "4–5", "Cronometragem", "Ranking", "Equalização", "Painel LED"],
+            ["1–3", "4–5", "Crono", "Ranking", "Equal.", "TB50"]) { Anchor = AnchorStyles.Top | AnchorStyles.Right, IndiceAoVivo = 2 };
         _passos.Mudou += i => { if (_abas.SelectedIndex != i) _abas.SelectedIndex = i; };
         _abas.SelectedIndexChanged += (_, _) => _passos.Selecionado = _abas.SelectedIndex;
         cab.Controls.AddRange([logo, t, s, menu, _passos]);

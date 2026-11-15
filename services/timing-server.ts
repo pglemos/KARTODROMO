@@ -16,7 +16,7 @@ import { invalidarAbertura } from '../lib/app-v1/abertura-frota';
 import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
-import { appendFileSync, closeSync, copyFileSync, cpSync, createWriteStream, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, createWriteStream, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { extname, join, relative, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { format } from 'node:util';
@@ -149,6 +149,7 @@ const TRANSPONDERS_FILE = join(DATA_DIR, 'transponders.json');
 const CATALOG_FILE = join(DATA_DIR, 'catalog.json');
 const SETTINGS_FILE = join(DATA_DIR, 'settings.json');
 const UI_DIR = resolve(process.cwd(), 'services', 'timing-ui');
+const PUBLIC_DIR = resolve(process.cwd(), 'public');
 const TRACK_NAME = process.env.TIMING_TRACK_NAME || 'Kartodromo Internacional de Betim';
 
 for (const dir of [DATA_DIR, SESSIONS_DIR, JOURNAL_DIR]) mkdirSync(dir, { recursive: true });
@@ -1114,6 +1115,7 @@ function saveTb50Config(patch: unknown, motivo = 'cronometragem'): Tb50Config {
   }
   try { writeJsonAtomic(TB50_CONFIG_FILE, tb50Config); } catch { /* fica em memoria */ }
   log(`TB50 config atualizada (${motivo}): layout=${tb50Config.layout} mode=${tb50Config.mode} offset=${tb50Config.offset}`);
+  enviarAosPaineis();
   scheduleStateBroadcast(20);
   return tb50Config;
 }
@@ -1129,6 +1131,7 @@ function setTb50Offset(value: unknown, motivo: string) {
   tb50Page = { offset, updatedAt: new Date().toISOString() };
   try { writeJsonAtomic(TB50_PAGE_FILE, tb50Page); } catch { /* fica em memoria */ }
   log(`telao TB50: posicoes ${offset + 1}-${offset + TB50_PAGE_SIZE} (${motivo})`);
+  enviarAosPaineis();
   scheduleStateBroadcast(20);
   return tb50Page;
 }
@@ -1405,6 +1408,7 @@ function liveSnapshot(painelTb50 = false) {
             .map(({ crossing, number }) => ({ number, time: formatLap(crossing.lapMs), timeMs: crossing.lapMs! }));
           return {
             position: r.position, kart: r.kart, name: r.name, time: formatLap(r.bestLapMs),
+            bestLapMs: r.bestLapMs ?? null, lastLapMs: r.lastLapMs ?? null,
             laps: r.laps, last: formatLap(r.lastLapMs), bestLap: r.bestLapNumber,
             gap: r.position === 1 ? '' : r.gapLaps > 0 ? `+${r.gapLaps} ${r.gapLaps === 1 ? 'volta' : 'voltas'}` : r.gapMs != null ? `+${(r.gapMs / 1000).toFixed(3)}` : '',
             lapTimes,
@@ -1525,6 +1529,83 @@ function sendFile(res: http.ServerResponse, name: string) {
   const mime = ext === '.png' ? 'image/png' : ext === '.svg' ? 'image/svg+xml' : ext === '.css' ? 'text/css' : ext === '.js' ? 'application/javascript' : 'text/html; charset=utf-8';
   res.writeHead(200, { 'content-type': mime, 'cache-control': 'no-store' });
   res.end(readFileSync(file));
+}
+
+function sendMediaStream(req: http.IncomingMessage, res: http.ServerResponse, filePath: string, cacheControl = 'public, max-age=300') {
+  if (!existsSync(filePath) || !statSync(filePath).isFile()) return send(res, 404, 'nao encontrado');
+  const stat = statSync(filePath);
+  const total = stat.size;
+  const ext = extname(filePath).toLowerCase();
+  const mime = ext === '.webm' ? 'video/webm' : mediaMimeType(filePath);
+  const range = req.headers.range;
+
+  if (range) {
+    const m = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+    if (!m) {
+      res.writeHead(416, { 'content-range': `bytes */${total}`, 'cache-control': 'no-store' });
+      return res.end();
+    }
+    const start = m[1] ? Number.parseInt(m[1], 10) : 0;
+    const end = m[2] ? Math.min(total - 1, Number.parseInt(m[2], 10)) : total - 1;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= total) {
+      res.writeHead(416, { 'content-range': `bytes */${total}`, 'cache-control': 'no-store' });
+      return res.end();
+    }
+    res.writeHead(206, {
+      'content-type': mime,
+      'content-range': `bytes ${start}-${end}/${total}`,
+      'accept-ranges': 'bytes',
+      'content-length': String(end - start + 1),
+      'access-control-allow-origin': '*',
+      'cache-control': cacheControl,
+    });
+    if (req.method === 'HEAD') return res.end();
+    createReadStream(filePath, { start, end }).pipe(res);
+    return;
+  }
+
+  res.writeHead(200, {
+    'content-type': mime,
+    'accept-ranges': 'bytes',
+    'content-length': String(total),
+    'access-control-allow-origin': '*',
+    'cache-control': cacheControl,
+  });
+  if (req.method === 'HEAD') return res.end();
+  createReadStream(filePath).pipe(res);
+}
+
+function resolvePublicAssetPath(pathname: string): string | null {
+  let rel = '';
+  try {
+    rel = decodeURIComponent(pathname).replace(/^\/+/, '');
+  } catch {
+    return null;
+  }
+  if (!rel) return null;
+  const candidate = resolve(PUBLIC_DIR, rel);
+  const publicRoot = `${PUBLIC_DIR}${sep}`;
+  if (candidate.startsWith(publicRoot) && existsSync(candidate) && statSync(candidate).isFile()) {
+    return candidate;
+  }
+  if (pathname === '/brand/kartodromo-betim-logo.png') {
+    const fallbacks = [
+      join(PUBLIC_DIR, 'brand', 'kib-logo.png'),
+      join(UI_DIR, 'kib-logo.png'),
+    ];
+    for (const fb of fallbacks) {
+      if (existsSync(fb) && statSync(fb).isFile()) return fb;
+    }
+  }
+  return null;
+}
+
+const PUBLIC_ASSET_PREFIXES = ['/podio-final/', '/brand/', '/videos/', '/tb50/teams/', '/final-race-frames/'];
+const PUBLIC_ASSET_FILES = new Set(['/final-race-video.mp4', '/final-race-video-original.mp4']);
+
+function isTb50PublicAssetPath(pathname: string): boolean {
+  if (PUBLIC_ASSET_FILES.has(pathname)) return true;
+  return PUBLIC_ASSET_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
 async function readBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
@@ -1968,10 +2049,11 @@ const emailsAgendados = new Map<string, NodeJS.Timeout>();
  * O log não mostra destinatário nem o link (o link é a chave da conta).
  */
 let filaEmailsDoAppRodando = false;
+let filaEmailsDoAppPausaAte = 0;
 async function enviarEmailsDoApp() {
   const destination = process.env.MOBILE_RESULTS_URL;
   const token = process.env.MOBILE_PUBLISH_TOKEN;
-  if (filaEmailsDoAppRodando || !destination || !token) return;
+  if (filaEmailsDoAppRodando || Date.now() < filaEmailsDoAppPausaAte || !destination || !token) return;
   const base = mobileApiEndpoint(destination, '/api/mobile/v1/internal/results', SIMULATE);
   if (!base) return;
   filaEmailsDoAppRodando = true;
@@ -1983,7 +2065,20 @@ async function enviarEmailsDoApp() {
     for (const m of fila) {
       let ok = true;
       try { await enviarEmailSimples(EMAIL_FILE, SIMULATE, m); enviados++; }
-      catch (e) { ok = false; log(`app: e-mail de conta não saiu (${traduzirErro(e)}); tenta de novo`); }
+      catch (e) {
+        ok = false;
+        const msgBruta = e instanceof Error ? e.message : String(e);
+        const erroTraduzido = traduzirErro(e);
+        if (ehErroLimitePorHora(erroTraduzido) || ehErroLimitePorHora(msgBruta)) {
+          filaEmailsDoAppPausaAte = Date.now() + 5 * 60_000;
+          log(`app: e-mail de conta pausado por 5 min (${erroTraduzido})`);
+          await fetch(new URL(`/api/mobile/v1/internal/outbox/${m.id}/falhou`, base), {
+            method: 'POST', headers: { 'x-mobile-publish-token': token }, redirect: 'error', signal: AbortSignal.timeout(15_000),
+          }).catch(() => undefined);
+          break;
+        }
+        log(`app: e-mail de conta não saiu (${erroTraduzido}); tenta de novo`);
+      }
       await fetch(new URL(`/api/mobile/v1/internal/outbox/${m.id}/${ok ? 'enviado' : 'falhou'}`, base), {
         method: 'POST', headers: { 'x-mobile-publish-token': token }, redirect: 'error', signal: AbortSignal.timeout(15_000),
       }).catch(() => undefined);
@@ -3789,6 +3884,7 @@ const LEITURA_PELA_INTERNET = new Set([
 
 function isAllowedPublicReadPath(pathname: string): boolean {
   if (LEITURA_PELA_INTERNET.has(pathname)) return true;
+  if (isTb50PublicAssetPath(pathname)) return true;
   if (/^\/api\/sessions\/[\w-]+\/laps$/.test(pathname)) return true;
   if (/^\/api\/sessions(?:\/[\w-]+)?$/.test(pathname)) return true;
   if (/^\/resultado\/[\w-]+$/.test(pathname)) return true;
@@ -3940,12 +4036,16 @@ const server = http.createServer((req, res) => {
   if (['/admin', '/cadastros', '/ferramentas', '/configuracoes'].includes(url.pathname)) return sendFile(res, 'admin.html');
   if (url.pathname === '/tv') return sendFile(res, 'tv.html');
   if (url.pathname === '/tb50') return sendFile(res, 'tb50.html');
+  if (isTb50PublicAssetPath(url.pathname)) {
+    const assetPath = resolvePublicAssetPath(url.pathname);
+    if (!assetPath) return send(res, 404, 'nao encontrado');
+    return sendMediaStream(req, res, assetPath);
+  }
   if (url.pathname.startsWith('/tb50-media/')) {
     const safeName = decodeURIComponent(url.pathname.slice('/tb50-media/'.length)).replace(/[/\\]/g, '');
     const mediaPath = join(TB50_MEDIA_DIR, safeName);
     if (!safeName || !existsSync(mediaPath) || !statSync(mediaPath).isFile()) return send(res, 404, 'nao encontrado');
-    res.writeHead(200, { 'content-type': mediaMimeType(mediaPath), 'cache-control': 'no-store' });
-    return res.end(readFileSync(mediaPath));
+    return sendMediaStream(req, res, mediaPath, 'no-store');
   }
   // TV com navegador antigo (LG Netcast 2013): mesmo placar em ES5, sem o /tv moderno
   if (url.pathname === '/tv-classica') return sendFile(res, 'tv-classica.html');

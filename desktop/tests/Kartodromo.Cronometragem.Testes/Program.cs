@@ -204,6 +204,54 @@ static class Program
                 f.Close();
             }
         });
+        Teste("aba Painel de LED (TB50): abre no passo 5, alterna sub-abas e desenha prévia 2048x512 ao vivo", ref erros, () =>
+        {
+            Environment.SetEnvironmentVariable("KARTODROMO_SEM_PAINEL", "1");
+            using var tela = new FormCrono("teste-tb50")
+            {
+                StartPosition = FormStartPosition.Manual,
+                Location = new Point(-4000, 0),
+                ShowInTaskbar = false,
+                Size = new Size(1380, 860),
+            };
+            var tipo = typeof(FormCrono);
+            var abas = (TabControl)tipo.GetField("_abas", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(tela)!;
+            var passos = (PassosSegmento)tipo.GetField("_passos", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(tela)!;
+            Exigir(abas.TabPages.Count == 6 && abas.TabPages[5].Text == "Painel de LED", $"esperava 6 abas terminando em Painel de LED, obtive {abas.TabPages.Count}");
+            tela.Show();
+            Application.DoEvents();
+            tipo.GetField("_sess", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(tela, Corrida(14, 1));
+            abas.SelectedIndex = 5;
+            Application.DoEvents();
+            Exigir(passos.Selecionado == 5, $"passo selecionado={passos.Selecionado}");
+            tela.AoEntrarAbaPainelTb50();
+            tela.AtualizarPreviewTb50AoVivo();
+            Application.DoEvents();
+            var pingEditor = (Label)tipo.GetField("_tb50PingEditor", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(tela)!;
+            var pingPai = pingEditor.Parent!;
+            pingEditor.Text = "● Conectado (0.5s)";
+            Application.DoEvents();
+            if (pingEditor.Visible)
+                foreach (Control irmao in pingPai.Controls)
+                    if (irmao != pingEditor && irmao.Visible)
+                        Exigir(!pingEditor.Bounds.IntersectsWith(irmao.Bounds), $"_tb50PingEditor sobrepôs '{irmao.Text}': {pingEditor.Bounds} vs {irmao.Bounds} (topo={pingPai.Size}, card={pingPai.Parent?.Size}, tela={tela.Size})");
+            var subSeg = (SegmentoDesign)tipo.GetField("_tb50SubSeg", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(tela)!;
+            var altSub = tipo.GetMethod("AlternarSubModoTb50", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var campoSub = tipo.GetField("_tb50SubModo", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            for (var idx = 0; idx < 8; idx++)
+            {
+                subSeg.Selecionado = idx;
+                campoSub.SetValue(tela, idx);
+                altSub.Invoke(tela, null);
+                Application.DoEvents();
+            }
+            subSeg.Selecionado = 0;
+            campoSub.SetValue(tela, 0);
+            altSub.Invoke(tela, null);
+            tela.AtualizarPreviewTb50AoVivo();
+            Application.DoEvents();
+            tela.Close();
+        });
         Console.WriteLine(erros == 0 ? "PASS: agrupamento de cores das passagens" : $"FAIL: {erros} teste(s)");
         return erros == 0 ? 0 : 1;
     }

@@ -106,6 +106,7 @@ public partial class FormCrono : Form
         _abas.TabPages.Add(AbaCronometragem());
         _abas.TabPages.Add(AbaRankingKarts());
         _abas.TabPages.Add(AbaEqualizacao());
+        _abas.TabPages.Add(AbaPainelTb50());
         _abas.SelectedIndex = 2;
         _cbSessao.IntegralHeight = false;
         _cbSessao.DropDownHeight = 420;
@@ -120,6 +121,7 @@ public partial class FormCrono : Form
             else if (_abas.SelectedIndex == 1) { MontarArvore(); }
             else if (_abas.SelectedIndex == 3) { _ = CarregarRankingKarts(); }
             else if (_abas.SelectedIndex == 4) { _ = CarregarEqualizacao(true); }
+            else if (_abas.SelectedIndex == 5) { AoEntrarAbaPainelTb50(); }
         };
 
         _status.Items.AddRange([_sHora, Sep(), _sData, Sep(), _sServidor, Sep(), _sDecoder, Sep(), _sTv, Sep(), _sPainel, Sep(), _sTransp]);
@@ -1441,6 +1443,7 @@ public partial class FormCrono : Form
     {
         _sHora.Text = DateTime.Now.ToString("HH:mm:ss");
         _sData.Text = DateTime.Now.ToString("dd/MM/yyyy");
+        AtualizarPreviewTb50AoVivo();
         if (_sess == null) { _lCrono.Text = "00:00:00.000"; _lRestante.Text = "---"; return; }
         // com a verde dada mas nenhum kart na linha ainda, o cronômetro fica parado em zero
         var andando = _sess.S("state") is "em_andamento" or "bandeira_final" && !_sess.B("aguardandoLargada");
