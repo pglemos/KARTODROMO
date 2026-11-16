@@ -28,11 +28,19 @@ try {
   if ($n -lt 2) { Log "healthz falhou ($n/2)"; exit 0 }
 
   Log "healthz falhou $n vezes: reiniciando"
+  # antes de matar, guarda a pilha do processo travado (inspetor em 127.0.0.1:9229, outra thread) para achar a causa depois
+  try {
+    $pilha = Join-Path $rt ("travado-{0}.txt" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    $o = & 'C:\Program Files\nodejs\node.exe' (Join-Path $raiz 'scripts\ops\capturar-pilha.mjs') 2>&1 | Out-String
+    Set-Content $pilha $o -Encoding UTF8
+    Log "pilha do processo travado em $pilha"
+    Get-ChildItem $rt -Filter 'travado-*.txt' | Sort-Object LastWriteTime -Descending | Select-Object -Skip 20 | Remove-Item -Force -ErrorAction SilentlyContinue
+  } catch { Log "captura de pilha falhou: $($_.Exception.Message)" }
   for ($t = 1; $t -le 3; $t++) {
     Stop-ScheduledTask -TaskName 'Kartodromo Servidor' -ErrorAction SilentlyContinue
     ProcServidor | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Start-Sleep 3
-    $cmd = 'cmd.exe /c ""C:\Program Files\nodejs\node.exe" --require "C:\kartodromo-servidor\node_modules\tsx\dist\preflight.cjs" --import "file:///C:/kartodromo-servidor/node_modules/tsx/dist/loader.mjs" services/ops-server.ts >> .runtime\ops-server.log 2>&1"'
+    $cmd = 'cmd.exe /c ""C:\Program Files\nodejs\node.exe" --require "C:\kartodromo-servidor\node_modules\tsx\dist\preflight.cjs" --inspect=127.0.0.1:9229 --import "file:///C:/kartodromo-servidor/node_modules/tsx/dist/loader.mjs" services/ops-server.ts >> .runtime\ops-server.log 2>&1"'
     $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmd; CurrentDirectory = $raiz }
     Log "tentativa $t : Create rc=$($r.ReturnValue) pid=$($r.ProcessId)"
     $ok = $false
