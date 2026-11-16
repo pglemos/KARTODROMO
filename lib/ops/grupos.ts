@@ -1333,12 +1333,18 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
       if (!codVch) throw new HttpError(400, 'Informe o código do voucher.');
       const [v] = await query<{
         Id: number; Codigo: string; Tipo: string; Valor: number; Ativo: boolean;
-        InicioEm: string; FimEm: string; DescontoMaximoCentavos: number | null; PedidoMinimoCentavos: number | null;
+        VigenciaOk?: number | boolean; InicioEm?: Date | string; FimEm?: Date | string;
+        DescontoMaximoCentavos: number | null; PedidoMinimoCentavos: number | null;
         UsoUnico: boolean | number; UsoMaxTotal: number | null; UsoMaxCliente: number; RestritoClientes: boolean | number;
-      }>(`SELECT * FROM dbo.Voucher WHERE Codigo = @c`, { c: codVch });
+      }>(`SELECT *, CASE WHEN CAST(SYSDATETIME() AS date) BETWEEN InicioEm AND FimEm THEN 1 ELSE 0 END AS VigenciaOk FROM dbo.Voucher WHERE Codigo = @c`, { c: codVch });
       if (!v || !v.Ativo) throw new HttpError(400, 'Voucher não encontrado ou inativo.');
-      const hoje = new Date().toISOString().slice(0, 10);
-      if (String(v.InicioEm).slice(0, 10) > hoje || String(v.FimEm).slice(0, 10) < hoje) throw new HttpError(400, 'Voucher expirado.');
+      if (v.VigenciaOk != null) {
+        if (!Number(v.VigenciaOk)) throw new HttpError(400, 'Voucher expirado.');
+      } else {
+        const hoje = new Date().toISOString().slice(0, 10);
+        const fmt = (d: Date | string | undefined) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d ?? '').slice(0, 10));
+        if (fmt(v.InicioEm) > hoje || fmt(v.FimEm) < hoje) throw new HttpError(400, 'Voucher expirado.');
+      }
 
       const usosTotaisRow = await one<{ n: number; doCli: number }>(
         `SELECT
