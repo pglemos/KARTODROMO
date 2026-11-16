@@ -1,5 +1,5 @@
 -- Auditoria e correção de pagamentos rateados indevidamente no modo "individual"
--- Executar no SQL Server KartodromoOps (SRVKART). Por padrão só diagnostica (@AplicarCorrecaoG6FFF18E = 0).
+-- Executar no SQL Server KartodromoOps (SRVKART). Por padrão só diagnostica (@AplicarCorrecao = 0).
 
 -- 1. Raio-X completo da reserva G6FFF18E
 SELECT g.Id GrupoId, g.Codigo, g.Modo, g.PrecoCentavos, g.Aniversario, b.Inicio, b.Nome Bateria,
@@ -23,22 +23,70 @@ SELECT g.Id GrupoId, g.Codigo, b.Inicio, b.Nome Bateria, g.PrecoCentavos,
    AND (pg.PilotoId IS NULL OR (pg.ValorCentavos % 10 <> 0 AND pg.Origem = 'manual'))
  ORDER BY b.Inicio DESC, g.Id, pg.Id;
 
--- 3. Correção segura de G6FFF18E (troque @AplicarCorrecao = 1 somente após conferir o Raio-X acima)
---    Regra:
---      - Para pagamentos manuais com valor fracionário gerado pelo rateio antigo (ex.: 14091, 14026, 14000),
---        ajusta para g.PrecoCentavos (14500) caso representem 1 vaga inteira quitada no balcão, OU estorna duplicatas.
---      - Nunca apaga linhas nem altera pagamentos Origem = 'asaas'.
+-- 3. Correção idempotente aplicada em 16/11/2026 (troque @AplicarCorrecao = 1 para executar)
 DECLARE @AplicarCorrecao BIT = 0;
 
 IF @AplicarCorrecao = 1
 BEGIN
+  SET XACT_ABORT ON;
   BEGIN TRAN;
-  SELECT pg.Id, pg.PilotoId, pg.ValorCentavos, pg.Forma, pg.Origem, pg.CriadoEm
-    FROM dbo.ReservaGrupoPagamento pg
-    JOIN dbo.ReservaGrupo g ON g.Id = pg.GrupoId
-   WHERE g.Codigo = 'G6FFF18E' AND pg.Cancelado = 0;
-  -- Exemplo após conferência:
-  -- UPDATE dbo.ReservaGrupoPagamento SET Cancelado = 1 WHERE Id = <ID_DO_LANCAMENTO_INDEVIDO_SEM_PILOTO> AND Origem = 'manual';
-  -- UPDATE dbo.ReservaGrupoPagamento SET ValorCentavos = 14500 WHERE GrupoId = (SELECT Id FROM dbo.ReservaGrupo WHERE Codigo = 'G6FFF18E') AND Cancelado = 0 AND Origem = 'manual' AND ValorCentavos IN (14091, 14026, 14000);
+
+  -- Grupo 88 (G6FFF18E): cancelar lançamento sem piloto (43), duplicatas de Asaas (40, 47) e vagas canceladas (36, 52, 359)
+  UPDATE dbo.ReservaGrupoPagamento
+     SET Cancelado = 1
+   WHERE GrupoId = 88 AND Origem = 'manual' AND Cancelado = 0 AND Id IN (36, 40, 43, 47, 52, 359);
+
+  -- Corrigir valores quebrados (14091, 14071, 14000, 13971) nas 8 vagas ativas para 14500
+  UPDATE dbo.ReservaGrupoPagamento
+     SET ValorCentavos = 14500
+   WHERE GrupoId = 88 AND Origem = 'manual' AND Cancelado = 0 AND Id IN (46, 48, 49, 852, 853, 854, 855, 856);
+
+  UPDATE i
+     SET Pago = 1, ValorCentavos = 14500, PrecoCentavos = 14500, Status = 'confirmada', AtualizadoEm = SYSDATETIME()
+    FROM dbo.Inscricao i
+    JOIN dbo.ReservaGrupoPiloto p ON p.InscricaoId = i.Id
+   WHERE p.GrupoId = 88 AND i.Status <> 'cancelada' AND i.VendaId IS NULL;
+
+  UPDATE p
+     SET PagoPeloGrupo = 1
+    FROM dbo.ReservaGrupoPiloto p
+    JOIN dbo.Inscricao i ON i.Id = p.InscricaoId
+   WHERE p.GrupoId = 88 AND i.Status <> 'cancelada' AND i.VendaId IS NULL;
+
+  -- Grupo 248 (GD626C77): desmembrar pagamento 547 (29000 sem piloto) para pilotos 2811 e 2812
+  IF EXISTS (SELECT 1 FROM dbo.ReservaGrupoPagamento WHERE Id = 547 AND GrupoId = 248 AND Cancelado = 0 AND PilotoId IS NULL AND ValorCentavos = 29000)
+  BEGIN
+    UPDATE dbo.ReservaGrupoPagamento SET PilotoId = 2811, ValorCentavos = 14500 WHERE Id = 547 AND GrupoId = 248 AND Cancelado = 0;
+    IF NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupoPagamento WHERE GrupoId = 248 AND PilotoId = 2812 AND Cancelado = 0)
+      INSERT INTO dbo.ReservaGrupoPagamento (GrupoId, PilotoId, ValorCentavos, Forma, Origem, UsuarioId)
+      SELECT GrupoId, 2812, 14500, Forma, Origem, UsuarioId FROM dbo.ReservaGrupoPagamento WHERE Id = 547;
+  END;
+  UPDATE i
+     SET Pago = 1, ValorCentavos = 14500, PrecoCentavos = 14500, Status = 'confirmada', AtualizadoEm = SYSDATETIME()
+    FROM dbo.Inscricao i JOIN dbo.ReservaGrupoPiloto p ON p.InscricaoId = i.Id
+   WHERE p.GrupoId = 248 AND p.Id IN (2811, 2812) AND i.Status <> 'cancelada' AND i.VendaId IS NULL;
+  UPDATE dbo.ReservaGrupoPiloto SET PagoPeloGrupo = 1 WHERE GrupoId = 248 AND Id IN (2811, 2812);
+
+  -- Grupo 101 (G975BF1D): vincular 204 -> 1147 e desmembrar 114 (29000) -> 1148 e 1149
+  UPDATE dbo.ReservaGrupoPagamento SET PilotoId = 1147 WHERE Id = 204 AND GrupoId = 101 AND Cancelado = 0 AND PilotoId IS NULL AND ValorCentavos = 14500;
+  IF EXISTS (SELECT 1 FROM dbo.ReservaGrupoPagamento WHERE Id = 114 AND GrupoId = 101 AND Cancelado = 0 AND PilotoId IS NULL AND ValorCentavos = 29000)
+  BEGIN
+    UPDATE dbo.ReservaGrupoPagamento SET PilotoId = 1148, ValorCentavos = 14500 WHERE Id = 114 AND GrupoId = 101 AND Cancelado = 0;
+    IF NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupoPagamento WHERE GrupoId = 101 AND PilotoId = 1149 AND Cancelado = 0)
+      INSERT INTO dbo.ReservaGrupoPagamento (GrupoId, PilotoId, ValorCentavos, Forma, Origem, UsuarioId)
+      SELECT GrupoId, 1149, 14500, Forma, Origem, UsuarioId FROM dbo.ReservaGrupoPagamento WHERE Id = 114;
+  END;
+  UPDATE i
+     SET Pago = 1, ValorCentavos = 14500, PrecoCentavos = 14500, Status = 'confirmada', AtualizadoEm = SYSDATETIME()
+    FROM dbo.Inscricao i JOIN dbo.ReservaGrupoPiloto p ON p.InscricaoId = i.Id
+   WHERE p.GrupoId = 101 AND p.Id IN (1147, 1148, 1149) AND i.Status <> 'cancelada' AND i.VendaId IS NULL;
+  UPDATE dbo.ReservaGrupoPiloto SET PagoPeloGrupo = 1 WHERE GrupoId = 101 AND Id IN (1147, 1148, 1149);
+
+  -- Grupo 338 (G1819936): ajustar preço 14499 -> 14500
+  UPDATE dbo.ReservaGrupo SET PrecoCentavos = 14500, AtualizadoEm = SYSDATETIME() WHERE Id = 338 AND PrecoCentavos = 14499;
+  UPDATE i SET PrecoCentavos = 14500, AtualizadoEm = SYSDATETIME()
+    FROM dbo.Inscricao i JOIN dbo.ReservaGrupoPiloto p ON p.InscricaoId = i.Id
+   WHERE p.GrupoId = 338 AND i.PrecoCentavos = 14499;
+
   COMMIT TRAN;
 END;

@@ -93,6 +93,37 @@ describe('grupo modo individual: blindagem contra rateio e R$ 140,91', () => {
     }
   });
 
+  it('pagamentos múltiplos de vagas inteiras (sem piloto ou excedente no piloto) quitam vagas inteiras em ordem', () => {
+    const base = grupoIndividual(6);
+    const mSemPiloto = montar(
+      base as never,
+      base.pilotos,
+      [{ id: 1, grupoId: 88, pilotoId: null, valor: 29000 }],
+      [],
+    );
+    expect(mSemPiloto.pagos).toBe(2);
+    expect(mSemPiloto.pago).toBe(29000);
+    expect(mSemPiloto.falta).toBe(4 * 14500);
+    expect(mSemPiloto.pagamentosSemPiloto).toBe(0);
+    expect(mSemPiloto.pilotos.slice(0, 2).every((p) => p.pago && p.valorPago === 14500 && p.falta_centavos === 0)).toBe(true);
+    expect(mSemPiloto.pilotos.slice(2).every((p) => !p.pago && p.valorPago === 0 && p.falta_centavos === 14500)).toBe(true);
+
+    const mExcedente = montar(
+      base as never,
+      base.pilotos,
+      [
+        { id: 1, grupoId: 88, pilotoId: 1, valor: 72500 },
+        { id: 2, grupoId: 88, pilotoId: 2, valor: 14500 },
+      ],
+      [],
+    );
+    expect(mExcedente.pagos).toBe(6);
+    expect(mExcedente.pago).toBe(6 * 14500);
+    expect(mExcedente.falta).toBe(0);
+    expect(mExcedente.pagamentosSemPiloto).toBe(0);
+    expect(mExcedente.pilotos.every((p) => p.pago && p.valorPago === 14500 && p.falta_centavos === 0)).toBe(true);
+  });
+
   it('modo sinal continua rateando o sinal entre os pilotos normalmente', () => {
     const base = { ...grupoIndividual(10), modo: 'sinal', sinalPct: 30 };
     const m = montar(

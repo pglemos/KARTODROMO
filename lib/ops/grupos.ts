@@ -14,7 +14,7 @@ import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { precoPrimeiraVezDoGrupo, reservarCupomDoLink } from './reserva-online';
 import { insertCliente, one, onlyDigits, query, tx, type ClienteInput } from './db';
 import { HttpError, cancelarReserva, exigePodeFecharBateria, exigePermissaoOffice, inscreverN, moverReservas } from './office';
-import { avaliarElegibilidadeVoucher, normalizarDocVoucher, vouchersDisponiveisParaCliente } from './vouchers';
+import { avaliarElegibilidadeVoucher, vouchersDisponiveisParaCliente } from './vouchers';
 import type { Sessao } from './auth';
 import { ANIVERSARIO_MIN_CONVIDADOS, ANIVERSARIO_PRECO_PADRAO } from './eventos-schema';
 
@@ -169,17 +169,43 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
   const fora_ = (p: Linha) => Boolean(p.inscricaoPaga && !p.pagoPeloGrupo);
   const pagosForaValor = ativos.filter(fora_).reduce((a, p) => a + precoDe(p), 0);
   // o pagamento "do grupo" (modos unico/sinal) se divide proporcionalmente ao preço de cada vaga (a do aniversariante custa menos).
-  // No modo "individual" ("cada um paga o seu"), um pagamento sem PilotoId NUNCA pode ser rateado entre os pilotos
-  // (caso contrário dilui cada vaga em centavos quebrados, ex.: R$ 145,00 -> R$ 140,91).
+  // No modo "individual" ("cada um paga o seu"), NUNCA rateia valor parcial entre os pilotos (evita saldos quebrados como R$ 140,91):
+  // excedentes de quem pagou várias vagas e pagamentos sem piloto só quitam vagas inteiras em aberto em ordem.
   const doGrupoRateado = individual ? 0 : doGrupo;
   const somaRestantes = ativos.filter((p) => !fora_(p)).reduce((a, p) => a + precoDe(p), 0);
   const restantes = Math.max(1, ativos.filter((p) => !fora_(p)).length);
   const pagoPainel = pagamentosAtivos.reduce((a, pg) => a + (Number(pg.valor) || 0), 0);
+  let creditoLivre = individual ? doGrupo : 0;
+  const proprioPorId = new Map<number, number>();
+  const alocadoPorId = new Map<number, number>();
+  if (individual) {
+    for (const p of ativos) {
+      if (fora_(p)) continue;
+      const precoP = precoDe(p);
+      const bruto = porPiloto.get(Number(p.id)) ?? 0;
+      const coberto = Math.min(bruto, precoP);
+      proprioPorId.set(Number(p.id), coberto);
+      creditoLivre += Math.max(0, bruto - precoP);
+    }
+    for (const p of ativos) {
+      if (fora_(p)) continue;
+      const precoP = precoDe(p);
+      const coberto = proprioPorId.get(Number(p.id)) ?? 0;
+      const faltaP = precoP - coberto;
+      if (faltaP > 0.5 && creditoLivre >= faltaP - 0.5) {
+        const usado = Math.min(faltaP, creditoLivre);
+        alocadoPorId.set(Number(p.id), coberto + usado);
+        creditoLivre = Math.max(0, creditoLivre - usado);
+      } else {
+        alocadoPorId.set(Number(p.id), coberto);
+      }
+    }
+  }
   const lista = ativos.map((p) => {
     const fora = fora_(p);
     const precoP = precoDe(p);
     const parteDoGrupo = somaRestantes > 0 ? doGrupoRateado * precoP / somaRestantes : doGrupoRateado / restantes;
-    const dela = fora ? precoP : (porPiloto.get(Number(p.id)) ?? 0) + parteDoGrupo;
+    const dela = fora ? precoP : individual ? (alocadoPorId.get(Number(p.id)) ?? 0) : (porPiloto.get(Number(p.id)) ?? 0) + parteDoGrupo;
     const ok = precoP <= 0 || dela >= precoP - 0.5;
     const cliente = p.documento !== undefined && (p.clienteId || p.responsavel) ? { documento: p.documento, email: p.email, peso: p.peso, telefone: p.clienteTelefone } : null;
     const falta = faltaNoCadastro(cliente);
@@ -211,7 +237,7 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
     ...g, linkGrupo: responsavel?.token ? linkCadastro(String(responsavel.token)) : null, linkPainel: linkPainel(String(g.codigo)), pilotos: lista, pagamentos: pagamentos.map((pg) => {
       const p = pilotos.find((p) => Number(p.id) === Number(pg.pilotoId));
       return { ...pg, pilotoNome: p ? nomeDaVaga(p) : null, pilotoCancelado: p?.inscricaoStatus === 'cancelada' };
-    }), n, total, pago, falta: faltaCalculada, pagamentosSemPiloto: individual ? doGrupo : 0, sinal, aniversario: Boolean(g.aniversario), campeonato: Boolean(g.campeonato), promocao,
+    }), n, total, pago, falta: faltaCalculada, pagamentosSemPiloto: individual ? Math.round(creditoLivre) : 0, sinal, aniversario: Boolean(g.aniversario), campeonato: Boolean(g.campeonato), promocao,
     pagos: lista.filter((p) => p.pago).length, cadastrados: lista.filter((p) => p.cadastro === 'completo').length,
     prontos: lista.filter((p) => p.pago && p.cadastro === 'completo').length,
     cobrancaGrupo: cobrancas.find((c) => !c.pilotoId && c.status === 'aguardando') ?? null,
@@ -1274,7 +1300,7 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     if (!pilotoId && g.modo === 'individual') throw new HttpError(400, 'Neste grupo cada um paga o seu: escolha de qual piloto é o pagamento.');
     const forma = txt(b.forma, 40) ?? 'Pix';
     const isVoucher = forma.toLowerCase() === 'voucher' || Boolean(b.voucherCodigo);
-    let valor = isVoucher && b.valorCentavos == null
+    const valor = isVoucher && b.valorCentavos == null
       ? (pilotoId ? (g.pilotos.find((p) => p.id === pilotoId)?.falta_centavos ?? 0) : g.falta)
       : cents(b.valorCentavos, 'Valor recebido');
 
