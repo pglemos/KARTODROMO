@@ -705,12 +705,16 @@ export async function puxarPagamentosDiretoDoAsaas(log: Log, grupoId?: number, s
           continue;
         }
 
-        const valorCentavos = Math.round(Number(n.value) * 100);
-        if (!Number.isFinite(valorCentavos) || (valorCentavos <= 0 && n.billingType !== 'VOUCHER')) continue;
+        const rawValue = Math.round(Number(n.value) * 100);
+        const descontoCupom = Math.round(Number((n as Record<string, unknown>).descontoCentavos ?? 0));
+        const isVoucher = n.billingType === 'VOUCHER';
+        const valorCentavos = isVoucher && descontoCupom > 0 ? descontoCupom : rawValue;
+        if (!Number.isFinite(valorCentavos) || valorCentavos <= 0) continue;
 
         const { gid, pid, modo } = await resolverGrupoEPilotoAsaas(n.asaasId, n.externalReference);
+        // Quitação 100% por voucher pelo link do grupo aguarda o vínculo do piloto pelo pré-cadastro
+        if (isVoucher && !pid) continue;
         if (gid) {
-          const isVoucher = n.billingType === 'VOUCHER';
           const forma = isVoucher ? 'Voucher' : n.billingType === 'PIX' ? 'Pix (Asaas)' : n.billingType === 'CREDIT_CARD' ? 'Cartão (Asaas)' : 'Asaas';
           if (modo === 'individual' && !pid) {
             log(`grupo ${gid}: aviso — pagamento webhook ${n.asaasId} sem piloto vinculado no modo individual (não será rateado)`);
@@ -724,11 +728,14 @@ export async function puxarPagamentosDiretoDoAsaas(log: Log, grupoId?: number, s
             const [vch] = await query<{ Id: number }>(`SELECT Id FROM dbo.Voucher WHERE Codigo = @c`, { c: codCupom });
             if (vch && pid) {
               const [pil] = await query<{ ClienteId: number | null; InscricaoId: number | null }>(`SELECT ClienteId, InscricaoId FROM dbo.ReservaGrupoPiloto WHERE Id = @pid`, { pid });
-              await query(
-                `INSERT INTO dbo.ReservaGrupoVoucherUso (AsaasId, GrupoId, PilotoId, VoucherId, ClienteId, DescontoCentavos, Estado)
-                 VALUES (@a, @g, @p, @vid, @cid, @d, 'consumido')`,
-                { a: n.asaasId, g: gid, p: pid, vid: vch.Id, cid: pil?.ClienteId ?? null, d: valorCentavos },
-              ).catch(() => undefined);
+              const [jaUso] = await query<{ Id: number }>(`SELECT Id FROM dbo.ReservaGrupoVoucherUso WHERE AsaasId = @a`, { a: n.asaasId });
+              if (!jaUso && pil?.ClienteId) {
+                await query(
+                  `INSERT INTO dbo.ReservaGrupoVoucherUso (AsaasId, GrupoId, PilotoId, VoucherId, ClienteId, DescontoCentavos, Estado)
+                   VALUES (@a, @g, @p, @vid, @cid, @d, 'consumido')`,
+                  { a: n.asaasId, g: gid, p: pid, vid: vch.Id, cid: pil.ClienteId, d: valorCentavos },
+                ).catch(() => undefined);
+              }
               if (pil?.InscricaoId) {
                 await query(`UPDATE dbo.Inscricao SET VoucherId = @vid WHERE Id = @insId`, { vid: vch.Id, insId: pil.InscricaoId }).catch(() => undefined);
               }
@@ -1366,7 +1373,7 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     }
 
     await tx(async (run) => {
-      const [ativo] = await run(`SELECT Id FROM dbo.ReservaGrupo WITH (UPDLOCK, HOLDLOCK) WHERE Id = @g AND Status = 'ativa'`, { g: id });
+      const [ativo] = await run(`SELECT Id, ResponsavelId FROM dbo.ReservaGrupo WITH (UPDLOCK, HOLDLOCK) WHERE Id = @g AND Status = 'ativa'`, { g: id });
       if (!ativo) throw new HttpError(409, 'Esta reserva não está ativa.');
       const [anterior] = await run(`SELECT PilotoId pilotoId, ValorCentavos valor, Forma forma, Cancelado cancelado FROM dbo.ReservaGrupoPagamento WHERE GrupoId = @g AND IdempotencyKey = @key`, { g: id, key });
       if (anterior) {
@@ -1374,14 +1381,16 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
           throw new HttpError(409, 'Esta chave já pertence a outro recebimento.');
         return;
       }
-      await run(`INSERT INTO dbo.ReservaGrupoPagamento (GrupoId, PilotoId, ValorCentavos, Forma, Origem, UsuarioId, IdempotencyKey)
-        VALUES (@g, @p, @v, @f, 'manual', @u, @key)`, { g: id, p: pilotoId, v: valor, f: isVoucher ? 'Voucher' : forma, u: sessao.uid, key });
+      const aidVoucher = voucherAplicado ? ('vch_' + key).slice(0, 60) : null;
+      await run(`INSERT INTO dbo.ReservaGrupoPagamento (GrupoId, PilotoId, ValorCentavos, Forma, Origem, UsuarioId, IdempotencyKey, AsaasId)
+        VALUES (@g, @p, @v, @f, 'manual', @u, @key, @aid)`, { g: id, p: pilotoId, v: valor, f: isVoucher ? 'Voucher' : forma, u: sessao.uid, key, aid: aidVoucher });
 
-      if (voucherAplicado) {
+      if (voucherAplicado && aidVoucher) {
+        const cidUso = pilDb?.clienteId ?? Number(ativo.ResponsavelId);
         await run(
-          `INSERT INTO dbo.ReservaGrupoVoucherUso (GrupoId, PilotoId, VoucherId, ClienteId, DescontoCentavos, Estado)
-           VALUES (@g, @p, @vid, @cid, @d, 'consumido')`,
-          { g: id, p: pilotoId, vid: voucherAplicado.id, cid: pilDb?.clienteId ?? null, d: voucherAplicado.descontoCentavos },
+          `INSERT INTO dbo.ReservaGrupoVoucherUso (AsaasId, GrupoId, PilotoId, VoucherId, ClienteId, DescontoCentavos, Estado)
+           VALUES (@aid, @g, @p, @vid, @cid, @d, 'consumido')`,
+          { aid: aidVoucher, g: id, p: pilotoId, vid: voucherAplicado.id, cid: cidUso, d: voucherAplicado.descontoCentavos },
         );
         if (pilDb?.inscricaoId) {
           await run(`UPDATE dbo.Inscricao SET VoucherId = @vid WHERE Id = @insId`, { vid: voucherAplicado.id, insId: pilDb.inscricaoId });
@@ -1409,8 +1418,14 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
 
   if ((m = path.match(/^\/grupos\/(\d+)\/pagamentos\/(\d+)$/)) && method === 'DELETE') {
     const id = Number(m[1]);
-    const r = await one<{ Id: number }>(`UPDATE dbo.ReservaGrupoPagamento SET Cancelado = 1 OUTPUT inserted.Id WHERE Id = @pg AND GrupoId = @g AND Cancelado = 0 AND Origem = 'manual'`, { pg: Number(m[2]), g: id });
+    const r = await one<{ Id: number; AsaasId: string | null; PilotoId: number | null }>(`UPDATE dbo.ReservaGrupoPagamento SET Cancelado = 1 OUTPUT inserted.Id, inserted.AsaasId, inserted.PilotoId WHERE Id = @pg AND GrupoId = @g AND Cancelado = 0 AND Origem = 'manual'`, { pg: Number(m[2]), g: id });
     if (!r) throw new HttpError(409, 'Só dá para estornar aqui pagamento lançado à mão. Pagamento do Asaas se estorna no Asaas.');
+    if (r.AsaasId && r.AsaasId.startsWith('vch_')) {
+      await query(`UPDATE dbo.ReservaGrupoVoucherUso SET Estado = 'liberado' WHERE AsaasId = @aid AND Estado IN ('reservado', 'consumido')`, { aid: r.AsaasId });
+      if (r.PilotoId) {
+        await query(`UPDATE dbo.Inscricao SET VoucherId = NULL WHERE Id = (SELECT InscricaoId FROM dbo.ReservaGrupoPiloto WHERE Id = @pid)`, { pid: r.PilotoId }).catch(() => undefined);
+      }
+    }
     await aplicarPagos(id);
     send(200, await grupo(id));
     return true;
@@ -1567,11 +1582,11 @@ export async function aplicarAcoesDoPainel(log: Log) {
 }
 
 /** A pessoa pagou (ou vai pagar) a vaga no fim do cadastro pelo link do grupo: a cobrança passa a ser da vaga que ficou com ela. */
-export async function registrarCobrancaDoLink(token: string, clienteId: number, cob: { id?: unknown; link?: unknown; valorCentavos?: unknown }, log: Log) {
+export async function registrarCobrancaDoLink(token: string, clienteId: number, cob: { id?: unknown; link?: unknown; valorCentavos?: unknown; pago?: unknown }, log: Log) {
   const asaasId = String(cob.id ?? '');
-  if (!/^pay_[A-Za-z0-9]{6,40}$/.test(asaasId)) return false;
-  const vaga = await one<{ id: number; grupoId: number }>(
-    `SELECT TOP 1 v.Id id, v.GrupoId grupoId FROM dbo.ReservaGrupoPiloto t JOIN dbo.ReservaGrupoPiloto v ON v.GrupoId = t.GrupoId
+  if (!/^pay_[A-Za-z0-9_]{6,45}$/.test(asaasId)) return false;
+  const vaga = await one<{ id: number; grupoId: number; inscricaoId: number | null }>(
+    `SELECT TOP 1 v.Id id, v.GrupoId grupoId, v.InscricaoId inscricaoId FROM dbo.ReservaGrupoPiloto t JOIN dbo.ReservaGrupoPiloto v ON v.GrupoId = t.GrupoId
       WHERE t.Token = @token AND v.ClienteId = @c ORDER BY v.Responsavel, v.Ordem`,
     { token, c: clienteId },
   );
@@ -1579,10 +1594,37 @@ export async function registrarCobrancaDoLink(token: string, clienteId: number, 
   // estreante pelo link pagou o preço de primeira vez: a vaga passa a valer esse preço (só o valor configurado é aceito)
   const valorCob = Math.round(Number(cob.valorCentavos) || 0);
   const cupom = (cob as { cupom?: { codigo?: unknown } }).cupom;
-  if (valorCob > 0 && cupom && /^[A-Z0-9_-]{1,40}$/.test(String(cupom.codigo ?? ''))) {
+  const pagoPorVoucher = valorCob === 0 && Boolean(cob.pago) && Boolean(cupom?.codigo);
+  if (cupom && /^[A-Z0-9_-]{1,40}$/.test(String(cupom.codigo ?? ''))) {
     const cli = await one<{ documento: string | null }>(`SELECT Documento documento FROM dbo.Cliente WHERE Id = @c`, { c: clienteId });
-    const vale = await reservarCupomDoLink({ asaasId, grupoId: vaga.grupoId, pilotoId: vaga.id, clienteId, documento: onlyDigits(cli?.documento), codigo: String(cupom.codigo), valorCobrado: valorCob }, log);
-    if (vale) await query(`UPDATE dbo.ReservaGrupoPiloto SET PrecoCentavos = @v WHERE Id = @p`, { v: vale, p: vaga.id });
+    const vale = await reservarCupomDoLink({
+      asaasId, grupoId: vaga.grupoId, pilotoId: vaga.id, clienteId,
+      documento: onlyDigits(cli?.documento), codigo: String(cupom.codigo),
+      valorCobrado: valorCob, consumido: pagoPorVoucher,
+    }, log);
+    if (vale !== null && vale > 0) await query(`UPDATE dbo.ReservaGrupoPiloto SET PrecoCentavos = @v WHERE Id = @p`, { v: vale, p: vaga.id });
+    if (vale !== null && pagoPorVoucher) {
+      const uso = await one<{ VoucherId: number; DescontoCentavos: number }>(
+        `SELECT VoucherId, DescontoCentavos FROM dbo.ReservaGrupoVoucherUso WHERE AsaasId = @a`,
+        { a: asaasId },
+      );
+      if (uso) {
+        const jaPg = await one<{ Id: number }>(`SELECT Id FROM dbo.ReservaGrupoPagamento WHERE AsaasId = @a AND Cancelado = 0`, { a: asaasId });
+        if (!jaPg) {
+          await query(
+            `INSERT INTO dbo.ReservaGrupoPagamento (GrupoId, PilotoId, ValorCentavos, Forma, Origem, AsaasId)
+             VALUES (@g, @p, @v, 'Voucher', 'voucher', @a)`,
+            { g: vaga.grupoId, p: vaga.id, v: uso.DescontoCentavos, a: asaasId },
+          );
+        }
+        if (vaga.inscricaoId) {
+          await query(`UPDATE dbo.Inscricao SET VoucherId = @vid WHERE Id = @insId`, { vid: uso.VoucherId, insId: vaga.inscricaoId }).catch(() => undefined);
+        }
+        await aplicarPagos(vaga.grupoId);
+        log(`grupo ${vaga.grupoId}: vaga do piloto ${vaga.id} quitada pelo voucher ${String(cupom.codigo)} (${asaasId})`);
+      }
+      return true;
+    }
   } else if (valorCob > 0) {
     const pv = await precoPrimeiraVezDoGrupo(vaga.grupoId);
     if (pv && valorCob === pv) await query(`UPDATE dbo.ReservaGrupoPiloto SET PrecoCentavos = @v WHERE Id = @p AND PrecoCentavos IS NULL`, { v: pv, p: vaga.id });

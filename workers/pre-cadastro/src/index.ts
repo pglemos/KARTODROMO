@@ -83,7 +83,7 @@ async function receber(req: Request, env: Env) {
   const aceite = await aceiteDoCadastro(env, corpo as Record<string, unknown>, req.headers.get('cf-connecting-ip'));
   if (aceite.erro) return json(409, { erro: aceite.erro });
   const registro = { chave, recebidoEm: new Date().toISOString(), ...v.dados, ...(reserva ? { reserva } : {}), ...(aceite.termo ? { termo: aceite.termo } : {}),
-    ...(pagamento ? { cobranca: { id: pagamento.id, link: pagamento.link, valorCentavos: pagamento.valorCentavos, ...(pagamento.cupom ? { cupom: pagamento.cupom } : {}) } } : {}) };
+    ...(pagamento ? { cobranca: { id: pagamento.id, link: pagamento.link, valorCentavos: pagamento.valorCentavos, ...(pagamento.pago ? { pago: true } : {}), ...(pagamento.cupom ? { cupom: pagamento.cupom } : {}) } } : {}) };
   // um cadastro por documento: se a pessoa enviar de novo, vale o último
   await env.PRE.put(`pendentes/${chave}.json`, JSON.stringify(registro), { httpMetadata: { contentType: 'application/json' } });
   await avisarCadastro(env as never, { nome: v.dados.nome, email: v.dados.email, grupo, pagamento, termo: aceite.termo as never }).catch(() => 0);
@@ -213,14 +213,16 @@ async function cobrancaDoLink(env: Env, token: string, chave: string, d: PreCada
 
   // Vaga quitada integralmente por voucher (desconto de 100%): confirma direto sem cobrança Asaas
   if (valor === 0 && preco.cupom) {
-    const payId = `pay_voucher_${token}_${chave}`;
+    const cpfLimpo = digitos(d.documento) || chave.replace(/[^A-Za-z0-9]/g, '');
+    const payId = `pay_vch${token.replace(/[^A-Za-z0-9]/g, '').slice(0, 12)}${cpfLimpo.slice(0, 16)}`.slice(0, 40);
     const r: CobrancaDoLink = { id: payId, link: '', valorCentavos: 0, pago: true, ...extra };
     await env.PRE.put(k, JSON.stringify(r), { httpMetadata: { contentType: 'application/json' } });
     await env.PRE.put(`grupos/pagos/${payId}.json`, JSON.stringify({
       asaasId: payId,
-      externalReference: `grupo-${g.codigo}-${chave}`,
+      externalReference: `grupo-${g.codigo}-${cpfLimpo}`.slice(0, 100),
       billingType: 'VOUCHER',
       value: 0,
+      descontoCentavos: preco.cupom.descontoCentavos,
       pagoEm: new Date().toISOString(),
       cupom: preco.cupom.codigo,
     }));

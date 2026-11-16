@@ -758,21 +758,87 @@ public class FormCheckout : CartaoModal
         var cod = _codVoucher.Text.Trim();
         if (cod.Length == 0) { Msg.Aviso(this, "Informe o codigo do voucher."); return; }
         if (_voucher != null) { Msg.Aviso(this, "Já existe um voucher aplicado nesta venda. Remova-o primeiro."); return; }
-        var clienteId = _cliente?.L("id") ?? _car.Select(c => c.ClienteId).FirstOrDefault(id => id != null);
-        var qs = "/api/office/vouchers/validar?codigo=" + Uri.EscapeDataString(cod) + (clienteId is long cid && cid > 0 ? $"&clienteId={cid}" : "");
-        var v = await Api.GetAsync(qs);
-        var alvo = _car.FirstOrDefault(c => (v.L("produtoId") == null || c.ProdutoId == v.L("produtoId")) && c.Desc == 0);
-        if (alvo == null) { Msg.Aviso(this, v.L("produtoId") != null ? "O produto do voucher não está na venda." : "Nenhum produto na venda para aplicar o voucher."); return; }
-        if (v.L("pedidoMinimo") is long min && Totais().sub < min) { Msg.Aviso(this, $"Valor do pedido insuficiente. Mínimo exigido: {Fmt.Brl(min)}."); return; }
-        var baseV = alvo.Unit * alvo.Qtd;
-        var d = v.S("tipo") == "percentual" ? (long)Math.Round(baseV * (v.L("valor") ?? 0) / 100m) : v.L("valor") ?? 0;
-        if (v.L("descontoMaximo") is long max) d = Math.Min(d, max);
-        alvo.Desc = Math.Min(baseV, d); alvo.Voucher = true; alvo.DescPct = baseV > 0 ? Math.Round(alvo.Desc * 100m / baseV, 2) : 0;
-        _voucher = v.S("codigo");
+        var candidatos = _car.Where(c => c.Desc == 0).ToList();
+        if (candidatos.Count == 0) { Msg.Aviso(this, "Nenhum item sem desconto no carrinho para aplicar o voucher."); return; }
+
+        JsonNode baseInfo = null;
+        string ultimoErro = null;
+        var validacoesPorCli = new Dictionary<long, JsonNode>();
+        var usadosPorCli = new Dictionary<long, long>();
+        long? restantesGlobais = null;
+        long usosGlobaisAgora = 0;
+        var aplicados = new List<ItemCarrinho>();
+
+        foreach (var item in candidatos)
+        {
+            var cid = item.ClienteId ?? _cliente?.L("id") ?? 0;
+            JsonNode infoCli = null;
+            if (cid > 0 && validacoesPorCli.TryGetValue(cid, out var cached))
+            {
+                infoCli = cached;
+            }
+            else
+            {
+                var qs = "/api/office/vouchers/validar?codigo=" + Uri.EscapeDataString(cod) + (cid > 0 ? $"&clienteId={cid}" : "");
+                try
+                {
+                    infoCli = await Api.GetAsync(qs);
+                    if (cid > 0) validacoesPorCli[cid] = infoCli;
+                }
+                catch (Exception ex)
+                {
+                    ultimoErro ??= ex.Message;
+                    if (candidatos.Count == 1) throw;
+                    continue;
+                }
+            }
+            baseInfo ??= infoCli;
+            if (infoCli.L("produtoId") is long pidReq && item.ProdutoId != pidReq) continue;
+            if (infoCli.L("pedidoMinimo") is long min && Totais().sub < min) { Msg.Aviso(this, $"Valor do pedido insuficiente. Mínimo exigido: {Fmt.Brl(min)}."); return; }
+
+            if (restantesGlobais == null && infoCli.L("restantes") is long restG) restantesGlobais = restG;
+            if (restantesGlobais is long rMax && usosGlobaisAgora >= rMax) break;
+            if (cid > 0 && infoCli.L("restantesPessoa") is long restP)
+            {
+                usadosPorCli.TryGetValue(cid, out var jaCli);
+                if (jaCli >= restP) continue;
+                usadosPorCli[cid] = jaCli + 1;
+            }
+
+            var baseV = item.Unit * item.Qtd;
+            var d = infoCli.S("tipo") == "percentual" ? (long)Math.Round(baseV * (infoCli.L("valor") ?? 0) / 100m) : infoCli.L("valor") ?? 0;
+            if (infoCli.L("descontoMaximo") is long max) d = Math.Min(d, max);
+            item.Desc = Math.Min(baseV, d);
+            item.Voucher = true;
+            item.DescPct = baseV > 0 ? Math.Round(item.Desc * 100m / baseV, 2) : 0;
+            aplicados.Add(item);
+            usosGlobaisAgora++;
+            if (infoCli.B("usoUnico")) break;
+        }
+
+        if (aplicados.Count == 0)
+        {
+            Msg.Aviso(this, !string.IsNullOrWhiteSpace(ultimoErro)
+                ? ultimoErro
+                : baseInfo?.L("produtoId") != null ? "O produto do voucher não está na venda." : "Nenhum piloto elegível na venda para este voucher.");
+            return;
+        }
+
+        _voucher = (baseInfo ?? validacoesPorCli.Values.First()).S("codigo");
         Atualizar();
-        var ben = v.S("beneficiarioNome");
-        var extra = v.L("restantes") is long rest && rest == 1 ? "\nEste é o último uso disponível: o voucher será esgotado ao concluir a venda." : "";
-        Msg.Info(this, $"Voucher aplicado{(string.IsNullOrWhiteSpace(ben) ? "" : $" ({ben})")}! Desconto de {Fmt.Brl(alvo.Desc)} em {alvo.Produto}.{extra}");
+        var totalDesc = aplicados.Sum(x => x.Desc);
+        var extra = restantesGlobais is long restFinal && usosGlobaisAgora >= restFinal
+            ? "\nOs usos disponíveis deste voucher serão esgotados ao concluir a venda."
+            : "";
+        if (aplicados.Count == 1)
+        {
+            var ben = baseInfo?.S("beneficiarioNome");
+            Msg.Info(this, $"Voucher aplicado{(string.IsNullOrWhiteSpace(ben) ? "" : $" ({ben})")}! Desconto de {Fmt.Brl(totalDesc)} em {aplicados[0].Produto}.{extra}");
+        }
+        else
+        {
+            Msg.Info(this, $"Voucher {_voucher} aplicado em {aplicados.Count} itens! Desconto total de {Fmt.Brl(totalDesc)}.{extra}");
+        }
     });
 
     void RemoverVoucher()
@@ -812,7 +878,7 @@ public class FormCheckout : CartaoModal
         try
         {
             var itens = new JsonArray();
-            foreach (var c in _car) itens.Add(new JsonObject { ["inscricaoId"] = c.InscricaoId, ["produtoId"] = c.ProdutoId, ["quantidade"] = c.Qtd, ["unitarioCentavos"] = c.Unit, ["descontoCentavos"] = c.Voucher ? 0 : c.Desc, ["acrescimoCentavos"] = c.Acr });
+            foreach (var c in _car) itens.Add(new JsonObject { ["inscricaoId"] = c.InscricaoId, ["produtoId"] = c.ProdutoId, ["clienteId"] = c.ClienteId, ["voucherAplicado"] = c.Voucher, ["quantidade"] = c.Qtd, ["unitarioCentavos"] = c.Unit, ["descontoCentavos"] = c.Voucher ? 0 : c.Desc, ["acrescimoCentavos"] = c.Acr });
             var pags = new JsonArray();
             foreach (var p in _pags) pags.Add(new JsonObject { ["formaPagamentoId"] = p.forma, ["valorCentavos"] = p.valor });
             var idempotencyKey = Guid.NewGuid().ToString();

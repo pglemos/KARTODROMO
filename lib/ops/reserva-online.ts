@@ -200,7 +200,7 @@ async function calcularPedidoOnline(input: CouponInput, read: ReadOne, lock: boo
   const base = { voucherId: null, clienteId: clienteId ?? 0, produtoId, precos, nome: String(bateria.nome), inicio: String(bateria.inicio) };
   if (!codigo) return { ...base, brutoCentavos, descontoCentavos: 0, totalCentavos: brutoCentavos };
 
-  const v = await avaliarVoucher({ codigo, documento, clienteId, produtoId, brutoCentavos }, read, lock, readList);
+  const v = await avaliarVoucher({ codigo, documento, clienteId, produtoId, brutoCentavos, brutoNominalCentavos: quantidade > 1 ? precos[0] : brutoCentavos }, read, lock, readList);
   return { ...base, brutoCentavos, descontoCentavos: v.descontoCentavos, totalCentavos: brutoCentavos - v.descontoCentavos, voucherId: v.voucherId, clienteId: v.clienteId };
 }
 
@@ -210,7 +210,7 @@ async function calcularPedidoOnline(input: CouponInput, read: ReadOne, lock: boo
  * (recepção + site + link do grupo) e pedido mínimo. Devolve o desconto em centavos.
  */
 export async function avaliarVoucher(
-  e: { codigo: string; documento: string; clienteId?: number; produtoId: number; brutoCentavos: number },
+  e: { codigo: string; documento: string; clienteId?: number; produtoId: number; brutoCentavos: number; brutoNominalCentavos?: number },
   read: ReadOne,
   lock: boolean,
   readList?: ReadList,
@@ -261,11 +261,16 @@ export async function avaliarVoucher(
     throw new HttpError(400, `Valor do pedido insuficiente. Mínimo exigido: ${brl(Number(voucher.PedidoMinimoCentavos))}.`);
   }
 
+  // Para voucher nominal/grupo restrito (1 uso por reserva online), aplica sobre 1 vaga (a do beneficiário)
+  // quando houver vários pilotos pagando juntos, evitando que 1 crédito quite vagas extras.
+  const baseDesconto = Boolean(voucher.RestritoClientes) && e.brutoNominalCentavos != null
+    ? Math.min(brutoCentavos, e.brutoNominalCentavos)
+    : brutoCentavos;
   let descontoCentavos = voucher.Tipo === 'percentual'
-    ? Math.round((brutoCentavos * Number(voucher.Valor)) / 100)
+    ? Math.round((baseDesconto * Number(voucher.Valor)) / 100)
     : Number(voucher.Valor);
   if (voucher.DescontoMaximoCentavos) descontoCentavos = Math.min(descontoCentavos, Number(voucher.DescontoMaximoCentavos));
-  descontoCentavos = Math.min(Math.max(0, descontoCentavos), brutoCentavos);
+  descontoCentavos = Math.min(Math.max(0, descontoCentavos), baseDesconto);
   return { voucherId: Number(voucher.Id), descontoCentavos, clienteId: cliente };
 }
 
@@ -380,10 +385,11 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
   const r = await one<Linha>(`${LINHA} WHERE PedidoId = @id`, { id: p.id });
   if (!r) return { id: p.id, acao: 'pago_sem_vaga', erro: 'Pedido não encontrado no sistema da recepção.' };
   if (r.Status === 'pago') return { id: p.id, acao: 'confirmado', codigo: r.Codigo, ...(await grupoDoPedido(p, r, ids(r.InscricaoIds), log)) };
-  // a Asaas diz se o cartão foi de débito (DEBIT_CARD) — a recepção mostra Pix / Crédito / Débito
-  const forma = p.pagamento?.billingType === 'PIX' ? 'pix' : p.pagamento?.billingType === 'DEBIT_CARD' ? 'debito' : 'credito';
+  // a Asaas diz se o cartão foi de débito (DEBIT_CARD); voucher 100% chega com VOUCHER
+  const forma = p.pagamento?.billingType === 'VOUCHER' ? 'voucher' : p.pagamento?.billingType === 'PIX' ? 'pix' : p.pagamento?.billingType === 'DEBIT_CARD' ? 'debito' : 'credito';
   if (r.Status === 'pago_sem_vaga') return { id: p.id, acao: 'pago_sem_vaga', erro: 'O pagamento está aguardando a resolução da recepção.' };
-  const voucherUso = await one<{ Estado: string }>(`SELECT Estado FROM dbo.ReservaOnlineVoucherUso WHERE PedidoId = @id`, { id: p.id });
+  const voucherUso = await one<{ Estado: string; VoucherId?: number | null; DescontoCentavos?: number | null }>(`SELECT Estado, VoucherId, DescontoCentavos FROM dbo.ReservaOnlineVoucherUso WHERE PedidoId = @id`, { id: p.id });
+  const voucherIdUso = voucherUso?.VoucherId ? Number(voucherUso.VoucherId) : null;
   if (voucherUso?.Estado === 'liberado') {
     await tx(async (run) => {
       await run(`UPDATE dbo.ReservaOnline SET Status = 'pago_sem_vaga', AsaasPagamentoId = @asaas, PagoEm = SYSDATETIME(), Forma = @forma WHERE Id = @id`, {
@@ -413,12 +419,12 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
     }
   }
   // cada vaga recebe a sua parte do valor pago, na proporção do preço dela (Happy Hour: primeira vez R$ 89,90, as outras R$ 99,90)
-  if (p.modo === 'individual') return await confirmarIndividual(p, r, insc, forma, log);
+  if (p.modo === 'individual') return await confirmarIndividual(p, r, insc, forma, log, voucherIdUso);
   const linhasPreco = await query<{ Id: number; PrecoCentavos: number | null }>(`SELECT Id, PrecoCentavos FROM dbo.Inscricao WHERE Id IN (${insc.join(',') || '0'}) ORDER BY Id`);
   const valores = dividirValor(r.ValorCentavos, linhasPreco.map((l) => Number(l.PrecoCentavos ?? 0)));
   const unit = Math.round(r.ValorCentavos / Math.max(1, r.Quantidade));
   await tx(async (run) => {
-    await run(`UPDATE dbo.Inscricao SET Pago = 1, ValorCentavos = @unit, Status = 'confirmada', AtualizadoEm = SYSDATETIME() WHERE Id IN (${insc.join(',')})`, { unit });
+    await run(`UPDATE dbo.Inscricao SET Pago = 1, ValorCentavos = @unit, ${voucherIdUso ? 'VoucherId = COALESCE(VoucherId, @vid), ' : ''}Status = 'confirmada', AtualizadoEm = SYSDATETIME() WHERE Id IN (${insc.join(',')})`, { unit, ...(voucherIdUso ? { vid: voucherIdUso } : {}) });
     if (linhasPreco.length === insc.length && new Set(linhasPreco.map((l) => l.PrecoCentavos)).size > 1) {
       for (const [k, l] of linhasPreco.entries()) await run(`UPDATE dbo.Inscricao SET ValorCentavos = @valor WHERE Id = @id`, { id: l.Id, valor: valores[k] });
     }
@@ -430,11 +436,11 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
 }
 
 /** Cada um paga o seu: o pagamento cobre só a vaga de quem organiza (se pilota); as dos amigos seguem reservadas. */
-async function confirmarIndividual(p: PedidoSite, r: Linha, insc: number[], forma: string, log: Log): Promise<Resultado> {
+async function confirmarIndividual(p: PedidoSite, r: Linha, insc: number[], forma: string, log: Log, voucherIdUso: number | null = null): Promise<Resultado> {
   const ordenadas = [...insc].sort((a, b) => a - b);
   const eu = p.compradorPilota !== false;
   await tx(async (run) => {
-    if (eu && ordenadas[0]) await run(`UPDATE dbo.Inscricao SET Pago = 1, ValorCentavos = @v, Status = 'confirmada', AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id: ordenadas[0], v: r.ValorCentavos });
+    if (eu && ordenadas[0]) await run(`UPDATE dbo.Inscricao SET Pago = 1, ValorCentavos = @v, ${voucherIdUso ? 'VoucherId = COALESCE(VoucherId, @vid), ' : ''}Status = 'confirmada', AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id: ordenadas[0], v: r.ValorCentavos, ...(voucherIdUso ? { vid: voucherIdUso } : {}) });
     await run(`UPDATE dbo.ReservaOnline SET Status = 'pago', InscricaoIds = @insc, AsaasPagamentoId = @asaas, PagoEm = SYSDATETIME(), Forma = @forma WHERE Id = @id`, { id: r.Id, insc: ordenadas.join(','), asaas: p.pagamento?.asaasId ?? null, forma });
     await run(`UPDATE dbo.ReservaOnlineVoucherUso SET Estado = 'consumido' WHERE PedidoId = @pedido AND Estado IN ('reservado', 'reembolso_pendente')`, { pedido: p.id });
   });
@@ -661,23 +667,23 @@ export async function precoDaVagaPeloLink(token: string, cpf: string, cupom = ''
  * Cupom usado na cobrança do link do grupo: reserva o uso (conta no limite do voucher) e confere o valor cobrado.
  * Devolve o preço que a vaga passa a valer, ou null se o cupom não vale mais (a vaga fica com o preço normal).
  */
-export async function reservarCupomDoLink(o: { asaasId: string; grupoId: number; pilotoId: number; clienteId: number; documento: string; codigo: string; valorCobrado: number }, log: Log): Promise<number | null> {
+export async function reservarCupomDoLink(o: { asaasId: string; grupoId: number; pilotoId: number; clienteId: number; documento: string; codigo: string; valorCobrado: number; consumido?: boolean }, log: Log): Promise<number | null> {
   const ja = await one<{ Id: number }>(`SELECT Id FROM dbo.ReservaGrupoVoucherUso WHERE AsaasId = @a`, { a: o.asaasId });
   if (ja) return o.valorCobrado;
-  const g = await one<{ preco: number; produtoId: number | null }>(`SELECT g.PrecoCentavos preco, b.ProdutoId produtoId FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId WHERE g.Id = @id`, { id: o.grupoId });
+  const g = await one<{ preco: number; produtoId: number | null; aniversario?: boolean | number; precoAniv?: number | null }>(`SELECT g.PrecoCentavos preco, b.ProdutoId produtoId, g.Aniversario aniversario, g.PrecoAniversarianteCentavos precoAniv FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId WHERE g.Id = @id`, { id: o.grupoId });
   if (!g) return null;
   const c = configOnline();
   const produto = produtoDaBateria(Number(g.produtoId), c);
-  const bases = [Number(g.preco) || 0, c.primeiraVez[produto]].filter((x): x is number => Number(x) > 0);
+  const bases = [...new Set([Number(g.preco) || 0, c.primeiraVez[produto], g.aniversario ? Number(g.precoAniv || 0) : 0].filter((x): x is number => Number(x) > 0))];
   try {
     return await tx(async (run) => {
       const read: ReadOne = async (sql, params) => (await run(sql, params))[0] ?? null;
       for (const base of bases) {
         const v = await avaliarVoucher({ codigo: o.codigo, documento: o.documento, clienteId: o.clienteId, produtoId: produto, brutoCentavos: base }, read, true, run);
         if (base - v.descontoCentavos !== o.valorCobrado) continue;
-        await run(`INSERT INTO dbo.ReservaGrupoVoucherUso (AsaasId, GrupoId, PilotoId, VoucherId, ClienteId, DescontoCentavos, Estado) VALUES (@a, @g, @p, @v, @c, @d, 'reservado')`,
-          { a: o.asaasId, g: o.grupoId, p: o.pilotoId, v: v.voucherId, c: o.clienteId, d: v.descontoCentavos });
-        log(`grupo ${o.grupoId}: cupom ${o.codigo} reservado na cobrança ${o.asaasId} (desconto ${brl(v.descontoCentavos)})`);
+        await run(`INSERT INTO dbo.ReservaGrupoVoucherUso (AsaasId, GrupoId, PilotoId, VoucherId, ClienteId, DescontoCentavos, Estado) VALUES (@a, @g, @p, @v, @c, @d, @estado)`,
+          { a: o.asaasId, g: o.grupoId, p: o.pilotoId, v: v.voucherId, c: o.clienteId, d: v.descontoCentavos, estado: o.consumido ? 'consumido' : 'reservado' });
+        log(`grupo ${o.grupoId}: cupom ${o.codigo} ${o.consumido ? 'consumido' : 'reservado'} na cobrança ${o.asaasId} (desconto ${brl(v.descontoCentavos)})`);
         return o.valorCobrado;
       }
       log(`grupo ${o.grupoId}: cupom ${o.codigo} da cobrança ${o.asaasId} não confere com o valor cobrado (${brl(o.valorCobrado)})`);

@@ -278,7 +278,11 @@
       <h2>Cupom de desconto <span class="op">(opcional)</span></h2>
       <p class="sub" style="margin-left:0">Tem um cupom? O desconto já sai no valor da sua vaga.</p>
       <label for="cupomCod">Código do cupom</label>
-      <input id="cupomCod" autocomplete="off" autocapitalize="characters" maxlength="40" style="text-transform:uppercase">
+      <div class="grade" style="align-items:center">
+        <div class="c4"><input id="cupomCod" autocomplete="off" autocapitalize="characters" maxlength="40" style="text-transform:uppercase" placeholder="Ex.: KB2KB5NX"></div>
+        <div class="c2"><button type="button" class="btn2" id="btnAplicarCupom" style="width:100%;height:48px;margin-top:0">Aplicar</button></div>
+      </div>
+      <p id="cupomMsg" class="legenda" style="margin-top:8px" hidden></p>
     </section>
 
     <button class="enviar" id="enviar" type="submit">Concluir cadastro</button>
@@ -672,13 +676,17 @@
   const aplicarGrupo = (g, salvarBase = false) => {
     if (salvarBase || !grupoBase) grupoBase = Object.assign({}, g);
     grupo = g;
+    const codDigitado = ($('cupomCod') ? $('cupomCod').value : '').trim();
+    const cup = g.cupomAplicado || null;
+    const quitadoCupom = !!cup && g.aCobrarCentavos === 0;
     const paga = g.aCobrarCentavos > 0;
-    $('cupomGrupo').hidden = !paga;
+    $('cupomGrupo').hidden = !paga && !quitadoCupom && !codDigitado;
     const sou = g.souResponsavel;
     $('grupoTitulo').textContent = sou ? 'Você é o responsável pelo grupo' : 'Você está no grupo de ' + g.responsavel;
     const t = $('grupoTexto');
     t.innerHTML = esc(g.bateria || 'Bateria') + ' · ' + quando(g.inicio) + '. ' +
-      (sou && paga ? 'Preencha seu cadastro e, no final, pague ' + oque(g) + ' (' + brl(g.aCobrarCentavos) + ') por Pix ou cartão.' + (g.modo === 'individual' ? '' : ' Os convidados só fazem o cadastro.')
+      (quitadoCupom ? 'Cupom <b>' + esc(cup.codigo) + '</b> aplicado: vaga quitada integralmente (R$ 0,00).'
+        : sou && paga ? 'Preencha seu cadastro e, no final, pague ' + oque(g) + ' (' + brl(g.aCobrarCentavos) + ') por Pix ou cartão.' + (g.modo === 'individual' ? '' : ' Os convidados só fazem o cadastro.')
         : sou ? 'O pagamento do grupo já está em dia. Preencha o seu cadastro.'
         : paga ? 'Preencha seu cadastro e, no final, pague a sua vaga (' + brl(g.aCobrarCentavos) + ') por Pix ou cartão.'
         : g.modo !== 'individual' ? 'Quem reservou paga pelo grupo. Você só preenche o seu cadastro.'
@@ -686,7 +694,14 @@
         : 'Preencha seu cadastro. Sua vaga já está reservada.') +
       (sou ? '' : ' Não é o(a) ' + esc(g.responsavel) + '? Peça o link certo a quem reservou.');
     const previaAnt = $('pagarPrevia');
-    if (paga) {
+    if (quitadoCupom) {
+      rotuloEnviar = 'Concluir cadastro (quitado com voucher)';
+      $('enviar').textContent = rotuloEnviar;
+      const previa = previaAnt || document.createElement('div');
+      previa.className = 'pagar previa'; previa.id = 'pagarPrevia';
+      previa.innerHTML = '<p><b>Etapa final · Voucher ' + esc(cup.codigo) + ' aplicado: R$ 0,00</b></p><p class="estado">Desconto de ' + brl(cup.descontoCentavos) + '. Ao concluir, sua vaga será confirmada automaticamente sem cobrança.</p>';
+      if (!previaAnt) $('enviar').parentNode.insertBefore(previa, $('enviar'));
+    } else if (paga) {
       rotuloEnviar = 'Concluir e ir para o pagamento';
       $('enviar').textContent = rotuloEnviar;
       const previa = previaAnt || document.createElement('div');
@@ -700,17 +715,46 @@
     topoFormulario();
     atualizarProgresso();
   };
-  const atualizarPrecoGrupo = async (cpf) => {
+  const mostrarMsgCupom = (texto, ok) => {
+    const m = $('cupomMsg');
+    if (!m) return;
+    if (!texto) { m.hidden = true; m.textContent = ''; return; }
+    m.hidden = false;
+    m.textContent = texto;
+    m.className = ok ? 'legenda' : 'msg-campo';
+    m.style.color = ok ? 'var(--verde)' : '';
+  };
+  const atualizarPrecoGrupo = async (cpf, mostrarErroSemCpf = false) => {
+    const cup = ($('cupomCod') ? $('cupomCod').value : '').trim().toUpperCase().replace(/\s/g, '');
+    if (mostrarErroSemCpf && !cpfOk(cpf)) {
+      mostrarMsgCupom('Informe o seu CPF no campo acima antes de aplicar o voucher.', false);
+      $('documento').focus();
+      return;
+    }
     if (!tokenReserva || !cpfOk(cpf)) return;
     const seq = ++seqPrecoGrupo;
+    const bt = $('btnAplicarCupom');
+    if (bt && cup) { bt.disabled = true; bt.textContent = 'Conferindo…'; }
     try {
-      const r = await fetch('/api/grupo/preco', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ r: tokenReserva, cpf: dig(cpf), cupom: $('cupom') ? $('cupom').value : '' }) });
+      const r = await fetch('/api/grupo/preco', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ r: tokenReserva, cpf: dig(cpf), cupom: cup }) });
       if (!r.ok || seq !== seqPrecoGrupo) return;
       const j = await r.json();
       if (seq !== seqPrecoGrupo || !grupo) return;
-      aplicarGrupo(Object.assign({}, grupo, { souResponsavel: !!j.souResponsavel, aCobrarCentavos: Number(j.aCobrarCentavos) || 0 }));
-    } catch {}
+      if (j.erroCupom) mostrarMsgCupom(j.erroCupom, false);
+      else if (j.cupom) mostrarMsgCupom('Cupom ' + j.cupom.codigo + ': desconto de ' + brl(j.cupom.descontoCentavos) + (Number(j.aCobrarCentavos) === 0 ? ' · Vaga quitada!' : ''), true);
+      else mostrarMsgCupom('', true);
+      aplicarGrupo(Object.assign({}, grupo, { souResponsavel: !!j.souResponsavel, aCobrarCentavos: Number(j.aCobrarCentavos) || 0, cupomAplicado: j.cupom || null }));
+    } catch {
+      if (cup) mostrarMsgCupom('Não foi possível conferir o cupom agora. Tente novamente em instantes.', false);
+    } finally {
+      if (bt) { bt.disabled = false; bt.textContent = 'Aplicar'; }
+    }
   };
+  if ($('btnAplicarCupom')) $('btnAplicarCupom').addEventListener('click', () => atualizarPrecoGrupo($('documento').value, true));
+  if ($('cupomCod')) {
+    $('cupomCod').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); atualizarPrecoGrupo($('documento').value, true); } });
+    $('cupomCod').addEventListener('change', () => { if ($('cupomCod').value.trim()) atualizarPrecoGrupo($('documento').value, false); else { mostrarMsgCupom('', true); if (cpfOk($('documento').value)) atualizarPrecoGrupo($('documento').value, false); } });
+  }
   if (tokenReserva) fetch('/api/grupo?r=' + encodeURIComponent(tokenReserva)).then((r) => r.ok ? r.json() : null).then((g) => {
     if (g && g.responsavel) {
       aplicarGrupo(g, true);
@@ -888,7 +932,10 @@
       $('progresso').style.display = 'none';
       $('prontoTitulo').textContent = `Tudo certo, ${j.nome || ''}!`.replace(', !', '!');
       if (j.pagamento) mostrarPagamento(j.pagamento, j.grupo);
-      if (tokenReserva && !(j.pagamento && !j.pagamento.pago)) {
+      if (tokenReserva && j.pagamento && j.pagamento.pago && j.pagamento.cupom) {
+        $('prontoSub').textContent = 'Vaga quitada com o voucher ' + j.pagamento.cupom.codigo + '! Cadastro vinculado ao grupo' + (j.grupo ? ' de ' + j.grupo.responsavel + ' · ' + j.grupo.bateria + ' · ' + quando(j.grupo.inicio) : '') + '.';
+        $('prontoInstrucao').innerHTML = '1. Vá à recepção ou totem de autoatendimento.<br>2. Digite seu <b>' + (tipo === 'Passaporte' ? 'passaporte' : tipo) + '</b>.<br>3. Você assina o termo na recepção.';
+      } else if (tokenReserva && !(j.pagamento && !j.pagamento.pago)) {
         $('prontoSub').textContent = 'Seu cadastro foi recebido e vinculado ao grupo' + (j.grupo ? ' de ' + j.grupo.responsavel + ' · ' + j.grupo.bateria + ' · ' + quando(j.grupo.inicio) : '') + '.';
         $('prontoInstrucao').innerHTML = '1. Vá à recepção ou totem de autoatendimento.<br>2. Digite seu <b>' + (tipo === 'Passaporte' ? 'passaporte' : tipo) + '</b>.<br>3. Você assina o termo na recepção.';
       }

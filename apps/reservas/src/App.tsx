@@ -671,11 +671,15 @@ function EtapaPagamento({ r, setR, cada, horario, agenda, abertoEm, voltar, onCr
         <div><dt>Pilotos</dt><dd>{cada ? `${r.quantidade} pilotos · 1 vaga paga agora + link para o grupo` : [...(r.euPiloto ? [r.comprador.nome] : []), ...r.acomp.slice(0, r.quantidade - (r.euPiloto ? 1 : 0)).map((a) => a.nome)].map((x) => x.trim().split(/\s+/)[0]).join(', ')}</dd></div>
         <div><dt>Quem reserva</dt><dd>{r.comprador.nome} · {r.comprador.email}</dd></div>
       </dl>
-      <fieldset className="escolha formas">
-        <legend>Como você quer pagar?</legend>
-        <label className={r.forma === 'pix' ? 'on' : ''}><input type="radio" name="forma" checked={r.forma === 'pix'} onChange={() => setR((x) => ({ ...x, forma: 'pix' }))} /><span><strong>Pix</strong><small>Aprovação imediata. O QR code aparece na próxima tela.</small></span></label>
-        <label className={r.forma === 'cartao' ? 'on' : ''}><input type="radio" name="forma" checked={r.forma === 'cartao'} onChange={() => setR((x) => ({ ...x, forma: 'cartao' }))} /><span><strong>Cartão de crédito</strong><small>Ambiente seguro da Asaas. Após pagar, volte para esta página.</small></span></label>
-      </fieldset>
+      {total > 0 ? (
+        <fieldset className="escolha formas">
+          <legend>Como você quer pagar?</legend>
+          <label className={r.forma === 'pix' ? 'on' : ''}><input type="radio" name="forma" checked={r.forma === 'pix'} onChange={() => setR((x) => ({ ...x, forma: 'pix' }))} /><span><strong>Pix</strong><small>Aprovação imediata. O QR code aparece na próxima tela.</small></span></label>
+          <label className={r.forma === 'cartao' ? 'on' : ''}><input type="radio" name="forma" checked={r.forma === 'cartao'} onChange={() => setR((x) => ({ ...x, forma: 'cartao' }))} /><span><strong>Cartão de crédito</strong><small>Ambiente seguro da Asaas. Após pagar, volte para esta página.</small></span></label>
+        </fieldset>
+      ) : (
+        <div className="dica" role="status"><Ico d={I.ok} /><p><strong>Voucher cobre 100% da reserva!</strong> Valor final R$ 0,00 — nenhuma cobrança financeira será gerada.</p></div>
+      )}
       <div className="cupom">
         <label htmlFor="cupom">Cupom de desconto <small>(opcional)</small></label>
         <div className="cupom-linha">
@@ -702,7 +706,7 @@ function EtapaPagamento({ r, setR, cada, horario, agenda, abertoEm, voltar, onCr
       {erro && <p className="msg-erro geral" role="alert">{erro}</p>}
       {incerto && <p className="dica-mini">Não conseguimos confirmar se sua reserva foi registrada. Para evitar pagamento duplicado, <a href={`https://wa.me/${WHATS}`} target="_blank" rel="noopener">fale com a recepção no WhatsApp</a> antes de tentar novamente.</p>}
       <div className="acoes"><button type="button" className="btn sec" onClick={voltar} disabled={enviando}>Voltar ao cadastro</button>
-        <button type="button" className="btn grande" onClick={enviar} disabled={enviando || !aceite || !agenda.pagamentoOnline} aria-busy={enviando}>{enviando ? 'Criando reserva…' : `Reservar e pagar ${reais(total)}`}</button></div>
+        <button type="button" className="btn grande" onClick={enviar} disabled={enviando || !aceite || !agenda.pagamentoOnline} aria-busy={enviando}>{enviando ? 'Criando reserva…' : total === 0 ? `Confirmar reserva (${reais(0)})` : `Reservar e pagar ${reais(total)}`}</button></div>
       {verPolitica && <ModalPolitica politica={politica} erro={erroPolitica} recarregar={carregarPolitica} fechar={() => setVerPolitica(false)} aceitar={() => { setAceite(true); setVerPolitica(false); }} />}
       {verTermo && <ModalTermo fechar={() => setVerTermo(false)} />}
     </>

@@ -634,7 +634,7 @@ export async function moverReservas(ids: number[], destino: number, grupoId?: nu
 
 // ---------------------------------------------------------------- venda (checkout / receita avulsa)
 
-type ItemIn = { produtoId?: number; inscricaoId?: number; descricao?: string; quantidade?: number; unitarioCentavos: number; descontoCentavos?: number; acrescimoCentavos?: number };
+type ItemIn = { produtoId?: number; inscricaoId?: number; clienteId?: number; voucherAplicado?: boolean; descricao?: string; quantidade?: number; unitarioCentavos: number; descontoCentavos?: number; acrescimoCentavos?: number };
 
 async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
   const mov = await movimentoAberto(sessao.uid);
@@ -648,21 +648,26 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
 
   return tx(async (run) => {
     // itens: confere reserva e produto no servidor
-    const itens = [] as (Required<Omit<ItemIn, 'produtoId' | 'inscricaoId'>> & { produtoId: number | null; inscricaoId: number | null; liquido: number; voucherId?: number })[];
+    const itens = [] as (Required<Omit<ItemIn, 'produtoId' | 'inscricaoId' | 'clienteId' | 'voucherAplicado'>> & {
+      produtoId: number | null; inscricaoId: number | null; itemClienteId: number | null;
+      voucherAplicado: boolean; liquido: number; voucherId?: number;
+    })[];
     for (const it of itensIn) {
       const qtd = int(it.quantidade ?? 1, 'Quantidade');
       let descricao = str(it.descricao, 200) ?? 'Item';
       let produtoId = it.produtoId ? int(it.produtoId, 'Produto') : null;
       const inscricaoId = it.inscricaoId ? int(it.inscricaoId, 'Reserva') : null;
+      let itemClienteId: number | null = it.clienteId ? int(it.clienteId, 'Cliente') : null;
       if (inscricaoId) {
         const [ins] = await run(
-          `SELECT i.Pago, i.Status, i.ProdutoId, c.Nome, b.Nome bateria FROM dbo.Inscricao i WITH (UPDLOCK) JOIN dbo.Cliente c ON c.Id = i.ClienteId JOIN dbo.Bateria b ON b.Id = i.BateriaId WHERE i.Id = @inscricaoId`,
+          `SELECT i.Pago, i.Status, i.ProdutoId, i.ClienteId, c.Nome, b.Nome bateria FROM dbo.Inscricao i WITH (UPDLOCK) JOIN dbo.Cliente c ON c.Id = i.ClienteId JOIN dbo.Bateria b ON b.Id = i.BateriaId WHERE i.Id = @inscricaoId`,
           { inscricaoId },
         );
         if (!ins) throw new HttpError(404, 'Reserva não encontrada.');
         if (ins.Pago) throw new HttpError(409, `A reserva de ${ins.Nome} já está paga.`);
         if (ins.Status === 'cancelada') throw new HttpError(409, `A reserva de ${ins.Nome} está cancelada.`);
         produtoId = produtoId ?? (ins.ProdutoId as number | null);
+        itemClienteId = (ins.ClienteId as number | null) ?? itemClienteId;
         descricao = `${ins.bateria} - ${ins.Nome}`.slice(0, 200);
       } else if (produtoId) {
         const [p] = await run(`SELECT Nome FROM dbo.Produto WHERE Id = @produtoId`, { produtoId });
@@ -674,14 +679,15 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
       const acr = cents(it.acrescimoCentavos ?? 0, 'Acréscimo');
       const liquido = unit * qtd - desc + acr;
       if (liquido < 0) throw new HttpError(400, 'Desconto maior que o valor do item.');
-      itens.push({ produtoId, inscricaoId, descricao, quantidade: qtd, unitarioCentavos: unit, descontoCentavos: desc, acrescimoCentavos: acr, liquido });
+      itens.push({
+        produtoId, inscricaoId, itemClienteId, voucherAplicado: Boolean(it.voucherAplicado),
+        descricao, quantidade: qtd, unitarioCentavos: unit, descontoCentavos: desc, acrescimoCentavos: acr, liquido,
+      });
     }
 
-    // voucher
+    // voucher (1 item por padrão, ou vários itens marcados com voucherAplicado pelo Caixa)
     let voucher: Record<string, unknown> | null = null;
-    let voucherDesconto = 0;
-    let clienteVoucherId: number | null = clienteId;
-    let voucherAutoLink: { vcId: number; clienteId: number } | null = null;
+    const voucherUsos: Array<{ clienteId: number | null; desconto: number; autoLink: { vcId: number; clienteId: number } | null }> = [];
     if (voucherCodigo) {
       const [v] = await run(
         `SELECT v.*, p.Ativo parceiroAtivo, fc.Ativo fidelidadeAtiva FROM dbo.Voucher v WITH (UPDLOCK, HOLDLOCK)
@@ -693,56 +699,63 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
       if (v.FidelidadeContaId && !v.fidelidadeAtiva) throw new HttpError(400, 'A conta de fidelidade vinculada ao voucher está inativa.');
       const [hoje] = await run(`SELECT CAST(SYSDATETIME() AS date) d`);
       if ((hoje.d as Date) < (v.InicioEm as Date) || (hoje.d as Date) > (v.FimEm as Date)) throw new HttpError(400, 'Voucher expirado.');
-      let clienteVoucherDoc: string | null = null;
-      if (v.RestritoClientes) {
-        if (!clienteVoucherId) {
-          const primeiraIns = itens.find((i) => i.inscricaoId)?.inscricaoId;
-          if (primeiraIns) {
-            const [insCli] = await run(`SELECT ClienteId clienteId FROM dbo.Inscricao WHERE Id = @insId`, { insId: primeiraIns });
-            if (insCli?.clienteId) clienteVoucherId = Number(insCli.clienteId);
-          }
-        }
-        if (clienteVoucherId) {
-          const [cli] = await run(`SELECT Documento, DocumentoNum FROM dbo.Cliente WHERE Id = @cid`, { cid: clienteVoucherId });
-          clienteVoucherDoc = normalizarDocVoucher(cli?.DocumentoNum ?? cli?.Documento);
-        }
-      }
-      const [usos] = await run(
-        `SELECT
-           (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @id AND Estornado = 0)
-           + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @id AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
-           + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @id AND Estado IN ('reservado', 'consumido')) n,
-           (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estornado = 0)
-           + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
-           + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estado IN ('reservado', 'consumido')) doCliente`,
-        { id: v.Id, cli: clienteVoucherId },
-      );
-      const eleg = await avaliarElegibilidadeVoucher({
-        voucherId: Number(v.Id),
-        usoUnico: Boolean(v.UsoUnico),
-        usoMaxTotal: v.UsoMaxTotal == null ? null : Number(v.UsoMaxTotal),
-        usoMaxCliente: Number(v.UsoMaxCliente ?? 1),
-        restritoClientes: Boolean(v.RestritoClientes),
-        usosTotais: Number(usos?.n ?? 0),
-        usosClienteDirecto: Number(usos?.doCliente ?? 0),
-        clienteId: clienteVoucherId,
-        documento: clienteVoucherDoc,
-        reader: run,
-      });
-      if (!eleg.ok) throw new HttpError(400, eleg.motivo);
-      if (eleg.autoLinkClienteId && eleg.matchedVcId) {
-        voucherAutoLink = { vcId: eleg.matchedVcId, clienteId: eleg.autoLinkClienteId };
-      }
       const totalPedido = itens.reduce((s, i) => s + i.liquido, 0);
       if (v.PedidoMinimoCentavos && totalPedido < (v.PedidoMinimoCentavos as number)) throw new HttpError(400, `Valor do pedido insuficiente. Mínimo exigido: ${brl(v.PedidoMinimoCentavos as number)}.`);
-      const alvo = itens.find((i) => (!v.ProdutoId || i.produtoId === v.ProdutoId) && i.descontoCentavos === 0);
-      if (!alvo) throw new HttpError(400, v.ProdutoId ? 'O produto do voucher não está na venda.' : 'Nenhum produto na venda para aplicar o voucher.');
-      voucherDesconto = v.Tipo === 'percentual' ? Math.round((alvo.liquido * (v.Valor as number)) / 100) : (v.Valor as number);
-      if (v.DescontoMaximoCentavos) voucherDesconto = Math.min(voucherDesconto, v.DescontoMaximoCentavos as number);
-      voucherDesconto = Math.min(voucherDesconto, alvo.liquido);
-      alvo.descontoCentavos += voucherDesconto;
-      alvo.liquido -= voucherDesconto;
-      alvo.voucherId = v.Id as number;
+
+      const marcados = itens.filter((i) => i.voucherAplicado);
+      const alvos = marcados.length
+        ? marcados.filter((i) => (!v.ProdutoId || i.produtoId === v.ProdutoId) && i.descontoCentavos === 0)
+        : [itens.find((i) => (!v.ProdutoId || i.produtoId === v.ProdutoId) && i.descontoCentavos === 0)].filter((x): x is (typeof itens)[number] => Boolean(x));
+
+      if (!alvos.length) throw new HttpError(400, v.ProdutoId ? 'O produto do voucher não está na venda.' : 'Nenhum produto na venda para aplicar o voucher.');
+
+      let usosExtra = 0;
+      const usosPorClienteExtra = new Map<number, number>();
+      for (const alvo of alvos) {
+        let cliAlvoId: number | null = alvo.itemClienteId ?? clienteId;
+        let cliAlvoDoc: string | null = null;
+        if (v.RestritoClientes && cliAlvoId) {
+          const [cli] = await run(`SELECT Documento, DocumentoNum FROM dbo.Cliente WHERE Id = @cid`, { cid: cliAlvoId });
+          cliAlvoDoc = normalizarDocVoucher(cli?.DocumentoNum ?? cli?.Documento);
+        }
+        const [usos] = await run(
+          `SELECT
+             (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @id AND Estornado = 0)
+             + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @id AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+             + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @id AND Estado IN ('reservado', 'consumido')) n,
+             (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estornado = 0)
+             + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+             + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estado IN ('reservado', 'consumido')) doCliente`,
+          { id: v.Id, cli: cliAlvoId },
+        );
+        const extraCli = cliAlvoId ? (usosPorClienteExtra.get(cliAlvoId) ?? 0) : 0;
+        const eleg = await avaliarElegibilidadeVoucher({
+          voucherId: Number(v.Id),
+          usoUnico: Boolean(v.UsoUnico),
+          usoMaxTotal: v.UsoMaxTotal == null ? null : Number(v.UsoMaxTotal),
+          usoMaxCliente: Number(v.UsoMaxCliente ?? 1),
+          restritoClientes: Boolean(v.RestritoClientes),
+          usosTotais: Number(usos?.n ?? 0) + usosExtra,
+          usosClienteDirecto: Number(usos?.doCliente ?? 0) + extraCli,
+          clienteId: cliAlvoId,
+          documento: cliAlvoDoc,
+          reader: run,
+        });
+        if (!eleg.ok) throw new HttpError(400, eleg.motivo);
+        let d = v.Tipo === 'percentual' ? Math.round((alvo.liquido * (v.Valor as number)) / 100) : (v.Valor as number);
+        if (v.DescontoMaximoCentavos) d = Math.min(d, v.DescontoMaximoCentavos as number);
+        d = Math.min(d, alvo.liquido);
+        alvo.descontoCentavos += d;
+        alvo.liquido -= d;
+        alvo.voucherId = v.Id as number;
+        usosExtra++;
+        if (cliAlvoId) usosPorClienteExtra.set(cliAlvoId, extraCli + 1);
+        voucherUsos.push({
+          clienteId: cliAlvoId,
+          desconto: d,
+          autoLink: eleg.autoLinkClienteId && eleg.matchedVcId ? { vcId: eleg.matchedVcId, clienteId: eleg.autoLinkClienteId } : null,
+        });
+      }
       voucher = v;
     }
 
@@ -784,8 +797,8 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
       );
       if (i.inscricaoId) {
         await run(
-          `UPDATE dbo.Inscricao SET Pago = 1, Aprovada = 1, Status = 'confirmada', ValorCentavos = @liq, DescontoCentavos = @desc, VendaId = @vendaId, AtualizadoEm = SYSDATETIME() WHERE Id = @ins`,
-          { liq: i.liquido, desc: i.descontoCentavos, vendaId, ins: i.inscricaoId },
+          `UPDATE dbo.Inscricao SET Pago = 1, Aprovada = 1, Status = 'confirmada', ValorCentavos = @liq, DescontoCentavos = @desc, VendaId = @vendaId${i.voucherId ? ', VoucherId = @vid' : ''}, AtualizadoEm = SYSDATETIME() WHERE Id = @ins`,
+          { liq: i.liquido, desc: i.descontoCentavos, vendaId, ins: i.inscricaoId, ...(i.voucherId ? { vid: i.voucherId } : {}) },
         );
       }
     }
@@ -793,9 +806,11 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
       await run(`INSERT INTO dbo.VendaPagamento (VendaId, FormaPagamentoId, ValorCentavos) VALUES (@vendaId, @f, @v)`, { vendaId, f: pg.formaPagamentoId, v: pg.valor });
     }
     if (voucher) {
-      await run(`INSERT INTO dbo.VoucherUso (VoucherId, VendaId, ClienteId, DescontoCentavos) VALUES (@v, @vendaId, @cli, @d)`, { v: voucher.Id, vendaId, cli: clienteId ?? clienteVoucherId, d: voucherDesconto });
-      if (voucherAutoLink) {
-        await run(`UPDATE dbo.VoucherCliente SET ClienteId = @cid WHERE Id = @vcId AND ClienteId IS NULL`, { cid: voucherAutoLink.clienteId, vcId: voucherAutoLink.vcId });
+      for (const vu of voucherUsos) {
+        await run(`INSERT INTO dbo.VoucherUso (VoucherId, VendaId, ClienteId, DescontoCentavos) VALUES (@v, @vendaId, @cli, @d)`, { v: voucher.Id, vendaId, cli: vu.clienteId ?? clienteId, d: vu.desconto });
+        if (vu.autoLink) {
+          await run(`UPDATE dbo.VoucherCliente SET ClienteId = @cid WHERE Id = @vcId AND ClienteId IS NULL`, { cid: vu.autoLink.clienteId, vcId: vu.autoLink.vcId });
+        }
       }
       if (voucher.Origem === 'parceiro' && voucher.ParceiroId) {
         const base = itens.filter((i) => i.voucherId === Number(voucher!.Id)).reduce((total, i) => total + i.liquido, 0);

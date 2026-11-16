@@ -140,6 +140,22 @@ describe('vouchers nominais, grupos e esgotamento automatico', () => {
     });
     expect(cotaEsg.ok).toBe(false);
     if (!cotaEsg.ok) expect(cotaEsg.esgotado).toBe(true);
+    // 6) Grupo compartilhado de 82 usos com 8 debitados (Yan 2 usos, demais 1 uso) -> 74 restantes
+    const poolMock = [
+      { id: 10, voucherId: 10, clienteId: 124066, nome: 'Yan Rodrigues Serafim', documento: '18812184650', telefone: null, usosMax: 82, observacao: null, usosFeitos: 2, ultimoUsoEm: '2026-11-15T17:40' },
+      { id: 11, voucherId: 10, clienteId: 51684, nome: 'Andre Gomes Serafim', documento: '10163720606', telefone: null, usosMax: 82, observacao: null, usosFeitos: 1, ultimoUsoEm: '2026-11-10T20:03' },
+    ];
+    expect(resumirStatusVoucher({
+      ativo: true, fim: '2027-12-15', hoje: '2026-11-16',
+      usoUnico: false, usoMaxTotal: 82, restritoClientes: true, usos: 8,
+      beneficiarios: [{ usosMax: 82, usosFeitos: 2 }, { usosMax: 82, usosFeitos: 1 }],
+    })).toMatchObject({ limiteTotal: 82, restantes: 74, esgotado: false, status: 'ativo' });
+
+    const yanPodeMais = await avaliarElegibilidadeVoucher({
+      voucherId: 10, usoUnico: false, usoMaxTotal: 82, usoMaxCliente: 82, restritoClientes: true,
+      usosTotais: 8, usosClienteDirecto: 2, clienteId: 124066, documento: '18812184650', reader: async () => poolMock,
+    });
+    expect(yanPodeMais).toMatchObject({ ok: true, beneficiarioNome: 'Yan Rodrigues Serafim', restantesPessoa: 74 });
   });
 
   it('mantem contratos de UI e regra de Totem sem teclado na tela', () => {
@@ -149,6 +165,8 @@ describe('vouchers nominais, grupos e esgotamento automatico', () => {
     const caixaCs = readFileSync(join(root, 'desktop/src/Kartodromo.Recepcao/Caixa.cs'), 'utf8');
     const cadCs = readFileSync(join(root, 'desktop/src/Kartodromo.Recepcao/Cadastros.cs'), 'utf8');
     const totemCs = readFileSync(join(root, 'desktop/src/Kartodromo.Autoatendimento/FormTotem.cs'), 'utf8');
+    const grupoHtml = readFileSync(join(root, 'workers/pre-cadastro/public/index.html'), 'utf8');
+    const reservasTsx = readFileSync(join(root, 'apps/reservas/src/App.tsx'), 'utf8');
 
     expect(adminApp).toContain("['vouchers', 'Vouchers', IC.voucher");
     expect(adminHtml).toContain('/vouchers.js');
@@ -159,6 +177,12 @@ describe('vouchers nominais, grupos e esgotamento automatico', () => {
     expect(cadCs).toContain('class FormVoucherClientes');
     expect(caixaCs).toContain('/api/office/vouchers/cliente?clienteId=');
     expect(caixaCs).toContain('&clienteId=');
+    expect(caixaCs).toContain('["voucherAplicado"] = c.Voucher');
+
+    expect(grupoHtml).toContain('id="cupomCod"');
+    expect(grupoHtml).toContain('id="btnAplicarCupom"');
+    expect(grupoHtml).not.toContain("$('cupom')");
+    expect(reservasTsx).toContain('Voucher cobre 100% da reserva!');
 
     // Totem reconhece voucher automaticamente pelo CPF/cadastro sem campo ou teclado de digitacao de cupom
     expect(totemCs).toContain('/api/totem/vouchers-cliente?grupo=');

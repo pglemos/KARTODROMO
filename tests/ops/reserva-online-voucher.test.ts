@@ -274,4 +274,43 @@ describe('consumo atômico e estados do voucher', () => {
     await online.expirarVencidos(() => undefined);
     expect(usageState).toBe('liberado');
   });
+
+  it('confirma reserva quitada 100% por voucher gravando forma=voucher e VoucherId na inscrição', async () => {
+    const baseOne = db.one.getMockImplementation()!;
+    db.one.mockImplementation(async (sql: string, params: Record<string, unknown> = {}) => {
+      if (sql.includes('SELECT Estado, VoucherId, DescontoCentavos FROM dbo.ReservaOnlineVoucherUso')) {
+        return { Estado: 'reservado', VoucherId: 10, DescontoCentavos: 14500 };
+      }
+      return baseOne(sql, params);
+    });
+    reservation = { Id: 11, PedidoId: 'pedido-voucher-100', Codigo: 'K8V100', Status: 'aguardando', InscricaoIds: '71', ValorCentavos: 0, expira: '2026-10-13T12:15:00', BateriaId: 101, ClienteId: 42, Quantidade: 1 };
+    const result = await online.confirmarPagamento({
+      ...pedido('pedido-voucher-100'),
+      quantidade: 1,
+      status: 'pago',
+      pagamento: { asaasId: 'VOUCHER_K8V100', billingType: 'VOUCHER', pagoEm: '', valorCentavos: 0 },
+    } as never, () => undefined);
+    expect(result).toMatchObject({ acao: 'confirmado', codigo: 'K8V100' });
+    const updRes = statements.find((s) => s.sql.includes("UPDATE dbo.ReservaOnline SET Status = 'pago'"));
+    expect(updRes?.params.forma).toBe('voucher');
+    const updIns = statements.find((s) => s.sql.includes('VoucherId = COALESCE(VoucherId, @vid)'));
+    expect(updIns?.params.vid).toBe(10);
+  });
+
+  it('voucher nominal restrito (100%) em pedido de 2 pilotos desconta apenas 1 vaga do beneficiário', async () => {
+    voucher = { ...voucher, Id: 10, Codigo: 'KB2KB5NX', Valor: 100, DescontoMaximoCentavos: null, UsoUnico: 0, UsoMaxTotal: 82, UsoMaxCliente: 82, RestritoClientes: 1 };
+    const baseQuery = db.query.getMockImplementation()!;
+    db.query.mockImplementation(async (sql: string, params?: Record<string, unknown>) => {
+      if (sql.includes('FROM dbo.VoucherCliente vc')) {
+        return [{ id: 1, voucherId: 10, clienteId: 42, nome: 'Yan', documento: testDocument, usosMax: 82, usosFeitos: 2 }];
+      }
+      return baseQuery(sql, params);
+    });
+    expect(await preview({ codigo: 'KB2KB5NX', documento: testDocument, bateriaId: 101, quantidade: 1 })).toEqual({
+      brutoCentavos: 14500, descontoCentavos: 14500, totalCentavos: 0,
+    });
+    expect(await preview({ codigo: 'KB2KB5NX', documento: testDocument, bateriaId: 101, quantidade: 2 })).toEqual({
+      brutoCentavos: 29000, descontoCentavos: 14500, totalCentavos: 14500,
+    });
+  });
 });

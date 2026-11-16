@@ -313,6 +313,50 @@ describe('Office: concorrência de voucher nas vendas presenciais', () => {
     expect(updInscr).toHaveLength(2);
     expect(updInscr.every((s) => !s.sql.includes('TermoImpressoEm ='))).toBe(true);
   });
+
+  it('aplica voucher de 100% em múltiplos itens marcados (voucherAplicado) e registra 1 VoucherUso por piloto', async () => {
+    db.one.mockResolvedValueOnce({ id: 12, terminalId: 3 }).mockResolvedValueOnce({ v: 'true' });
+    const statements: { sql: string; params: Record<string, unknown> }[] = [];
+    db.tx.mockImplementation(async (work) => work(async (sql: string, params: Record<string, unknown> = {}) => {
+      statements.push({ sql, params });
+      if (sql.includes('b.Nome bateria')) {
+        const cid = params.inscricaoId === 201 ? 124066 : 51684;
+        return [{ Pago: 0, Status: 'reservada', ProdutoId: 4, ClienteId: cid, Nome: `Piloto ${cid}`, bateria: 'Bateria 20:30' }];
+      }
+      if (sql.includes('FROM dbo.VoucherCliente vc')) {
+        return [
+          { id: 1, voucherId: 10, clienteId: 124066, nome: 'Yan', documento: '18812184650', usosMax: 82, usosFeitos: 2 },
+          { id: 2, voucherId: 10, clienteId: 51684, nome: 'Andre', documento: '10163720606', usosMax: 82, usosFeitos: 1 },
+        ];
+      }
+      if (sql.includes('FROM dbo.Voucher v')) {
+        return [{ Id: 10, Codigo: 'KB2KB5NX', Tipo: 'percentual', Valor: 100, InicioEm: new Date('2026-11-10'), FimEm: new Date('2027-12-15'), UsoMaxCliente: 82, UsoMaxTotal: 82, UsoUnico: 0, RestritoClientes: 1, Ativo: 1 }];
+      }
+      if (sql.includes('CAST(SYSDATETIME() AS date)')) return [{ d: new Date('2026-11-16T12:00:00') }];
+      if (sql.includes('SELECT Documento, DocumentoNum FROM dbo.Cliente')) {
+        return [{ DocumentoNum: params.cid === 124066 ? '18812184650' : '10163720606' }];
+      }
+      if (sql.includes('COUNT(*)') && sql.includes('VoucherUso')) return [{ n: 8, doCliente: params.cli === 124066 ? 2 : 1 }];
+      if (sql.includes('INSERT INTO dbo.Venda (')) return [{ id: 27000 }];
+      return [];
+    }));
+
+    const res = await call('/vendas', 'POST', {
+      voucherCodigo: 'KB2KB5NX',
+      itens: [
+        { inscricaoId: 201, clienteId: 124066, voucherAplicado: true, unitarioCentavos: 14500 },
+        { inscricaoId: 202, clienteId: 51684, voucherAplicado: true, unitarioCentavos: 14500 },
+      ],
+      pagamentos: [],
+    });
+
+    expect(res).toMatchObject({ status: 201, body: { id: 27000, total: 0 } });
+    const voucherUsos = statements.filter((s) => s.sql.includes('INSERT INTO dbo.VoucherUso'));
+    expect(voucherUsos).toHaveLength(2);
+    expect(voucherUsos.map((s) => s.params.cli)).toEqual([124066, 51684]);
+    const updInscr = statements.filter((s) => s.sql.includes('VoucherId = @vid'));
+    expect(updInscr).toHaveLength(2);
+  });
 });
 
 describe('Office: mover reserva preserva os dados de cobrança', () => {
