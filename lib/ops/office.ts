@@ -640,7 +640,7 @@ export async function moverReservas(ids: number[], destino: number, grupoId?: nu
           (r.Pago ? ` · pago ${brl(jaPago)} · ${falta > 0 ? `diferença ${brl(falta)} a cobrar no caixa` : 'sem diferença a cobrar'}` : '');
         await run(
           `UPDATE kart.inscricao SET bateria_id = @destino, produto_id = @produtoDestino, preco_centavos = @precoDestino,
-           observacao = left(concat_ws(' · ', nullif(observacao, ''), @nota), 400), termo_impresso_em = NULL, atualizado_em = now() WHERE id = @id`,
+           observacao = left(concat_ws(' · ', nullif(observacao, ''), @nota::text), 400), termo_impresso_em = NULL, atualizado_em = now() WHERE id = @id`,
           { destino, id, produtoDestino: d.produtoId, precoDestino: d.preco, nota },
         );
         resultado.trocasDeServico += 1;
