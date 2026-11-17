@@ -34,6 +34,8 @@ for (const nome of nomes) {
       const ja = await destino.head(o.Key!);
       const etag = (o.ETag ?? '').replace(/"/g, '');
       if (ja && ja.size === o.Size && ja.etag === etag) return;
+      // depois da virada a VPS é a dona: nunca troca um objeto daqui por uma versão mais velha da Cloudflare
+      if (ja && o.LastModified && ja.uploaded.getTime() >= o.LastModified.getTime()) return;
       const g = await s3.send(new GetObjectCommand({ Bucket: nome, Key: o.Key! }));
       const corpo = await g.Body!.transformToByteArray();
       await destino.put(o.Key!, corpo, {

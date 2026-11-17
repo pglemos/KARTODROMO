@@ -72,7 +72,7 @@ for (const item of config.workers) {
   manifesto.push({
     nome,
     modulo,
-    rotas: [...rotas(w), ...(item.rotasExtras ?? []).map((h) => ({ host: h, caminho: '/', exato: false, dominio: true }))],
+    rotas: [...rotas(w), ...rotas({ routes: item.rotasZona ?? [] }), ...(item.rotasExtras ?? []).map((h) => ({ host: h, caminho: '/', exato: false, dominio: true }))],
     vars: w.vars ?? {},
     d1: (w.d1_databases ?? []).map(({ binding, database_name }) => ({ binding, database_name })),
     r2: (w.r2_buckets ?? []).map(({ binding, bucket_name }) => ({ binding, bucket_name })),

@@ -13,6 +13,12 @@ for (const alvo of alvos) {
   const [host, worker] = alvo.split('=');
   const registros = (await cf(`/zones/${ZONA}/dns_records?name=${host}`)).result ?? [];
   if (modo === 'vps') {
+    // rota de zona (host/*) apontando para Worker intercepta mesmo com registro A: sai também (guardada no log para o rollback)
+    const rotas = (await cf(`/zones/${ZONA}/workers/routes`)).result ?? [];
+    for (const r of rotas.filter((x) => x.pattern.split('/')[0] === host)) {
+      const d = await cf(`/zones/${ZONA}/workers/routes/${r.id}`, { method: 'DELETE' });
+      console.log(host, 'rota removida (rollback: recriar)', JSON.stringify({ pattern: r.pattern, script: r.script }), d.success);
+    }
     const d = dominios.find((x) => x.hostname === host);
     if (d) {
       const r = await cf(`/accounts/${A}/workers/domains/${d.id}`, { method: 'DELETE' });
@@ -28,6 +34,10 @@ for (const alvo of alvos) {
       const c = await cf(`/zones/${ZONA}/dns_records`, { method: 'POST', body: JSON.stringify({ type: 'A', name: host, content: VPS, proxied: true, ttl: 1, comment: 'kart-edge na VPS (Fase 4)' }) });
       console.log(host, '-> VPS (A proxied):', c.success, JSON.stringify(c.errors ?? []));
     }
+  } else if (modo === 'rota') {
+    // rollback de rota: <padrao>=<worker>
+    const r = await cf(`/zones/${ZONA}/workers/routes`, { method: 'POST', body: JSON.stringify({ pattern: host, script: worker }) });
+    console.log('rota', host, '->', worker, r.success, JSON.stringify(r.errors ?? []));
   } else if (modo === 'worker') {
     for (const x of registros.filter((x) => x.type === 'A' && x.content === VPS)) await cf(`/zones/${ZONA}/dns_records/${x.id}`, { method: 'DELETE' });
     const r = await cf(`/accounts/${A}/workers/domains`, { method: 'PUT', body: JSON.stringify({ hostname: host, service: worker, environment: 'production', zone_id: ZONA }) });

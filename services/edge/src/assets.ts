@@ -43,7 +43,7 @@ export class Assets {
       if (this.op.not_found_handling === 'single-page-application') alvo = arquivo(this.op.directory, '/index.html');
       else if (this.op.not_found_handling === '404-page') { alvo = arquivo(this.op.directory, '/404.html'); status = 404; }
     }
-    if (!alvo) return new Response('Not Found', { status: 404 });
+    if (!alvo) return new Response(null, { status: 404 }); // a Cloudflare devolve 404 vazio
     const st = statSync(alvo);
     const etag = `"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}"`;
     const h = new Headers({ 'content-type': TIPOS[extname(alvo).toLowerCase()] ?? 'application/octet-stream', etag, 'cache-control': 'public, max-age=0, must-revalidate' });
