@@ -1,0 +1,35 @@
+# kart-edge na VPS: os Workers da Cloudflare rodando em Node, atrás do Caddy do Kartódromo OS (rede caddy-sites).
+# Fica em /home/deploy/servicos/kart-edge/compose.yml; o build vem de services/edge/publicar.sh.
+services:
+  kart-edge:
+    image: node:24-alpine
+    container_name: kart-edge
+    command: ["node", "--disable-warning=ExperimentalWarning", "/app/server.mjs"]
+    user: "1000:1000"
+    environment:
+      EDGE_DIST: /app
+      EDGE_DADOS: /dados
+      EDGE_PORTA: "8787"
+      EDGE_LOG_ACESSO: "1"
+      TZ: America/Sao_Paulo
+    env_file:
+      - /srv/kart-edge/edge.env
+    volumes:
+      - /srv/kart-edge/dist:/app:ro
+      - /srv/kart-edge/dados:/dados
+    networks: [caddy-sites]
+    mem_limit: 768m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8787/__edge/saude"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+networks:
+  caddy-sites:
+    external: true
+    name: kartodromo-os_caddy-sites

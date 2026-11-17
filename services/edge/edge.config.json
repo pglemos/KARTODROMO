@@ -1,0 +1,12 @@
+{
+  "workers": [
+    { "wrangler": "workers/acesso-testadores/wrangler.jsonc" },
+    { "wrangler": "workers/app-operacional/wrangler.jsonc" },
+    { "wrangler": "workers/campeonato-200/wrangler.jsonc" },
+    { "wrangler": "workers/backup/wrangler.jsonc", "rotasExtras": ["backup.kartodromodebetim.com.br"] },
+    { "wrangler": "workers/resultados/wrangler.jsonc" },
+    { "wrangler": "workers/transmissao/wrangler.jsonc" },
+    { "wrangler": "workers/pre-cadastro/wrangler.jsonc" },
+    { "wrangler": "workers/admin/wrangler.jsonc" }
+  ]
+}
