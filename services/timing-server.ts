@@ -1,4 +1,5 @@
 import { invalidarAbertura } from '../lib/app-v1/abertura-frota';
+import { chassisFrota, gravarChassi } from '../lib/app-v1/chassi';
 /**
  * Servico de cronometragem proprio (substitui o LapTime.Server).
  *
@@ -3811,8 +3812,35 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       transponderMap[raw] = kart;
     } else delete transponderMap[raw];
     saveTransponders();
+    storeOperacional?.subirRevisao('frota'); // app do galpão vê o kart novo na hora
+    scheduleStateBroadcast();
     log(`transponder ${raw} -> kart ${kart || '(removido)'}`);
-    return send(res, 200, { ok: true });
+    return send(res, 200, { ok: true, kart });
+  }
+
+  // chassi de cada kart (o mesmo do app do galpão): o número do chassi é livre e não define a frota
+  if (path === '/api/frota/chassis' && method === 'GET') return send(res, 200, storeOperacional ? chassisFrota(storeOperacional) : {});
+  if (path === '/api/frota/chassis' && method === 'PUT') {
+    if (!storeOperacional) return send(res, 503, { error: 'Cadastro de chassi indisponível (app operacional desligado).' });
+    const body = await readBody(req);
+    const kartTxt = String(body.kart ?? '').trim();
+    const kart = /^\d{1,3}$/.test(kartTxt) ? String(Number(kartTxt)) : kartTxt;
+    const chassi = String(body.chassi ?? '').trim();
+    try {
+      if (!chassi) {
+        storeOperacional.db.prepare('DELETE FROM karts_chassi WHERE kart = ?').run(kart);
+        storeOperacional.subirRevisao('frota');
+        scheduleStateBroadcast();
+        log(`chassi do kart ${kart} removido`);
+        return send(res, 200, { ok: true, kart, chassi: null, liberadoDe: null });
+      }
+      const r = gravarChassi(storeOperacional, kart, chassi, 'cronometragem', kartsCadastrados());
+      scheduleStateBroadcast();
+      log(`chassi ${r.chassi} -> kart ${kart}${r.liberadoDe ? ` (saiu do kart ${r.liberadoDe})` : ''}`);
+      return send(res, 200, { ok: true, ...r });
+    } catch (err) {
+      return send(res, 400, { error: (err as Error).message });
+    }
   }
 
   if (path === '/api/agenda' && method === 'GET') {

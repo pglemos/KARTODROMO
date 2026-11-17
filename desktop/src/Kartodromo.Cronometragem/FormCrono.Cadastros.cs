@@ -37,28 +37,37 @@ public partial class FormCrono
 
             "CadGrupo" => CadastroGrupo(),
 
-            "CadTranspDePara" => new("Registro de transponder (De/Para)", "Número gravado no transponder → número do kart", "M7 7h10v10H7zM4 10h3M4 14h3M17 10h3M17 14h3M10 4v3M14 4v3M10 17v3M14 17v3", "linear-gradient(180deg, #48D6CC, #0E9C9C)",
-                [new("decoder", "Decoder", 2, "select", [$"{NomeDecoder()}={NomeDecoder()}"]), new("raw", "Nº original (transponder)", 2, "int"), new("kart", "Nº novo (kart)", 2)],
-                [new("Decoder", 0, r => r.S("decoder")), new("Nº original", 180, r => r.S("raw"), 'D'), new("Nº novo (kart)", 160, r => r.S("kart"), 'D')],
+            "CadTranspDePara" => new("Registro de kart (transponder e chassi)", "Nº do transponder → Nº do kart (1 a 99 Light · 100+ Super) → chassi", "M7 7h10v10H7zM4 10h3M4 14h3M17 10h3M17 14h3M10 4v3M14 4v3M10 17v3M14 17v3", "linear-gradient(180deg, #48D6CC, #0E9C9C)",
+                [new("decoder", "Decoder", 2, "select", [$"{NomeDecoder()}={NomeDecoder()}"]), new("raw", "Nº do transponder", 2, "int"), new("kart", "Nº do kart", 1, "int"), new("chassi", "Nº do chassi", 1)],
+                [new("Nº do transponder", 0, r => r.S("raw"), 'D'), new("Nº do kart", 120, r => r.S("kart"), 'D'), new("Frota", 100, r => FrotaDoKart(r.S("kart")), 'C'), new("Nº do chassi", 160, r => r.S("chassi"), 'D')],
                 new FonteReg
                 {
                     Listar = async () =>
                     {
                         var mapa = (await Crono.Api.Get("/api/transponders"))?.AsObject() ?? [];
-                        var lista = mapa.Select(kv => new JsonObject { ["id"] = kv.Key, ["raw"] = kv.Key, ["kart"] = kv.Value?.ToString(), ["decoder"] = NomeDecoder() })
+                        JsonObject chassis = [];
+                        try { chassis = (await Crono.Api.Get("/api/frota/chassis"))?.AsObject() ?? []; } catch (Exception ex) { Diagnostico.Registrar("Cadastro.Chassis", ex); }
+                        var lista = mapa.Select(kv => new JsonObject { ["id"] = kv.Key, ["raw"] = kv.Key, ["kart"] = kv.Value?.ToString(), ["chassi"] = chassis[kv.Value?.ToString() ?? ""]?.ToString() ?? "", ["decoder"] = NomeDecoder() })
                             .OrderBy(r => int.TryParse(r.S("kart"), out var k) ? k : 9999).ToList();
                         // lidos na pista sem kart: aparecem primeiro, sem número, para digitar o kart
-                        foreach (var t in _transpNovos.Where(t => !mapa.ContainsKey(t)).Reverse()) lista.Insert(0, new JsonObject { ["id"] = t, ["raw"] = t, ["kart"] = "", ["decoder"] = NomeDecoder() });
+                        foreach (var t in _transpNovos.Where(t => !mapa.ContainsKey(t)).Reverse()) lista.Insert(0, new JsonObject { ["id"] = t, ["raw"] = t, ["kart"] = "", ["chassi"] = "", ["decoder"] = NomeDecoder() });
                         return lista;
                     },
-                    Incluir = b => Crono.Api.Put("/api/transponders", new JsonObject { ["raw"] = b.S("raw"), ["kart"] = b.S("kart") }),
+                    Incluir = async b =>
+                    {
+                        var r = await Crono.Api.Put("/api/transponders", new JsonObject { ["raw"] = b.S("raw"), ["kart"] = b.S("kart") });
+                        await SalvarChassi(r?["kart"]?.ToString() ?? b.S("kart"), b.S("chassi"), "");
+                        return r;
+                    },
                     Alterar = async (r, b) =>
                     {
                         if (r.S("raw") != b.S("raw")) await Crono.Api.Put("/api/transponders", new JsonObject { ["raw"] = r.S("raw"), ["kart"] = "" });
-                        return await Crono.Api.Put("/api/transponders", new JsonObject { ["raw"] = b.S("raw"), ["kart"] = b.S("kart") });
+                        var res = await Crono.Api.Put("/api/transponders", new JsonObject { ["raw"] = b.S("raw"), ["kart"] = b.S("kart") });
+                        await SalvarChassi(res?["kart"]?.ToString() ?? b.S("kart"), b.S("chassi"), r.S("kart") == b.S("kart") ? r.S("chassi") : "");
+                        return res;
                     },
                     Excluir = r => Crono.Api.Put("/api/transponders", new JsonObject { ["raw"] = r.S("raw"), ["kart"] = "" }),
-                }) { Nome = "transponder", Padrao = () => new JsonObject { ["decoder"] = NomeDecoder() } },
+                }) { Nome = "kart", Padrao = () => new JsonObject { ["decoder"] = NomeDecoder() } },
 
             "CadTranspCompetidor" => new("Registro de transponder X competidor", "Qual número de competidor cada transponder representa, por categoria", "M7 7h10v10H7zM4 10h3M4 14h3M17 10h3M17 14h3M10 4v3M14 4v3M10 17v3M14 17v3", "linear-gradient(180deg, #48D6CC, #0E9C9C)",
                 [new("categoryId", "Categoria", 2, "lista", Itens: () => Crono.Arr(_catalog, "categories").Select((c, i) => new Campos.Item(i + 1, c.S("name"), c))), new("transponder", "Transponder", 2, "int"), new("kart", "Competidor (nº)", 2)],
@@ -73,6 +82,18 @@ public partial class FormCrono
         f.Depois = async () => { await CarregarCatalogo(); };
         f.ShowDialog(this);
         return true;
+    }
+
+    /// <summary>1 a 99 = Light, 100 em diante = Super (só pelo número do kart; o chassi não define a frota).</summary>
+    static string FrotaDoKart(string kart) => int.TryParse(kart, out var n) && n > 0 ? (n >= 100 ? "Super" : "Light") : "";
+
+    /// <summary>Grava o chassi do kart (mesmo cadastro do app do galpão). Chassi que estava em outro kart sai de lá (troca de placa/sensor).</summary>
+    async Task SalvarChassi(string kart, string chassi, string anterior)
+    {
+        chassi = (chassi ?? "").Trim();
+        if (string.IsNullOrEmpty(kart) || chassi == (anterior ?? "").Trim()) return;
+        var r = await Crono.Api.Put("/api/frota/chassis", new JsonObject { ["kart"] = kart, ["chassi"] = chassi });
+        if (r?["liberadoDe"]?.ToString() is { Length: > 0 } de) Msg.Info(this, $"O chassi {chassi} estava no kart {de} e agora está no kart {kart}. O kart {de} ficou sem chassi.");
     }
 
     string NomeDecoder() => (_state?["decoder"] as JsonObject)?.S("name") is { Length: > 0 } n ? n : "TranX (pista)";

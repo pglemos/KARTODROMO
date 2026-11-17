@@ -213,7 +213,7 @@ public partial class FormCrono : Form
         cad.DropDownItems.Add(new ToolStripSeparator());
         cad.DropDownItems.Add("Decoder", null, (_, _) => JanelaCadastro("CadDecoder"));
         cad.DropDownItems.Add("Placar", null, (_, _) => JanelaCadastro("PlacarConfig"));
-        cad.DropDownItems.Add("Transponder (De/Para)", null, (_, _) => Transponders());
+        cad.DropDownItems.Add("Kart: transponder e chassi (De/Para)", null, (_, _) => Transponders());
         cad.DropDownItems.Add("Transponder × Competidor", null, (_, _) => JanelaCadastro("CadTranspCompetidor"));
         var ferr = new ToolStripMenuItem("Ferramentas");
         ferr.DropDownItems.Add("Parâmetros do sistema", null, (_, _) => JanelaCadastro("ParamSistema"));

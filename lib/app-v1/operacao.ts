@@ -1,4 +1,4 @@
-import { chassisFrota, gravarChassi } from './chassi';
+import { chassisFrota, gravarChassi, soltarChassiDeOutroKart } from './chassi';
 import { indicadoresDia } from './indicadores-dia';
 import { tempoGalpao } from './tempo-galpao';
 import { criarAberturaFrota, kartLiberadoHoje } from './abertura-frota';
@@ -428,6 +428,7 @@ export function criarOperacao(d: DepsOperacao) {
         const chassiInformado = texto(p.chassi, 80);
         const chassi = chassiInformado || chassiRow?.chassi || null;
         if (chassiInformado && chassiInformado !== chassiRow?.chassi) {
+          soltarChassiDeOutroKart(d.store, kart, chassiInformado);
           d.store.db.prepare('INSERT OR REPLACE INTO karts_chassi (kart, chassi, atualizadoPor, atualizadoEm) VALUES (?, ?, ?, ?)').run(kart, chassiInformado, q.usuario, new Date().toISOString());
           d.store.subirRevisao('frota');
         }
