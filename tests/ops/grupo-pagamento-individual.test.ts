@@ -213,3 +213,17 @@ describe('grupo modo individual: blindagem contra rateio e R$ 140,91', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('diferença da troca de serviço (grupo "cada um paga o seu")', () => {
+  it('quem já pagou no site deve só a diferença; o pagamento antigo conta para a própria vaga', () => {
+    const g = { id: 1, codigo: 'GTESTE', modo: 'individual', preco: 14500, sinalPct: 0, responsavelId: 10, inicio: '2026-11-20T14:40', bateria: 'BATERIA 14:40' };
+    const piloto = (id: number, resp: boolean) => ({ id, ordem: id, responsavel: resp, clienteId: 10 + id, inscricaoId: 100 + id, token: 'T' + id, precoProprio: 14500, inscricaoPaga: false, pagoPeloGrupo: false, inscricaoStatus: 'reservada' });
+    const m = montar(g as never, [piloto(1, true), piloto(2, false)], [
+      { grupoId: 1, pilotoId: 1, valor: 9990 },
+      { grupoId: 1, pilotoId: 2, valor: 8990 },
+    ], []);
+    expect(m.pilotos.map((p) => p.falta_centavos)).toEqual([4510, 5510]);
+    expect(m.falta).toBe(10020);
+    expect(m.pilotos.every((p) => !p.pago)).toBe(true);
+  });
+});

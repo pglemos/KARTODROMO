@@ -548,6 +548,84 @@ async function criarCobranca(grupoId: number, pilotoId: number | null) {
   return { link: String(c.link), valor, reaproveitada: false };
 }
 
+/**
+ * Diferença a cobrar de reservas JÁ PAGAS que trocaram de serviço (ex.: Happy Hour R$ 89,90 → locação R$ 145): monta um
+ * grupo "cada um paga o seu" com essas vagas, lança como pago o que cada um já pagou e gera um link Asaas por pessoa só
+ * com a diferença. A vaga volta a "a pagar" com o que já entrou como desconto, então o caixa da Recepção também cobra só a
+ * diferença; quando o Asaas confirma, aplicarPagos marca a vaga paga pelo preço novo (como em qualquer grupo).
+ */
+export async function cobrarDiferencaEmGrupo(inscricaoIds: number[], usuarioId: number | null, log: Log) {
+  const ids = [...new Set(inscricaoIds.map(Number))].filter((n) => Number.isInteger(n) && n > 0);
+  if (!ids.length || ids.length > 40) throw new HttpError(400, 'Escolha as reservas (até 40).');
+  const gid = await tx(async (run) => {
+    const linhas = await run(
+      `SELECT i.id id, i.bateria_id "bateriaId", i.cliente_id "clienteId", i.responsavel_id "responsavelId", i.pago pago, i.status status,
+              coalesce(i.valor_centavos, 0) "valorPago", coalesce(i.preco_centavos, p.preco_centavos, 0) preco, c.nome nome, c.telefone telefone,
+              EXISTS (SELECT 1 FROM kart.reserva_grupo_piloto gp JOIN kart.reserva_grupo g ON g.id = gp.grupo_id WHERE gp.inscricao_id = i.id AND g.status = 'ativa') "noGrupo"
+         FROM kart.inscricao i JOIN kart.bateria b ON b.id = i.bateria_id LEFT JOIN kart.produto p ON p.id = coalesce(i.produto_id, b.produto_id)
+         JOIN kart.cliente c ON c.id = i.cliente_id
+        WHERE i.id IN (${ids.join(',')}) ORDER BY i.id for update of i`,
+    );
+    if (linhas.length !== ids.length) throw new HttpError(404, 'Reserva não encontrada.');
+    const bateriaId = Number(linhas[0].bateriaId);
+    for (const l of linhas) {
+      if (Number(l.bateriaId) !== bateriaId) throw new HttpError(409, 'As reservas precisam ser da mesma bateria.');
+      if (l.status === 'cancelada') throw new HttpError(409, `Reserva cancelada: ${l.nome}.`);
+      if (!l.pago) throw new HttpError(409, `${l.nome} ainda não pagou nada: use a reserva em grupo normal.`);
+      if (l.noGrupo) throw new HttpError(409, `${l.nome} já está numa reserva em grupo.`);
+    }
+    if (!linhas.some((l) => Number(l.preco) > Number(l.valorPago))) throw new HttpError(409, 'Nenhuma dessas reservas tem diferença a pagar.');
+    const resp = Number(linhas.find((l) => l.responsavelId)?.responsavelId ?? linhas[0].clienteId);
+    const preco = Math.max(...linhas.map((l) => Number(l.preco)));
+    const [g] = await run(
+      `INSERT INTO kart.reserva_grupo (codigo, bateria_id, responsavel_id, origem, modo, preco_centavos, sinal_pct, observacao, criado_por)
+        VALUES (@codigo, @b, @r, 'recepcao', 'individual', @preco, 0, @obs, @u) returning id id`,
+      { codigo: codigoNovo(), b: bateriaId, r: resp, preco, obs: 'Diferença da troca de serviço · cada um paga a sua diferença', u: usuarioId },
+    );
+    const grupoId = Number(g.id);
+    let ordem = 1;
+    // quem organiza primeiro (vaga 1), depois os outros na ordem das reservas
+    for (const l of [...linhas].sort((a, b) => Number(Number(b.clienteId) === resp) - Number(Number(a.clienteId) === resp))) {
+      const ehResp = Number(l.clienteId) === resp && ordem === 1;
+      const [pl] = await run(
+        `INSERT INTO kart.reserva_grupo_piloto (grupo_id, ordem, nome, telefone, menor, responsavel, cliente_id, inscricao_id, token, preco_centavos)
+         VALUES (@g, @o, NULL, @t, false, @r, @c, @i, @k, @preco) returning id id`,
+        { g: grupoId, o: ordem++, t: l.telefone ?? null, r: ehResp, c: l.clienteId, i: l.id, k: tokenNovo(), preco: Number(l.preco) },
+      );
+      const jaPago = Math.min(Number(l.valorPago), Number(l.preco));
+      if (jaPago > 0) {
+        await run(
+          `INSERT INTO kart.reserva_grupo_pagamento (grupo_id, piloto_id, valor_centavos, forma, origem, usuario_id) VALUES (@g, @p, @v, 'Pago antes da troca', 'site', @u)`,
+          { g: grupoId, p: Number(pl.id), v: jaPago, u: usuarioId },
+        );
+      }
+      if (Number(l.preco) > jaPago) {
+        // a vaga fica "a pagar" só pela diferença: o que já entrou vira desconto (o caixa cobra preço − desconto)
+        await run(
+          `UPDATE kart.inscricao SET pago = false, status = 'reservada', valor_centavos = NULL, desconto_centavos = @ja,
+             observacao = left(concat_ws(' · ', nullif(observacao, ''), @nota::text), 400), atualizado_em = now() WHERE id = @id`,
+          { id: l.id, ja: jaPago, nota: `Diferença no grupo (link de pagamento individual): já pago ${(jaPago / 100).toFixed(2).replace('.', ',')}` },
+        );
+      }
+    }
+    return grupoId;
+  });
+  log(`grupo ${gid}: diferença de troca de serviço (${ids.length} vaga(s))`);
+  await aplicarPagos(gid);
+  const g0 = await grupo(gid);
+  const links: { pilotoId: number; nome: string; valor: number; link: string | null; erro?: string }[] = [];
+  for (const p of g0.pilotos) {
+    if (p.falta_centavos <= 0) continue;
+    try {
+      const c = await criarCobranca(gid, Number(p.id));
+      links.push({ pilotoId: Number(p.id), nome: String(p.nome), valor: c.valor, link: c.link });
+    } catch (e) {
+      links.push({ pilotoId: Number(p.id), nome: String(p.nome), valor: p.falta_centavos, link: null, erro: (e as Error).message });
+    }
+  }
+  return { grupo: await grupo(gid), links };
+}
+
 /** A cada minuto: confere no Asaas as cobranças em aberto e lança o pagamento de quem pagou. */
 let proximaConferenciaGeral = 0;
 /**
@@ -1440,6 +1518,12 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     return true;
   }
 
+  if (path === '/grupos/diferenca' && method === 'POST') {
+    const b = await req.body();
+    const ids = (Array.isArray(b.inscricoes) ? b.inscricoes : []).map((x: unknown) => int(x, 'Reserva'));
+    send(201, await cobrarDiferencaEmGrupo(ids, sessao.uid, (...a) => console.log(...a)));
+    return true;
+  }
   if ((m = path.match(/^\/grupos\/(\d+)\/cobrancas$/)) && method === 'POST') {
     const id = Number(m[1]);
     const b = await req.body();
@@ -1757,15 +1841,15 @@ export async function enviarLembretesDosGrupos(log: Log) {
   if (!siteUrl() || !siteChave() || Date.now() < proximosLembretes) return 0;
   proximosLembretes = Date.now() + 15 * 60_000;
   const janela = `b.inicio > now() + interval '2 hours' AND b.inicio <= now() + interval '48 hours'`;
-  const pagar = await query<{ grupoId: number; pilotoId: number; nome: string; email: string; bateria: string; inicio: string; preco: number; origem: string; responsavel: string; token: string; cobranca: string | null }>(
+  const pagar = await query<{ grupoId: number; pilotoId: number; nome: string; email: string; bateria: string; inicio: string; preco: number; origem: string; responsavel: string; token: string; cobranca: string | null; valorCobranca: number | null }>(
     `SELECT g.id "grupoId", p.id "pilotoId", c.nome nome, c.email email, b.nome bateria, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio, g.preco_centavos preco, g.origem origem,
-            r.nome responsavel, rt.token token, cob.link cobranca
+            r.nome responsavel, rt.token token, cob.link cobranca, cob.valor_centavos "valorCobranca"
        FROM kart.reserva_grupo g JOIN kart.bateria b ON b.id = g.bateria_id JOIN kart.cliente r ON r.id = g.responsavel_id
        JOIN kart.reserva_grupo_piloto p ON p.grupo_id = g.id AND p.cliente_id IS NOT NULL
        JOIN kart.cliente c ON c.id = p.cliente_id
        JOIN kart.inscricao i ON i.id = p.inscricao_id
        JOIN kart.reserva_grupo_piloto rt ON rt.grupo_id = g.id AND rt.responsavel = true
-       LEFT JOIN LATERAL (SELECT link FROM kart.reserva_grupo_cobranca WHERE piloto_id = p.id AND status = 'aguardando' ORDER BY id DESC LIMIT 1) cob ON true
+       LEFT JOIN LATERAL (SELECT link, valor_centavos FROM kart.reserva_grupo_cobranca WHERE piloto_id = p.id AND status = 'aguardando' ORDER BY id DESC LIMIT 1) cob ON true
       WHERE g.status = 'ativa' AND g.modo = 'individual' AND ${janela}
         AND i.status <> 'cancelada' AND i.pago = false AND i.venda_id IS NULL AND c.email LIKE '%_@_%._%'
         -- só com a cobrança aberta: o link dela paga direto na Asaas (refazer o cadastro pelo link do grupo é ruim)
@@ -1782,7 +1866,7 @@ export async function enviarLembretesDosGrupos(log: Log) {
   );
   const lembretes = [
     ...pagar.map((x) => ({ chave: `pagar-${x.pilotoId}-${x.inicio.replace(/\D/g, '')}`, tipo: 'pagar', para: x.email, nome: x.nome, bateria: x.bateria, inicio: x.inicio,
-      link: String(x.cobranca), responsavel: primeiroNome(x.responsavel), valorCentavos: Number(x.preco) || 0, soltaEm24h: x.origem === 'site' })),
+      link: String(x.cobranca), responsavel: primeiroNome(x.responsavel), valorCentavos: Number(x.valorCobranca ?? x.preco) || 0, soltaEm24h: x.origem === 'site' })),
     ...cadastros.map((x) => ({ chave: `cadastros-${x.grupoId}-${x.inicio.replace(/\D/g, '')}`, tipo: 'cadastros', para: x.email, nome: x.nome, bateria: x.bateria, inicio: x.inicio,
       link: linkCadastro(x.token), painel: linkPainel(x.codigo), faltam: Number(x.faltam) || 0, soltaEm24h: x.origem === 'site' && x.modo === 'individual' })),
   ];
