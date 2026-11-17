@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "arial",
+        "createdAt": "2026-11-17T23:04:28.556Z",
+        "reason": "print-only internal PDF guide; system font fallback is intentional"
+      }
+    ]
+  }
+}

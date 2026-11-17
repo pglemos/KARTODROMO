@@ -1679,6 +1679,7 @@ public partial class FormCrono : Form
     async Task AutoTesteAsync()
     {
         Directory.CreateDirectory(_autoteste);
+        if (Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "manual-kart") { await TestarManualKartAsync(); return; }
         if (Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "recuperar") { await TestarRecuperarPiloto(); return; }
         if (Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "redutor") { await TestarEditorRedutor(); return; }
         if (Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "ordenacao") { await TesteOrdenacaoAsync(); return; }

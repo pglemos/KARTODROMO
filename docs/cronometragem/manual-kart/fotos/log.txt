@@ -1,0 +1,11 @@
+OK    karts de teste 98 e 97 livres antes do teste
+OK    transponder 9990001 ligado ao kart 98
+OK    chassi TESTE-301 gravado no kart 98
+OK    chassi TESTE-302 gravado no kart 97
+AVISO NA TELA: INFO: O chassi TESTE-302 estava no kart 97 e agora está no kart 98. O kart 97 ficou sem chassi.
+OK    troca: chassi TESTE-302 foi para o kart 98 e o kart 97 ficou sem chassi
+OK    kart 0 recusado pelo servidor
+OK    kart '097' gravado como 97
+OK    janela 'Registro de kart' abriu pelo menu
+OK    limpeza: transponders de teste removidos
+RESULTADO: TUDO OK

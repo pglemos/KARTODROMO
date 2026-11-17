@@ -1,0 +1,167 @@
+[
+  {
+    "foto": "01-tela-principal-menu-cadastros.png",
+    "largura": 1600,
+    "altura": 960,
+    "alvos": [
+      {
+        "x": 344,
+        "y": 42,
+        "w": 87,
+        "h": 29
+      }
+    ]
+  },
+  {
+    "foto": "02-menu-cadastros-aberto.png",
+    "largura": 289,
+    "altura": 236,
+    "alvos": [
+      {
+        "x": 0,
+        "y": 190,
+        "w": 288,
+        "h": 22,
+        "nome": "Kart: transponder e chassi (De/Para)"
+      }
+    ]
+  },
+  {
+    "foto": "03-registro-de-kart-lista.png",
+    "largura": 1060,
+    "altura": 680,
+    "alvos": [
+      {
+        "x": 158,
+        "y": 636,
+        "w": 78,
+        "h": 32,
+        "nome": "\u002B Novo"
+      }
+    ]
+  },
+  {
+    "foto": "04-novo-campos-vazios.png",
+    "largura": 1060,
+    "altura": 680,
+    "alvos": [
+      {
+        "x": 364,
+        "y": 99,
+        "w": 332,
+        "h": 34,
+        "nome": ""
+      },
+      {
+        "x": 710,
+        "y": 99,
+        "w": 159,
+        "h": 34,
+        "nome": ""
+      },
+      {
+        "x": 883,
+        "y": 99,
+        "w": 159,
+        "h": 34,
+        "nome": ""
+      }
+    ]
+  },
+  {
+    "foto": "05-novo-preenchido.png",
+    "largura": 1060,
+    "altura": 680,
+    "alvos": [
+      {
+        "x": 364,
+        "y": 99,
+        "w": 332,
+        "h": 34,
+        "nome": ""
+      },
+      {
+        "x": 710,
+        "y": 99,
+        "w": 159,
+        "h": 34,
+        "nome": ""
+      },
+      {
+        "x": 883,
+        "y": 99,
+        "w": 159,
+        "h": 34,
+        "nome": ""
+      },
+      {
+        "x": 905,
+        "y": 634,
+        "w": 137,
+        "h": 34,
+        "nome": "Gravar e fechar"
+      }
+    ]
+  },
+  {
+    "foto": "06-gravado-na-lista.png",
+    "largura": 1060,
+    "altura": 680,
+    "alvos": []
+  },
+  {
+    "foto": "07-editar-selecionado.png",
+    "largura": 1060,
+    "altura": 680,
+    "alvos": [
+      {
+        "x": 244,
+        "y": 636,
+        "w": 66,
+        "h": 32,
+        "nome": "Editar"
+      }
+    ]
+  },
+  {
+    "foto": "08-trocar-chassi.png",
+    "largura": 1060,
+    "altura": 680,
+    "alvos": [
+      {
+        "x": 883,
+        "y": 99,
+        "w": 159,
+        "h": 34,
+        "nome": ""
+      },
+      {
+        "x": 905,
+        "y": 634,
+        "w": 137,
+        "h": 34,
+        "nome": "Gravar e fechar"
+      }
+    ]
+  },
+  {
+    "foto": "09-chassi-trocado.png",
+    "largura": 1060,
+    "altura": 680,
+    "alvos": []
+  },
+  {
+    "foto": "10-excluir.png",
+    "largura": 1060,
+    "altura": 680,
+    "alvos": [
+      {
+        "x": 318,
+        "y": 636,
+        "w": 69,
+        "h": 32,
+        "nome": "Excluir"
+      }
+    ]
+  }
+]

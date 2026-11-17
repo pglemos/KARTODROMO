@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Cadastro de kart – Cronometragem</title>
+<style>
+@page { size: A4; margin: 12mm 12mm 14mm; }
+:root { --verde:#14804a; --verm:#e51e2d; --tinta:#16181c; --cinza:#5b616b; --linha:#dfe2e6; --fundo:#f5f6f8; --amarelo:#fff6d6; --borda-am:#e0a800; }
+* { box-sizing: border-box; }
+body { font-family: "Segoe UI", -apple-system, Helvetica, Arial, sans-serif; color:var(--tinta); font-size:10.5pt; line-height:1.42; margin:0; }
+img { max-width:100%; display:block; border:1px solid var(--linha); border-radius:6px; }
+.capa { height: 265mm; display:flex; flex-direction:column; justify-content:center; padding: 0 8mm; }
+.capa .tag { color:var(--verde); font-weight:700; letter-spacing:.12em; font-size:10pt; }
+.capa h1 { font-size:34pt; line-height:1.05; margin:8px 0 10px; }
+.capa p { font-size:13pt; color:var(--cinza); margin:0 0 22px; max-width:150mm; }
+.regras { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:12px; }
+.regra { background:var(--fundo); border-radius:10px; padding:12px 14px; }
+.regra .big { display:block; font-size:15pt; margin-bottom:3px; }
+.regra span { color:var(--cinza); font-size:10pt; }
+.sumario { margin-top:26px; columns:2; font-size:11pt; }
+.sumario div { margin:2px 0; }
+h2.secao { margin-top:18px !important; break-after: avoid; } h2.secao.pg { break-before: page; } h2.secao { font-size:18pt; margin:0 0 4px; padding-bottom:6px; border-bottom:3px solid var(--tinta); }
+.sub { color:var(--cinza); margin:0 0 12px; }
+.passo { break-inside: avoid; border:1px solid var(--linha); border-radius:12px; padding:12px 14px 14px; margin:0 0 12px; }
+.passo h3 { margin:0 0 8px; font-size:13pt; display:flex; align-items:center; gap:10px; }
+.num { flex:none; width:30px; height:30px; border-radius:50%; background:var(--verde); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:13pt; }
+.quadro { display:grid; grid-template-columns: 1fr 1fr; gap:6px 14px; margin:8px 0 0; font-size:10pt; }
+.quadro div { background:var(--fundo); border-radius:8px; padding:6px 10px; }
+.quadro .rot { display:block; font-size:8.5pt; letter-spacing:.06em; color:var(--cinza); text-transform:uppercase; }
+.lado { display:grid; grid-template-columns: 1.15fr 1fr; gap:12px; align-items:start; }
+.zooms { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.zooms img { height:92px; width:auto; }
+.digite { font-family: Consolas, Menlo, monospace; background:#111; color:#fff; padding:1px 7px; border-radius:4px; font-size:10pt; }
+.aviso { background:var(--amarelo); border:1.5px solid var(--borda-am); border-radius:8px; padding:8px 11px; margin:8px 0 0; }
+.ok { background:#eaf8ee; border-color:#1fae4b; }
+.vm { color:var(--verm); font-weight:700; }
+table { border-collapse:collapse; width:100%; font-size:10pt; }
+td, th { border:1px solid var(--linha); padding:6px 8px; text-align:left; vertical-align:top; }
+th { background:var(--fundo); }
+.pe { color:var(--cinza); font-size:8.5pt; margin-top:10px; }
+</style></head><body>
+
+<section class="capa">
+  <div class="tag">KARTÓDROMO INTERNACIONAL DE BETIM · CRONOMETRAGEM</div>
+  <h1>Cadastro de kart<br>no programa da cronometragem</h1>
+  <p>Passo a passo com as telas reais do programa <b>Kartódromo Cronometragem</b> (versão 1.0.114): ligar o transponder ao número do kart, informar o chassi, trocar placa e sensor de chassi e conferir na pista.</p>
+  <div class="regras">
+    <div class="regra"><b>1 a 99</b><span>Número do kart da frota <b>Light</b> (lastro 90 kg)</span></div>
+    <div class="regra"><b>100 em diante</b><span>Número do kart da frota <b>Super</b> (lastro 100 kg)</span></div>
+    <div class="regra"><b>Chassi livre</b><span>Qualquer número ou texto. O chassi <b>não</b> define Light ou Super.</span></div>
+  </div>
+  <div class="sumario">
+    <div><span class="rot">A.</span> Cadastrar um kart do zero</div>
+    <div><span class="rot">B.</span> Conferir na pista</div>
+    <div><span class="rot">C.</span> Trocar placa e sensor de chassi</div>
+    <div><span class="rot">D.</span> Trocar o número ou desligar um transponder</div>
+    <div><span class="rot">E.</span> Transponder que passou sem cadastro</div>
+    <div><span class="rot">F.</span> Depois do cadastro (app do galpão)</div>
+    <div><span class="rot">G.</span> Problemas comuns</div>
+  </div>
+  <p class="pe">Todas as telas deste manual foram tiradas do programa instalado no computador da cronometragem em 17/11/2026, durante um teste real de cadastro (karts de teste 97 e 98, apagados ao final).</p>
+</section>
+
+<h2 class="secao pg">A. Cadastrar um kart do zero</h2>
+<p class="sub">Antes de começar, tenha em mãos: o <b>número do transponder</b> (etiqueta no próprio transponder), o <b>número do kart</b> (placa) e o <b>número do chassi</b> (gravado ou plaqueta no chassi).</p>
+
+<div class="passo">
+  <h3><span class="num">1</span>Abrir o programa da cronometragem</h3>
+  <p>Na área de trabalho do computador da cronometragem, dê dois cliques no ícone <b>Kartódromo Cronometragem</b>. Se o programa já estiver aberto (como na hora das baterias), use ele mesmo: o cadastro pode ser feito com corrida em andamento.</p>
+</div>
+
+<div class="passo">
+  <h3><span class="num">2</span>Clicar no menu <span class="vm">Cadastros</span></h3>
+  <img src="marcadas/01-tela-principal-menu-cadastros-marcada.png">
+  <div class="quadro">
+    <div><span class="rot">Onde clicar</span>Menu <b>Cadastros</b>, na barra de cima, ao lado de “Início”.</div>
+    <div><span class="rot">O que abre</span>A lista de cadastros do programa.</div>
+  </div>
+  <div class="zooms"><img src="marcadas/x-menu-barra.png"></div>
+</div>
+
+<div class="passo">
+  <h3><span class="num">3</span>Clicar em <span class="vm">Kart: transponder e chassi (De/Para)</span></h3>
+  <div class="lado">
+    <img src="marcadas/02-menu-cadastros-aberto-marcada.png">
+    <div class="quadro" style="grid-template-columns:1fr">
+      <div><span class="rot">Onde clicar</span>Item <b>Kart: transponder e chassi (De/Para)</b>, quase no fim da lista.</div>
+      <div><span class="rot">O que abre</span>A janela <b>Registro de kart (transponder e chassi)</b>.</div>
+      <div><span class="rot">Atenção</span>Não confundir com “Transponder × Competidor”, que fica logo abaixo e serve para outra coisa.</div>
+    </div>
+  </div>
+</div>
+
+<div class="passo">
+  <h3><span class="num">4</span>Na janela que abriu, clicar em <span class="vm">+ Novo</span></h3>
+  <img src="marcadas/03-registro-de-kart-lista-marcada.png">
+  <div class="quadro">
+    <div><span class="rot">O que aparece</span>A lista de todos os karts: transponder, número do kart, frota (Light ou Super) e chassi.</div>
+    <div><span class="rot">Onde clicar</span>Botão verde <b>+ Novo</b>, no canto de baixo à esquerda.</div>
+  </div>
+</div>
+
+<div class="passo">
+  <h3><span class="num">5</span>Os campos de cima ficam em branco para digitar</h3>
+  <img src="marcadas/04-novo-campos-vazios-marcada.png">
+  <div class="quadro">
+    <div><span class="rot">1 · Nº do transponder</span>Número da etiqueta do transponder. Só números.</div>
+    <div><span class="rot">2 · Nº do kart</span>Número da placa do kart. Só números, de 1 a 999.</div>
+    <div><span class="rot">3 · Nº do chassi</span>Número do chassi, do jeito que está gravado nele.</div>
+    <div><span class="rot">Decoder</span>Deixe como está: <b>TranX (pista)</b>.</div>
+  </div>
+</div>
+
+<div class="passo">
+  <h3><span class="num">6</span>Digitar os três números e clicar em <span class="vm">Gravar e fechar</span></h3>
+  <img src="marcadas/05-novo-preenchido-marcada.png">
+  <div class="quadro">
+    <div><span class="rot">Exemplo do teste</span>Transponder <span class="digite">9990001</span> · Kart <span class="digite">98</span> · Chassi <span class="digite">TESTE-301</span></div>
+    <div><span class="rot">Onde clicar</span><b>4 · Gravar e fechar</b> (botão verde, canto de baixo à direita).</div>
+  </div>
+  <div class="zooms"><img src="marcadas/05-novo-preenchido-zoom1.png"><img src="marcadas/05-novo-preenchido-zoom2.png"><img src="marcadas/05-novo-preenchido-zoom3.png"><img src="marcadas/05-novo-preenchido-zoom4.png"></div>
+  <div class="aviso">Digite o número do kart sem zero na frente e sem letras: <b>7</b>, e não “07” nem “K7”. Se digitar “07”, o programa grava como 7.</div>
+</div>
+
+<div class="passo">
+  <h3><span class="num">7</span>Conferir: o kart aparece na lista com a frota e o chassi</h3>
+  <img src="marcadas/x-resultado-lista.png">
+  <div class="aviso ok">Abra de novo <b>Cadastros › Kart: transponder e chassi</b> e role a lista até o número do kart. A coluna <b>Frota</b> é preenchida sozinha pelo número do kart (98 = Light).</div>
+</div>
+
+<h2 class="secao">B. Conferir na pista</h2>
+<div class="passo">
+  <h3><span class="num">8</span>Dar uma volta com o kart e olhar o Registro de passagens</h3>
+  <img src="marcadas/x-passagens.png">
+  <div class="quadro">
+    <div><span class="rot">Onde olhar</span>Quadro verde <b>REGISTRO DE PASSAGENS</b>, à esquerda na tela principal.</div>
+    <div><span class="rot">Certo</span>A passagem aparece com o <b>número do kart</b> na coluna Nº.</div>
+  </div>
+  <div class="aviso">Se aparecer um aviso vermelho de transponder sem kart no rodapé, ou o kart não contar volta, veja as partes <b>E</b> e <b>G</b>.</div>
+</div>
+
+<h2 class="secao pg">C. Trocar placa e sensor de chassi</h2>
+<p class="sub">Use quando o kart quebra e a placa com o número e o sensor (transponder) vão para outro chassi, ou quando há troca de karts no endurance. O número do kart e o transponder continuam os mesmos; só muda o chassi.</p>
+
+<div class="passo">
+  <h3><span class="num">1</span>Selecionar o kart na lista e clicar em <span class="vm">Editar</span></h3>
+  <img src="marcadas/07-editar-selecionado-marcada.png">
+  <div class="quadro">
+    <div><span class="rot">Como achar o kart</span>Role a lista ou digite o número na busca do canto de cima à direita.</div>
+    <div><span class="rot">Onde clicar</span>Clique na linha do kart e depois em <b>Editar</b>.</div>
+  </div>
+</div>
+
+<div class="passo">
+  <h3><span class="num">2</span>Digitar o chassi novo e clicar em <span class="vm">Gravar e fechar</span></h3>
+  <img src="marcadas/08-trocar-chassi-marcada.png">
+  <div class="quadro">
+    <div><span class="rot">No exemplo</span>A placa 98 foi para o chassi <span class="digite">TESTE-302</span>, que estava no kart 97.</div>
+    <div><span class="rot">O que o programa faz</span>Avisa: <i>“O chassi TESTE-302 estava no kart 97 e agora está no kart 98. O kart 97 ficou sem chassi.”</i></div>
+  </div>
+</div>
+
+<div class="passo">
+  <h3><span class="num">3</span>Resultado: o chassi saiu do kart antigo</h3>
+  <img src="marcadas/x-troca-lista.png">
+  <div class="aviso ok">Um chassi só fica em um kart. O kart que perdeu o chassi fica com o campo em branco: quando ele ganhar outro chassi, edite e preencha.</div>
+</div>
+
+<h2 class="secao">D. Trocar o número ou desligar um transponder</h2>
+<div class="passo">
+  <h3><span class="num">1</span>Trocar o número do kart de um transponder</h3>
+  <p>Selecione a linha, clique em <b>Editar</b>, troque o <b>Nº do kart</b> e clique em <b>Gravar e fechar</b>. Cada kart tem um transponder só: se o número já tinha outro transponder, esse outro é desligado sozinho.</p>
+</div>
+<div class="passo">
+  <h3><span class="num">2</span>Desligar um transponder (sensor que saiu da frota)</h3>
+  <img src="marcadas/10-excluir-marcada.png">
+  <div class="quadro">
+    <div><span class="rot">Onde clicar</span>Selecione a linha e clique em <b>Excluir</b> (texto vermelho, embaixo).</div>
+    <div><span class="rot">O que acontece</span>O transponder deixa de contar volta para aquele kart. O chassi do kart continua guardado.</div>
+  </div>
+</div>
+
+<h2 class="secao">E. Transponder que passou sem cadastro</h2>
+<div class="passo">
+  <h3><span class="num">1</span>Aviso de transponder sem kart</h3>
+  <p>Quando um transponder sem cadastro passa pela linha de chegada, aparece um aviso no rodapé da tela principal. <b>Clique no aviso</b>: abre a mesma janela <b>Registro de kart</b>, com o transponder lido já no topo da lista e o número do kart em branco.</p>
+  <p>Clique na linha, depois em <b>Editar</b>, digite o <b>Nº do kart</b> e o <b>Nº do chassi</b> e clique em <b>Gravar e fechar</b>. Assim você nem precisa ler a etiqueta do transponder.</p>
+</div>
+
+<h2 class="secao">F. Depois do cadastro (app do galpão)</h2>
+<div class="passo">
+  <h3><span class="num">1</span>O kart aparece no app na hora</h3>
+  <p>O cadastro feito no programa da cronometragem é o mesmo do app do tablet. Em <b>Frota</b>, o kart novo aparece com o chassi (<b>CH …</b>). Se não aparecer, arraste a tela para baixo para atualizar.</p>
+</div>
+<div class="passo">
+  <h3><span class="num">2</span>Kart que estava na oficina</h3>
+  <p>No app, em <b>Frota › OFICINA</b>, toque no kart e em <b>Concluir oficina · enviar à abertura</b>.</p>
+</div>
+<div class="passo">
+  <h3><span class="num">3</span>Liberar para o sorteio (todo dia)</h3>
+  <p>No app, em <b>Frota › Abertura do dia</b>: faça o checklist do kart, toque em <b>Enviar checklist do kart X</b> e o responsável toca em <b>Aceitar e liberar kart X</b>. O kart fica <b>LIVRE</b> (verde) e entra no sorteio da frota dele.</p>
+  <div class="aviso">Kart novo, ou que mexeu em motor ou carburação, deve passar pela <b>Equalização</b> antes de rodar com cliente.</div>
+</div>
+
+<h2 class="secao pg">G. Problemas comuns</h2>
+<table>
+<tr><th style="width:42%">O que acontece</th><th>O que fazer</th></tr>
+<tr><td>Aviso “Número do kart inválido”</td><td>Use só números de 1 a 999.</td></tr>
+<tr><td>Kart passa e não aparece com número</td><td>Transponder sem cadastro: parte <b>E</b>.</td></tr>
+<tr><td>Kart não conta volta nenhuma</td><td>Transponder descarregado ou mal preso. Carregue, prenda e dê outra volta.</td></tr>
+<tr><td>Kart no Light mas deveria ser Super</td><td>A frota vem só do número do kart: 1 a 99 = Light, 100 ou mais = Super. Confira o número da placa.</td></tr>
+<tr><td>Chassi aparece em dois karts</td><td>Não acontece: ao gravar o chassi num kart, ele sai do outro automaticamente (parte <b>C</b>).</td></tr>
+<tr><td>Kart não aparece no app do galpão</td><td>Confira se ele está nesta lista. No app, arraste a tela para baixo.</td></tr>
+<tr><td>“Nenhum kart Light/Super livre” no sorteio</td><td>Faça a abertura do dia no app (parte <b>F</b>).</td></tr>
+<tr><td>Programa sem o campo “Nº do chassi”</td><td>Feche e abra o programa para ele se atualizar (versão 1.0.114 ou mais nova, aparece no rodapé).</td></tr>
+</table>
+<p class="pe">Teste de 17/11/2026 no programa instalado: cadastro, chassi, troca de chassi, kart inválido (0), zero à esquerda (097 → 97) e exclusão conferidos. Os karts de teste foram apagados.</p>
+</body></html>
