@@ -245,7 +245,7 @@
 // aovivo.* (ou ?publico=1): para quem assiste de fora. A TV do kartódromo segue com rolagem automática e sem ponteiro.
 const PUBLICO = location.hostname.startsWith('aovivo.') || new URLSearchParams(location.search).has('publico');
 // foto do piloto (do banco do kartódromo, pelo kart da bateria): só na TV da rede local; sem foto, a imagem some
-const fotoHtml = (kart, sessao, cls, mini) => (PUBLICO || !kart ? '' : `<img class="${cls}" src="/foto-piloto?kart=${encodeURIComponent(kart)}&b=${encodeURIComponent(sessao || '')}${mini ? '&mini=1' : ''}" alt="" onerror="this.remove()">`);
+const fotoHtml = (kart, sessao, cls, mini) => (PUBLICO || !kart ? '' : `<img class="${cls}" src="/api/foto-piloto?kart=${encodeURIComponent(kart)}&b=${encodeURIComponent(sessao || '')}${mini ? '&mini=1' : ''}" alt="" onerror="this.remove()">`);
 if (PUBLICO) document.body.classList.add('publico');
 const fmt = (ms) => { if (ms == null) return '–'; const s = ms / 1000, m = Math.floor(s / 60); const r = (s - m * 60).toFixed(3); return m ? `${m}:${r.padStart(6, '0')}` : r; };
 const relogio = (ms) => { const t = Math.max(0, Math.ceil((ms || 0) / 1000)); return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };

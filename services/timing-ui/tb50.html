@@ -886,7 +886,7 @@ function fotoOuCapacete(cls, kart, sessao, estilo) {
   var k = String(kart || '').replace(/^\s+|\s+$/g, '');
   var st = estilo ? ' style="' + estilo + '"' : '';
   if (!k || k === '-') return '<img class="' + cls + '" src="/podio-final/helmet-premium.png" alt=""' + st + '>';
-  var src = '/foto-piloto?kart=' + encodeURIComponent(k) + '&b=' + encodeURIComponent(sessao || '');
+  var src = '/api/foto-piloto?kart=' + encodeURIComponent(k) + '&b=' + encodeURIComponent(sessao || '');
   return '<img class="' + cls + ' foto-piloto" src="' + src + '" alt=""' + st +
     ' onerror="this.onerror=null;this.className=\'' + cls + '\';this.src=\'/podio-final/helmet-premium.png\'">';
 }

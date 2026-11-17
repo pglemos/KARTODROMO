@@ -2713,8 +2713,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
   }
 
   if (path === '/api/state') return send(res, 200, veioDaInternet(req) ? JSON.parse(jsonPublico(stateView())) : stateView());
-  // foto do piloto do kart (TV, telão TB50, pódio): só na rede do kartódromo; o id do cadastro nunca sai para a tela
-  if (path === '/foto-piloto' && method === 'GET') {
+  // /api/foto-piloto: foto do piloto do kart (TV, telão TB50, pódio): só na rede do kartódromo; o id do cadastro nunca sai para a tela
+  if (path === '/api/foto-piloto' && method === 'GET') {
     if (veioDaInternet(req)) return send(res, 404, { error: 'Não encontrado.' });
     const sessao = (url.searchParams.get('b') && sessions.get(String(url.searchParams.get('b')))) || runningSession() || ultimaEncerrada();
     const kart = String(url.searchParams.get('kart') ?? '').trim();
