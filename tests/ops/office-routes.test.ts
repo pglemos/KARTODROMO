@@ -429,6 +429,21 @@ describe('Office: mover reserva preserva os dados de cobrança', () => {
     expect(String(update?.params.nota)).toMatch(/diferença R\$\s?85,10 a cobrar no caixa/);
   });
 
+  it('troca de serviço paga para bateria de locação normal cobra pelo ANTECIPADO (R$ 145), não pelo balcão', async () => {
+    const statements: { sql: string; params: Record<string, unknown> }[] = [];
+    db.tx.mockImplementation(async (work) => work(async (sql: string, params: Record<string, unknown> = {}) => {
+      statements.push({ sql, params });
+      if (tem(sql, 'SELECT i.cliente_id "ClienteId", i.bateria_id')) return [{ ...reservaPendente, Pago: true, produtoId: 67, preco: 8990, valorPago: 8990, produtoNome: 'HAPPY HOUR - 15 MIN' }];
+      if (tem(sql, 'SELECT b.status "Status", b.vagas')) return [{ ...bateriaDestino, Nome: 'BATERIA 14:40', produtoId: 11, preco: 17500, produtoNome: 'BALCÃO - LOCAÇÃO PADRÃO' }];
+      if (tem(sql, 'FROM kart.produto WHERE id = @id')) return params.id === 4 ? [{ Id: 4, Nome: 'ANTECIPADO - LOCAÇÃO PADRÃO', preco: 14500 }] : [];
+      return [];
+    }));
+    await expect(call('/reservas/42/mover', 'POST', { bateriaId: 8, trocarServico: true })).resolves.toMatchObject({ status: 200, body: { diferencaCentavos: 5510 } });
+    const update = statements.find((s) => tem(s.sql, 'UPDATE kart.inscricao SET bateria_id'));
+    expect(update?.params).toMatchObject({ produtoDestino: 4, precoDestino: 14500 });
+    expect(String(update?.params.nota)).toContain('→ ANTECIPADO - LOCAÇÃO PADRÃO');
+  });
+
   it('troca para serviço mais barato não gera diferença; tipo de kart diferente continua bloqueado', async () => {
     const barata = moverComReserva({ ...reservaPendente, Pago: true, valorPago: 17500 }, { ...bateriaDestino, produtoId: 20, preco: 8990 });
     await expect(barata.trocando()).resolves.toMatchObject({ status: 200, body: { trocasDeServico: 1, diferencaCentavos: 0 } });
@@ -455,6 +470,37 @@ describe('Office: mover reserva preserva os dados de cobrança', () => {
     expect(update?.sql).toContain('bateria_id = @destino');
     expect(update?.sql).not.toContain('preco_centavos =');
     expect(update?.params).toEqual({ destino: 8, id: 42 });
+  });
+});
+
+describe('Office: pago antecipado pela Recepção', () => {
+  function incluir(bateria: Record<string, unknown>, corpo: Record<string, unknown>) {
+    const statements: { sql: string; params: Record<string, unknown> }[] = [];
+    db.tx.mockImplementation(async (work) => work(async (sql: string, params: Record<string, unknown> = {}) => {
+      statements.push({ sql, params });
+      if (tem(sql, 'SELECT b.id "Id", b.status "Status"')) return [bateria];
+      if (tem(sql, 'SELECT bloqueado "Bloqueado"')) return [{ Bloqueado: false, Nome: 'TESTE CODEX' }];
+      if (tem(sql, 'FROM kart.produto WHERE id = @id')) return params.id === 4 ? [{ Id: 4, preco: 14500 }] : [];
+      if (tem(sql, 'INSERT INTO kart.inscricao')) return [{ id: 900 }];
+      return [];
+    }));
+    return { statements, executar: () => call('/baterias/8/incluir', 'POST', { clienteId: 5, ...corpo }) };
+  }
+  const bateria = { Id: 8, Status: 'aberta', Vagas: 30, ocupadas: 2, passada: 0, Nome: 'BATERIA 14:40', ProdutoId: 11, preco: 17500 };
+
+  it('locação normal paga antecipado entra pelo ANTECIPADO (R$ 145)', async () => {
+    const { statements, executar } = incluir(bateria, { pagoAntecipado: true });
+    await expect(executar()).resolves.toMatchObject({ status: 201 });
+    const ins = statements.find((s) => tem(s.sql, 'INSERT INTO kart.inscricao'));
+    expect(ins?.params).toMatchObject({ produtoId: 4, preco: 14500, pago: 1, valor: 14500 });
+  });
+  it('sem pagar, ou em campeonato, fica o produto da bateria', async () => {
+    const naoPago = incluir(bateria, {});
+    await naoPago.executar();
+    expect(naoPago.statements.find((s) => tem(s.sql, 'INSERT INTO kart.inscricao'))?.params).toMatchObject({ produtoId: 11, preco: 17500 });
+    const camp = incluir({ ...bateria, Nome: 'BATERIA 15:50 Kojak Campeonato Lotokart' }, { pagoAntecipado: true });
+    await camp.executar();
+    expect(camp.statements.find((s) => tem(s.sql, 'INSERT INTO kart.inscricao'))?.params).toMatchObject({ produtoId: 11, preco: 17500 });
   });
 });
 

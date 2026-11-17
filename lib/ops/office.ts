@@ -3,6 +3,7 @@
  * Todas as rotas daqui exigem sessao de usuario (lib/ops/auth.ts).
  */
 import { saldosDasBaterias } from './agenda-financeiro';
+import { produtoAntecipado } from './preco-antecipado';
 import { pedirVinculoAgora } from './app-mobile';
 import { CLIENTE_COLS, colPg, insertCliente, isValidCpf, one, onlyDigits, query, sqlPg, tx, updateCliente, type ClienteInput } from './db';
 import { confereSenha, hashSenha, type Sessao } from './auth';
@@ -525,7 +526,7 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
   if (pessoas) n = pessoas.length;
   const inscrever = async (run: OpsRun) => {
     const [b] = await run(
-      `SELECT b.id "Id", b.status "Status", b.vagas "Vagas", b.inicio "Inicio", b.produto_id "ProdutoId", p.preco_centavos preco,
+      `SELECT b.id "Id", b.status "Status", b.vagas "Vagas", b.inicio "Inicio", b.nome "Nome", b.produto_id "ProdutoId", p.preco_centavos preco,
         (SELECT COUNT(*) FROM kart.inscricao i WHERE i.bateria_id = b.id AND i.status <> 'cancelada') ocupadas,
         CASE WHEN b.inicio < (now() + make_interval(mins => (-30)::int)) THEN 1 ELSE 0 END passada
        FROM kart.bateria b LEFT JOIN kart.produto p ON p.id = b.produto_id WHERE b.id = @bateriaId for update of b`,
@@ -554,6 +555,13 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
       const [p] = await run(`SELECT id "Id", preco_centavos preco FROM kart.produto WHERE id = @id`, { id: opcoes.produtoId });
       if (!p) throw new HttpError(404, 'Produto não encontrado.');
       produtoId = p.Id as number; preco = (p.preco as number | null) ?? null;
+    } else if (opcoes.pago) {
+      // pago antecipado (WhatsApp/Recepção) sem produto escolhido: locação normal sai pelo ANTECIPADO (R$ 145)
+      const pa = produtoAntecipado(produtoId, b.Nome as string | null);
+      if (pa && pa !== produtoId) {
+        const [p] = await run(`SELECT id "Id", preco_centavos preco FROM kart.produto WHERE id = @id`, { id: pa });
+        if (p?.preco != null) { produtoId = p.Id as number; preco = p.preco as number; }
+      }
     }
     const pago = Boolean(opcoes.pago);
     const ids: number[] = [];
@@ -613,7 +621,7 @@ export async function moverReservas(ids: number[], destino: number, grupoId?: nu
       if (r.Status === 'cancelada') throw new HttpError(409, 'Não é possível mover uma reserva cancelada.');
       if (Number(r.BateriaId) === destino) continue;
       const [d] = await run(
-        `SELECT b.status "Status", b.vagas "Vagas", b.reserva_fechada "reservaFechada", b.tipo_kart "tipoKart", p.servico_locacao "servicoLocacao", p.categoria categoria, REPLACE(REPLACE(UPPER(p.nome), 'ANTECIPADO - ', ''), 'BALCÃO - ', '') servico, p.duracao_min "duracaoMin", p.id "produtoId", p.nome "produtoNome", p.preco_centavos preco, (SELECT COUNT(*) FROM kart.inscricao x WHERE x.bateria_id = b.id AND x.status <> 'cancelada') ocupadas
+        `SELECT b.status "Status", b.vagas "Vagas", b.nome "Nome", b.reserva_fechada "reservaFechada", b.tipo_kart "tipoKart", p.servico_locacao "servicoLocacao", p.categoria categoria, REPLACE(REPLACE(UPPER(p.nome), 'ANTECIPADO - ', ''), 'BALCÃO - ', '') servico, p.duracao_min "duracaoMin", p.id "produtoId", p.nome "produtoNome", p.preco_centavos preco, (SELECT COUNT(*) FROM kart.inscricao x WHERE x.bateria_id = b.id AND x.status <> 'cancelada') ocupadas
          FROM kart.bateria b LEFT JOIN kart.produto p ON p.id = b.produto_id WHERE b.id = @destino for update of b`,
         { destino },
       );
@@ -632,6 +640,14 @@ export async function moverReservas(ids: number[], destino: number, grupoId?: nu
       const [dup] = await run(`SELECT 1 x FROM kart.inscricao WHERE bateria_id = @destino AND cliente_id = @c AND status <> 'cancelada'`, { destino, c: r.ClienteId });
       if (dup) throw new HttpError(409, 'Já existe uma reserva para este cliente na bateria selecionada.');
       if (trocaServico) {
+        // reserva paga vai pelo preço do pagamento antecipado (locação normal = ANTECIPADO R$ 145; Happy Hour, campeonato e eventos = o da bateria)
+        if (r.Pago) {
+          const pa = produtoAntecipado(Number(d.produtoId), d.Nome as string | null);
+          if (pa && pa !== Number(d.produtoId)) {
+            const [p] = await run(`SELECT id "Id", nome "Nome", preco_centavos preco FROM kart.produto WHERE id = @id`, { id: pa });
+            if (p?.preco != null) { d.produtoId = p.Id; d.produtoNome = p.Nome; d.preco = p.preco; }
+          }
+        }
         // pago: o que já entrou (valor pago, ou preço − desconto se ainda não houver valor gravado); sem pagar: nada
         const jaPago = r.Pago ? Number(r.valorPago ?? Math.max(0, Number(r.preco ?? 0) - Number(r.desconto ?? 0))) : 0;
         const falta = r.Pago ? Math.max(0, Number(d.preco) - jaPago) : 0;

@@ -14,6 +14,9 @@
  */
 import { isValidCpf, one, onlyDigits, query, tx } from './db';
 import { HttpError, inscreverN } from './office';
+import { configOnline, produtoDaBateria } from './preco-antecipado';
+
+export { configOnline, produtoDaBateria };
 import { avaliarElegibilidadeVoucher } from './vouchers';
 import { grupoDaReservaOnline } from './grupos';
 import { emCurso } from './andamento';
@@ -21,21 +24,6 @@ import { gravarAcompanhante, gravarPreCadastro, preCadastroLigado, type Acompanh
 import { escutarPedidosDeVinculo, publicarClientesDoApp, publicarHistoricosVinculados, publicarRankingDoApp, sincronizarPerfisDoApp, vincularContasDoApp } from './app-mobile';
 
 type Log = (...args: unknown[]) => void;
-
-export const configOnline = () => {
-  const e = process.env;
-  return {
-    produtoVenda: Number(e.OPS_ONLINE_PRODUTO || 4),
-    produtosBateria: String(e.OPS_ONLINE_PRODUTOS_BATERIA || '11,4,67').split(',').map(Number).filter((n) => n > 0),
-    precoProprio: String(e.OPS_ONLINE_PRECO_PROPRIO ?? '67').split(',').map(Number).filter((n) => n > 0),
-    primeiraVez: Object.fromEntries(String(e.OPS_ONLINE_PRIMEIRA_VEZ ?? '67:8990').split(',').map((par) => par.split(':').map(Number))
-      .filter(([prod, preco]) => prod > 0 && Number.isSafeInteger(preco) && preco > 0)) as Record<number, number>,
-    antecedenciaMin: Number(e.OPS_ONLINE_ANTECEDENCIA_MIN || 120),
-    maxPilotos: Number(e.OPS_ONLINE_MAX || 10),
-    prazoMin: Number(e.OPS_ONLINE_PRAZO_MIN || 15),
-    diasAgenda: Number(e.OPS_ONLINE_DIAS || 500), // a agenda do ano seguinte inteiro abre em outubro
-  };
-};
 
 const url = () => (process.env.PRECADASTRO_URL || '').replace(/\/+$/, '');
 async function chamar(caminho: string, init: RequestInit = {}, timeoutMs = 10_000) {
@@ -52,9 +40,6 @@ async function chamar(caminho: string, init: RequestInit = {}, timeoutMs = 10_00
 
 export type HorarioOnline = { id: number; inicio: string; nome: string; livres: number; precoCentavos: number; precoPrimeiraVezCentavos?: number };
 
-/** Produto cobrado numa bateria: o da própria bateria (Happy Hour) ou o ANTECIPADO de sempre. */
-export const produtoDaBateria = (produtoBateria: number | null | undefined, c = configOnline()) =>
-  produtoBateria && c.precoProprio.includes(Number(produtoBateria)) ? Number(produtoBateria) : c.produtoVenda;
 
 /**
  * Primeira vez no kartódromo: CPF sem cadastro, ou cadastro sem nenhuma inscrição (corrida, marcada ou paga) e que não veio
