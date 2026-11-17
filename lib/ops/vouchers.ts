@@ -1,6 +1,6 @@
 /**
  * Regras compartilhadas de vouchers: limite total (UsoMaxTotal), esgotamento automático e
- * lista de pessoas/grupos autorizados (dbo.VoucherCliente).
+ * lista de pessoas/grupos autorizados (kart.voucher_cliente).
  * Usado pela Recepção (lib/ops/office.ts), Reserva Online / Grupos (lib/ops/reserva-online.ts)
  * e Totem (services/ops-server.ts).
  */
@@ -16,32 +16,8 @@ export function resetarCacheSchemaVouchers() {
 
 /** Garante de forma idempotente as colunas e a tabela de beneficiários do módulo de vouchers. */
 export async function garantirSchemaVouchers(): Promise<void> {
-  if (schemaPronto) return;
-  await query(`
-    IF COL_LENGTH('dbo.Voucher', 'UsoMaxTotal') IS NULL
-      ALTER TABLE dbo.Voucher ADD UsoMaxTotal INT NULL;
-    IF COL_LENGTH('dbo.Voucher', 'RestritoClientes') IS NULL
-      ALTER TABLE dbo.Voucher ADD RestritoClientes BIT NOT NULL CONSTRAINT DF_Voucher_RestritoClientes DEFAULT 0;
-    IF OBJECT_ID('dbo.VoucherCliente') IS NULL
-    BEGIN
-      CREATE TABLE dbo.VoucherCliente (
-        Id INT IDENTITY(1,1) PRIMARY KEY,
-        VoucherId INT NOT NULL REFERENCES dbo.Voucher(Id) ON DELETE CASCADE,
-        ClienteId INT NULL REFERENCES dbo.Cliente(Id),
-        Nome NVARCHAR(200) NOT NULL,
-        Documento VARCHAR(30) NULL,
-        Telefone NVARCHAR(40) NULL,
-        UsosMax INT NOT NULL DEFAULT 1 CHECK (UsosMax >= 1),
-        Observacao NVARCHAR(250) NULL,
-        CriadoEm DATETIME2(0) NOT NULL DEFAULT SYSDATETIME()
-      );
-      CREATE INDEX IX_VoucherCliente_Voucher ON dbo.VoucherCliente (VoucherId);
-      CREATE INDEX IX_VoucherCliente_Cliente ON dbo.VoucherCliente (ClienteId) WHERE ClienteId IS NOT NULL;
-      CREATE INDEX IX_VoucherCliente_Documento ON dbo.VoucherCliente (Documento) WHERE Documento IS NOT NULL;
-    END;
-    IF COL_LENGTH('dbo.Inscricao', 'VoucherId') IS NULL
-      ALTER TABLE dbo.Inscricao ADD VoucherId INT NULL REFERENCES dbo.Voucher(Id);
-  `);
+  // No Postgres o schema (kart.voucher.uso_max_total/restrito_clientes, kart.voucher_cliente, kart.inscricao.voucher_id)
+  // vem das migrations do Kartódromo OS (supabase/kartodromo/migrations); nada a criar em tempo de execução.
   schemaPronto = true;
 }
 
@@ -162,46 +138,46 @@ export function normalizarBeneficiariosInput(raw: unknown): BeneficiarioInput[] 
 }
 
 const BENEFICIARIOS_SQL = `
-  SELECT vc.Id id, vc.VoucherId voucherId, vc.ClienteId clienteId,
-         COALESCE(NULLIF(LTRIM(RTRIM(c.Nome)), N''), vc.Nome) nome,
-         COALESCE(NULLIF(vc.Documento, ''), NULLIF(c.DocumentoNum, ''), REPLACE(REPLACE(REPLACE(c.Documento, '.', ''), '-', ''), '/', '')) documento,
-         COALESCE(NULLIF(LTRIM(RTRIM(vc.Telefone)), N''), NULLIF(LTRIM(RTRIM(c.Telefone)), N'')) telefone,
-         vc.UsosMax usosMax, vc.Observacao observacao,
-         CONVERT(varchar(16), vc.CriadoEm, 126) criadoEm,
+  select vc.id, vc.voucher_id "voucherId", vc.cliente_id "clienteId",
+         coalesce(nullif(trim(c.nome), ''), vc.nome) nome,
+         coalesce(nullif(vc.documento, ''), nullif(c.documento_num, ''), replace(replace(replace(c.documento, '.', ''), '-', ''), '/', '')) documento,
+         coalesce(nullif(trim(vc.telefone), ''), nullif(trim(c.telefone), '')) telefone,
+         vc.usos_max "usosMax", vc.observacao,
+         to_char(vc.criado_em, 'YYYY-MM-DD"T"HH24:MI') "criadoEm",
          (
-           (SELECT COUNT(*) FROM dbo.VoucherUso u LEFT JOIN dbo.Cliente uc ON uc.Id = u.ClienteId
-             WHERE u.VoucherId = vc.VoucherId AND u.Estornado = 0
-               AND ((vc.ClienteId IS NOT NULL AND u.ClienteId = vc.ClienteId)
-                 OR (NULLIF(vc.Documento, '') IS NOT NULL AND (uc.DocumentoNum = vc.Documento OR REPLACE(REPLACE(REPLACE(uc.Documento, '.', ''), '-', ''), '/', '') = vc.Documento))))
-           + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso o LEFT JOIN dbo.Cliente oc ON oc.Id = o.ClienteId
-             WHERE o.VoucherId = vc.VoucherId AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente')
-               AND ((vc.ClienteId IS NOT NULL AND o.ClienteId = vc.ClienteId)
-                 OR (NULLIF(vc.Documento, '') IS NOT NULL AND (oc.DocumentoNum = vc.Documento OR REPLACE(REPLACE(REPLACE(oc.Documento, '.', ''), '-', ''), '/', '') = vc.Documento))))
-           + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso gv LEFT JOIN dbo.Cliente gc ON gc.Id = gv.ClienteId
-             WHERE gv.VoucherId = vc.VoucherId AND gv.Estado IN ('reservado', 'consumido')
-               AND ((vc.ClienteId IS NOT NULL AND gv.ClienteId = vc.ClienteId)
-                 OR (NULLIF(vc.Documento, '') IS NOT NULL AND (gc.DocumentoNum = vc.Documento OR REPLACE(REPLACE(REPLACE(gc.Documento, '.', ''), '-', ''), '/', '') = vc.Documento))))
-         ) usosFeitos,
-         (SELECT CONVERT(varchar(16), MAX(dt), 126) FROM (
-            SELECT MAX(u.CriadoEm) dt FROM dbo.VoucherUso u LEFT JOIN dbo.Cliente uc ON uc.Id = u.ClienteId
-              WHERE u.VoucherId = vc.VoucherId AND u.Estornado = 0
-                AND ((vc.ClienteId IS NOT NULL AND u.ClienteId = vc.ClienteId)
-                  OR (NULLIF(vc.Documento, '') IS NOT NULL AND (uc.DocumentoNum = vc.Documento OR REPLACE(REPLACE(REPLACE(uc.Documento, '.', ''), '-', ''), '/', '') = vc.Documento)))
-            UNION ALL
-            SELECT MAX(o.CriadoEm) dt FROM dbo.ReservaOnlineVoucherUso o LEFT JOIN dbo.Cliente oc ON oc.Id = o.ClienteId
-              WHERE o.VoucherId = vc.VoucherId AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente')
-                AND ((vc.ClienteId IS NOT NULL AND o.ClienteId = vc.ClienteId)
-                  OR (NULLIF(vc.Documento, '') IS NOT NULL AND (oc.DocumentoNum = vc.Documento OR REPLACE(REPLACE(REPLACE(oc.Documento, '.', ''), '-', ''), '/', '') = vc.Documento)))
-            UNION ALL
-            SELECT MAX(gv.CriadoEm) dt FROM dbo.ReservaGrupoVoucherUso gv LEFT JOIN dbo.Cliente gc ON gc.Id = gv.ClienteId
-              WHERE gv.VoucherId = vc.VoucherId AND gv.Estado IN ('reservado', 'consumido')
-                AND ((vc.ClienteId IS NOT NULL AND gv.ClienteId = vc.ClienteId)
-                  OR (NULLIF(vc.Documento, '') IS NOT NULL AND (gc.DocumentoNum = vc.Documento OR REPLACE(REPLACE(REPLACE(gc.Documento, '.', ''), '-', ''), '/', '') = vc.Documento)))
-         ) d) ultimoUsoEm
-  FROM dbo.VoucherCliente vc
-  LEFT JOIN dbo.Cliente c ON c.Id = vc.ClienteId
-  WHERE vc.VoucherId = @voucherId
-  ORDER BY vc.Nome, vc.Id
+           (select count(*) from kart.voucher_uso u left join kart.cliente uc on uc.id = u.cliente_id
+             where u.voucher_id = vc.voucher_id and not u.estornado
+               and ((vc.cliente_id is not null and u.cliente_id = vc.cliente_id)
+                 or (nullif(vc.documento, '') is not null and (uc.documento_num = vc.documento or replace(replace(replace(uc.documento, '.', ''), '-', ''), '/', '') = vc.documento))))
+           + (select count(*) from kart.reserva_online_voucher_uso o left join kart.cliente oc on oc.id = o.cliente_id
+             where o.voucher_id = vc.voucher_id and o.estado in ('reservado', 'consumido', 'reembolso_pendente')
+               and ((vc.cliente_id is not null and o.cliente_id = vc.cliente_id)
+                 or (nullif(vc.documento, '') is not null and (oc.documento_num = vc.documento or replace(replace(replace(oc.documento, '.', ''), '-', ''), '/', '') = vc.documento))))
+           + (select count(*) from kart.reserva_grupo_voucher_uso gv left join kart.cliente gc on gc.id = gv.cliente_id
+             where gv.voucher_id = vc.voucher_id and gv.estado in ('reservado', 'consumido')
+               and ((vc.cliente_id is not null and gv.cliente_id = vc.cliente_id)
+                 or (nullif(vc.documento, '') is not null and (gc.documento_num = vc.documento or replace(replace(replace(gc.documento, '.', ''), '-', ''), '/', '') = vc.documento))))
+         ) "usosFeitos",
+         (select to_char(max(dt), 'YYYY-MM-DD"T"HH24:MI') from (
+            select max(u.criado_em) dt from kart.voucher_uso u left join kart.cliente uc on uc.id = u.cliente_id
+              where u.voucher_id = vc.voucher_id and not u.estornado
+                and ((vc.cliente_id is not null and u.cliente_id = vc.cliente_id)
+                  or (nullif(vc.documento, '') is not null and (uc.documento_num = vc.documento or replace(replace(replace(uc.documento, '.', ''), '-', ''), '/', '') = vc.documento)))
+            union all
+            select max(o.criado_em) dt from kart.reserva_online_voucher_uso o left join kart.cliente oc on oc.id = o.cliente_id
+              where o.voucher_id = vc.voucher_id and o.estado in ('reservado', 'consumido', 'reembolso_pendente')
+                and ((vc.cliente_id is not null and o.cliente_id = vc.cliente_id)
+                  or (nullif(vc.documento, '') is not null and (oc.documento_num = vc.documento or replace(replace(replace(oc.documento, '.', ''), '-', ''), '/', '') = vc.documento)))
+            union all
+            select max(gv.criado_em) dt from kart.reserva_grupo_voucher_uso gv left join kart.cliente gc on gc.id = gv.cliente_id
+              where gv.voucher_id = vc.voucher_id and gv.estado in ('reservado', 'consumido')
+                and ((vc.cliente_id is not null and gv.cliente_id = vc.cliente_id)
+                  or (nullif(vc.documento, '') is not null and (gc.documento_num = vc.documento or replace(replace(replace(gc.documento, '.', ''), '-', ''), '/', '') = vc.documento)))
+         ) d) "ultimoUsoEm"
+  from kart.voucher_cliente vc
+  left join kart.cliente c on c.id = vc.cliente_id
+  where vc.voucher_id = @voucherId
+  order by vc.nome, vc.id
 `;
 
 export async function listarBeneficiariosVoucher(voucherId: number, reader?: Reader): Promise<BeneficiarioRow[]> {
@@ -236,10 +212,10 @@ export async function sincronizarBeneficiariosVoucher(
 ): Promise<{ total: number }> {
   const executar = async (run: Reader) => {
     if (mode === 'replace') {
-      await run(`DELETE FROM dbo.VoucherCliente WHERE VoucherId = @vid`, { vid: voucherId });
+      await run(`delete from kart.voucher_cliente where voucher_id = @vid`, { vid: voucherId });
     }
     const existentes = mode === 'merge'
-      ? await run(`SELECT Id id, ClienteId clienteId, Documento documento FROM dbo.VoucherCliente WHERE VoucherId = @vid`, { vid: voucherId })
+      ? await run(`select id, cliente_id "clienteId", documento from kart.voucher_cliente where voucher_id = @vid`, { vid: voucherId })
       : [];
 
     for (const item of lista) {
@@ -249,7 +225,7 @@ export async function sincronizarBeneficiariosVoucher(
       let telefone = item.telefone ?? null;
 
       if (clienteId) {
-        const [cli] = await run(`SELECT Id, Nome, DocumentoNum, Documento, Telefone FROM dbo.Cliente WHERE Id = @cid`, { cid: clienteId });
+        const [cli] = await run(`select id "Id", nome "Nome", documento_num "DocumentoNum", documento "Documento", telefone "Telefone" from kart.cliente where id = @cid`, { cid: clienteId });
         if (cli) {
           nome = nome || String(cli.Nome ?? '');
           documento = documento ?? normalizarDocVoucher(cli.DocumentoNum ?? cli.Documento);
@@ -259,11 +235,11 @@ export async function sincronizarBeneficiariosVoucher(
         }
       } else if (documento) {
         const [cli] = await run(
-          `SELECT TOP 1 Id, Nome, DocumentoNum, Documento, Telefone
-           FROM dbo.Cliente
-           WHERE (DocumentoNum = @doc OR REPLACE(REPLACE(REPLACE(Documento, '.', ''), '-', ''), '/', '') = @doc)
-             AND ResponsavelId IS NULL
-           ORDER BY AtualizadoEm DESC`,
+          `select id "Id", nome "Nome", documento_num "DocumentoNum", documento "Documento", telefone "Telefone"
+           from kart.cliente
+           where (documento_num = @doc or replace(replace(replace(documento, '.', ''), '-', ''), '/', '') = @doc)
+             and responsavel_id is null
+           order by atualizado_em desc limit 1`,
           { doc: documento },
         );
         if (cli) {
@@ -279,25 +255,25 @@ export async function sincronizarBeneficiariosVoucher(
       );
       if (dup) {
         await run(
-          `UPDATE dbo.VoucherCliente
-           SET ClienteId = COALESCE(ClienteId, @cid),
-               Nome = @nome,
-               Documento = COALESCE(@doc, Documento),
-               Telefone = COALESCE(@tel, Telefone),
-               UsosMax = @usosMax,
-               Observacao = COALESCE(@obs, Observacao)
-           WHERE Id = @id`,
+          `update kart.voucher_cliente
+           set cliente_id = coalesce(cliente_id, @cid::int),
+               nome = @nome,
+               documento = coalesce(@doc, documento),
+               telefone = coalesce(@tel, telefone),
+               usos_max = @usosMax,
+               observacao = coalesce(@obs, observacao)
+           where id = @id`,
           { id: dup.id, cid: clienteId, nome: nome.slice(0, 200), doc: documento, tel: telefone, usosMax: item.usosMax ?? 1, obs: item.observacao ?? null },
         );
       } else {
         await run(
-          `INSERT INTO dbo.VoucherCliente (VoucherId, ClienteId, Nome, Documento, Telefone, UsosMax, Observacao)
-           VALUES (@vid, @cid, @nome, @doc, @tel, @usosMax, @obs)`,
+          `insert into kart.voucher_cliente (voucher_id, cliente_id, nome, documento, telefone, usos_max, observacao)
+           values (@vid, @cid, @nome, @doc, @tel, @usosMax, @obs)`,
           { vid: voucherId, cid: clienteId, nome: nome.slice(0, 200), doc: documento, tel: telefone, usosMax: item.usosMax ?? 1, obs: item.observacao ?? null },
         );
       }
     }
-    const [cnt] = await run(`SELECT COUNT(*) n FROM dbo.VoucherCliente WHERE VoucherId = @vid`, { vid: voucherId });
+    const [cnt] = await run(`select count(*) n from kart.voucher_cliente where voucher_id = @vid`, { vid: voucherId });
     return { total: Number(cnt?.n ?? 0) };
   };
   return reader ? executar(reader) : tx(executar);
@@ -308,7 +284,7 @@ export type ElegibilidadeResult =
   | { ok: false; motivo: string; esgotado?: boolean; exigeIdentificacao?: boolean };
 
 /**
- * Avalia limite total do voucher (UsoUnico / UsoMaxTotal) e elegibilidade nominal/grupo (dbo.VoucherCliente).
+ * Avalia limite total do voucher (UsoUnico / UsoMaxTotal) e elegibilidade nominal/grupo (kart.voucher_cliente).
  * Pode rodar dentro de transação (run) ou fora (one/query).
  */
 export async function avaliarElegibilidadeVoucher(opts: {
@@ -405,7 +381,7 @@ export async function vouchersDisponiveisParaCliente(params: {
   let docNorm = normalizarDocVoucher(params.documento);
   if (!docNorm && clienteId) {
     const cli = await one<{ doc: string | null; docNum: string | null }>(
-      `SELECT Documento doc, DocumentoNum docNum FROM dbo.Cliente WHERE Id = @id`,
+      `select documento doc, documento_num "docNum" from kart.cliente where id = @id`,
       { id: clienteId },
     );
     docNorm = normalizarDocVoucher(cli?.docNum ?? cli?.doc);
@@ -418,33 +394,33 @@ export async function vouchersDisponiveisParaCliente(params: {
     usoUnico: boolean | number; usoMaxTotal: number | null; usoMaxCliente: number; restritoClientes: boolean | number;
     usosTotais: number; vcId: number | null; vcUsosMax: number | null; vcNome: string | null; vcClienteId: number | null; vcDoc: string | null;
   }>(
-    `SELECT v.Id id, v.Codigo codigo, v.Origem origem, v.Referencia referencia, v.Tipo tipo, v.Valor valor,
-            v.ProdutoId produtoId, p.Nome produto, v.DescontoMaximoCentavos descontoMaximo, v.PedidoMinimoCentavos pedidoMinimo,
-            v.UsoUnico usoUnico, v.UsoMaxTotal usoMaxTotal, v.UsoMaxCliente usoMaxCliente, v.RestritoClientes restritoClientes,
+    `select v.id, v.codigo, v.origem, v.referencia, v.tipo, v.valor,
+            v.produto_id "produtoId", p.nome produto, v.desconto_maximo_centavos "descontoMaximo", v.pedido_minimo_centavos "pedidoMinimo",
+            v.uso_unico "usoUnico", v.uso_max_total "usoMaxTotal", v.uso_max_cliente "usoMaxCliente", v.restrito_clientes "restritoClientes",
             (
-              (SELECT COUNT(*) FROM dbo.VoucherUso u WHERE u.VoucherId = v.Id AND u.Estornado = 0)
-              + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso o WHERE o.VoucherId = v.Id AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
-              + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso gv WHERE gv.VoucherId = v.Id AND gv.Estado IN ('reservado', 'consumido'))
-            ) usosTotais,
-            vc.Id vcId, vc.UsosMax vcUsosMax, vc.Nome vcNome, vc.ClienteId vcClienteId, vc.Documento vcDoc
-     FROM dbo.Voucher v
-     LEFT JOIN dbo.Produto p ON p.Id = v.ProdutoId
-     LEFT JOIN dbo.Parceiro pr ON pr.Id = v.ParceiroId
-     LEFT JOIN dbo.FidelidadeConta fc ON fc.Id = v.FidelidadeContaId
-     OUTER APPLY (
-       SELECT TOP 1 x.Id, x.UsosMax, x.Nome, x.ClienteId, x.Documento
-       FROM dbo.VoucherCliente x
-       WHERE x.VoucherId = v.Id
-         AND ((@cid IS NOT NULL AND x.ClienteId = @cid)
-           OR (@doc IS NOT NULL AND x.Documento = @doc))
-       ORDER BY x.Id
-     ) vc
-     WHERE v.Ativo = 1
-       AND CAST(SYSDATETIME() AS date) BETWEEN v.InicioEm AND v.FimEm
-       AND (v.ParceiroId IS NULL OR pr.Ativo = 1)
-       AND (v.FidelidadeContaId IS NULL OR fc.Ativo = 1)
-       AND (vc.Id IS NOT NULL OR (@cid IS NOT NULL AND fc.ClienteId = @cid))
-     ORDER BY v.Id DESC`,
+              (select count(*) from kart.voucher_uso u where u.voucher_id = v.id and not u.estornado)
+              + (select count(*) from kart.reserva_online_voucher_uso o where o.voucher_id = v.id and o.estado in ('reservado', 'consumido', 'reembolso_pendente'))
+              + (select count(*) from kart.reserva_grupo_voucher_uso gv where gv.voucher_id = v.id and gv.estado in ('reservado', 'consumido'))
+            ) "usosTotais",
+            vc.id "vcId", vc.usos_max "vcUsosMax", vc.nome "vcNome", vc.cliente_id "vcClienteId", vc.documento "vcDoc"
+     from kart.voucher v
+     left join kart.produto p on p.id = v.produto_id
+     left join kart.parceiro pr on pr.id = v.parceiro_id
+     left join kart.fidelidade_conta fc on fc.id = v.fidelidade_conta_id
+     left join lateral (
+       select x.id, x.usos_max, x.nome, x.cliente_id, x.documento
+       from kart.voucher_cliente x
+       where x.voucher_id = v.id
+         and ((@cid::int is not null and x.cliente_id = @cid::int)
+           or (@doc::text is not null and x.documento = @doc::text))
+       order by x.id limit 1
+     ) vc on true
+     where v.ativo
+       and current_date between v.inicio_em and v.fim_em
+       and (v.parceiro_id is null or pr.ativo)
+       and (v.fidelidade_conta_id is null or fc.ativo)
+       and (vc.id is not null or (@cid::int is not null and fc.cliente_id = @cid::int))
+     order by v.id desc`,
     { cid: clienteId, doc: docNorm },
   );
 
@@ -458,19 +434,19 @@ export async function vouchersDisponiveisParaCliente(params: {
     // Usos desta pessoa especificamente (por ClienteId ou Documento)
     const docEfetivo = normalizarDocVoucher(r.vcDoc ?? docNorm);
     const usosPessoaRow = await one<{ n: number }>(
-      `SELECT
-        (SELECT COUNT(*) FROM dbo.VoucherUso u LEFT JOIN dbo.Cliente uc ON uc.Id = u.ClienteId
-          WHERE u.VoucherId = @vid AND u.Estornado = 0
-            AND ((@cid IS NOT NULL AND u.ClienteId = @cid)
-              OR (@doc IS NOT NULL AND (uc.DocumentoNum = @doc OR REPLACE(REPLACE(REPLACE(uc.Documento, '.', ''), '-', ''), '/', '') = @doc))))
-        + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso o LEFT JOIN dbo.Cliente oc ON oc.Id = o.ClienteId
-          WHERE o.VoucherId = @vid AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente')
-            AND ((@cid IS NOT NULL AND o.ClienteId = @cid)
-              OR (@doc IS NOT NULL AND (oc.DocumentoNum = @doc OR REPLACE(REPLACE(REPLACE(oc.Documento, '.', ''), '-', ''), '/', '') = @doc))))
-        + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso gv LEFT JOIN dbo.Cliente gc ON gc.Id = gv.ClienteId
-          WHERE gv.VoucherId = @vid AND gv.Estado IN ('reservado', 'consumido')
-            AND ((@cid IS NOT NULL AND gv.ClienteId = @cid)
-              OR (@doc IS NOT NULL AND (gc.DocumentoNum = @doc OR REPLACE(REPLACE(REPLACE(gc.Documento, '.', ''), '-', ''), '/', '') = @doc)))) n`,
+      `select
+        (select count(*) from kart.voucher_uso u left join kart.cliente uc on uc.id = u.cliente_id
+          where u.voucher_id = @vid and not u.estornado
+            and ((@cid::int is not null and u.cliente_id = @cid::int)
+              or (@doc::text is not null and (uc.documento_num = @doc::text or replace(replace(replace(uc.documento, '.', ''), '-', ''), '/', '') = @doc::text))))
+        + (select count(*) from kart.reserva_online_voucher_uso o left join kart.cliente oc on oc.id = o.cliente_id
+          where o.voucher_id = @vid and o.estado in ('reservado', 'consumido', 'reembolso_pendente')
+            and ((@cid::int is not null and o.cliente_id = @cid::int)
+              or (@doc::text is not null and (oc.documento_num = @doc::text or replace(replace(replace(oc.documento, '.', ''), '-', ''), '/', '') = @doc::text))))
+        + (select count(*) from kart.reserva_grupo_voucher_uso gv left join kart.cliente gc on gc.id = gv.cliente_id
+          where gv.voucher_id = @vid and gv.estado in ('reservado', 'consumido')
+            and ((@cid::int is not null and gv.cliente_id = @cid::int)
+              or (@doc::text is not null and (gc.documento_num = @doc::text or replace(replace(replace(gc.documento, '.', ''), '-', ''), '/', '') = @doc::text)))) n`,
       { vid: r.id, cid: clienteId ?? r.vcClienteId ?? null, doc: docEfetivo },
     );
     const usosFeitos = Number(usosPessoaRow?.n ?? 0);

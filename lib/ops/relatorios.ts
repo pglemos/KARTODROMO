@@ -1,4 +1,4 @@
-/** Relatorios imprimiveis do app da recepcao (HTML), no lugar dos RDLC do LapTime. */
+/** Relatorios imprimiveis do app da recepcao (HTML). */
 import { one, query } from './db';
 import { HttpError, sumarioMovimento } from './office';
 
@@ -12,7 +12,7 @@ const agora = () => new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_
  *  cabecalho com o logo num bloco escuro a esquerda e titulo/subtitulo a direita; empresa no rodape. */
 async function page(titulo: string, subtitulo: string, corpo: string, opts: { cupom?: boolean; paisagem?: boolean; janela?: string } = {}) {
   const emp = await one<{ nome: string; razao: string; cnpj: string; tel: string; end: string }>(
-    `SELECT Nome nome, RazaoSocial razao, Cnpj cnpj, Telefone tel, CONCAT(Endereco, ', ', Numero, ' - ', Bairro, ' - ', Cidade, '/', Estado) [end] FROM dbo.Empresa WHERE Id = 1`,
+    `select nome, razao_social razao, cnpj, telefone tel, concat(endereco, ', ', numero, ' - ', bairro, ' - ', cidade, '/', estado) "end" from kart.empresa where id = 1`,
   );
   const size = opts.cupom ? '80mm auto' : opts.paisagem ? 'A4 landscape' : 'A4';
   const largura = opts.cupom ? '74mm' : opts.paisagem ? '1040px' : '720px';
@@ -54,19 +54,19 @@ export async function relatorio(tipo: string, url: URL): Promise<string> {
       const movId = Number(p.get('mov'));
       if (!movId) throw new HttpError(400, 'Movimento não informado.');
       const mov = await one<Record<string, string>>(
-        `SELECT t.Nome terminal, tu.Descricao turno, u.Nome usuario, CONVERT(varchar(16), m.AbertoEm, 126) aberto, CONVERT(varchar(16), m.FechadoEm, 126) fechado, m.ProximoTurnoCentavos prox
-         FROM dbo.Movimento m JOIN dbo.Terminal t ON t.Id = m.TerminalId LEFT JOIN dbo.Turno tu ON tu.Id = m.TurnoId LEFT JOIN dbo.Usuario u ON u.Id = m.UsuarioId WHERE m.Id = @movId`,
+        `select t.nome terminal, tu.descricao turno, u.nome usuario, to_char(m.aberto_em, 'YYYY-MM-DD"T"HH24:MI') aberto, to_char(m.fechado_em, 'YYYY-MM-DD"T"HH24:MI') fechado, m.proximo_turno_centavos prox
+         from kart.movimento m join kart.terminal t on t.id = m.terminal_id left join kart.turno tu on tu.id = m.turno_id left join kart.usuario u on u.id = m.usuario_id where m.id = @movId`,
         { movId },
       );
       if (!mov) throw new HttpError(404, 'Movimento não encontrado.');
       const s = await sumarioMovimento(movId);
       const vendas = await query(
-        `SELECT CONVERT(varchar(16), v.CriadoEm, 126) dh, v.Id id, c.Nome cliente, v.FinalCentavos final, v.RecebidoCentavos recebido, v.TrocoCentavos troco, v.EstornoCentavos estorno,
-                STUFF((SELECT ', ' + ISNULL(f.Nome,'?') + ' ' + FORMAT(vp.ValorCentavos / 100.0, 'N2', 'pt-BR') FROM dbo.VendaPagamento vp LEFT JOIN dbo.FormaPagamento f ON f.Id = vp.FormaPagamentoId WHERE vp.VendaId = v.Id FOR XML PATH('')), 1, 2, '') formas
-         FROM dbo.Venda v LEFT JOIN dbo.Cliente c ON c.Id = v.ClienteId WHERE v.MovimentoId = @movId ORDER BY v.Id`,
+        `select to_char(v.criado_em, 'YYYY-MM-DD"T"HH24:MI') dh, v.id, c.nome cliente, v.final_centavos final, v.recebido_centavos recebido, v.troco_centavos troco, v.estorno_centavos estorno,
+                (select string_agg(coalesce(f.nome, '?') || ' ' || replace(replace(replace(to_char(vp.valor_centavos / 100.0, 'FM999,999,990.00'), ',', '#'), '.', ','), '#', '.'), ', ' order by vp.id) from kart.venda_pagamento vp left join kart.forma_pagamento f on f.id = vp.forma_pagamento_id where vp.venda_id = v.id) formas
+         from kart.venda v left join kart.cliente c on c.id = v.cliente_id where v.movimento_id = @movId order by v.id`,
         { movId },
       );
-      const trans = await query(`SELECT CONVERT(varchar(16), CriadoEm, 126) dh, Tipo tipo, ValorCentavos valor, Observacao obs FROM dbo.MovimentoTransacao WHERE MovimentoId = @movId ORDER BY Id`, { movId });
+      const trans = await query(`select to_char(criado_em, 'YYYY-MM-DD"T"HH24:MI') dh, tipo, valor_centavos valor, observacao obs from kart.movimento_transacao where movimento_id = @movId order by id`, { movId });
       // linhas no modelo do canvas; saidas com "– R$"; "Vendas (baterias)" = vendas brutas menos os produtos
       const kv = (k: string, v: number, o: { menos?: boolean; forte?: boolean } = {}) =>
         `<tr${o.forte ? ' class="forte"' : ''}><td>${k}</td><td>${o.menos && v ? '– ' : ''}${brl(v)}</td></tr>`;
@@ -90,18 +90,18 @@ export async function relatorio(tipo: string, url: URL): Promise<string> {
     case 'participantes': {
       const bateriaId = Number(p.get('bateria'));
       const b = await one<Record<string, string>>(
-        `SELECT b.Nome nome, CONVERT(varchar(16), b.Inicio, 126) inicio, pr.Nome produto, t.Nome tracado, b.Vagas vagas FROM dbo.Bateria b
-         LEFT JOIN dbo.Produto pr ON pr.Id = b.ProdutoId LEFT JOIN dbo.Tracado t ON t.Id = b.TracadoId WHERE b.Id = @bateriaId`,
+        `select b.nome, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio, pr.nome produto, t.nome tracado, b.vagas from kart.bateria b
+         left join kart.produto pr on pr.id = b.produto_id left join kart.tracado t on t.id = b.tracado_id where b.id = @bateriaId`,
         { bateriaId },
       );
       if (!b) throw new HttpError(404, 'Bateria não encontrada.');
-      const params = Object.fromEntries((await query<{ k: string; v: string }>(`SELECT Chave k, Valor v FROM dbo.Parametro`)).map((x) => [x.k, x.v]));
+      const params = Object.fromEntries((await query<{ k: string; v: string }>(`select chave k, valor v from kart.parametro`)).map((x) => [x.k, x.v]));
       const email = params['office.exibirEmailLista'] !== 'false';
       const peso = params['office.exibirPesoLista'] !== 'false';
       const rows = await query(
-        `SELECT c.Nome nome, c.Documento doc, c.Telefone tel, c.Email email, c.Peso peso, CONVERT(varchar(10), c.Nascimento, 126) nasc, i.Kart kart, i.Pago pago, i.Aprovada aprovada,
-                CASE WHEN i.TermoImpressoEm IS NULL THEN 0 ELSE 1 END termo, r.Nome resp
-         FROM dbo.Inscricao i JOIN dbo.Cliente c ON c.Id = i.ClienteId LEFT JOIN dbo.Cliente r ON r.Id = c.ResponsavelId WHERE i.BateriaId = @bateriaId AND i.Status <> 'cancelada' ORDER BY c.Nome`,
+        `select c.nome, c.documento doc, c.telefone tel, c.email, c.peso, to_char(c.nascimento, 'YYYY-MM-DD') nasc, i.kart, i.pago, i.aprovada,
+                case when i.termo_impresso_em is null then 0 else 1 end termo, r.nome resp
+         from kart.inscricao i join kart.cliente c on c.id = i.cliente_id left join kart.cliente r on r.id = c.responsavel_id where i.bateria_id = @bateriaId and i.status <> 'cancelada' order by c.nome`,
         { bateriaId },
       );
       return page(
@@ -117,8 +117,8 @@ export async function relatorio(tipo: string, url: URL): Promise<string> {
       const de = p.get('de');
       const ate = p.get('ate');
       const rows = await query(
-        `SELECT c.Nome nome, c.Documento doc, c.Telefone tel, c.Email email, c.Cidade cidade, CONVERT(varchar(10), c.Nascimento, 126) nasc, CONVERT(varchar(10), c.CriadoEm, 126) criado, c.Origem origem
-         FROM dbo.Cliente c WHERE c.CriadoEm >= @de AND c.CriadoEm < DATEADD(day, 1, @ate) ORDER BY c.CriadoEm`,
+        `select c.nome, c.documento doc, c.telefone tel, c.email, c.cidade, to_char(c.nascimento, 'YYYY-MM-DD') nasc, to_char(c.criado_em, 'YYYY-MM-DD') criado, c.origem
+         from kart.cliente c where c.criado_em >= @de::date and c.criado_em < @ate::date + 1 order by c.criado_em`,
         { de, ate },
       );
       return page(
@@ -132,10 +132,10 @@ export async function relatorio(tipo: string, url: URL): Promise<string> {
     case 'agenda': {
       const mes = String(p.get('mes') ?? '');
       const rows = await query(
-        `SELECT CONVERT(varchar(16), b.Inicio, 126) inicio, b.Nome nome, pr.Nome produto, b.Vagas vagas,
-                (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') reservas,
-                (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada' AND i.Pago = 1) pagos
-         FROM dbo.Bateria b LEFT JOIN dbo.Produto pr ON pr.Id = b.ProdutoId WHERE b.Status <> 'cancelada' AND b.Inicio >= @d AND b.Inicio < DATEADD(month, 1, @d) ORDER BY b.Inicio`,
+        `select to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio, b.nome, pr.nome produto, b.vagas,
+                (select count(*) from kart.inscricao i where i.bateria_id = b.id and i.status <> 'cancelada') reservas,
+                (select count(*) from kart.inscricao i where i.bateria_id = b.id and i.status <> 'cancelada' and i.pago) pagos
+         from kart.bateria b left join kart.produto pr on pr.id = b.produto_id where b.status <> 'cancelada' and b.inicio >= @d::date and b.inicio < @d::date + interval '1 month' order by b.inicio`,
         { d: `${mes}-01` },
       );
       const porDia = new Map<string, typeof rows>();
@@ -155,10 +155,10 @@ export async function relatorio(tipo: string, url: URL): Promise<string> {
     case 'reservas-diaria': {
       const data = String(p.get('data') ?? '');
       const rows = await query(
-        `SELECT CONVERT(varchar(16), b.Inicio, 126) inicio, b.Nome bateria, c.Nome cliente, c.Telefone tel, pr.Nome produto, i.Pago pago, i.Aprovada aprovada,
-                CASE WHEN i.Pago = 1 THEN i.ValorCentavos ELSE ISNULL(i.PrecoCentavos, pr.PrecoCentavos) END valor
-         FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId JOIN dbo.Cliente c ON c.Id = i.ClienteId LEFT JOIN dbo.Produto pr ON pr.Id = ISNULL(i.ProdutoId, b.ProdutoId)
-         WHERE b.Inicio >= @d AND b.Inicio < DATEADD(day, 1, @d) AND i.Status <> 'cancelada' ORDER BY b.Inicio, c.Nome`,
+        `select to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio, b.nome bateria, c.nome cliente, c.telefone tel, pr.nome produto, i.pago, i.aprovada,
+                case when i.pago then i.valor_centavos else coalesce(i.preco_centavos, pr.preco_centavos) end valor
+         from kart.inscricao i join kart.bateria b on b.id = i.bateria_id join kart.cliente c on c.id = i.cliente_id left join kart.produto pr on pr.id = coalesce(i.produto_id, b.produto_id)
+         where b.inicio >= @d::date and b.inicio < @d::date + 1 and i.status <> 'cancelada' order by b.inicio, c.nome`,
         { d: data },
       );
       return page(
@@ -174,27 +174,27 @@ export async function relatorio(tipo: string, url: URL): Promise<string> {
       const ate = p.get('ate');
       const agrupar = p.get('agrupar') || 'forma';
       const term = Number(p.get('terminal')) > 0 ? Number(p.get('terminal')) : null;
-      const fTerm = term ? ' AND v.TerminalId = @term' : '';
-      const base = `FROM dbo.Venda v WHERE v.Cancelada = 0 AND v.CriadoEm >= @de AND v.CriadoEm < DATEADD(day, 1, @ate)${fTerm}`;
+      const fTerm = term ? ' and v.terminal_id = @term' : '';
+      const base = `from kart.venda v where not v.cancelada and v.criado_em >= @de::date and v.criado_em < @ate::date + 1${fTerm}`;
       let rows: Record<string, unknown>[];
       let titulo: string;
       if (agrupar === 'produto') {
         titulo = 'Receitas agrupadas por Produto';
         // agrupa pelo produto (nome do cadastro); item avulso sem produto cai pela descricao
-        rows = await query(`SELECT ISNULL(pr.Nome, vi.Descricao) grupo, SUM(vi.Quantidade) qtd, SUM(vi.LiquidoCentavos) valor
-          FROM dbo.VendaItem vi JOIN dbo.Venda v ON v.Id = vi.VendaId LEFT JOIN dbo.Produto pr ON pr.Id = vi.ProdutoId
-          WHERE v.Cancelada = 0 AND vi.Estornado = 0 AND v.CriadoEm >= @de AND v.CriadoEm < DATEADD(day, 1, @ate)${fTerm} GROUP BY ISNULL(pr.Nome, vi.Descricao)`, { de, ate, term });
+        rows = await query(`select coalesce(pr.nome, vi.descricao) grupo, sum(vi.quantidade) qtd, sum(vi.liquido_centavos) valor
+          from kart.venda_item vi join kart.venda v on v.id = vi.venda_id left join kart.produto pr on pr.id = vi.produto_id
+          where not v.cancelada and not vi.estornado and v.criado_em >= @de::date and v.criado_em < @ate::date + 1${fTerm} group by coalesce(pr.nome, vi.descricao)`, { de, ate, ...(term ? { term } : {}) });
       } else if (agrupar === 'cliente') {
         titulo = 'Receitas por Clientes';
-        rows = await query(`SELECT ISNULL(c.Nome, '(sem cliente)') grupo, COUNT(*) qtd, SUM(v.FinalCentavos) valor ${base.replace('FROM dbo.Venda v', 'FROM dbo.Venda v LEFT JOIN dbo.Cliente c ON c.Id = v.ClienteId')} GROUP BY c.Nome ORDER BY valor DESC`, { de, ate, term });
+        rows = await query(`select coalesce(c.nome, '(sem cliente)') grupo, count(*) qtd, sum(v.final_centavos) valor ${base.replace('from kart.venda v', 'from kart.venda v left join kart.cliente c on c.id = v.cliente_id')} group by c.nome order by valor desc`, { de, ate, ...(term ? { term } : {}) });
       } else if (agrupar === 'dia') {
         titulo = 'Fluxo de Caixa (por dia)';
-        rows = await query(`SELECT CONVERT(varchar(10), v.CriadoEm, 103) grupo, COUNT(*) qtd, SUM(v.FinalCentavos) valor, MIN(v.CriadoEm) o ${base} GROUP BY CONVERT(varchar(10), v.CriadoEm, 103) ORDER BY o`, { de, ate, term });
+        rows = await query(`select to_char(v.criado_em, 'DD/MM/YYYY') grupo, count(*) qtd, sum(v.final_centavos) valor, min(v.criado_em) o ${base} group by to_char(v.criado_em, 'DD/MM/YYYY') order by o`, { de, ate, ...(term ? { term } : {}) });
       } else {
         titulo = 'Receitas por Forma de Pagamento';
-        rows = await query(`SELECT ISNULL(f.Nome, 'Outros') grupo, COUNT(*) qtd, SUM(vp.ValorCentavos - CASE WHEN f.Tipo = 'dinheiro' THEN v.TrocoCentavos ELSE 0 END) valor
-          FROM dbo.VendaPagamento vp JOIN dbo.Venda v ON v.Id = vp.VendaId LEFT JOIN dbo.FormaPagamento f ON f.Id = vp.FormaPagamentoId
-          WHERE v.Cancelada = 0 AND vp.Cancelado = 0 AND v.CriadoEm >= @de AND v.CriadoEm < DATEADD(day, 1, @ate)${fTerm} GROUP BY f.Nome ORDER BY valor DESC`, { de, ate, term });
+        rows = await query(`select coalesce(f.nome, 'Outros') grupo, count(*) qtd, sum(vp.valor_centavos - case when f.tipo = 'dinheiro' then v.troco_centavos else 0 end) valor
+          from kart.venda_pagamento vp join kart.venda v on v.id = vp.venda_id left join kart.forma_pagamento f on f.id = vp.forma_pagamento_id
+          where not v.cancelada and not vp.cancelado and v.criado_em >= @de::date and v.criado_em < @ate::date + 1${fTerm} group by f.nome order by valor desc`, { de, ate, ...(term ? { term } : {}) });
       }
       if (agrupar === 'produto') rows = rows.sort((a, b) => (b.valor as number) - (a.valor as number));
       const total = rows.reduce((s, r) => s + ((r.valor as number) ?? 0), 0);
@@ -209,10 +209,10 @@ export async function relatorio(tipo: string, url: URL): Promise<string> {
     case 'ticket': {
       const ids = String(p.get('ids') ?? '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 30);
       const rows = await query(
-        `SELECT i.Id id, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio, c.Nome cliente, pr.Nome produto, i.Pago pago, i.Kart kart,
-                CASE WHEN i.Pago = 1 THEN i.ValorCentavos ELSE ISNULL(i.PrecoCentavos, pr.PrecoCentavos) END valor
-         FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId JOIN dbo.Cliente c ON c.Id = i.ClienteId LEFT JOIN dbo.Produto pr ON pr.Id = ISNULL(i.ProdutoId, b.ProdutoId)
-         WHERE i.Id IN (${ids.map((_, n) => '@i' + n).join(',') || '0'})`,
+        `select i.id, b.nome bateria, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio, c.nome cliente, pr.nome produto, i.pago, i.kart,
+                case when i.pago then i.valor_centavos else coalesce(i.preco_centavos, pr.preco_centavos) end valor
+         from kart.inscricao i join kart.bateria b on b.id = i.bateria_id join kart.cliente c on c.id = i.cliente_id left join kart.produto pr on pr.id = coalesce(i.produto_id, b.produto_id)
+         where i.id in (${ids.map((_, n) => '@i' + n).join(',') || '0'})`,
         Object.fromEntries(ids.map((id, n) => ['i' + n, id])),
       );
       return page(
@@ -226,14 +226,14 @@ export async function relatorio(tipo: string, url: URL): Promise<string> {
     case 'venda': {
       const id = Number(p.get('id'));
       const v = await one<Record<string, unknown>>(
-        `SELECT v.Id id, CONVERT(varchar(16), v.CriadoEm, 126) dh, c.Nome cliente, c.Documento doc, u.Nome usuario, t.Nome terminal, v.BrutoCentavos bruto, v.DescontoCentavos desconto,
-                v.AcrescimoCentavos acrescimo, v.FinalCentavos final, v.RecebidoCentavos recebido, v.TrocoCentavos troco, v.Cancelada cancelada
-         FROM dbo.Venda v LEFT JOIN dbo.Cliente c ON c.Id = v.ClienteId LEFT JOIN dbo.Usuario u ON u.Id = v.UsuarioId LEFT JOIN dbo.Terminal t ON t.Id = v.TerminalId WHERE v.Id = @id`,
+        `select v.id, to_char(v.criado_em, 'YYYY-MM-DD"T"HH24:MI') dh, c.nome cliente, c.documento doc, u.nome usuario, t.nome terminal, v.bruto_centavos bruto, v.desconto_centavos desconto,
+                v.acrescimo_centavos acrescimo, v.final_centavos final, v.recebido_centavos recebido, v.troco_centavos troco, v.cancelada
+         from kart.venda v left join kart.cliente c on c.id = v.cliente_id left join kart.usuario u on u.id = v.usuario_id left join kart.terminal t on t.id = v.terminal_id where v.id = @id`,
         { id },
       );
       if (!v) throw new HttpError(404, 'Venda não encontrada.');
-      const itens = await query(`SELECT Descricao d, Quantidade q, LiquidoCentavos l, Estornado e FROM dbo.VendaItem WHERE VendaId = @id ORDER BY Item`, { id });
-      const pags = await query(`SELECT ISNULL(f.Nome,'?') f, vp.ValorCentavos v FROM dbo.VendaPagamento vp LEFT JOIN dbo.FormaPagamento f ON f.Id = vp.FormaPagamentoId WHERE vp.VendaId = @id`, { id });
+      const itens = await query(`select descricao d, quantidade q, liquido_centavos l, estornado e from kart.venda_item where venda_id = @id order by item`, { id });
+      const pags = await query(`select coalesce(f.nome, '?') f, vp.valor_centavos v from kart.venda_pagamento vp left join kart.forma_pagamento f on f.id = vp.forma_pagamento_id where vp.venda_id = @id`, { id });
       return page(
         `Comprovante nº ${v.id}`,
         `${dmy(v.dh)} ${hm(v.dh)} · ${esc(v.terminal)} · ${esc(v.usuario)}`,

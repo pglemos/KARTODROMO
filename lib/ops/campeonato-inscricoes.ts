@@ -66,11 +66,11 @@ export async function buscarPiloto(doc: string, nascimento: string) {
   if (!data) return null;
   const termo = doc.trim().toLowerCase();
   const num = onlyDigits(termo);
-  const where = termo.includes('@') ? 'c.Email = @email' : 'c.DocumentoNum = @num';
+  const where = termo.includes('@') ? 'lower(c.email) = @email' : 'c.documento_num = @num';
   if (!termo.includes('@') && num.length !== 11) return null;
   const c = await one<Linha>(
-    `SELECT TOP 1 c.Id id, c.Nome nome, c.DocumentoNum cpf, c.Telefone telefone, c.Email email, c.Cidade cidade, c.Peso peso
-     FROM dbo.Cliente c WHERE ${where} AND c.Nascimento = @data AND ISNULL(c.Bloqueado, 0) = 0 ORDER BY c.AtualizadoEm DESC`,
+    `select c.id, c.nome, c.documento_num cpf, c.telefone, c.email, c.cidade, c.peso
+     from kart.cliente c where ${where} and c.nascimento = @data::date and not coalesce(c.bloqueado, false) order by c.atualizado_em desc limit 1`,
     { email: termo, num, data },
   );
   if (!c) return null;
@@ -79,19 +79,19 @@ export async function buscarPiloto(doc: string, nascimento: string) {
 
 async function montar(where: string, p: Linha): Promise<Insc[]> {
   const insc = await query<Linha>(
-    `SELECT i.Id id, i.Evento evento, i.Protocolo protocolo, i.Token token, i.Equipe equipe, i.ChefeNome chefeNome, i.ChefeCpf chefeCpf, i.ChefeTelefone chefeTelefone,
-            i.ChefeEmail chefeEmail, i.Cidade cidade, i.Karts karts, i.ValorCentavos valor, i.Status status, i.Observacao observacao, i.ObsInterna obsInterna,
-            i.AutorizaImagem autorizaImagem, i.Origem origem, CONVERT(varchar(16), i.CriadoEm, 126) criadoEm,
-            ISNULL((SELECT SUM(g.ValorCentavos) FROM dbo.CampeonatoInscricaoPagamento g WHERE g.InscricaoId = i.Id), 0) pago
-     FROM dbo.CampeonatoInscricao i WHERE ${where} ORDER BY i.Id DESC`,
+    `select i.id, i.evento, i.protocolo, i.token, i.equipe, i.chefe_nome "chefeNome", i.chefe_cpf "chefeCpf", i.chefe_telefone "chefeTelefone",
+            i.chefe_email "chefeEmail", i.cidade, i.karts, i.valor_centavos valor, i.status, i.observacao, i.obs_interna "obsInterna",
+            i.autoriza_imagem "autorizaImagem", i.origem, to_char(i.criado_em, 'YYYY-MM-DD"T"HH24:MI') "criadoEm",
+            coalesce((select sum(g.valor_centavos) from kart.campeonato_inscricao_pagamento g where g.inscricao_id = i.id), 0) pago
+     from kart.campeonato_inscricao i where ${where} order by i.id desc`,
     p,
   );
   if (!insc.length) return [];
   const ids = insc.map((i) => Number(i.id)).join(',');
   const [pilotos, cobrancas, pagamentos] = await Promise.all([
-    query<Linha>(`SELECT Id id, InscricaoId inscricaoId, Kart kart, ClienteId clienteId, Nome nome, Cpf cpf, CONVERT(varchar(10), Nascimento, 126) nascimento, Telefone telefone, Email email, AlturaCm alturaCm, PesoKg pesoKg FROM dbo.CampeonatoInscricaoPiloto WHERE InscricaoId IN (${ids}) AND Ativo = 1 ORDER BY Kart, Id`),
-    query<Linha>(`SELECT Id id, InscricaoId inscricaoId, ValorCentavos valor, Forma forma, Parcelas parcelas, Link link, Status status, CONVERT(varchar(16), CriadoEm, 126) criadoEm FROM dbo.CampeonatoInscricaoCobranca WHERE InscricaoId IN (${ids}) ORDER BY Id DESC`),
-    query<Linha>(`SELECT Id id, InscricaoId inscricaoId, ValorCentavos valor, Forma forma, Origem origem, Observacao observacao, CONVERT(varchar(16), Em, 126) em FROM dbo.CampeonatoInscricaoPagamento WHERE InscricaoId IN (${ids}) ORDER BY Id DESC`),
+    query<Linha>(`select id, inscricao_id "inscricaoId", kart, cliente_id "clienteId", nome, cpf, to_char(nascimento, 'YYYY-MM-DD') nascimento, telefone, email, altura_cm "alturaCm", peso_kg "pesoKg" from kart.campeonato_inscricao_piloto where inscricao_id in (${ids}) and ativo order by kart, id`),
+    query<Linha>(`select id, inscricao_id "inscricaoId", valor_centavos valor, forma, parcelas, link, status, to_char(criado_em, 'YYYY-MM-DD"T"HH24:MI') "criadoEm" from kart.campeonato_inscricao_cobranca where inscricao_id in (${ids}) order by id desc`),
+    query<Linha>(`select id, inscricao_id "inscricaoId", valor_centavos valor, forma, origem, observacao, to_char(em, 'YYYY-MM-DD"T"HH24:MI') em from kart.campeonato_inscricao_pagamento where inscricao_id in (${ids}) order by id desc`),
   ]);
   return insc.map((i) => {
     const valor = Number(i.valor), pago = Number(i.pago);
@@ -104,7 +104,7 @@ async function montar(where: string, p: Linha): Promise<Insc[]> {
     } as Insc;
   });
 }
-const umaPorId = async (id: number) => (await montar('i.Id = @id', { id }))[0] ?? null;
+const umaPorId = async (id: number) => (await montar('i.id = @id', { id }))[0] ?? null;
 
 const siteUrl = () => (process.env.PRECADASTRO_URL || '').replace(/\/+$/, '');
 async function site(caminho: string, init: RequestInit = {}) {
@@ -138,10 +138,10 @@ async function gerarCobranca(id: number, forma: string, parcelas: number) {
     }),
   });
   const antigas = (i.cobrancas as Linha[]).filter((x) => x.status === 'aguardando');
-  await query(`INSERT INTO dbo.CampeonatoInscricaoCobranca (InscricaoId, ValorCentavos, Forma, Parcelas, AsaasId, Link) VALUES (@i, @v, @f, @n, @a, @l)`, { i: id, v: i.falta, f, n, a: String(c.id), l: String(c.link) });
+  await query(`insert into kart.campeonato_inscricao_cobranca (inscricao_id, valor_centavos, forma, parcelas, asaas_id, link) values (@i, @v, @f, @n, @a, @l)`, { i: id, v: i.falta, f, n, a: String(c.id), l: String(c.link) });
   // fatura trocada: a antiga deixa de valer no Asaas, senão a equipe podia pagar duas vezes
   for (const a of antigas) {
-    const atual = await one<{ asaas: string }>(`UPDATE dbo.CampeonatoInscricaoCobranca SET Status = 'cancelada' OUTPUT inserted.AsaasId asaas WHERE Id = @id AND Status = 'aguardando'`, { id: a.id });
+    const atual = await one<{ asaas: string }>(`update kart.campeonato_inscricao_cobranca set status = 'cancelada' where id = @id and status = 'aguardando' returning asaas_id asaas`, { id: a.id });
     if (atual) await site(`/api/sync/campeonato/cobranca/${encodeURIComponent(atual.asaas)}`, { method: 'DELETE' }).catch(() => undefined);
   }
   return String(c.link);
@@ -151,19 +151,19 @@ async function gerarCobranca(id: number, forma: string, parcelas: number) {
 export async function conferirCobrancasCampeonato(log: Log) {
   if (!siteUrl() || !process.env.PRECADASTRO_KEY) return;
   const abertas = await query<{ id: number; inscricao: number; valor: number; asaas: string; forma: string; parcelas: number }>(
-    `SELECT TOP 60 Id id, InscricaoId inscricao, ValorCentavos valor, AsaasId asaas, Forma forma, Parcelas parcelas FROM dbo.CampeonatoInscricaoCobranca WHERE Status = 'aguardando' ORDER BY Id`,
+    `select id, inscricao_id inscricao, valor_centavos valor, asaas_id asaas, forma, parcelas from kart.campeonato_inscricao_cobranca where status = 'aguardando' order by id limit 60`,
   );
   for (const c of abertas) {
     try {
       const s = await site(`/api/sync/campeonato/cobranca/${encodeURIComponent(c.asaas)}`);
       if (s.pago) {
         await tx(async (run) => {
-          const [ok] = await run(`UPDATE dbo.CampeonatoInscricaoCobranca SET Status = 'pago', PagoEm = SYSDATETIME() OUTPUT inserted.Id WHERE Id = @id AND Status = 'aguardando'`, { id: c.id });
-          if (ok) await run(`INSERT INTO dbo.CampeonatoInscricaoPagamento (InscricaoId, ValorCentavos, Forma, Origem, AsaasId) VALUES (@i, @v, @f, 'asaas', @a)`, { i: c.inscricao, v: c.valor, f: s.forma === 'PIX' ? 'Pix (Asaas)' : `Cartão ${c.parcelas}x (Asaas)`, a: c.asaas });
+          const [ok] = await run(`update kart.campeonato_inscricao_cobranca set status = 'pago', pago_em = now() where id = @id and status = 'aguardando' returning id`, { id: c.id });
+          if (ok) await run(`insert into kart.campeonato_inscricao_pagamento (inscricao_id, valor_centavos, forma, origem, asaas_id) values (@i, @v, @f, 'asaas', @a)`, { i: c.inscricao, v: c.valor, f: s.forma === 'PIX' ? 'Pix (Asaas)' : `Cartão ${c.parcelas}x (Asaas)`, a: c.asaas });
         });
         log(`campeonato: inscrição ${c.inscricao} pagou ${c.valor} centavos pelo Asaas`);
       } else if (['REFUNDED', 'DELETED'].includes(String(s.status))) {
-        await query(`UPDATE dbo.CampeonatoInscricaoCobranca SET Status = 'cancelada' WHERE Id = @id`, { id: c.id });
+        await query(`update kart.campeonato_inscricao_cobranca set status = 'cancelada' where id = @id`, { id: c.id });
       }
     } catch (e) {
       log(`campeonato: conferência da cobrança ${c.id} falhou (${(e as Error).message})`);
@@ -174,13 +174,13 @@ export async function conferirCobrancasCampeonato(log: Log) {
 async function cpfJaInscrito(eventoId: string, cpfs: string[], excetoPiloto = 0) {
   if (!cpfs.length) return null;
   return one<{ nome: string; equipe: string }>(
-    `SELECT TOP 1 p.Nome nome, i.Equipe equipe FROM dbo.CampeonatoInscricaoPiloto p JOIN dbo.CampeonatoInscricao i ON i.Id = p.InscricaoId
-     WHERE i.Evento = @e AND i.Status = 'ativa' AND p.Ativo = 1 AND p.Id <> @x AND p.Cpf IN (${cpfs.map((c) => `'${onlyDigits(c)}'`).join(',')})`,
+    `select p.nome, i.equipe from kart.campeonato_inscricao_piloto p join kart.campeonato_inscricao i on i.id = p.inscricao_id
+     where i.evento = @e and i.status = 'ativa' and p.ativo and p.id <> @x and p.cpf in (${cpfs.map((c) => `'${onlyDigits(c)}'`).join(',')}) limit 1`,
     { e: eventoId, x: excetoPiloto },
   );
 }
 
-const clienteDoCpf = async (cpf: string) => (await one<{ id: number }>(`SELECT TOP 1 Id id FROM dbo.Cliente WHERE DocumentoNum = @cpf ORDER BY AtualizadoEm DESC`, { cpf }))?.id ?? null;
+const clienteDoCpf = async (cpf: string) => (await one<{ id: number }>(`select id from kart.cliente where documento_num = @cpf order by atualizado_em desc limit 1`, { cpf }))?.id ?? null;
 
 async function criarInscricao(eventoId: string, b: Linha, origem: string) {
   const e = evento(eventoId);
@@ -208,15 +208,17 @@ async function criarInscricao(eventoId: string, b: Linha, origem: string) {
   const chefeClienteId = await clienteDoCpf(chefeCpf);
   const token = randomBytes(18).toString('base64url');
   const id = await tx(async (run) => {
-    const [dup] = await run(`SELECT 1 x FROM dbo.CampeonatoInscricao WITH (UPDLOCK, HOLDLOCK) WHERE Evento = @e AND Status = 'ativa' AND Equipe = @q`, { e: eventoId, q: equipe });
+    // trava por evento+equipe até o fim da transação (o UPDLOCK/HOLDLOCK do banco anterior também travava a faixa vazia)
+    await run(`select pg_advisory_xact_lock(hashtext('campeonato:' || @e || ':' || lower(@q)))`, { e: eventoId, q: equipe });
+    const [dup] = await run(`select 1 x from kart.campeonato_inscricao where evento = @e and status = 'ativa' and lower(equipe) = lower(@q)`, { e: eventoId, q: equipe });
     if (dup) throw new HttpError(409, 'Já existe uma inscrição com esse nome de equipe. Fale com a organização se ela for sua.');
     const [n] = await run(
-      `INSERT INTO dbo.CampeonatoInscricao (Evento, Protocolo, Token, Equipe, ChefeClienteId, ChefeNome, ChefeCpf, ChefeTelefone, ChefeEmail, Cidade, Karts, ValorCentavos, Observacao, AutorizaImagem, Origem)
-       OUTPUT inserted.Id id VALUES (@e, @prot, @tok, @q, @cc, @cn, @cpf, @tel, @em, @cid, @k, @v, @obs, @img, @org)`,
-      { e: eventoId, prot: `M${Date.now().toString(36).toUpperCase().slice(-7)}${randomBytes(1).toString('hex').toUpperCase()}`, tok: token, q: equipe, cc: chefeClienteId, cn: chefeNome, cpf: chefeCpf, tel: chefeTelefone, em: chefeEmail, cid: txt(b.cidade, 100) || null, k: karts, v: karts * e.valorCentavos, obs: txt(b.observacao, 1000) || null, img: b.autorizaImagem ? 1 : 0, org: origem },
+      `insert into kart.campeonato_inscricao (evento, protocolo, token, equipe, chefe_cliente_id, chefe_nome, chefe_cpf, chefe_telefone, chefe_email, cidade, karts, valor_centavos, observacao, autoriza_imagem, origem)
+       values (@e, @prot, @tok, @q, @cc, @cn, @cpf, @tel, @em, @cid, @k, @v, @obs, @img, @org) returning id`,
+      { e: eventoId, prot: `M${Date.now().toString(36).toUpperCase().slice(-7)}${randomBytes(1).toString('hex').toUpperCase()}`, tok: token, q: equipe, cc: chefeClienteId, cn: chefeNome, cpf: chefeCpf, tel: chefeTelefone, em: chefeEmail, cid: txt(b.cidade, 100) || null, k: karts, v: karts * e.valorCentavos, obs: txt(b.observacao, 1000) || null, img: !!b.autorizaImagem, org: origem },
     );
     for (const p of pilotos) {
-      await run(`INSERT INTO dbo.CampeonatoInscricaoPiloto (InscricaoId, Kart, ClienteId, Nome, Cpf, Nascimento, Telefone, Email, AlturaCm, PesoKg) VALUES (@i, @k, @c, @n, @cpf, @d, @t, @em, @a, @pk)`,
+      await run(`insert into kart.campeonato_inscricao_piloto (inscricao_id, kart, cliente_id, nome, cpf, nascimento, telefone, email, altura_cm, peso_kg) values (@i, @k, @c, @n, @cpf, @d, @t, @em, @a, @pk)`,
         { i: n.id, k: p.kart, c: p.clienteId, n: p.nome, cpf: p.cpf, d: p.nascimento, t: p.telefone || null, em: p.email || null, a: p.alturaCm, pk: p.pesoKg });
     }
     return Number(n.id);
@@ -261,7 +263,7 @@ export async function campeonatoSiteRoutes(path: string, method: string, corpo: 
   }
   const t = resto.match(/^\/inscricoes\/([\w-]{20,40})(\/pagar)?$/);
   if (t) {
-    const i = (await montar('i.Token = @t AND i.Evento = @e', { t: t[1], e: ev }))[0];
+    const i = (await montar('i.token = @t and i.evento = @e', { t: t[1], e: ev }))[0];
     if (!i) throw new HttpError(404, 'Inscrição não encontrada.');
     if (!t[2] && method === 'GET') { send(200, publico(i)); return true; }
     if (t[2] && method === 'POST') {
@@ -281,7 +283,7 @@ export async function campeonatoOfficeRoutes(req: { method: string; url: URL; bo
   let m: RegExpMatchArray | null;
   if (path === '/campeonato-inscricoes' && method === 'GET') {
     const ev = url.searchParams.get('evento') || '200-milhas';
-    send(200, { evento: { id: ev, ...evento(ev), aberta: aberta(ev) }, inscricoes: await montar('i.Evento = @e', { e: ev }) });
+    send(200, { evento: { id: ev, ...evento(ev), aberta: aberta(ev) }, inscricoes: await montar('i.evento = @e', { e: ev }) });
     return true;
   }
   if (path === '/campeonato-inscricoes' && method === 'POST') {
@@ -297,16 +299,16 @@ export async function campeonatoOfficeRoutes(req: { method: string; url: URL; bo
     if (nome.length < 2) throw new HttpError(400, 'Informe o nome da equipe.');
     if (!/^\d{10,13}$/.test(tel)) throw new HttpError(400, 'Informe o WhatsApp com DDD.');
     if (!emailOk(em)) throw new HttpError(400, 'Confira o e-mail.');
-    await query(`UPDATE dbo.CampeonatoInscricao SET Equipe = @q, ChefeNome = @n, ChefeTelefone = @t, ChefeEmail = @em, Cidade = @c, ObsInterna = @o, AtualizadoEm = SYSDATETIME() WHERE Id = @id`,
+    await query(`update kart.campeonato_inscricao set equipe = @q, chefe_nome = @n, chefe_telefone = @t, chefe_email = @em, cidade = @c, obs_interna = @o where id = @id`,
       { id, q: nome, n: txt(b.chefeNome, 150), t: tel, em, c: txt(b.cidade, 100) || null, o: txt(b.obsInterna, 1000) || null });
     send(200, await umaPorId(id));
     return true;
   }
   if ((m = path.match(/^\/campeonato-inscricoes\/(\d+)\/cancelar$/)) && method === 'POST') {
     const id = Number(m[1]);
-    const abertas = await query<{ asaas: string }>(`UPDATE dbo.CampeonatoInscricaoCobranca SET Status = 'cancelada' OUTPUT inserted.AsaasId asaas WHERE InscricaoId = @id AND Status = 'aguardando'`, { id });
+    const abertas = await query<{ asaas: string }>(`update kart.campeonato_inscricao_cobranca set status = 'cancelada' where inscricao_id = @id and status = 'aguardando' returning asaas_id asaas`, { id });
     for (const a of abertas) await site(`/api/sync/campeonato/cobranca/${encodeURIComponent(a.asaas)}`, { method: 'DELETE' }).catch(() => undefined);
-    await query(`UPDATE dbo.CampeonatoInscricao SET Status = 'cancelada', AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id });
+    await query(`update kart.campeonato_inscricao set status = 'cancelada' where id = @id`, { id });
     send(200, await umaPorId(id));
     return true;
   }
@@ -316,7 +318,7 @@ export async function campeonatoOfficeRoutes(req: { method: string; url: URL; bo
     if (!i) throw new HttpError(404, 'Inscrição não encontrada.');
     const ja = await cpfJaInscrito(String(i.evento), (i.pilotos as Linha[]).map((p) => String(p.cpf)));
     if (ja) throw new HttpError(409, `${ja.nome} já está na equipe ${ja.equipe}.`);
-    await query(`UPDATE dbo.CampeonatoInscricao SET Status = 'ativa', AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id });
+    await query(`update kart.campeonato_inscricao set status = 'ativa' where id = @id`, { id });
     send(200, await umaPorId(id));
     return true;
   }
@@ -332,13 +334,13 @@ export async function campeonatoOfficeRoutes(req: { method: string; url: URL; bo
     if (!(valor > 0 && valor <= 100_000_000)) throw new HttpError(400, 'Informe o valor recebido.');
     const forma = txt(b.forma, 60);
     if (!forma) throw new HttpError(400, 'Informe a forma de pagamento.');
-    await query(`INSERT INTO dbo.CampeonatoInscricaoPagamento (InscricaoId, ValorCentavos, Forma, Origem, UsuarioId, Observacao) VALUES (@i, @v, @f, 'manual', @u, @o)`,
+    await query(`insert into kart.campeonato_inscricao_pagamento (inscricao_id, valor_centavos, forma, origem, usuario_id, observacao) values (@i, @v, @f, 'manual', @u, @o)`,
       { i: id, v: valor, f: forma, u: sessao.uid, o: txt(b.observacao, 300) || null });
     send(201, await umaPorId(id));
     return true;
   }
   if ((m = path.match(/^\/campeonato-inscricoes\/(\d+)\/pagamentos\/(\d+)$/)) && method === 'DELETE') {
-    const r = await one(`DELETE FROM dbo.CampeonatoInscricaoPagamento OUTPUT deleted.Id WHERE Id = @p AND InscricaoId = @i AND Origem = 'manual'`, { p: Number(m[2]), i: Number(m[1]) });
+    const r = await one(`delete from kart.campeonato_inscricao_pagamento where id = @p and inscricao_id = @i and origem = 'manual' returning id`, { p: Number(m[2]), i: Number(m[1]) });
     if (!r) throw new HttpError(409, 'Só dá para excluir pagamento lançado à mão.');
     send(200, await umaPorId(Number(m[1])));
     return true;
@@ -354,13 +356,13 @@ export async function campeonatoOfficeRoutes(req: { method: string; url: URL; bo
     if (p.kart > Number(i.karts)) throw new HttpError(400, 'Esse kart não existe nesta inscrição.');
     const ja = await cpfJaInscrito(String(i.evento), [p.cpf]);
     if (ja) throw new HttpError(409, `${ja.nome} já está na equipe ${ja.equipe}.`);
-    await query(`INSERT INTO dbo.CampeonatoInscricaoPiloto (InscricaoId, Kart, ClienteId, Nome, Cpf, Nascimento, Telefone, Email, AlturaCm, PesoKg) VALUES (@i, @k, @c, @n, @cpf, @d, @t, @em, @a, @pk)`,
+    await query(`insert into kart.campeonato_inscricao_piloto (inscricao_id, kart, cliente_id, nome, cpf, nascimento, telefone, email, altura_cm, peso_kg) values (@i, @k, @c, @n, @cpf, @d, @t, @em, @a, @pk)`,
       { i: id, k: p.kart, c: await clienteDoCpf(p.cpf), n: p.nome, cpf: p.cpf, d: p.nascimento, t: p.telefone || null, em: p.email || null, a: p.alturaCm, pk: p.pesoKg });
     send(201, await umaPorId(id));
     return true;
   }
   if ((m = path.match(/^\/campeonato-inscricoes\/(\d+)\/pilotos\/(\d+)$/)) && method === 'DELETE') {
-    await query(`UPDATE dbo.CampeonatoInscricaoPiloto SET Ativo = 0 WHERE Id = @p AND InscricaoId = @i`, { p: Number(m[2]), i: Number(m[1]) });
+    await query(`update kart.campeonato_inscricao_piloto set ativo = false where id = @p and inscricao_id = @i`, { p: Number(m[2]), i: Number(m[1]) });
     send(200, await umaPorId(Number(m[1])));
     return true;
   }
@@ -370,8 +372,8 @@ export async function campeonatoOfficeRoutes(req: { method: string; url: URL; bo
     if (q.length < 3) { send(200, []); return true; }
     const num = onlyDigits(q);
     send(200, await query(
-      `SELECT TOP 8 Id id, Nome nome, DocumentoNum cpf, CONVERT(varchar(10), Nascimento, 126) nascimento, Telefone telefone, Email email, Peso peso FROM dbo.Cliente
-       WHERE ${q.includes('@') ? 'Email = @em' : num.length === 11 ? 'DocumentoNum = @num' : 'Nome LIKE @nome'} ORDER BY Nome`,
+      `select id, nome, documento_num cpf, to_char(nascimento, 'YYYY-MM-DD') nascimento, telefone, email, peso from kart.cliente
+       where ${q.includes('@') ? 'lower(email) = @em' : num.length === 11 ? 'documento_num = @num' : 'nome ilike @nome'} order by nome limit 8`,
       { em: q.toLowerCase(), num, nome: `${q}%` },
     ));
     return true;

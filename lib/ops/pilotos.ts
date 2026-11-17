@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- respostas dinâmicas da API do app (conta/convite) */
 /**
- * Página Pilotos do painel web: a cartela de clientes (dbo.Cliente) com a carreira de cada um na cronometragem,
- * o ranking dos melhores tempos por traçado (semana, mês e geral) e a foto do piloto (dbo.ClienteFoto).
+ * Página Pilotos do painel web: a cartela de clientes (kart.cliente) com a carreira de cada um na cronometragem,
+ * o ranking dos melhores tempos por traçado (semana, mês e geral) e a foto do piloto (kart.cliente_foto).
  *
  * A carreira vem das baterias encerradas do ORBITS (GET /api/sessions e /api/sessions/:id): cada bateria encerrada é
  * lida uma vez e guardada em .runtime/pilotos-cronometragem.json (bateria encerrada não muda; se a cronometragem
@@ -85,12 +85,12 @@ async function carregarAliases(log?: (m: string) => void): Promise<boolean> {
   aliasEm = Date.now();
   try {
     const rows = await query<{ id: number; canon: number; nome: string; nomeCanon: string }>(
-      `WITH g AS (
-         SELECT Id, LOWER(LTRIM(RTRIM(Email))) em, UPPER(LTRIM(RTRIM(Nome))) nm,
-                ROW_NUMBER() OVER (PARTITION BY LOWER(LTRIM(RTRIM(Email))), UPPER(LTRIM(RTRIM(Nome))) ORDER BY AtualizadoEm DESC, Id DESC) ordem,
-                COUNT(*) OVER (PARTITION BY LOWER(LTRIM(RTRIM(Email))), UPPER(LTRIM(RTRIM(Nome)))) qtd
-           FROM dbo.Cliente WHERE ResponsavelId IS NULL AND Email LIKE '_%@_%._%' AND LEN(LTRIM(RTRIM(Nome))) >= 5)
-       SELECT a.Id id, b.Id canon, (SELECT Nome FROM dbo.Cliente WHERE Id = a.Id) nome, (SELECT Nome FROM dbo.Cliente WHERE Id = b.Id) nomeCanon FROM g a JOIN g b ON b.em = a.em AND b.nm = a.nm AND b.ordem = 1 WHERE a.qtd BETWEEN 2 AND 3 AND a.ordem > 1`, {});
+      `with g as (
+         select id, lower(trim(email)) em, upper(trim(nome)) nm,
+                row_number() over (partition by lower(trim(email)), upper(trim(nome)) order by atualizado_em desc, id desc) ordem,
+                count(*) over (partition by lower(trim(email)), upper(trim(nome))) qtd
+           from kart.cliente where responsavel_id is null and email like '_%@_%._%' and length(trim(nome)) >= 5)
+       select a.id, b.id canon, (select nome from kart.cliente where id = a.id) nome, (select nome from kart.cliente where id = b.id) "nomeCanon" from g a join g b on b.em = a.em and b.nm = a.nm and b.ordem = 1 where a.qtd between 2 and 3 and a.ordem > 1`, {});
     const novo = new Map(rows.map((r) => [String(r.id), String(r.canon)]));
     const mudou = novo.size !== aliasCliente.size || [...novo].some(([k, v]) => aliasCliente.get(k) !== v);
     aliasCliente = novo;
@@ -138,7 +138,7 @@ export function atualizarIndice(log?: (m: string) => void): Promise<void> {
   if (atualizando) return atualizando;
   atualizando = (async () => {
     // CalXPro (2023 a jan/2025) não depende da cronometragem estar no ar: lê uma vez e grava no índice
-    // LapTime antigo (banco local LapTimeMirror) também não depende da cronometragem
+    // o histórico antigo também não depende da cronometragem (já está no índice gravado)
     try {
       if (!legadoCarregado) { await carregarLegado(log); await gravarIndiceArq(); }
       if (!calxproCarregado && await carregarCalxpro(log)) { await gravarIndiceArq(); }
@@ -189,7 +189,7 @@ export function atualizarIndice(log?: (m: string) => void): Promise<void> {
 }
 async function indiceFresco() { if (Date.now() - atualizadoEm > 120_000) await atualizarIndice(); if (!normalizado) normalizarNomes(); }
 
-// ---------------------------------------------------------------- LapTime antigo (banco LapTimeMirror do SRVKART, só leitura)
+// ---------------------------------------------------------------- histórico dos sistemas antigos (2018 a set/2026, já gravado em .runtime)
 // Corridas detalhadas só de 02/09 a 23/09/2026 (o LapTime não guardava mais que isso); rankings diário/semanal/mensal desde
 // jan/2025 com os 10 primeiros de cada faixa de peso, por traçado e categoria (Indoor, Super Kart). O LapTime foi desligado em
 // 23/09: os dados não mudam mais, então são lidos uma vez e guardados em .runtime/pilotos-laptime.json.
@@ -202,56 +202,11 @@ const msDe = (t: unknown) => (t instanceof Date ? t.getTime() : null);
 const tipoAntigo: Record<string, string> = { '1': 'treino', '2': 'treino', '3': 'classificacao', '4': 'corrida' };
 
 async function carregarLegado(log?: (m: string) => void) {
-  try {
-    const corridas = await query<{ id: string; nome: string; tipo: string; inicio: Date; tracado: string; piloto: string; kart: string; pos: number; voltas: number; melhor: Date | null; oculto: boolean; cid: number | null; categoria: string | null }>(
-      `SELECT r.Id_Racing id, r.Name nome, r.Id_RacingType tipo, r.StartDateTime inicio, t.Name tracado, rc.Competitor piloto, rc.Number kart, rc.Pos pos, rc.Lap voltas,
-              rc.BestLapTime melhor, rc.IsHidden oculto, c.Id cid, cat.Name categoria
-         FROM LapTimeMirror.dbo.Racing r JOIN LapTimeMirror.dbo.RacingTrack t ON t.Id_RacingTrack = r.Id_RacingTrack
-         JOIN LapTimeMirror.dbo.RacingCompetitor rc ON rc.Id_Racing = r.Id_Racing
-         LEFT JOIN LapTimeMirror.dbo.Category cat ON cat.Id_Category = rc.Id_Category
-         LEFT JOIN LapTimeMirror.dbo.BookingCustomer bc ON bc.UniqueId = rc.BookingCustomerUId
-         LEFT JOIN dbo.Cliente c ON c.LegadoId = bc.Id_Customer
-        WHERE r.StartDateTime IS NOT NULL AND rc.Competitor IS NOT NULL`,
-    );
-    for (const k of Object.keys(indice)) if (k.startsWith('lt-')) delete indice[k];
-    for (const x of corridas) {
-      if (x.oculto || semNome(x.piloto ?? '', String(x.kart ?? ''))) continue;
-      const id = 'lt-' + x.id, inicio = x.inicio.getTime(), tracado = comCategoria(tracadoBase(String(x.tracado ?? 'Traçado principal')), x.categoria);
-      const b = indice[id] ?? (indice[id] = { id, nome: String(x.nome ?? 'Bateria').trim(), tipo: tipoAntigo[String(x.tipo)] ?? 'treino', dia: diaSp(inicio), inicio, fim: inicio, chuva: chuvaNoNome(String(x.tracado ?? '')), trackId: null, tracado, pilotos: [] });
-      const ms = msDe(x.melhor);
-      b.pilotos.push({ cid: x.cid ? String(x.cid) : null, nome: String(x.piloto).trim(), kart: String(x.kart ?? ''), pos: x.pos || 0, voltas: x.voltas || 0, melhor: ms && ms > 0 ? ms : null, cat: null, dq: false });
-    }
-    // Fev/2025 a abr/2026: o LapTime apagou as corridas (tempos e posições), mas as reservas pagas ficaram. Cada bateria
-    // reservada entre o fim do CalXPro e a primeira corrida guardada entra só com quem andou (sem posição nem tempo).
-    for (const k of Object.keys(indice)) if (k.startsWith('lr-')) delete indice[k];
-    const primeiraCorrida = corridas.reduce((a, x) => Math.min(a, x.inicio.getTime()), Date.now());
-    const fimCalxpro = Object.values(indice).reduce((a, b) => (b.id.startsWith('cx-') ? Math.max(a, b.inicio) : a), 0);
-    const reservas = await query<{ id: string; nome: string; inicio: Date; tracado: string | null; cid: number; piloto: string; categoria: string | null }>(
-      `SELECT b.Id_Booking id, b.Name nome, b.ExpectedDateTime inicio, t.Name tracado, c.Id cid, c.Nome piloto, cat.Name categoria
-         FROM LapTimeMirror.dbo.Booking b JOIN LapTimeMirror.dbo.BookingCustomer bc ON bc.Id_Booking = b.Id_Booking
-         JOIN dbo.Cliente c ON c.LegadoId = bc.Id_Customer
-         LEFT JOIN LapTimeMirror.dbo.RacingTrack t ON t.Id_RacingTrack = b.Id_RacingTrack
-         LEFT JOIN LapTimeMirror.dbo.Category cat ON cat.Id_Category = bc.Id_Category
-        WHERE bc.IsCanceled = 0 AND bc.PaidOut = 1 AND b.ExpectedDateTime > @de AND b.ExpectedDateTime < @ate`,
-      { de: new Date(fimCalxpro + 86_400_000), ate: new Date(Math.min(primeiraCorrida, Date.now())) },
-    );
-    for (const x of reservas) {
-      const id = 'lr-' + x.id, inicio = x.inicio.getTime();
-      const b = indice[id] ?? (indice[id] = { id, nome: String(x.nome ?? 'Bateria').trim(), tipo: 'treino', dia: diaSp(inicio), inicio, fim: inicio, chuva: false, trackId: null, tracado: comCategoria(tracadoBase(String(x.tracado ?? SEM_TRACADO)), x.categoria), pilotos: [], reserva: true });
-      if (!b.pilotos.some((p) => p.cid === String(x.cid))) b.pilotos.push({ cid: String(x.cid), nome: String(x.piloto ?? '').trim(), kart: '', pos: 0, voltas: 0, melhor: null, cat: null, dq: false });
-    }
-    const ranks = await query<{ tipo: string; periodo: string; inicio: Date; tracado: string; categoria: string; pos: number; faixa: string | null; cid: number | null; nome: string; melhor: Date | null }>(
-      `SELECT r.Id_RankingType tipo, r.Period periodo, r.StartDateTime inicio, t.Name tracado, cat.Name categoria, r.Pos pos, r.RangeWeight faixa, c.Id cid, r.Name nome, r.BestLapTime melhor
-         FROM LapTimeMirror.dbo.Ranking r JOIN LapTimeMirror.dbo.RacingTrack t ON t.Id_RacingTrack = r.Id_RacingTrack
-         LEFT JOIN LapTimeMirror.dbo.Category cat ON cat.Id_Category = r.Id_Category
-         LEFT JOIN LapTimeMirror.dbo.Customer cu ON cu.UniqueId = r.CustomerUid LEFT JOIN dbo.Cliente c ON c.LegadoId = cu.Id_Customer
-        WHERE r.Id_RankingType IN (2, 3) AND r.BestLapTime IS NOT NULL`,
-    );
-    rankAntigo = ranks.map((x) => ({ tipo: String(x.tipo) === '2' ? 'semana' as const : 'mes' as const, periodo: String(x.periodo ?? ''), dia: diaSp(x.inicio.getTime()), tracado: tracadoBase(String(x.tracado ?? '')), categoria: String(x.categoria ?? ''), pos: x.pos, faixa: x.faixa ?? null, cid: x.cid ? String(x.cid) : null, nome: String(x.nome ?? '').trim(), ms: msDe(x.melhor) ?? 0 })).filter((x) => x.ms > 0);
-    const tmp = ARQ_LEGADO + '.tmp'; writeFileSync(tmp, JSON.stringify({ versao: 6, rankings: rankAntigo })); renameSync(tmp, ARQ_LEGADO);
-    legadoCarregado = true;
-    log?.(`pilotos: LapTime antigo lido (${corridas.length} participações em corridas, ${reservas.length} em reservas sem tempo, ${rankAntigo.length} posições de ranking)`);
-  } catch (e) { log?.(`pilotos: LapTime antigo indisponível (${(e as Error).message})`); legadoCarregado = true; }
+  // O histórico dos sistemas antigos (2018 a set/2026) já está gravado no índice (.runtime/pilotos-cronometragem.json,
+  // baterias "lt-", "lr-" e "cx-") e no ranking antigo (.runtime/pilotos-laptime.json). Não muda mais e não há banco
+  // antigo para reler: só marca como carregado.
+  legadoCarregado = true;
+  if (!rankAntigo.length) log?.('pilotos: ranking antigo não encontrado em .runtime (o histórico de corridas continua no índice)');
 }
 // ---------------------------------------------------------------- CalXPro (sistema anterior ao LapTime, banco CALXPRO do SRVKART, só leitura)
 // Corridas de 2023 a jan/2025 com posição, voltas e melhor volta de cada piloto. O CalXPro não guardava o cliente da
@@ -261,64 +216,10 @@ async function carregarLegado(log?: (m: string) => void) {
 const ARQ_CALXPRO_VERSAO = resolve(join(process.cwd(), '.runtime', 'pilotos-calxpro-versao.txt'));
 const CALXPRO_VERSAO = '3';
 let calxproCarregado = Object.keys(indice).some((k) => k.startsWith('cx-')) && (() => { try { return readFileSync(ARQ_CALXPRO_VERSAO, 'utf8').trim() === CALXPRO_VERSAO; } catch { return false; } })();
-async function carregarCalxpro(log?: (m: string) => void) {
-  try {
-    const linhas = await query<{ id: string; nome: string; inicio: Date; piloto: string; sobrenome: string | null; kart: number | null; pos: number | null; voltas: number | null; melhor: number | null; cid: number | null }>(
-      `WITH base AS (SELECT LOWER(LTRIM(RTRIM(Email))) e, Id, UPPER(LTRIM(RTRIM(Nome))) nm,
-                      ROW_NUMBER() OVER (PARTITION BY LOWER(LTRIM(RTRIM(Email))) ORDER BY AtualizadoEm DESC, Id DESC) ordem
-                      FROM dbo.Cliente WHERE Email LIKE '%@%' AND ResponsavelId IS NULL),
-            -- e-mail de um cadastro só, ou de cadastros duplicados da mesma pessoa (mesmo nome): fica o mais recente
-            em AS (SELECT e, MAX(CASE WHEN ordem = 1 THEN Id END) cid FROM base GROUP BY e HAVING COUNT(DISTINCT nm) = 1 AND COUNT(*) <= 3)
-       SELECT h.ID_CORRIDA id, h.ST_NOME nome, h.DT_DATA_HORA inicio, cc.ST_NOME piloto, cc.ST_SOBRENOME sobrenome, cc.NM_NUMERO kart,
-              cc.NM_POSICAO pos, cc.TOT_VOLTAS voltas,
-              CASE WHEN cc.TEMPO_MELHOR_VOLTA IS NULL THEN NULL ELSE DATEDIFF(ms, CAST(CAST(cc.TEMPO_MELHOR_VOLTA AS date) AS datetime2), cc.TEMPO_MELHOR_VOLTA) END melhor,
-              em.cid cid
-         FROM CALXPRO.dbo.HIST_CORRIDA h JOIN CALXPRO.dbo.HIST_COMPETIDOR_CORRIDA cc ON cc.ID_CORRIDA = h.ID_CORRIDA
-         LEFT JOIN em ON em.e = LOWER(LTRIM(RTRIM(cc.ST_EMAIL)))
-        WHERE h.DT_DATA_HORA IS NOT NULL AND cc.ST_NOME IS NOT NULL`,
-    );
-    // HIST_COMPETIDOR_CORRIDA (09/2023 a 01/2025) só completa voltas e kart; a fonte das baterias é BATERIAS_CLIENTES
-    const extra = new Map<string, { voltas: number; kart: string }>();
-    for (const x of linhas) {
-      if (!x.cid) continue;
-      const nomeBat = String(x.nome ?? '');
-      const tipo = /CORRIDA\s*$/i.test(nomeBat.trim()) ? 'corrida' : /TOMADA|CLASSIF|QUALI/i.test(nomeBat) ? 'classificacao' : 'treino';
-      extra.set(`${x.cid}|${diaSp(x.inicio.getTime() + 3 * 3_600_000)}|${tipo}|${x.pos || 0}`, { voltas: x.voltas || 0, kart: String(x.kart ?? '') });
-    }
-    // BATERIAS_CLIENTES (2018 a 01/2025): cada bateria tem tomada de tempo e corrida, com o cliente ligado pelo CalxproId
-    const bc = await query<{ bid: string; nome: string; inicio: Date; pista: number | null; cat: number | null; cid: number | null; piloto: string | null; pq: number | null; tq: Date | null; pc: number | null; tc: Date | null; nq: number; nc: number }>(
-      `SELECT b.ID_BATERIAS bid, b.ST_NOME nome, b.DT_DATA_HORA inicio, b.ID_PISTA pista, b.ID_CATEGORIA cat, c.Id cid, c.Nome piloto,
-              bc.NM_POSICAO_QFY pq, bc.TEMPO_MELHOR_VOLTA_QFY tq, bc.NM_POSICAO_CRD pc, bc.TEMPO_MELHOR_VOLTA_CRD tc,
-              SUM(CASE WHEN bc.NM_POSICAO_QFY > 0 THEN 1 ELSE 0 END) OVER (PARTITION BY bc.ID_BATERIAS) nq,
-              SUM(CASE WHEN bc.NM_POSICAO_CRD > 0 THEN 1 ELSE 0 END) OVER (PARTITION BY bc.ID_BATERIAS) nc
-         FROM CALXPRO.dbo.BATERIAS_CLIENTES bc JOIN CALXPRO.dbo.BATERIAS b ON b.ID_BATERIAS = bc.ID_BATERIAS
-         LEFT JOIN (SELECT CalxproId, MAX(Id) Id, MAX(Nome) Nome FROM dbo.Cliente WHERE CalxproId IS NOT NULL GROUP BY CalxproId) c ON c.CalxproId = bc.ID_CLIENTE
-        WHERE b.DT_DATA_HORA IS NOT NULL AND (bc.NM_POSICAO_QFY > 0 OR bc.NM_POSICAO_CRD > 0)`,
-    );
-    for (const k of Object.keys(indice)) if (k.startsWith('cx-')) delete indice[k];
-    const msVolta = (t: Date | null) => { if (!(t instanceof Date)) return null; const ms = t.getTime() - Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()); return ms > 20_000 && ms < 600_000 ? ms : null; };
-    let n = 0;
-    for (const x of bc) {
-      if (!x.cid) continue;
-      const inicio = x.inicio.getTime() + 3 * 3_600_000; // DT_DATA_HORA é hora de Betim gravada sem fuso
-      const dia = diaSp(inicio);
-      const tracado = tracadoBase(x.pista ? `Traçado ${x.pista}` : 'Traçado principal');
-      const titulo = /\d{1,2}:\d{2}/.exec(String(x.nome ?? ''))?.[0];
-      const cat = x.cat === 2 ? 'Super Kart' : x.cat === 1 ? 'Indoor' : null;
-      for (const [tipo, pos, t, off] of [['classificacao', x.pq, x.tq, 0], ['corrida', x.pc, x.tc, 60_000]] as const) {
-        if (!pos || pos < 1) continue;
-        const id = `cx-${tipo === 'corrida' ? 'c' : 'q'}${x.bid}`;
-        const b = indice[id] ?? (indice[id] = { id, nome: titulo ? `Bateria ${titulo}` : 'Bateria', tipo, dia, inicio: inicio + off, fim: inicio + off, chuva: chuvaNoNome(String(x.nome ?? '')), trackId: null, tracado, pilotos: [] });
-        const e = extra.get(`${x.cid}|${dia}|${tipo}|${pos}`);
-        b.pilotos.push({ cid: String(x.cid), nome: String(x.piloto ?? '').trim() || 'Piloto', kart: e?.kart ?? '', pos, voltas: e?.voltas ?? 0, melhor: msVolta(t), cat, dq: false });
-        n++;
-      }
-    }
-    calxproCarregado = true;
-    try { writeFileSync(ARQ_CALXPRO_VERSAO, CALXPRO_VERSAO); } catch { /* recarrega no próximo início */ }
-    log?.(`pilotos: CalXPro lido (${n} participações de 2018 a 2025)`);
-    return true;
-  } catch (e) { log?.(`pilotos: CalXPro indisponível (${(e as Error).message})`); calxproCarregado = true; return false; }
+async function carregarCalxpro(_log?: (m: string) => void) {
+  // histórico 2018-2025 já gravado no índice ("cx-"); nada a reler
+  calxproCarregado = true;
+  return false;
 }
 
 /** Primeiro dia com corrida detalhada (LapTime ou cronometragem nova): antes disso, só o ranking antigo do LapTime. */
@@ -442,23 +343,23 @@ function tracadosComTempos(per: Periodo, itens?: Map<string, ItemRank[]>) {
 }
 
 // ---------------------------------------------------------------- cartela
-const COLS_LISTA = `c.Id id, c.Nome nome, CONVERT(varchar(10), c.Nascimento, 126) nascimento, c.Peso peso, c.Telefone telefone, c.Email email,
-  c.Instagram instagram, c.Documento documento, c.ResponsavelId responsavelId, r.Nome responsavelNome, c.Bloqueado bloqueado, c.Origem origem,
-  CONVERT(varchar(10), c.CriadoEm, 126) criadoEm, CASE WHEN f.ClienteId IS NULL THEN 0 ELSE 1 END temFoto`;
-const DE_LISTA = `FROM dbo.Cliente c LEFT JOIN dbo.Cliente r ON r.Id = c.ResponsavelId LEFT JOIN dbo.ClienteFoto f ON f.ClienteId = c.Id`;
-const INCOMPLETO = `(c.ResponsavelId IS NULL AND (c.DocumentoNum IS NULL OR c.Peso IS NULL OR c.TelefoneNum IS NULL OR c.Email IS NULL))`;
+const COLS_LISTA = `c.id, c.nome, to_char(c.nascimento, 'YYYY-MM-DD') nascimento, c.peso, c.telefone, c.email,
+  c.instagram, c.documento, c.responsavel_id "responsavelId", r.nome "responsavelNome", c.bloqueado, c.origem,
+  to_char(c.criado_em, 'YYYY-MM-DD') "criadoEm", case when f.cliente_id is null then 0 else 1 end "temFoto"`;
+const DE_LISTA = `from kart.cliente c left join kart.cliente r on r.id = c.responsavel_id left join kart.cliente_foto f on f.cliente_id = c.id`;
+const INCOMPLETO = `(c.responsavel_id is null and (c.documento_num is null or c.peso is null or c.telefone_num is null or c.email is null))`;
 const POR_PAGINA = 50;
 
 async function hojeNaPista() {
   return query<{ id: number; hora: string }>(
-    `SELECT i.ClienteId id, MIN(CONVERT(varchar(5), b.Inicio, 108)) hora FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId
-      WHERE i.Status <> 'cancelada' AND CONVERT(date, b.Inicio) = CONVERT(date, SYSDATETIME()) GROUP BY i.ClienteId`,
+    `select i.cliente_id id, min(to_char(b.inicio, 'HH24:MI')) hora from kart.inscricao i join kart.bateria b on b.id = i.bateria_id
+      where i.status <> 'cancelada' and b.inicio::date = current_date group by i.cliente_id`,
   );
 }
 async function porIds(ids: number[]) {
   if (!ids.length) return [];
   const p = Object.fromEntries(ids.map((id, i) => ['i' + i, id]));
-  const rows = await query<Record<string, unknown>>(`SELECT ${COLS_LISTA} ${DE_LISTA} WHERE c.Id IN (${ids.map((_, i) => '@i' + i).join(',')})`, p);
+  const rows = await query<Record<string, unknown>>(`select ${COLS_LISTA} ${DE_LISTA} where c.id in (${ids.map((_, i) => '@i' + i).join(',')})`, p);
   const ordem = new Map(ids.map((id, i) => [id, i]));
   return rows.sort((a, b) => (ordem.get(a.id as number) ?? 0) - (ordem.get(b.id as number) ?? 0));
 }
@@ -467,10 +368,10 @@ async function duplicadosDe(ids: number[]) {
   if (!ids.length) return new Map<number, { id: number; nome: string }>();
   const p = Object.fromEntries(ids.map((id, i) => ['i' + i, id]));
   const rows = await query<{ id: number; outro: number; nome: string }>(
-    `SELECT c.Id id, MIN(o.Id) outro, MIN(o.Nome) nome FROM dbo.Cliente c JOIN dbo.Cliente o ON o.Id <> c.Id AND (
-        (c.DocumentoNum IS NOT NULL AND LEN(c.DocumentoNum) >= 11 AND o.DocumentoNum = c.DocumentoNum)
-        OR (o.Nome = c.Nome AND ((c.TelefoneNum IS NOT NULL AND o.TelefoneNum = c.TelefoneNum) OR (c.Nascimento IS NOT NULL AND o.Nascimento = c.Nascimento))))
-      WHERE c.Id IN (${ids.map((_, i) => '@i' + i).join(',')}) AND NOT (o.ResponsavelId = c.Id OR c.ResponsavelId = o.Id) GROUP BY c.Id`,
+    `select c.id, min(o.id) outro, min(o.nome) nome from kart.cliente c join kart.cliente o on o.id <> c.id and (
+        (c.documento_num is not null and length(c.documento_num) >= 11 and o.documento_num = c.documento_num)
+        or (lower(o.nome) = lower(c.nome) and ((c.telefone_num is not null and o.telefone_num = c.telefone_num) or (c.nascimento is not null and o.nascimento = c.nascimento))))
+      where c.id in (${ids.map((_, i) => '@i' + i).join(',')}) and not (coalesce(o.responsavel_id = c.id, false) or coalesce(c.responsavel_id = o.id, false)) group by c.id`,
     p,
   );
   return new Map(rows.map((r) => [r.id, { id: r.outro, nome: r.nome }]));
@@ -523,7 +424,7 @@ const emailVoltouDe = (lista: Record<string, EmailVoltou>, email: unknown) => (t
 async function contaApp(id: number, acao: string, b: Record<string, unknown>, quem: string) {
   if (!['consultar', 'criar', 'editar', 'senha', 'convite'].includes(acao)) throw new HttpError(400, 'Ação desconhecida.');
   const c = await one<{ nome: string; doc: string | null; email: string | null; fone: string | null }>(
-    `SELECT Nome nome, DocumentoNum doc, Email email, TelefoneNum fone FROM dbo.Cliente WHERE Id = @id`, { id });
+    `select nome, documento_num doc, email, telefone_num fone from kart.cliente where id = @id`, { id });
   if (!c) throw new HttpError(404, 'Cliente não encontrado.');
   baseApp();
   const cpf = onlyDigits(String(c.doc ?? ''));
@@ -540,9 +441,9 @@ async function contaApp(id: number, acao: string, b: Record<string, unknown>, qu
     console.log(`app: ${acao} da conta do cliente ${id} por ${quem}`);
     statusCache = null;
     // CPF/e-mail trocados na conta: a ficha acompanha, senão a conta e o cadastro se desencontram
-    if (acao === 'editar' && corpo.novoCpf && corpo.novoCpf !== cpf) await query(`UPDATE dbo.Cliente SET DocumentoNum = @d, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { d: corpo.novoCpf, id });
-    if (acao === 'editar' && corpo.novoEmail) await query(`UPDATE dbo.Cliente SET Email = @e, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { e: corpo.novoEmail.toLowerCase(), id });
-    if (acao === 'criar' && corpo.email && !c.email) await query(`UPDATE dbo.Cliente SET Email = @e, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { e: corpo.email.toLowerCase(), id });
+    if (acao === 'editar' && corpo.novoCpf && corpo.novoCpf !== cpf) await query(`update kart.cliente set documento_num = @d where id = @id`, { d: corpo.novoCpf, id });
+    if (acao === 'editar' && corpo.novoEmail) await query(`update kart.cliente set email = @e where id = @id`, { e: corpo.novoEmail.toLowerCase(), id });
+    if (acao === 'criar' && corpo.email && !c.email) await query(`update kart.cliente set email = @e where id = @id`, { e: corpo.email.toLowerCase(), id });
     await publicarHistoricoDoCliente(String(id)).catch(() => 0); // histórico no app na hora
   }
   return { ...j, cliente } as Record<string, any>;
@@ -556,15 +457,15 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
   if (path === '/pilotos/resumo' && method === 'GET') {
     await indiceFresco();
     const [base] = await query<Record<string, number>>(
-      `SELECT COUNT(*) total, SUM(CASE WHEN LegadoId IS NOT NULL THEN 1 ELSE 0 END) legado,
-              SUM(CASE WHEN CriadoEm >= DATEADD(day, -7, SYSDATETIME()) AND Origem <> 'laptime' THEN 1 ELSE 0 END) novos,
-              SUM(CASE WHEN ResponsavelId IS NULL AND (DocumentoNum IS NULL OR Peso IS NULL OR TelefoneNum IS NULL OR Email IS NULL) THEN 1 ELSE 0 END) incompletos,
-              SUM(CASE WHEN MONTH(Nascimento) = MONTH(SYSDATETIME()) THEN 1 ELSE 0 END) aniversariantes
-         FROM dbo.Cliente`,
+      `select count(*) total, sum(case when legado_id is not null then 1 else 0 end) legado,
+              sum(case when criado_em >= now() - interval '7 days' and origem <> 'legado' then 1 else 0 end) novos,
+              sum(case when responsavel_id is null and (documento_num is null or peso is null or telefone_num is null or email is null) then 1 else 0 end) incompletos,
+              sum(case when extract(month from nascimento) = extract(month from now()) then 1 else 0 end) aniversariantes
+         from kart.cliente`,
     );
     const lim = somaDias(hojeSp(), -30), ativos = new Set<string>();
     for (const b of Object.values(indice)) if (b.dia >= lim) for (const p of b.pilotos) if (p.cid) ativos.add(p.cid);
-    const novosOrigem = await query<{ origem: string; n: number }>(`SELECT Origem origem, COUNT(*) n FROM dbo.Cliente WHERE CriadoEm >= DATEADD(day, -7, SYSDATETIME()) AND Origem <> 'laptime' GROUP BY Origem`);
+    const novosOrigem = await query<{ origem: string; n: number }>(`select origem, count(*) n from kart.cliente where criado_em >= now() - interval '7 days' and origem <> 'legado' group by origem`);
     send(200, { ...base, ativos30: ativos.size, hoje: (await hojeNaPista()).length, novosOrigem, baterias: Object.keys(indice).length, desde: Object.values(indice).reduce((a, b) => (!a || b.dia < a ? b.dia : a), '' as string) || null, atualizadoEm, erroCronometragem: ultimoErro });
     return true;
   }
@@ -585,8 +486,8 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
     let rows: Record<string, unknown>[] = [], total = 0;
     if (q.length >= 2) {
       const d = onlyDigits(q);
-      const where = q.includes('@') ? 'c.Email LIKE @q' : d.length >= 4 && d.length === q.replace(/[\s.\-()/]/g, '').length ? '(c.DocumentoNum LIKE @d OR c.TelefoneNum LIKE @t)' : 'c.Nome COLLATE Latin1_General_CI_AI LIKE @n';
-      rows = await query(`SELECT TOP 100 ${COLS_LISTA} ${DE_LISTA} WHERE ${where} ORDER BY c.Nome`, { q: q.toLowerCase() + '%', d: d + '%', t: '%' + d, n: '%' + q.replace(/\s+/g, '%') + '%' });
+      const where = q.includes('@') ? 'lower(c.email) like @q' : d.length >= 4 && d.length === q.replace(/[\s.\-()/]/g, '').length ? '(c.documento_num like @d or c.telefone_num like @t)' : 'unaccent(c.nome) ilike unaccent(@n)';
+      rows = await query(`select ${COLS_LISTA} ${DE_LISTA} where ${where} order by c.nome limit 100`, { q: q.toLowerCase() + '%', d: d + '%', t: '%' + d, n: '%' + q.replace(/\s+/g, '%') + '%' });
       total = rows.length;
     } else if (filtro === 'hoje' || filtro === 'ativos' || filtro === 'app' || filtro === 'convidados') {
       let ids: number[];
@@ -607,12 +508,12 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
       total = ids.length;
       rows = await porIds(ids.slice(ini, ini + porPag));
     } else {
-      const where = filtro === 'novos' ? `c.CriadoEm >= DATEADD(day, -7, SYSDATETIME()) AND c.Origem <> 'laptime'`
+      const where = filtro === 'novos' ? `c.criado_em >= now() - interval '7 days' and c.origem <> 'legado'`
         : filtro === 'incompletos' ? INCOMPLETO
-          : filtro === 'aniversariantes' ? 'MONTH(c.Nascimento) = MONTH(SYSDATETIME())' : '1 = 1';
-      const ordemSql = ordem === 'nome' ? 'c.Nome, c.Id' : filtro === 'aniversariantes' ? 'DAY(c.Nascimento), c.Nome' : 'c.AtualizadoEm DESC, c.Id DESC';
-      total = (await one<{ n: number }>(`SELECT COUNT(*) n FROM dbo.Cliente c WHERE ${where}`))?.n ?? 0;
-      rows = await query(`SELECT ${COLS_LISTA} ${DE_LISTA} WHERE ${where} ORDER BY ${ordemSql} OFFSET @ini ROWS FETCH NEXT ${porPag} ROWS ONLY`, { ini });
+          : filtro === 'aniversariantes' ? 'extract(month from c.nascimento) = extract(month from now())' : 'true';
+      const ordemSql = ordem === 'nome' ? 'c.nome, c.id' : filtro === 'aniversariantes' ? 'extract(day from c.nascimento), c.nome' : 'c.atualizado_em desc, c.id desc';
+      total = (await one<{ n: number }>(`select count(*) n from kart.cliente c where ${where}`))?.n ?? 0;
+      rows = await query(`select ${COLS_LISTA} ${DE_LISTA} where ${where} order by ${ordemSql} offset @ini limit ${porPag}`, { ini });
     }
     const [st, voltaram] = await Promise.all([statusApp(), emailsQueVoltaram()]);
     const linhas = (await completar(rows, hoje, car)).map((l) => ({ ...l, app: st[String((l as { id?: unknown }).id)]?.s ?? null,
@@ -624,8 +525,8 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
   if ((m = path.match(/^\/pilotos\/(\d+)$/)) && method === 'GET') {
     await indiceFresco();
     const id = Number(m[1]);
-    const c = await one<Record<string, unknown>>(`SELECT ${CLIENTE_COLS}, r.Nome responsavelNome, c.LegadoId legadoId, CASE WHEN f.ClienteId IS NULL THEN 0 ELSE 1 END temFoto
-      FROM dbo.Cliente c LEFT JOIN dbo.Cliente r ON r.Id = c.ResponsavelId LEFT JOIN dbo.ClienteFoto f ON f.ClienteId = c.Id WHERE c.Id = @id`, { id });
+    const c = await one<Record<string, unknown>>(`select ${CLIENTE_COLS}, r.nome "responsavelNome", c.legado_id "legadoId", case when f.cliente_id is null then 0 else 1 end "temFoto"
+      from kart.cliente c left join kart.cliente r on r.id = c.responsavel_id left join kart.cliente_foto f on f.cliente_id = c.id where c.id = @id`, { id });
     if (!c) throw new HttpError(404, 'Cliente não encontrado.');
     const cid = String(id);
     const corridas = Object.values(indice).flatMap((b) => b.pilotos.filter((p) => p.cid === cid).map((p) => ({ sessaoId: b.id, dia: b.dia, inicio: b.inicio, bateria: b.nome, tipo: b.tipo, tracado: tk(b, p), chuva: b.chuva, pos: p.pos, de: b.pilotos.length, voltas: p.voltas, melhor: p.melhor, kart: p.kart, dq: p.dq })))
@@ -634,7 +535,7 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
     const porTracado = new Map<string, { ms: number; dia: string; bateria: string }>();
     for (const x of corridas) if (!x.chuva && !x.dq && x.melhor && valeNoRanking(x.tracado, x.melhor)) { const at = porTracado.get(x.tracado); if (!at || x.melhor < at.ms) porTracado.set(x.tracado, { ms: x.melhor, dia: x.dia, bateria: x.bateria }); }
     const meusAntigos = rankAntigo.filter((x) => x.cid === cid);
-    for (const x of meusAntigos) { if (!valeNoRanking(x.tracado, x.ms)) continue; const at = porTracado.get(x.tracado); if (!at || x.ms < at.ms) porTracado.set(x.tracado, { ms: x.ms, dia: x.dia, bateria: 'ranking do LapTime' }); }
+    for (const x of meusAntigos) { if (!valeNoRanking(x.tracado, x.ms)) continue; const at = porTracado.get(x.tracado); if (!at || x.ms < at.ms) porTracado.set(x.tracado, { ms: x.ms, dia: x.dia, bateria: 'ranking antigo' }); }
     const tracados = [...porTracado.entries()].map(([nome, t]) => {
       const rs = ranking(nome, sem), rm = ranking(nome, mes), rg = ranking(nome, periodo('geral'));
       const posDe = (r: LinhaRank[]) => { const l = r.find((x) => x.cid === cid); return l ? { pos: l.pos, de: r.length } : null; };
@@ -647,8 +548,8 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
     const semanasTop = new Set(meusAntigos.filter((y) => y.tipo === 'semana').map((y) => y.periodo + y.tracado)).size;
     const principal = tracados[0]?.nome ?? null;
     const evolucao = principal ? corridas.filter((x) => x.tracado === principal && !x.chuva && x.melhor && !x.dq).slice(0, 12).reverse().map((x) => ({ dia: x.dia, ms: x.melhor, bateria: x.bateria })) : [];
-    const dependentes = await query(`SELECT Id id, Nome nome, CONVERT(varchar(10), Nascimento, 126) nascimento FROM dbo.Cliente WHERE ResponsavelId = @id ORDER BY Nome`, { id });
-    const financeiro = await one(`SELECT COUNT(*) vendas, ISNULL(SUM(FinalCentavos), 0) total, CONVERT(varchar(16), MAX(CriadoEm), 126) ultima FROM dbo.Venda WHERE ClienteId = @id AND Cancelada = 0`, { id });
+    const dependentes = await query(`select id, nome, to_char(nascimento, 'YYYY-MM-DD') nascimento from kart.cliente where responsavel_id = @id order by nome`, { id });
+    const financeiro = await one(`select count(*) vendas, coalesce(sum(final_centavos), 0) total, to_char(max(criado_em), 'YYYY-MM-DD"T"HH24:MI') ultima from kart.venda where cliente_id = @id and not cancelada`, { id });
     const hoje = (await hojeNaPista()).find((h) => h.id === id)?.hora ?? null;
     const resumo = carreiras().get(cid) ?? null;
     const duplicado = (await duplicadosDe([id])).get(id) ?? null;
@@ -694,7 +595,7 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
   if ((m = path.match(/^\/pilotos\/(\d+)\/foto$/))) {
     const id = Number(m[1]);
     if (method === 'GET') {
-      const f = await one<{ Foto: Buffer; Miniatura: Buffer; Tipo: string }>(`SELECT Foto, Miniatura, Tipo FROM dbo.ClienteFoto WHERE ClienteId = @id`, { id });
+      const f = await one<{ Foto: Buffer; Miniatura: Buffer; Tipo: string }>(`select foto "Foto", miniatura "Miniatura", tipo "Tipo" from kart.cliente_foto where cliente_id = @id`, { id });
       if (!f) throw new HttpError(404, 'Piloto sem foto.');
       const b = url.searchParams.get('mini') === '1' ? f.Miniatura : f.Foto;
       send(200, { foto: `data:${f.Tipo};base64,${Buffer.from(b).toString('base64')}` });
@@ -710,24 +611,23 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
         return { tipo: mm[1], buf };
       };
       const foto = dec(b.foto, 400_000), mini = dec(b.miniatura, 40_000);
-      if (!(await one(`SELECT 1 x FROM dbo.Cliente WHERE Id = @id`, { id }))) throw new HttpError(404, 'Cliente não encontrado.');
+      if (!(await one(`select 1 x from kart.cliente where id = @id`, { id }))) throw new HttpError(404, 'Cliente não encontrado.');
       await query(
-        `MERGE dbo.ClienteFoto AS t USING (SELECT @id ClienteId) AS s ON t.ClienteId = s.ClienteId
-         WHEN MATCHED THEN UPDATE SET Foto = @foto, Miniatura = @mini, Tipo = @tipo, AtualizadoPor = @uid, AtualizadoEm = SYSDATETIME()
-         WHEN NOT MATCHED THEN INSERT (ClienteId, Foto, Miniatura, Tipo, AtualizadoPor) VALUES (@id, @foto, @mini, @tipo, @uid);`,
+        `insert into kart.cliente_foto (cliente_id, foto, miniatura, tipo, atualizado_por) values (@id, @foto, @mini, @tipo, @uid)
+         on conflict (cliente_id) do update set foto = excluded.foto, miniatura = excluded.miniatura, tipo = excluded.tipo, atualizado_por = excluded.atualizado_por, atualizado_em = now()`,
         { id, foto: foto.buf, mini: mini.buf, tipo: foto.tipo, uid: req.sessao.uid },
       );
       send(200, { ok: true });
       return true;
     }
-    if (method === 'DELETE') { await query(`DELETE FROM dbo.ClienteFoto WHERE ClienteId = @id`, { id }); send(200, { ok: true }); return true; }
+    if (method === 'DELETE') { await query(`delete from kart.cliente_foto where cliente_id = @id`, { id }); send(200, { ok: true }); return true; }
   }
 
   if (path === '/pilotos/miniaturas' && method === 'GET') {
     const ids = String(url.searchParams.get('ids') ?? '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 100);
     if (!ids.length) { send(200, {}); return true; }
     const p = Object.fromEntries(ids.map((id, i) => ['i' + i, id]));
-    const rows = await query<{ id: number; Miniatura: Buffer; Tipo: string }>(`SELECT ClienteId id, Miniatura, Tipo FROM dbo.ClienteFoto WHERE ClienteId IN (${ids.map((_, i) => '@i' + i).join(',')})`, p);
+    const rows = await query<{ id: number; Miniatura: Buffer; Tipo: string }>(`select cliente_id id, miniatura "Miniatura", tipo "Tipo" from kart.cliente_foto where cliente_id in (${ids.map((_, i) => '@i' + i).join(',')})`, p);
     send(200, Object.fromEntries(rows.map((r) => [r.id, `data:${r.Tipo};base64,${Buffer.from(r.Miniatura).toString('base64')}`])));
     return true;
   }
@@ -743,7 +643,7 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
     const linhas = todas.slice(0, top);
     const ids = linhas.map((l) => Number(l.cid)).filter((n) => n > 0);
     const extras = ids.length ? await query<{ id: number; nascimento: string | null; sexo: string | null; temFoto: number }>(
-      `SELECT c.Id id, CONVERT(varchar(10), c.Nascimento, 126) nascimento, c.Sexo sexo, CASE WHEN f.ClienteId IS NULL THEN 0 ELSE 1 END temFoto FROM dbo.Cliente c LEFT JOIN dbo.ClienteFoto f ON f.ClienteId = c.Id WHERE c.Id IN (${ids.map((_, i) => '@i' + i).join(',')})`,
+      `select c.id, to_char(c.nascimento, 'YYYY-MM-DD') nascimento, c.sexo, case when f.cliente_id is null then 0 else 1 end "temFoto" from kart.cliente c left join kart.cliente_foto f on f.cliente_id = c.id where c.id in (${ids.map((_, i) => '@i' + i).join(',')})`,
       Object.fromEntries(ids.map((id, i) => ['i' + i, id])),
     ) : [];
     const ex = new Map(extras.map((e) => [String(e.id), e]));
@@ -780,7 +680,7 @@ export async function rankingPublicoParaApp() {
   // cadastros duplicados unificados ficam com a data mais antiga.
   const cadastroDesde = new Map<string, string>();
   try {
-    for (const c of await query<{ id: number; em: Date | null }>('SELECT Id id, CriadoEm em FROM dbo.Cliente WHERE CriadoEm IS NOT NULL', {})) {
+    for (const c of await query<{ id: number; em: Date | null }>('select id, criado_em em from kart.cliente where criado_em is not null', {})) {
       if (!(c.em instanceof Date) || c.em.getFullYear() < 2000) continue;
       const id = aliasCliente.get(String(c.id)) ?? String(c.id), dia = c.em.toISOString().slice(0, 10); // o banco grava a data local sem fuso
       const at = cadastroDesde.get(id); if (!at || dia < at) cadastroDesde.set(id, dia);
