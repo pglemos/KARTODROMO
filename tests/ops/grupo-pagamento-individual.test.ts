@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+/** O SQL do Postgres mistura maiúsculas e minúsculas: compara sem diferenciar. */
+const tem = (sql: unknown, trecho: string) => String(sql).toLowerCase().includes(trecho.toLowerCase());
+
 const db = vi.hoisted(() => ({ one: vi.fn(), query: vi.fn(), tx: vi.fn() }));
 vi.mock('../../lib/ops/db', () => ({
   ...db,
@@ -161,8 +164,8 @@ describe('grupo modo individual: blindagem contra rateio e R$ 140,91', () => {
   it('permite vincular pagamento sem piloto a um piloto específico via PATCH e recusa desvincular no modo individual', async () => {
     const base = grupoIndividual(2);
     db.query.mockImplementation(async (sql: string) => {
-      if (sql.includes('FROM dbo.ReservaGrupo g')) return [base];
-      if (sql.includes('FROM dbo.ReservaGrupoPiloto p')) return base.pilotos.map((p) => ({ ...p, grupoId: 88 }));
+      if (tem(sql, 'FROM kart.reserva_grupo g')) return [base];
+      if (tem(sql, 'FROM kart.reserva_grupo_piloto p')) return base.pilotos.map((p) => ({ ...p, grupoId: 88 }));
       return [];
     });
 
@@ -191,7 +194,7 @@ describe('grupo modo individual: blindagem contra rateio e R$ 140,91', () => {
     );
 
     expect(db.one).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE dbo.ReservaGrupoPagamento SET PilotoId = @p'),
+      expect.stringContaining('UPDATE kart.reserva_grupo_pagamento SET piloto_id = @p'),
       { p: 2, pg: 9, g: 88 },
     );
     expect(send).toHaveBeenCalledWith(200, expect.objectContaining({ id: 88 }));

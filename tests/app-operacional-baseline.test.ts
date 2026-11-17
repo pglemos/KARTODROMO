@@ -40,7 +40,7 @@ describe('baseline do App Operacional', () => {
     const trecho = servidor.slice(ini, servidor.indexOf('createSession', ini));
     expect(trecho).toContain('/grid`');
     expect(trecho).not.toMatch(/aprovada|\.pago/);
-    expect(ops).toMatch(/i\.Pago pago, i\.Aprovada aprovada/);
+    expect(ops).toMatch(/i\.pago pago, i\.aprovada aprovada/);
   });
 
   it('sorteio recusa lista alterada e bateria já largada', () => {

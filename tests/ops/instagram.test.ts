@@ -5,7 +5,7 @@ import { clienteColumns } from '../../lib/ops/db';
 
 describe('Instagram obrigatório no cadastro', () => {
   it('normaliza o link antes de limitar o tamanho da coluna no banco', () => {
-    expect(clienteColumns({ instagram: 'https://www.instagram.com/Piloto.Betim/?igsh=teste' }, false).Instagram).toBe('@piloto.betim');
+    expect(clienteColumns({ instagram: 'https://www.instagram.com/Piloto.Betim/?igsh=teste' }, false).instagram).toBe('@piloto.betim');
   });
   it.each([undefined, null, '', ' '])('recusa Instagram vazio: %s', (instagram) => {
     expect(erroCadastroObrigatorio({ email: 'teste@example.com', peso: 80, instagram })).toContain('Instagram é obrigatório');

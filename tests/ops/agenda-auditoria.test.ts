@@ -32,9 +32,9 @@ describe('Agenda: validações no servidor', () => {
    .mockResolvedValueOnce([]).mockResolvedValueOnce([]);
   await carregarGrupos('g.Id = @id',{id:8});
   const sql=String(db.query.mock.calls[1]?.[0]);
-  expect(sql).toContain('LEFT JOIN dbo.ReservaGrupo rg ON rg.Id = p.GrupoId');
-  expect(sql).toContain('THEN rg.ResponsavelId END');
-  expect(sql).not.toContain('SELECT ResponsavelId FROM dbo.ReservaGrupo');
+  expect(sql).toContain('LEFT JOIN kart.reserva_grupo rg ON rg.id = p.grupo_id');
+  expect(sql).toContain('THEN rg.responsavel_id END');
+  expect(sql).not.toMatch(/SELECT responsavel_id FROM kart.reserva_grupo/i);
  });
 
  it('bloquear limpa reserva exclusiva',async()=>{
@@ -44,7 +44,7 @@ describe('Agenda: validações no servidor', () => {
  it('recebimento sem chave de idempotência não grava',async()=>{
   db.query.mockReset();db.one.mockReset();db.query.mockResolvedValue([]); db.one.mockResolvedValue(null);
   await expect(gruposRoutes({method:'POST',url:new URL('http://ops/api/office/grupos/1/pagamentos'),sessao:admin,body:async()=>({valorCentavos:14500,forma:'Pix'})},()=>{})).rejects.toMatchObject({status:400});
-  expect(db.query.mock.calls.some(([s])=>s.includes('INSERT INTO dbo.ReservaGrupoPagamento'))).toBe(false);
+  expect(db.query.mock.calls.some(([s])=>tem(s, 'INSERT INTO kart.reserva_grupo_pagamento'))).toBe(false);
  });
  it('perfil de consulta não altera bateria por chamada direta',async()=>{
   db.query.mockReset();db.one.mockReset();db.query.mockResolvedValue([{funcao:'agenda',acessar:true,alterar:false}]);
@@ -54,6 +54,9 @@ describe('Agenda: validações no servidor', () => {
 });
 
 import { saldosDasBaterias } from '../../lib/ops/agenda-financeiro';
+
+/** O SQL do Postgres mistura maiúsculas e minúsculas: compara sem diferenciar. */
+const tem = (sql: unknown, trecho: string) => String(sql).toLowerCase().includes(trecho.toLowerCase());
 describe('Agenda: saldo financeiro contratado',()=>{
  it('usa saldo parcial do grupo e valor líquido dos avulsos sem duplicar integrantes',()=>{
   const r=saldosDasBaterias([{id:1,preco:17500}], [{id:10,bateriaId:1,pago:false,total:14500},{id:11,bateriaId:1,pago:false,total:10000},{id:12,bateriaId:1,pago:true,total:17500}], [{bateriaId:1,falta:10000,pilotos:[{inscricaoId:10}]}]);
@@ -67,23 +70,23 @@ describe('Agenda: movimento flexível',()=>{
   const executed: string[] = [];
   db.tx.mockImplementation(async(work:(run:unknown)=>unknown)=>work(async(sql:string)=>{
    executed.push(sql);
-   if(sql.includes('ReservaGrupoPiloto') && sql.includes('SELECT')) return [{grupoId:8}];
-   if(sql.includes('ReservaGrupoPiloto') && sql.includes('UPDATE')) return [];
-   if(sql.includes('i.ClienteId'))return [{ClienteId:9,BateriaId:1,Pago:false,Status:'reservada',produtoId:11,preco:14500}];
-   if(sql.includes('dbo.Bateria b'))return [{Status:'aberta',Vagas:30,ocupadas:0,produtoId:11,preco:17500}];
-   if(sql.includes('SELECT 1 x FROM dbo.Inscricao'))return [];
+   if(tem(sql, 'reserva_grupo_piloto') && tem(sql, 'SELECT')) return [{grupoId:8}];
+   if(tem(sql, 'reserva_grupo_piloto') && tem(sql, 'UPDATE')) return [];
+   if(tem(sql, 'i.cliente_id'))return [{ClienteId:9,BateriaId:1,Pago:false,Status:'reservada',produtoId:11,preco:14500}];
+   if(tem(sql, 'kart.bateria b'))return [{Status:'aberta',Vagas:30,ocupadas:0,produtoId:11,preco:17500}];
+   if(tem(sql, 'SELECT 1 x FROM kart.inscricao'))return [];
    return [];
   }));
   const res = await officeRoutes({method:'POST',url:new URL('http://ops/api/office/reservas/10/mover'),sessao:admin,body:async()=>({bateriaId:2})},()=>{});
   expect(res).toBe(true);
-  expect(executed.some(s => s.includes('UPDATE dbo.ReservaGrupoPiloto SET InscricaoId = NULL'))).toBe(true);
+  expect(executed.some(s => tem(s, 'UPDATE kart.reserva_grupo_piloto SET inscricao_id = NULL'))).toBe(true);
  });
  it('permite mover para destino passado ou fechado',async()=>{
   db.tx.mockImplementation(async(work:(run:unknown)=>unknown)=>work(async(sql:string)=>{
-   if(sql.includes('ReservaGrupoPiloto') && sql.includes('SELECT'))return [];
-   if(sql.includes('i.ClienteId'))return [{ClienteId:9,BateriaId:1,Pago:false,Status:'reservada',produtoId:11,preco:14500}];
-   if(sql.includes('dbo.Bateria b'))return [{Status:'fechada',Vagas:30,ocupadas:0,produtoId:11,preco:17500,passada:1}];
-   if(sql.includes('SELECT 1 x FROM dbo.Inscricao'))return [];
+   if(tem(sql, 'reserva_grupo_piloto') && tem(sql, 'SELECT'))return [];
+   if(tem(sql, 'i.cliente_id'))return [{ClienteId:9,BateriaId:1,Pago:false,Status:'reservada',produtoId:11,preco:14500}];
+   if(tem(sql, 'kart.bateria b'))return [{Status:'fechada',Vagas:30,ocupadas:0,produtoId:11,preco:17500,passada:1}];
+   if(tem(sql, 'SELECT 1 x FROM kart.inscricao'))return [];
    return [];
   }));
   const res = await officeRoutes({method:'POST',url:new URL('http://ops/api/office/reservas/10/mover'),sessao:admin,body:async()=>({bateriaId:2})},()=>{});

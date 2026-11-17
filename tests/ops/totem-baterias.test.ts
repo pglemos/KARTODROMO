@@ -27,7 +27,7 @@ describe('baterias visíveis no autoatendimento', () => {
   });
 
   it('usa o dia corrente como limite inferior, não uma janela de dez minutos', () => {
-    expect(TOTEM_BATERIAS_SQL).toContain('CAST(SYSDATETIME() AS date)');
-    expect(TOTEM_BATERIAS_SQL).not.toContain('DATEADD(minute, -10, SYSDATETIME())');
+    expect(TOTEM_BATERIAS_SQL).toContain('b.inicio >= current_date');
+    expect(TOTEM_BATERIAS_SQL).not.toMatch(/interval '10 minutes'|now\(\) - /);
   });
 });

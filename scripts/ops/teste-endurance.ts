@@ -35,15 +35,15 @@ try {
   console.log('filas', ev.filas.map((f: any) => `${f.kart}:${f.situacao}${f.fileira ?? ''}`).join(' '), 'punicoes', ev.punicoes.length);
   const an = await chamar('GET', `/endurance/eventos/${id}/analise`);
   console.log('analise', an.erroCrono, an.analise.equipes.map((e: any) => `${e.numero} v${e.voltas} p${e.posOficial} ${e.desclassificada ? 'DQ' : ''}`).join(' | '));
-  const tk = tokenEquipe(await one<any>(`SELECT Segredo segredo FROM dbo.EnduranceEvento WHERE Id = @id`, { id }) as any, a);
+  const tk = tokenEquipe(await one<any>(`SELECT segredo segredo FROM kart.endurance_evento WHERE id = @id`, { id }) as any, a);
   const pg = await paginaDoChefe(tk);
   console.log('chefe', pg.equipe.nome, pg.pilotos.map((x: any) => `${x.nome}#${x.pulseira}`).join(', '));
   try { await paginaDoChefe(tk.slice(0, -1) + (tk.endsWith('A') ? 'B' : 'A')); console.log('ERRO: token falso aceito'); } catch { console.log('token falso recusado ok'); }
 } finally {
   if (id) {
-    for (const t of ['EnduranceParadaAjuste', 'EndurancePunicao', 'EnduranceTroca', 'EnduranceFila', 'EndurancePesagem', 'EndurancePiloto', 'EnduranceEquipe']) await query(`DELETE FROM dbo.${t} WHERE EventoId = @id`, { id });
-    await query(`DELETE FROM dbo.EnduranceEvento WHERE Id = @id`, { id });
+    for (const t of ['endurance_parada_ajuste', 'endurance_punicao', 'endurance_troca', 'endurance_fila', 'endurance_pesagem', 'endurance_piloto', 'endurance_equipe']) await query(`DELETE FROM kart.${t} WHERE evento_id = @id`, { id });
+    await query(`DELETE FROM kart.endurance_evento WHERE id = @id`, { id });
     console.log('evento de teste apagado');
   }
-  await (await getPool()).close();
+  await getPool().end();
 }

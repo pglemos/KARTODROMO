@@ -14,10 +14,10 @@ describe('cancelamento com pagamento preservado', () => {
     for (let n = 0; n < 2; n++) await officeRoutes({ method: 'DELETE', url: new URL('http://ops/api/office/reservas/42'), sessao, body: async () => ({}) }, send);
     expect(send).toHaveBeenCalledWith(200, expect.anything());
     for (const [sql, params] of db.one.mock.calls) {
-      expect(sql).toContain("SET Status = 'cancelada'");
-      expect(sql).toContain('OUTPUT inserted.Id');
-      expect(sql).not.toMatch(/SET[^]*?(Pago|VendaId|ValorCentavos)\s*=/);
-      expect(sql).not.toContain('Pago = 0');
+      expect(sql).toContain("SET status = 'cancelada'");
+      expect(sql).toMatch(/returning id/i);
+      expect(sql).not.toMatch(/SET[^]*?(pago|venda_id|valor_centavos)\s*=/i);
+      expect(sql).not.toMatch(/pago = (0|false)/i);
       expect(params).toEqual({ id: 42 });
     }
     expect(db.query).not.toHaveBeenCalled();
@@ -34,8 +34,8 @@ describe('cancelamento com pagamento preservado', () => {
     const send = vi.fn();
     await gruposRoutes({ method: 'DELETE', url: new URL('http://ops/api/office/grupos/1/pilotos/2'), sessao, body: async () => ({}) }, send);
     expect(send).toHaveBeenCalledWith(200, expect.anything());
-    expect(db.one).toHaveBeenCalledWith(expect.stringContaining("SET Status = 'cancelada'"), { id: 42 });
-    expect(db.query.mock.calls.some(([sql]) => /DELETE FROM|SET Pago/.test(sql))).toBe(false);
+    expect(db.one).toHaveBeenCalledWith(expect.stringContaining("SET status = 'cancelada'"), { id: 42 });
+    expect(db.query.mock.calls.some(([sql]) => /DELETE FROM|SET pago/i.test(sql))).toBe(false);
   });
 });
 
@@ -56,14 +56,14 @@ describe('pagamentos de vagas canceladas', () => {
 describe('estorno posterior ao cancelamento', () => {
   it('mantém a vaga cancelada quando a venda for estornada depois', async () => {
     const run = vi.fn(async (sql: string) => {
-      if (sql.startsWith('SELECT v.Id')) return [{ Id: 7, MovimentoId: 1, FechadoEm: null }];
-      if (sql.startsWith('SELECT Id, LiquidoCentavos')) return [{ Id: 8, LiquidoCentavos: 14500, InscricaoId: 42, VoucherId: null, Estornado: false }];
+      if (sql.startsWith('SELECT v.id')) return [{ Id: 7, MovimentoId: 1, FechadoEm: null }];
+      if (sql.startsWith('SELECT id "Id", liquido_centavos')) return [{ Id: 8, LiquidoCentavos: 14500, InscricaoId: 42, VoucherId: null, Estornado: false }];
       if (sql.startsWith('SELECT COUNT(*)')) return [{ n: 0 }];
       return [];
     });
     db.tx.mockImplementation(async (work) => work(run));
     await officeRoutes({ method: 'POST', url: new URL('http://ops/api/office/vendas/7/estorno'), sessao, body: async () => ({ itemIds: [8] }) }, () => {});
-    expect(run).toHaveBeenCalledWith(expect.stringContaining("Status = CASE WHEN Status = 'cancelada' THEN 'cancelada' ELSE 'reservada' END"), { i: 42 });
+    expect(run).toHaveBeenCalledWith(expect.stringContaining("status = CASE WHEN status = 'cancelada' THEN 'cancelada' ELSE 'reservada' END"), { i: 42 });
   });
 });
 

@@ -29,7 +29,7 @@ describe('Happy Hour online (10/11/2026)', () => {
     const read = vi.fn(async (_sql: string, p?: Record<string, unknown>) => ({ n: p?.doc === '52998224725' ? 1 : 0 }));
     expect(await primeiraVez(['529.982.247-25', '111.444.777-35', '123'], read)).toEqual([false, true, false]);
     expect(read).toHaveBeenCalledTimes(2);
-    expect(read.mock.calls[0][0]).toMatch(/laptime/);
+    expect(read.mock.calls[0][0]).toMatch(/origem = 'legado'/);
   });
   it('divide o valor pago na proporção dos preços e fecha no total', () => {
     expect(dividirValor(18980, [8990, 9990])).toEqual([8990, 9990]);

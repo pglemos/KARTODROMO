@@ -4,6 +4,9 @@ import ts from 'typescript';
 import { describe, expect, it, vi } from 'vitest';
 import { renderTermoResponsabilidade } from '../../lib/ops/termo';
 
+/** O SQL do Postgres mistura maiúsculas e minúsculas: compara sem diferenciar. */
+const tem = (sql: unknown, trecho: string) => String(sql).toLowerCase().includes(trecho.toLowerCase());
+
 const source = readFileSync('services/ops-server.ts', 'utf8');
 function carregar(nome: string, fim: string, deps: Record<string, unknown>) {
   const trecho = source.slice(source.indexOf(`async function ${nome}(`), source.indexOf(fim, source.indexOf(`async function ${nome}(`)));
@@ -19,10 +22,10 @@ describe('ligações do servidor para termo e grupos do totem', () => {
       TERMO_FILE: '', renderTermoResponsabilidade,
     });
     const html = await termo([42]);
-    expect(query.mock.calls[0][0]).toContain('b.Nome bateriaNome');
-    expect(query.mock.calls[0][0]).toContain('grupo.responsavel grupoResponsavel');
-    expect(query.mock.calls[0][0]).toContain('gp.InscricaoId = i.Id');
-    expect(query.mock.calls[0][0]).toContain('CHARINDEX');
+    expect(query.mock.calls[0][0]).toContain('b.nome "bateriaNome"');
+    expect(query.mock.calls[0][0]).toContain('grupo.responsavel "grupoResponsavel"');
+    expect(query.mock.calls[0][0]).toContain('gp.inscricao_id = i.id');
+    expect(query.mock.calls[0][0]).toContain('split_part');
     expect(html).toContain('BATERIA 19:20');
     expect(html).toContain('GRUPO DO(A) MARCUS');
     expect(html).not.toContain('colegas');
@@ -94,7 +97,7 @@ describe('impressão local por totem', () => {
     const route = carregar('totemRoutes', '// ---------------------------------------------------------------- login', {
       send, readBody: async () => ({ bateriaIds: [1, 2], participantes: [{ id: 42, token: 'valido' }, { id: 43, token: 'valido' }], impressaoLocal }),
       int: Number, sign: () => 'valido', HttpError: Error, log: vi.fn(),
-      one: async (sql: string, params: Record<string, number>) => sql.includes('dbo.Inscricao') ? { Id: params.b * 100 + params.c } : { inicio: '2026-11-07T19:00' },
+      one: async (sql: string, params: Record<string, number>) => tem(sql, 'kart.inscricao') ? { Id: params.b * 100 + params.c } : { inicio: '2026-11-07T19:00' },
       parametros: async () => ({}), query: async () => [],
       termoLink: (ids: number[]) => '/termo?ids=' + ids.join(','),
       enfileirarImpressao: fila, origemDe: () => 'Totem 2',

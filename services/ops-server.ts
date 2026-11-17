@@ -875,7 +875,7 @@ async function atender(req: http.IncomingMessage, res: http.ServerResponse) {
       let m = path.match(/^\/api\/crono\/baterias\/(\d+)\/grid$/);
       if (m) {
         const rows = await query(
-          `SELECT i.id "inscricaoId", c.nome nome, endurance.equipe, endurance.equipeId, endurance.pulseira, i.kart kart, i.pago pago, i.aprovada aprovada, c.id "clienteId" FROM kart.inscricao i JOIN kart.cliente c ON c.id = i.cliente_id
+          `SELECT i.id "inscricaoId", c.nome nome, endurance.equipe, endurance."equipeId", endurance.pulseira, i.kart kart, i.pago pago, i.aprovada aprovada, c.id "clienteId" FROM kart.inscricao i JOIN kart.cliente c ON c.id = i.cliente_id
            ${ENDURANCE_VINCULO_SQL}
            WHERE i.bateria_id = @id AND i.status <> 'cancelada' ORDER BY i.id`,
           { id: Number(m[1]) },

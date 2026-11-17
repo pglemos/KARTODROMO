@@ -2,8 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({ one: vi.fn(), query: vi.fn(), tx: vi.fn() }));
 
-vi.mock('../../lib/ops/db', () => ({
+vi.mock('../../lib/ops/db', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../lib/ops/db')>();
+  return {
   CLIENTE_COLS: '',
+  colPg: real.colPg,
+  sqlPg: real.sqlPg,
+  DATA: real.DATA,
+  DATA_HORA: real.DATA_HORA,
   insertCliente: vi.fn(),
   isValidCpf: vi.fn(() => true),
   onlyDigits: (value: unknown) => (typeof value === 'string' || typeof value === 'number' ? String(value).replace(/\D/g, '') : ''),
@@ -11,10 +17,14 @@ vi.mock('../../lib/ops/db', () => ({
   query: db.query,
   tx: db.tx,
   updateCliente: vi.fn(),
-}));
+  };
+});
 
 import { hashSenha } from '../../lib/ops/auth';
 import { HttpError, officeRoutes } from '../../lib/ops/office';
+
+/** O SQL do Postgres mistura maiúsculas e minúsculas: compara sem diferenciar. */
+const tem = (sql: unknown, trecho: string) => String(sql).toLowerCase().includes(trecho.toLowerCase());
 
 const admin = { uid: 7, nome: 'Admin de teste', admin: true, exp: Date.now() + 60_000 };
 const recepcionista = { ...admin, admin: false };
@@ -73,7 +83,7 @@ describe('Office: permissões de resultados móveis e vínculo assistido', () =>
     db.one.mockResolvedValueOnce({ allowed: 0 });
     expect(await call('/mobile-permissions/resultados_publicar_mobile', 'GET', {}, recepcionista))
       .toEqual({ status: 200, body: { allowed: false } });
-    expect(db.one.mock.calls[0][0]).toContain('PerfilPermissao');
+    expect(db.one.mock.calls[0][0]).toContain('kart.perfil_permissao');
     expect(db.one.mock.calls[0][1]).toMatchObject({ uid: recepcionista.uid, funcao: 'resultados_publicar_mobile' });
   });
 
@@ -145,7 +155,7 @@ describe('Office: gravação de baterias com hora local', () => {
   it('grava uma edição com segundos sem converter o horário de Brasília para UTC', async () => {
     db.one.mockResolvedValueOnce({ data: '2026-09-27', n: 0, pagas: 0 }).mockResolvedValueOnce({ c: 'Indoor' });
     expect(await call('/baterias/20', 'PUT', bateria)).toEqual({ status: 200, body: { ok: true } });
-    expect(db.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE dbo.Bateria'), expect.objectContaining({ inicio: '2026-09-27T10:45:00' }));
+    expect(db.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE kart.bateria SET inicio'), expect.objectContaining({ inicio: '2026-09-27T10:45:00' }));
   });
 
   it.each(['2026-02-30T10:45', '2026-09-27T24:00', '2026-09-27T10:60'])('recusa data ou hora impossível: %s', async (inicio) => {
@@ -163,7 +173,7 @@ describe('Office: gravação de baterias com hora local', () => {
 describe('Office: edição de reserva atualiza o peso do cliente', () => {
   it('devolve o peso atual do cliente na lista usada pelo formulário de edição', async () => {
     await call('/reservas');
-    expect(db.query).toHaveBeenCalledWith(expect.stringContaining('c.Peso peso'), expect.any(Object));
+    expect(db.query).toHaveBeenCalledWith(expect.stringContaining('c.peso peso'), expect.any(Object));
     const sql = db.query.mock.calls[0][0] as string;
     expect(sql).toContain('END idade');
     expect(sql).toContain('END termo');
@@ -179,7 +189,7 @@ describe('Office: edição de reserva atualiza o peso do cliente', () => {
     await call('/reservas/42', 'PUT', { peso: '75,5' });
 
     expect(statements).toHaveLength(1);
-    expect(statements[0].sql).toContain('UPDATE c SET Peso = @peso');
+    expect(statements[0].sql).toContain('UPDATE kart.cliente c SET peso = @peso');
     expect(statements[0].params).toEqual({ id: 42, peso: 75.5 });
     expect(db.query).not.toHaveBeenCalled();
   });
@@ -200,24 +210,24 @@ describe('Office: edição de produto e confirmação do termo', () => {
     const statements: { sql: string; params: Record<string, unknown> }[] = [];
     db.tx.mockImplementation(async (work) => work(async (sql: string, params: Record<string, unknown> = {}) => {
       statements.push({ sql, params });
-      if (sql.includes('SELECT i.Pago AS Pago')) return [{ Pago: false, Status: 'confirmada', produtoId: 10 }];
-      if (sql.includes('SELECT PrecoCentavos preco FROM dbo.Produto')) return [{ preco: 22000 }];
+      if (tem(sql, 'SELECT i.pago AS "Pago"')) return [{ Pago: false, Status: 'confirmada', produtoId: 10 }];
+      if (tem(sql, 'SELECT preco_centavos preco FROM kart.produto')) return [{ preco: 22000 }];
       return [];
     }));
 
     await expect(call('/reservas/42', 'PUT', { produtoId: 20 })).resolves.toMatchObject({ status: 200 });
 
-    const update = statements.find((statement) => statement.sql.startsWith('UPDATE dbo.Inscricao'));
-    expect(update?.sql).toContain('ProdutoId = @pid');
-    expect(update?.sql).toContain('PrecoCentavos = @preco');
+    const update = statements.find((statement) => tem(statement.sql, 'UPDATE kart.inscricao SET produto_id'));
+    expect(update?.sql).toContain('produto_id = @pid');
+    expect(update?.sql).toContain('preco_centavos = @preco');
     expect(update?.sql).toContain('ELSE 0 END');
-    expect(update?.sql).not.toContain('TermoImpressoEm =');
+    expect(update?.sql).not.toContain('termo_impresso_em =');
     expect(update?.params).toMatchObject({ id: 42, pid: 20, preco: 22000, produtoOrigem: 10 });
   });
 
   it('impede trocar o produto depois que a reserva foi paga', async () => {
     db.tx.mockImplementation(async (work) => work(async (sql: string) => {
-      if (sql.includes('SELECT i.Pago AS Pago')) return [{ Pago: true, Status: 'confirmada', produtoId: 10 }];
+      if (tem(sql, 'SELECT i.pago AS "Pago"')) return [{ Pago: true, Status: 'confirmada', produtoId: 10 }];
       return [];
     }));
 
@@ -229,14 +239,14 @@ describe('Office: edição de produto e confirmação do termo', () => {
     const statements: { sql: string; params: Record<string, unknown> }[] = [];
     db.tx.mockImplementation(async (work) => work(async (sql: string, params: Record<string, unknown> = {}) => {
       statements.push({ sql, params });
-      if (sql.includes('SELECT i.Pago AS Pago')) return [{ Pago: false, Status: 'confirmada', produtoId: 10 }];
+      if (tem(sql, 'SELECT i.pago AS "Pago"')) return [{ Pago: false, Status: 'confirmada', produtoId: 10 }];
       return [];
     }));
 
     await call('/reservas/42', 'PUT', { termo: true });
 
-    expect(statements.find((statement) => statement.sql.startsWith('UPDATE dbo.Inscricao'))?.sql).toContain('COALESCE(TermoImpressoEm, SYSDATETIME())');
-    expect(statements.find((statement) => statement.sql.includes('COALESCE(TermoImpressoEm'))?.params).toEqual({ id: 42, termo: true });
+    expect(statements.find((statement) => tem(statement.sql, 'UPDATE kart.inscricao SET termo_impresso_em'))?.sql).toContain('COALESCE(termo_impresso_em, now())');
+    expect(statements.find((statement) => tem(statement.sql, 'COALESCE(termo_impresso_em'))?.params).toEqual({ id: 42, termo: true });
   });
 
   it('recusa estado do termo que não seja booleano', async () => {
@@ -250,7 +260,7 @@ describe('Office: concorrência de voucher nas vendas presenciais', () => {
     db.one.mockResolvedValueOnce({ id: 12, terminalId: 3 }).mockResolvedValueOnce({ v: 'false' });
     let voucherSql = '';
     db.tx.mockImplementation(async (work) => work(async (sql: string) => {
-      if (sql.includes('FROM dbo.Voucher')) {
+      if (tem(sql, 'FROM kart.voucher')) {
         voucherSql = sql;
         return [];
       }
@@ -262,16 +272,16 @@ describe('Office: concorrência de voucher nas vendas presenciais', () => {
       itens: [{ descricao: 'Bateria', unitarioCentavos: 1000 }],
     })).rejects.toMatchObject({ status: 400 });
 
-    expect(voucherSql).toMatch(/WITH\s*\(UPDLOCK,\s*HOLDLOCK\)/i);
+    expect(voucherSql).toMatch(/for update of v/i);
   });
 
   it('inclui resgates online ativos ao validar o limite da venda presencial', async () => {
     db.one.mockResolvedValueOnce({ id: 12, terminalId: 3 }).mockResolvedValueOnce({ v: 'false' });
     let usageSql = '';
     db.tx.mockImplementation(async (work) => work(async (sql: string) => {
-      if (sql.includes('FROM dbo.Voucher v')) return [{ Id: 5, Ativo: 1, UsoUnico: 1, UsoMaxCliente: 1 }];
-      if (sql.includes('CAST(SYSDATETIME() AS date)')) return [{ d: new Date('2026-10-13T12:00:00') }];
-      if (sql.includes('COUNT(*)') && sql.includes('VoucherUso')) {
+      if (tem(sql, 'FROM kart.voucher v')) return [{ Id: 5, Ativo: 1, UsoUnico: 1, UsoMaxCliente: 1 }];
+      if (tem(sql, '(now())::date d')) return [{ d: new Date('2026-10-13T12:00:00') }];
+      if (tem(sql, 'COUNT(*)') && tem(sql, 'voucher_uso')) {
         usageSql = sql;
         return [{ n: 1, doCliente: 1 }];
       }
@@ -284,8 +294,8 @@ describe('Office: concorrência de voucher nas vendas presenciais', () => {
       itens: [{ descricao: 'Bateria', unitarioCentavos: 1000 }],
     })).rejects.toMatchObject({ status: 400 });
 
-    expect(usageSql).toContain('dbo.ReservaOnlineVoucherUso');
-    expect(usageSql).toContain("Estado IN ('reservado', 'consumido', 'reembolso_pendente')");
+    expect(usageSql).toContain('kart.reserva_online_voucher_uso');
+    expect(usageSql).toContain("estado IN ('reservado', 'consumido', 'reembolso_pendente')");
   });
 
   it('identifica termos pendentes apenas para inscrições que não vieram do totem e não têm termo', async () => {
@@ -293,10 +303,10 @@ describe('Office: concorrência de voucher nas vendas presenciais', () => {
     const statements: { sql: string; params: Record<string, unknown> }[] = [];
     db.tx.mockImplementation(async (work) => work(async (sql: string, params: Record<string, unknown> = {}) => {
       statements.push({ sql, params });
-      if (sql.includes('b.Nome bateria')) return [{ Pago: 0, Status: 'reservada', ProdutoId: 1, Nome: 'Piloto', bateria: 'Bateria 19h' }];
-      if (sql.includes('FROM dbo.FormaPagamento')) return [{ Tipo: 'cartao' }];
-      if (sql.includes('INSERT INTO dbo.Venda (')) return [{ id: 999 }];
-      if (sql.includes('SELECT Id id FROM dbo.Inscricao WHERE Id IN')) return [{ id: 102 }];
+      if (tem(sql, 'b.nome bateria')) return [{ Pago: 0, Status: 'reservada', ProdutoId: 1, Nome: 'Piloto', bateria: 'Bateria 19h' }];
+      if (tem(sql, 'FROM kart.forma_pagamento')) return [{ Tipo: 'cartao' }];
+      if (tem(sql, 'INSERT INTO kart.venda (')) return [{ id: 999 }];
+      if (tem(sql, 'SELECT id id FROM kart.inscricao WHERE id IN')) return [{ id: 102 }];
       return [];
     }));
 
@@ -309,9 +319,9 @@ describe('Office: concorrência de voucher nas vendas presenciais', () => {
     });
 
     expect(res).toMatchObject({ status: 201, body: { id: 999, semTermo: [102], inscricoes: [101, 102] } });
-    const updInscr = statements.filter((s) => s.sql.includes('UPDATE dbo.Inscricao SET Pago = 1'));
+    const updInscr = statements.filter((s) => tem(s.sql, 'UPDATE kart.inscricao SET pago = true'));
     expect(updInscr).toHaveLength(2);
-    expect(updInscr.every((s) => !s.sql.includes('TermoImpressoEm ='))).toBe(true);
+    expect(updInscr.every((s) => !tem(s.sql, 'termo_impresso_em ='))).toBe(true);
   });
 
   it('aplica voucher de 100% em múltiplos itens marcados (voucherAplicado) e registra 1 VoucherUso por piloto', async () => {
@@ -319,25 +329,25 @@ describe('Office: concorrência de voucher nas vendas presenciais', () => {
     const statements: { sql: string; params: Record<string, unknown> }[] = [];
     db.tx.mockImplementation(async (work) => work(async (sql: string, params: Record<string, unknown> = {}) => {
       statements.push({ sql, params });
-      if (sql.includes('b.Nome bateria')) {
+      if (tem(sql, 'b.nome bateria')) {
         const cid = params.inscricaoId === 201 ? 124066 : 51684;
         return [{ Pago: 0, Status: 'reservada', ProdutoId: 4, ClienteId: cid, Nome: `Piloto ${cid}`, bateria: 'Bateria 20:30' }];
       }
-      if (sql.includes('FROM dbo.VoucherCliente vc')) {
+      if (tem(sql, 'FROM kart.voucher_cliente vc')) {
         return [
           { id: 1, voucherId: 10, clienteId: 124066, nome: 'Yan', documento: '18812184650', usosMax: 82, usosFeitos: 2 },
           { id: 2, voucherId: 10, clienteId: 51684, nome: 'Andre', documento: '10163720606', usosMax: 82, usosFeitos: 1 },
         ];
       }
-      if (sql.includes('FROM dbo.Voucher v')) {
+      if (tem(sql, 'FROM kart.voucher v')) {
         return [{ Id: 10, Codigo: 'KB2KB5NX', Tipo: 'percentual', Valor: 100, InicioEm: new Date('2026-11-10'), FimEm: new Date('2027-12-15'), UsoMaxCliente: 82, UsoMaxTotal: 82, UsoUnico: 0, RestritoClientes: 1, Ativo: 1 }];
       }
-      if (sql.includes('CAST(SYSDATETIME() AS date)')) return [{ d: new Date('2026-11-16T12:00:00') }];
-      if (sql.includes('SELECT Documento, DocumentoNum FROM dbo.Cliente')) {
+      if (tem(sql, '(now())::date d')) return [{ d: new Date('2026-11-16T12:00:00') }];
+      if (tem(sql, 'SELECT documento "Documento", documento_num')) {
         return [{ DocumentoNum: params.cid === 124066 ? '18812184650' : '10163720606' }];
       }
-      if (sql.includes('COUNT(*)') && sql.includes('VoucherUso')) return [{ n: 8, doCliente: params.cli === 124066 ? 2 : 1 }];
-      if (sql.includes('INSERT INTO dbo.Venda (')) return [{ id: 27000 }];
+      if (tem(sql, 'COUNT(*)') && tem(sql, 'voucher_uso')) return [{ n: 8, doCliente: params.cli === 124066 ? 2 : 1 }];
+      if (tem(sql, 'INSERT INTO kart.venda (')) return [{ id: 27000 }];
       return [];
     }));
 
@@ -351,10 +361,10 @@ describe('Office: concorrência de voucher nas vendas presenciais', () => {
     });
 
     expect(res).toMatchObject({ status: 201, body: { id: 27000, total: 0 } });
-    const voucherUsos = statements.filter((s) => s.sql.includes('INSERT INTO dbo.VoucherUso'));
+    const voucherUsos = statements.filter((s) => tem(s.sql, 'INSERT INTO kart.voucher_uso'));
     expect(voucherUsos).toHaveLength(2);
     expect(voucherUsos.map((s) => s.params.cli)).toEqual([124066, 51684]);
-    const updInscr = statements.filter((s) => s.sql.includes('VoucherId = @vid'));
+    const updInscr = statements.filter((s) => tem(s.sql, 'voucher_id = @vid'));
     expect(updInscr).toHaveLength(2);
   });
 });
@@ -364,9 +374,9 @@ describe('Office: mover reserva preserva os dados de cobrança', () => {
     const statements: { sql: string; params: Record<string, unknown> }[] = [];
     db.tx.mockImplementation(async (work) => work(async (sql: string, params: Record<string, unknown> = {}) => {
       statements.push({ sql, params });
-      if (sql.includes('SELECT i.ClienteId, i.BateriaId')) return [reserva];
-      if (sql.includes('SELECT b.Status, b.Vagas')) return [destino];
-      if (sql.includes('SELECT 1 x FROM dbo.Inscricao WHERE BateriaId')) return [];
+      if (tem(sql, 'SELECT i.cliente_id "ClienteId", i.bateria_id')) return [reserva];
+      if (tem(sql, 'SELECT b.status "Status", b.vagas')) return [destino];
+      if (tem(sql, 'SELECT 1 x FROM kart.inscricao WHERE bateria_id')) return [];
       return [];
     }));
     return { statements, executar: () => call('/reservas/42/mover', 'POST', { bateriaId: 8 }) };
@@ -380,8 +390,8 @@ describe('Office: mover reserva preserva os dados de cobrança', () => {
 
     await expect(executar()).resolves.toMatchObject({ status: 200 });
 
-    const update = statements.find((statement) => statement.sql.includes('UPDATE dbo.Inscricao SET BateriaId'));
-    expect(update?.sql).toContain('ProdutoId = @produtoDestino, PrecoCentavos = @precoDestino');
+    const update = statements.find((statement) => tem(statement.sql, 'UPDATE kart.inscricao SET bateria_id'));
+    expect(update?.sql).toContain('produto_id = @produtoDestino, preco_centavos = @precoDestino');
     expect(update?.sql).toContain('ELSE 0 END');
     expect(update?.params).toEqual({ destino: 8, id: 42, produtoOrigem: 10, produtoDestino: 20, precoDestino: 22000 });
   });
@@ -391,19 +401,19 @@ describe('Office: mover reserva preserva os dados de cobrança', () => {
 
     await executar();
 
-    const update = statements.find((statement) => statement.sql.includes('UPDATE dbo.Inscricao SET BateriaId'));
-    expect(update?.sql).toContain('THEN CASE WHEN DescontoCentavos > @precoDestino THEN @precoDestino');
+    const update = statements.find((statement) => tem(statement.sql, 'UPDATE kart.inscricao SET bateria_id'));
+    expect(update?.sql).toContain('THEN CASE WHEN desconto_centavos > @precoDestino THEN @precoDestino');
   });
 
   it('bloqueia reserva paga quando o serviço diverge', async () => {
     const { statements, executar } = moverComReserva({ ...reservaPendente, Pago: true }, { ...bateriaDestino, produtoId: 20 });
     await expect(executar()).rejects.toMatchObject({ status: 409, message: expect.stringContaining('mesmo serviço') });
-    expect(statements.some((statement) => statement.sql.startsWith('UPDATE dbo.Inscricao'))).toBe(false);
+    expect(statements.some((statement) => tem(statement.sql, 'UPDATE kart.inscricao'))).toBe(false);
   });
   it('preserva tarifa paga mesmo quando a tarifa atual do mesmo produto aumentou', async () => {
     const { statements, executar } = moverComReserva({ ...reservaPendente, Pago: true }, { ...bateriaDestino, produtoId: 10, preco: 22000 });
     await expect(executar()).resolves.toMatchObject({status:200});
-    expect(statements.find((s)=>s.sql.startsWith('UPDATE dbo.Inscricao'))?.sql).not.toContain('PrecoCentavos =');
+    expect(statements.find((s)=>tem(s.sql, 'UPDATE kart.inscricao SET bateria_id'))?.sql).not.toContain('preco_centavos =');
   });
 
   it('permite mover reserva paga mantendo produto e preço, sem reescrever a cobrança', async () => {
@@ -414,9 +424,9 @@ describe('Office: mover reserva preserva os dados de cobrança', () => {
 
     await expect(executar()).resolves.toMatchObject({ status: 200 });
 
-    const update = statements.find((statement) => statement.sql.startsWith('UPDATE dbo.Inscricao'));
-    expect(update?.sql).toContain('BateriaId = @destino');
-    expect(update?.sql).not.toContain('PrecoCentavos =');
+    const update = statements.find((statement) => tem(statement.sql, 'UPDATE kart.inscricao SET bateria_id'));
+    expect(update?.sql).toContain('bateria_id = @destino');
+    expect(update?.sql).not.toContain('preco_centavos =');
     expect(update?.params).toEqual({ destino: 8, id: 42 });
   });
 });
@@ -424,8 +434,8 @@ describe('Office: mover reserva preserva os dados de cobrança', () => {
 describe('Office: fidelidade e parceiros', () => {
   it('cria conta de fidelidade idempotente por cliente', async () => {
     db.tx.mockImplementation(async (work) => work(async (sql: string) => {
-      if (sql.includes('FROM dbo.Cliente')) return [{ Id: 21 }];
-      if (sql.includes('FROM dbo.FidelidadeConta WITH')) return [{ id: 44 }];
+      if (tem(sql, 'FROM kart.cliente')) return [{ Id: 21 }];
+      if (tem(sql, 'FROM kart.fidelidade_conta WHERE cliente_id')) return [{ id: 44 }];
       throw new Error('SQL inesperado no teste');
     }));
 
@@ -435,9 +445,9 @@ describe('Office: fidelidade e parceiros', () => {
 
   it('não permite que ajuste negativo deixe o saldo abaixo de zero', async () => {
     db.tx.mockImplementation(async (work) => work(async (sql: string) => {
-      if (sql.includes('SELECT Id, SaldoPontos')) return [{ Id: 9, SaldoPontos: 4 }];
-      if (sql.includes('IdempotencyKey')) return [];
-      if (sql.startsWith('UPDATE dbo.FidelidadeConta')) return [];
+      if (tem(sql, 'saldo_pontos "SaldoPontos" FROM kart.fidelidade_conta')) return [{ Id: 9, SaldoPontos: 4 }];
+      if (tem(sql, 'idempotency_key')) return [];
+      if (tem(sql, 'UPDATE kart.fidelidade_conta')) return [];
       throw new Error('SQL inesperado no teste');
     }));
 
@@ -456,14 +466,14 @@ describe('Office: fidelidade e parceiros', () => {
     db.one.mockResolvedValue({ id: 2 });
     db.tx.mockImplementation(async (work) => work(async (sql: string, params: Record<string, unknown> = {}) => {
       statements.push({ sql, params });
-      if (sql.includes('FROM dbo.ParceiroComissao WITH')) return [{ Id: 13, ValorCentavos: 1750, Estado: 'pendente' }];
-      if (sql.includes('FROM dbo.ParceiroComissaoTransacao WHERE')) return [];
+      if (tem(sql, 'FROM kart.parceiro_comissao WHERE id')) return [{ Id: 13, ValorCentavos: 1750, Estado: 'pendente' }];
+      if (tem(sql, 'FROM kart.parceiro_comissao_transacao WHERE')) return [];
       return [];
     }));
 
     const response = await call('/parceiros/comissoes/13/pagar', 'POST', { idempotencyKey: 'pay-000013', formaPagamentoId: 2 });
     expect(response).toEqual({ status: 201, body: { id: 13, estado: 'paga', repetido: false } });
-    expect(statements.find((x) => x.sql.includes('INSERT INTO dbo.ParceiroComissaoTransacao'))?.params).toMatchObject({
+    expect(statements.find((x) => tem(x.sql, 'INSERT INTO kart.parceiro_comissao_transacao'))?.params).toMatchObject({
       tipo: 'pagamento', valor: -1750, formaPagamentoId: 2, uid: admin.uid,
     });
   });
@@ -472,9 +482,9 @@ describe('Office: fidelidade e parceiros', () => {
     let inserted = 0;
     db.one.mockResolvedValue({ id: 2 });
     db.tx.mockImplementation(async (work) => work(async (sql: string) => {
-      if (sql.includes('FROM dbo.ParceiroComissao WITH')) return [{ Id: 13, ValorCentavos: 1750, Estado: 'paga' }];
-      if (sql.includes('FROM dbo.ParceiroComissaoTransacao WHERE')) return [{ id: 99, tipo: 'pagamento', motivo: 'Pagamento de comissão', formaPagamentoId: 2 }];
-      if (sql.includes('INSERT INTO dbo.ParceiroComissaoTransacao')) inserted++;
+      if (tem(sql, 'FROM kart.parceiro_comissao WHERE id')) return [{ Id: 13, ValorCentavos: 1750, Estado: 'paga' }];
+      if (tem(sql, 'FROM kart.parceiro_comissao_transacao WHERE')) return [{ id: 99, tipo: 'pagamento', motivo: 'Pagamento de comissão', formaPagamentoId: 2 }];
+      if (tem(sql, 'INSERT INTO kart.parceiro_comissao_transacao')) inserted++;
       return [];
     }));
 
@@ -485,8 +495,8 @@ describe('Office: fidelidade e parceiros', () => {
 
   it('rejects reusing a loyalty idempotency key with a different point delta', async () => {
     db.tx.mockImplementation(async (work) => work(async (sql: string) => {
-      if (sql.includes('SELECT Id, SaldoPontos')) return [{ Id: 9, SaldoPontos: 4 }];
-      if (sql.includes('IdempotencyKey')) return [{ id: 4, pontos: 10, saldoApos: 14, motivo: 'Bonus' }];
+      if (tem(sql, 'saldo_pontos "SaldoPontos" FROM kart.fidelidade_conta')) return [{ Id: 9, SaldoPontos: 4 }];
+      if (tem(sql, 'idempotency_key')) return [{ id: 4, pontos: 10, saldoApos: 14, motivo: 'Bonus' }];
       throw new Error('Unexpected SQL in test');
     }));
 
@@ -498,7 +508,7 @@ describe('Office: fidelidade e parceiros', () => {
     db.one.mockResolvedValue({ id: 5 });
     const response = await call('/vouchers/5', 'DELETE');
     expect(response).toEqual({ status: 200, body: { id: 5, ok: true, desativado: true } });
-    expect(db.query).toHaveBeenCalledWith('UPDATE dbo.Voucher SET Ativo = 0 WHERE Id = @id', { id: 5 });
+    expect(db.query).toHaveBeenCalledWith('UPDATE kart.voucher SET ativo = false WHERE id = @id', { id: 5 });
   });
 
   it('updates a voucher without deleting its use history', async () => {
@@ -508,7 +518,7 @@ describe('Office: fidelidade e parceiros', () => {
     });
     const response = await call('/vouchers/5', 'PUT', { valor: 15, fim: '2026-10-31' });
     expect(response).toEqual({ status: 200, body: { id: 5, ok: true } });
-    expect(db.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE dbo.Voucher SET'), expect.objectContaining({ Valor: 15, FimEm: '2026-10-31' }));
+    expect(db.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE kart.voucher SET'), expect.objectContaining({ Valor: 15, FimEm: '2026-10-31' }));
   });
 
   it('requires the current password before changing it', async () => {

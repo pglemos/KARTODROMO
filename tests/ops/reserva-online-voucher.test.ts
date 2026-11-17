@@ -15,6 +15,9 @@ vi.mock('../../lib/ops/pre-cadastro', () => ({
 import * as online from '../../lib/ops/reserva-online';
 import { officeRoutes } from '../../lib/ops/office';
 
+/** O SQL do Postgres mistura maiúsculas e minúsculas: compara sem diferenciar. */
+const tem = (sql: unknown, trecho: string) => String(sql).toLowerCase().includes(trecho.toLowerCase());
+
 type SqlRow = Record<string, unknown>;
 type CouponInput = { codigo: string; documento: string; bateriaId: number; quantidade: number };
 type CouponPreview = (input: CouponInput) => Promise<unknown>;
@@ -76,22 +79,22 @@ beforeEach(() => {
   statements = [];
 
   db.one.mockImplementation(async (sql: string, params: Record<string, unknown> = {}) => {
-    if (sql.includes('SELECT CONVERT(varchar(19), ExpiraEm')) return { expira: '2026-10-13T12:15:00' };
-    if (sql.includes('FROM dbo.Bateria') && sql.includes('inicio')) return { ...battery, inicio: '2026-10-20T09:15', ok: 1 };
+    if (tem(sql, 'SELECT to_char(expira_em')) return { expira: '2026-10-13T12:15:00' };
+    if (tem(sql, 'FROM kart.bateria') && sql.includes('inicio')) return { ...battery, inicio: '2026-10-20T09:15', ok: 1 };
     // pedido com cupom esperando o desfecho (rota resolver da Recepção antiga)
-    if (sql.includes('FROM dbo.ReservaOnlineVoucherUso u')) return usageState === 'reembolso_pendente' ? { x: 1 } : null;
-    if (sql.includes('FROM dbo.ReservaOnline') && sql.includes('PedidoId')) return reservation?.PedidoId === params.id ? reservation : null;
-    if (sql.includes('FROM dbo.Bateria')) return battery;
-    if (sql.includes('FROM dbo.Produto')) return { Id: 4, preco: 14500 };
-    if (sql.includes('COUNT(')) return { n: usageCount, doCliente: customerUsageCount, totalUsos: usageCount, usosCliente: customerUsageCount };
-    if (sql.includes('FROM dbo.Voucher v')) return voucher;
-    if (sql.includes('FROM dbo.Cliente')) return { id: 42, Bloqueado: 0 };
-    if (sql.includes('OUTPUT inserted.Codigo')) return reservation ? { Codigo: reservation.Codigo } : null;
+    if (tem(sql, 'FROM kart.reserva_online_voucher_uso u')) return usageState === 'reembolso_pendente' ? { x: 1 } : null;
+    if (tem(sql, 'FROM kart.reserva_online') && tem(sql, 'pedido_id')) return reservation?.PedidoId === params.id ? reservation : null;
+    if (tem(sql, 'FROM kart.bateria')) return battery;
+    if (tem(sql, 'FROM kart.produto')) return { Id: 4, preco: 14500 };
+    if (tem(sql, 'COUNT(')) return { n: usageCount, doCliente: customerUsageCount, totalUsos: usageCount, usosCliente: customerUsageCount };
+    if (tem(sql, 'FROM kart.voucher v')) return voucher;
+    if (tem(sql, 'FROM kart.cliente')) return { id: 42, Bloqueado: 0 };
+    if (tem(sql, 'returning codigo')) return reservation ? { Codigo: reservation.Codigo } : null;
     return null;
   });
   db.query.mockImplementation(async (sql: string) => {
-    if (sql.includes('ExpiraEm <')) return expiredReservations;
-    if (sql.includes('FROM dbo.Inscricao')) return activeEntries;
+    if (tem(sql, 'expira_em <')) return expiredReservations;
+    if (tem(sql, 'FROM kart.inscricao')) return activeEntries;
     return [];
   });
   db.tx.mockImplementation(async (callback: (run: (sql: string, params?: Record<string, unknown>) => Promise<SqlRow[]>) => Promise<unknown>) => {
@@ -102,45 +105,45 @@ beforeEach(() => {
     const transaction = ++transactionSequence;
     const run = async (sql: string, params: Record<string, unknown> = {}) => {
       statements.push({ transaction, sql, params });
-      if (sql.includes('FROM dbo.Bateria')) return [battery];
-      if (sql.includes('FROM dbo.Produto')) return [{ Id: 4, preco: 14500 }];
-      if (sql.includes('FROM dbo.Cliente')) return [{ Bloqueado: 0 }];
-      if (sql.includes('COUNT(') && sql.includes('VoucherUso')) return [{ n: usageCount, doCliente: customerUsageCount }];
-      if (sql.includes('FROM dbo.Voucher v')) return [{ ...voucher, parceiroAtivo: 1, fidelidadeAtiva: 1, vigenciaOk: 1 }];
-      if (sql.includes('INSERT INTO dbo.Inscricao')) return [{ id: 70 + transaction }];
-      if (sql.includes('INSERT INTO dbo.ReservaOnlineVoucherUso')) {
+      if (tem(sql, 'FROM kart.bateria')) return [battery];
+      if (tem(sql, 'FROM kart.produto')) return [{ Id: 4, preco: 14500 }];
+      if (tem(sql, 'FROM kart.cliente')) return [{ Bloqueado: 0 }];
+      if (tem(sql, 'COUNT(') && tem(sql, 'voucher_uso')) return [{ n: usageCount, doCliente: customerUsageCount }];
+      if (tem(sql, 'FROM kart.voucher v')) return [{ ...voucher, parceiroAtivo: 1, fidelidadeAtiva: 1, vigenciaOk: 1 }];
+      if (tem(sql, 'INSERT INTO kart.inscricao')) return [{ id: 70 + transaction }];
+      if (tem(sql, 'INSERT INTO kart.reserva_online_voucher_uso')) {
         usageCount++;
         customerUsageCount++;
         usageState = 'reservado';
         return [];
       }
-      if (sql.includes('INSERT INTO dbo.ReservaOnline ')) {
+      if (tem(sql, 'INSERT INTO kart.reserva_online ')) {
         reservation = { Id: transaction, PedidoId: params.pedido, Codigo: params.codigo, Status: 'aguardando', ValorCentavos: params.valor, InscricaoIds: String(params.insc ?? '71'), BateriaId: 101, ClienteId: 42, Quantidade: Number(params.n ?? 1), expira: '2026-10-13T12:15:00' };
         return [];
       }
-      if (sql.includes('SELECT CONVERT(varchar(19), ExpiraEm')) return [{ expira: '2026-10-13T12:15:00' }];
-      if (sql.includes('UPDATE dbo.ReservaOnlineVoucherUso')) {
+      if (tem(sql, 'SELECT to_char(expira_em')) return [{ expira: '2026-10-13T12:15:00' }];
+      if (tem(sql, 'UPDATE kart.reserva_online_voucher_uso')) {
         const next = String(params.estado ?? /Estado\s*=\s*'([^']+)'/i.exec(sql)?.[1] ?? '');
         if (next) usageState = next;
         return [];
       }
-      if (sql.includes("UPDATE dbo.ReservaOnline SET Status = 'pago_sem_vaga'")) {
+      if (tem(sql, "UPDATE kart.reserva_online SET status = 'pago_sem_vaga'")) {
         if (reservation) reservation.Status = 'pago_sem_vaga';
         return [];
       }
-      if (sql.includes("UPDATE dbo.ReservaOnline SET Status = 'pago'")) {
+      if (tem(sql, "UPDATE kart.reserva_online SET status = 'pago'")) {
         if (reservation) reservation.Status = 'pago';
         return [];
       }
-      if (sql.includes("UPDATE dbo.ReservaOnline SET Status = 'expirado'")) {
+      if (tem(sql, "UPDATE kart.reserva_online SET status = 'expirado'")) {
         if (reservation) reservation.Status = 'expirado';
         return [];
       }
-      if (sql.includes("UPDATE dbo.ReservaOnline SET Status = 'resolvido'")) {
+      if (tem(sql, "UPDATE kart.reserva_online SET status = 'resolvido'")) {
         if (reservation) reservation.Status = 'resolvido';
         return reservation ? [{ Codigo: reservation.Codigo }] : [];
       }
-      if (sql.includes('FROM dbo.ReservaOnline') && sql.includes('PedidoId')) return reservation ? [reservation] : [];
+      if (tem(sql, 'FROM kart.reserva_online') && tem(sql, 'pedido_id')) return reservation ? [reservation] : [];
       return [];
     };
     try { return await callback(run); } finally { release(); }
@@ -208,12 +211,12 @@ describe('consumo atômico e estados do voucher', () => {
     ]);
     expect([first, second].filter((result) => result.acao === 'reservado')).toHaveLength(1);
     expect([first, second].filter((result) => result.acao === 'recusado')).toHaveLength(1);
-    const lock = statements.find(({ sql }) => sql.includes('FROM dbo.Voucher'));
-    expect(lock?.sql).toMatch(/UPDLOCK\s*,\s*HOLDLOCK/i);
-    const insertion = statements.find(({ sql }) => sql.includes('INSERT INTO dbo.ReservaOnline '));
+    const lock = statements.find(({ sql }) => tem(sql, 'FROM kart.voucher'));
+    expect(lock?.sql).toMatch(/for update/i);
+    const insertion = statements.find(({ sql }) => tem(sql, 'INSERT INTO kart.reserva_online '));
     expect(insertion?.params.valor).toBe(24000);
-    const seatInsert = statements.find(({ sql }) => sql.includes('INSERT INTO dbo.Inscricao'));
-    const voucherInsert = statements.find(({ sql }) => sql.includes('INSERT INTO dbo.ReservaOnlineVoucherUso'));
+    const seatInsert = statements.find(({ sql }) => tem(sql, 'INSERT INTO kart.inscricao'));
+    const voucherInsert = statements.find(({ sql }) => tem(sql, 'INSERT INTO kart.reserva_online_voucher_uso'));
     expect(seatInsert?.transaction).toBe(insertion?.transaction);
     expect(voucherInsert?.transaction).toBe(insertion?.transaction);
     expect(usageCount).toBe(1);
@@ -278,7 +281,7 @@ describe('consumo atômico e estados do voucher', () => {
   it('confirma reserva quitada 100% por voucher gravando forma=voucher e VoucherId na inscrição', async () => {
     const baseOne = db.one.getMockImplementation()!;
     db.one.mockImplementation(async (sql: string, params: Record<string, unknown> = {}) => {
-      if (sql.includes('SELECT Estado, VoucherId, DescontoCentavos FROM dbo.ReservaOnlineVoucherUso')) {
+      if (tem(sql, 'from kart.reserva_online_voucher_uso where pedido_id')) {
         return { Estado: 'reservado', VoucherId: 10, DescontoCentavos: 14500 };
       }
       return baseOne(sql, params);
@@ -291,9 +294,9 @@ describe('consumo atômico e estados do voucher', () => {
       pagamento: { asaasId: 'VOUCHER_K8V100', billingType: 'VOUCHER', pagoEm: '', valorCentavos: 0 },
     } as never, () => undefined);
     expect(result).toMatchObject({ acao: 'confirmado', codigo: 'K8V100' });
-    const updRes = statements.find((s) => s.sql.includes("UPDATE dbo.ReservaOnline SET Status = 'pago'"));
+    const updRes = statements.find((s) => tem(s.sql, "UPDATE kart.reserva_online SET status = 'pago'"));
     expect(updRes?.params.forma).toBe('voucher');
-    const updIns = statements.find((s) => s.sql.includes('VoucherId = COALESCE(VoucherId, @vid)'));
+    const updIns = statements.find((s) => tem(s.sql, 'voucher_id = COALESCE(voucher_id, @vid)'));
     expect(updIns?.params.vid).toBe(10);
   });
 
@@ -301,7 +304,7 @@ describe('consumo atômico e estados do voucher', () => {
     voucher = { ...voucher, Id: 10, Codigo: 'KB2KB5NX', Valor: 100, DescontoMaximoCentavos: null, UsoUnico: 0, UsoMaxTotal: 82, UsoMaxCliente: 82, RestritoClientes: 1 };
     const baseQuery = db.query.getMockImplementation()!;
     db.query.mockImplementation(async (sql: string, params?: Record<string, unknown>) => {
-      if (sql.includes('FROM dbo.VoucherCliente vc')) {
+      if (tem(sql, 'FROM kart.voucher_cliente vc')) {
         return [{ id: 1, voucherId: 10, clienteId: 42, nome: 'Yan', documento: testDocument, usosMax: 82, usosFeitos: 2 }];
       }
       return baseQuery(sql, params);

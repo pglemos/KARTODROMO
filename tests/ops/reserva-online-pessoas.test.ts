@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+/** O SQL do Postgres mistura maiúsculas e minúsculas: compara sem diferenciar. */
+const tem = (sql: unknown, trecho: string) => String(sql).toLowerCase().includes(trecho.toLowerCase());
+
 // Reserva online de grupo: cada vaga vira a inscrição de UMA pessoa (comprador + cadastros dos outros pilotos).
 const chamadas = vi.hoisted(() => ({ inscrever: [] as unknown[][], acompanhantes: [] as unknown[] }));
 
@@ -7,9 +10,9 @@ vi.mock('../../lib/ops/db', async () => {
   const real = await vi.importActual<typeof import('../../lib/ops/db')>('../../lib/ops/db');
   // leituras do cálculo do pedido (bateria aberta para venda online, preço do produto) e do prazo gravado
   const ler = async (sql: string) => {
-    if (sql.includes('FROM dbo.ReservaOnline WHERE PedidoId')) return chamadas.inscrever.length ? [{ expira: '2026-10-09T18:35:00' }] : [];
-    if (sql.includes('FROM dbo.Bateria b')) return [{ nome: 'BATERIA 19:20', inicio: '2026-10-09T19:20', ok: 1, Vagas: 20, ocupadas: 0 }];
-    if (sql.includes('FROM dbo.Produto')) return [{ preco: 14500 }];
+    if (tem(sql, 'FROM kart.reserva_online WHERE pedido_id')) return chamadas.inscrever.length ? [{ expira: '2026-10-09T18:35:00' }] : [];
+    if (tem(sql, 'FROM kart.bateria b')) return [{ nome: 'BATERIA 19:20', inicio: '2026-10-09T19:20', ok: 1, Vagas: 20, ocupadas: 0 }];
+    if (tem(sql, 'FROM kart.produto')) return [{ preco: 14500 }];
     return [];
   };
   return {
