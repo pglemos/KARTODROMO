@@ -665,8 +665,8 @@ export async function moverReservas(ids: number[], destino: number, grupoId?: nu
         await run(`UPDATE kart.inscricao SET bateria_id = @destino, termo_impresso_em = NULL, atualizado_em = now() WHERE id = @id`, { destino, id });
       } else {
         await run(
-          `UPDATE kart.inscricao SET bateria_id = @destino, produto_id = @produtoDestino, preco_centavos = @precoDestino,
-           desconto_centavos = CASE WHEN @produtoOrigem = @produtoDestino THEN CASE WHEN desconto_centavos > @precoDestino THEN @precoDestino ELSE desconto_centavos END ELSE 0 END,
+          `UPDATE kart.inscricao SET bateria_id = @destino, produto_id = @produtoDestino::int, preco_centavos = @precoDestino::int,
+           desconto_centavos = CASE WHEN @produtoOrigem::int = @produtoDestino::int THEN CASE WHEN desconto_centavos > @precoDestino::int THEN @precoDestino::int ELSE desconto_centavos END ELSE 0 END,
            termo_impresso_em = NULL, atualizado_em = now() WHERE id = @id`,
           { destino, id, produtoOrigem: r.produtoId, produtoDestino: d.produtoId, precoDestino: d.preco },
         );

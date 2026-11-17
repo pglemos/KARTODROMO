@@ -395,7 +395,9 @@ describe('Office: mover reserva preserva os dados de cobrança', () => {
     await expect(executar()).resolves.toMatchObject({ status: 200 });
 
     const update = statements.find((statement) => tem(statement.sql, 'UPDATE kart.inscricao SET bateria_id'));
-    expect(update?.sql).toContain('produto_id = @produtoDestino, preco_centavos = @precoDestino');
+    expect(update?.sql).toContain('produto_id = @produtoDestino::int, preco_centavos = @precoDestino::int');
+    // Postgres: parâmetro comparado com outro parâmetro precisa de tipo explícito (quebrou o mover em 17/11/2026)
+    expect(update?.sql).toContain('@produtoOrigem::int = @produtoDestino::int');
     expect(update?.sql).toContain('ELSE 0 END');
     expect(update?.params).toEqual({ destino: 8, id: 42, produtoOrigem: 10, produtoDestino: 20, precoDestino: 22000 });
   });
@@ -406,7 +408,7 @@ describe('Office: mover reserva preserva os dados de cobrança', () => {
     await executar();
 
     const update = statements.find((statement) => tem(statement.sql, 'UPDATE kart.inscricao SET bateria_id'));
-    expect(update?.sql).toContain('THEN CASE WHEN desconto_centavos > @precoDestino THEN @precoDestino');
+    expect(update?.sql).toContain('THEN CASE WHEN desconto_centavos > @precoDestino::int THEN @precoDestino::int');
   });
 
   it('bloqueia reserva paga quando o serviço diverge', async () => {
