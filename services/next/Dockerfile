@@ -3,7 +3,8 @@ FROM node:24-bookworm-slim AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund --ignore-scripts
+# npm ci recusa o lock gerado no macOS por causa de opcionais de outra plataforma (@emnapi); install respeita o lock
+RUN npm install --no-audit --no-fund --ignore-scripts
 COPY . .
 ARG NEXT_PUBLIC_DEFAULT_UID=""
 ENV NEXT_PUBLIC_DEFAULT_UID=$NEXT_PUBLIC_DEFAULT_UID NEXT_STANDALONE=1
