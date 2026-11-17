@@ -1,13 +1,50 @@
 {
   "workers": [
-    { "wrangler": "workers/acesso-testadores/wrangler.jsonc" },
-    { "wrangler": "workers/app-operacional/wrangler.jsonc" },
-    { "wrangler": "workers/campeonato-200/wrangler.jsonc" },
-    { "wrangler": "workers/backup/wrangler.jsonc", "rotasExtras": ["backup.kartodromodebetim.com.br"] },
-    { "wrangler": "workers/resultados/wrangler.jsonc" },
-    { "wrangler": "workers/transmissao/wrangler.jsonc" },
-    { "wrangler": "workers/pre-cadastro/wrangler.jsonc" },
-    { "wrangler": "reservas-deploy/wrangler.jsonc", "rotasZona": ["reservas.kartodromodebetim.com.br/*"] },
-    { "wrangler": "workers/admin/wrangler.jsonc" }
-  ]
+    {
+      "wrangler": "workers/acesso-testadores/wrangler.jsonc"
+    },
+    {
+      "wrangler": "workers/app-operacional/wrangler.jsonc"
+    },
+    {
+      "wrangler": "workers/campeonato-200/wrangler.jsonc"
+    },
+    {
+      "wrangler": "workers/backup/wrangler.jsonc",
+      "rotasExtras": [
+        "backup.kartodromodebetim.com.br"
+      ]
+    },
+    {
+      "wrangler": "workers/resultados/wrangler.jsonc"
+    },
+    {
+      "wrangler": "workers/transmissao/wrangler.jsonc"
+    },
+    {
+      "wrangler": "workers/pre-cadastro/wrangler.jsonc"
+    },
+    {
+      "wrangler": "reservas-deploy/wrangler.jsonc",
+      "rotasZona": [
+        "reservas.kartodromodebetim.com.br/*"
+      ]
+    },
+    {
+      "wrangler": "workers/admin/wrangler.jsonc"
+    },
+    {
+      "wrangler": "site-deploy/wrangler.jsonc",
+      "rotasZona": [
+        "kartodromodebetim.com.br/*",
+        "www.kartodromodebetim.com.br/*"
+      ]
+    },
+    {
+      "wrangler": "privacidade-deploy/wrangler.jsonc"
+    }
+  ],
+  "servicosExternos": {
+    "kartodromo": "http://kart-next:3000"
+  }
 }

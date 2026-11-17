@@ -1,0 +1,10 @@
+// Pacote PUBLICADO do Worker kartodromo-site-2026, recuperado em 17/11/2026 (services/edge/ferramentas/recuperar-site.mjs).
+// O fonte não está no repo; mudanças no site devem virar um site novo (planejado), não remendos aqui.
+// Roda no kart-edge da VPS. O LEGACY é o Next (container kart-next), declarado em services/edge/edge.config.json.
+{
+  "name": "kartodromo-site-2026",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./dist", "binding": "ASSETS", "run_worker_first": true, "html_handling": "none" },
+  "services": [{ "binding": "LEGACY", "service": "kartodromo" }]
+}

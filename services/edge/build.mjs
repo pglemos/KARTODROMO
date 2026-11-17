@@ -59,6 +59,7 @@ for (const item of config.workers) {
     target: 'node24',
     outfile: join(DIST, modulo),
     alias: { 'cloudflare:workers': join(AQUI, 'src', 'cloudflare-workers.ts') },
+    loader: { '.txt': 'text' },
     logLevel: 'warning',
     legalComments: 'none',
   });
@@ -84,6 +85,7 @@ for (const item of config.workers) {
   console.log(`ok ${nome}: ${manifesto.at(-1).rotas.map((r) => r.host + (r.dominio ? '' : r.caminho + (r.exato ? '' : '*'))).join(', ') || '(sem rota)'}`);
 }
 writeFileSync(join(DIST, 'manifest.json'), JSON.stringify(manifesto, null, 2));
+writeFileSync(join(DIST, 'externos.json'), JSON.stringify(config.servicosExternos ?? {}, null, 2));
 await build({
   entryPoints: [join(AQUI, 'src', 'server.ts')],
   bundle: true,

@@ -1,0 +1,13 @@
+// Pacote publicado do Worker kartodromo-privacidade (só assets), recuperado do site no ar em 17/11/2026.
+{
+  "name": "kartodromo-privacidade",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./dist", "binding": "ASSETS" },
+  "routes": [
+    { "pattern": "kartodromodebetim.com.br/privacidade*", "zone_name": "kartodromodebetim.com.br" },
+    { "pattern": "www.kartodromodebetim.com.br/privacidade*", "zone_name": "kartodromodebetim.com.br" },
+    { "pattern": "kartodromodebetim.com.br/excluir-conta", "zone_name": "kartodromodebetim.com.br" },
+    { "pattern": "www.kartodromodebetim.com.br/excluir-conta", "zone_name": "kartodromodebetim.com.br" }
+  ]
+}

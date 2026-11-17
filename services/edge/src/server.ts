@@ -18,6 +18,7 @@ import { DurableObjectNamespace } from './durable';
 import { Assets } from './assets';
 import { EnvioEmail } from './email';
 import { EdgeResponse, WebSocketPair, ligar, type CfWebSocket } from './websocket';
+import { HTMLRewriter } from './html-rewriter';
 
 const NativeResponse = globalThis.Response;
 Object.defineProperty(EdgeResponse, Symbol.hasInstance, { value: (o: unknown) => o instanceof NativeResponse });
@@ -35,10 +36,22 @@ export function limparSaida(input: RequestInfo | URL, init?: RequestInit): Reque
   for (const k of sujos) h.delete(k);
   return new Request(r, { headers: h });
 }
+/**
+ * O fetch do Node já entrega o corpo descomprimido mas mantém `content-encoding`/`content-length` da origem; repassado
+ * como está, o navegador tenta descomprimir de novo (ERR_CONTENT_DECODING_FAILED). Na Cloudflare o runtime resolve isso.
+ */
+async function semCodificacao(r: Response): Promise<Response> {
+  if (!r.headers.has('content-encoding')) return r;
+  const h = new Headers(r.headers);
+  h.delete('content-encoding');
+  h.delete('content-length');
+  return new Response(r.body, { status: r.status, statusText: r.statusText, headers: h });
+}
 Object.assign(globalThis, {
   Response: EdgeResponse,
   WebSocketPair,
-  fetch: (input: RequestInfo | URL, init?: RequestInit) => fetchNativo(limparSaida(input, init)),
+  HTMLRewriter,
+  fetch: async (input: RequestInfo | URL, init?: RequestInit) => semCodificacao(await fetchNativo(limparSaida(input, init))),
 });
 
 export interface Rota { host: string; caminho: string; exato: boolean; dominio: boolean }
@@ -79,6 +92,22 @@ function casaGlob(padrao: string, caminho: string): boolean {
 }
 
 const carregados = new Map<string, Carregado>();
+
+/** Serviços que não são Workers (ex.: o Next em container próprio): nome -> URL base. Vem de dist/externos.json. */
+const EXTERNOS: Record<string, string> = existsSync(join(DIST, 'externos.json')) ? JSON.parse(readFileSync(join(DIST, 'externos.json'), 'utf8')) : {};
+async function paraExterno(base: string, req: Request): Promise<Response> {
+  const u = new URL(req.url);
+  const destino = new URL(u.pathname + u.search, base);
+  const h = new Headers(req.headers);
+  h.set('x-forwarded-host', u.host);
+  h.set('x-forwarded-proto', 'https');
+  h.delete('host');
+  const r = await semCodificacao(await fetchNativo(new Request(destino, { method: req.method, headers: h, body: req.body, redirect: 'manual', duplex: 'half' } as RequestInit)));
+  // redirecionamento absoluto do serviço interno volta para o hostname público
+  const loc = r.headers.get('location');
+  if (loc && loc.startsWith(base)) { const hh = new Headers(r.headers); hh.set('location', `https://${u.host}${loc.slice(base.replace(/\/$/, '').length)}`); return new Response(r.body, { status: r.status, headers: hh }); }
+  return r;
+}
 const dbs = new Map<string, D1Database>();
 const buckets = new Map<string, R2Bucket>();
 
@@ -113,6 +142,7 @@ export async function carregar(manifesto: WorkerManifest[]): Promise<void> {
       c.env[s.binding] = {
         fetch: (input: Request | string | URL, init?: RequestInit) => {
           const alvo = carregados.get(s.service);
+          if (!alvo && EXTERNOS[s.service]) return paraExterno(EXTERNOS[s.service], input instanceof Request && !init ? input : new Request(input, init));
           if (!alvo) return Promise.resolve(new Response(`serviço ${s.service} não está na VPS`, { status: 502 }));
           return atender(alvo, input instanceof Request && !init ? input : new Request(input, init));
         },
