@@ -214,6 +214,10 @@
     body.publico header .sub { flex-wrap: wrap; font-size: 11px; white-space: normal; gap: 4px 8px; }
     body.publico #conexao { margin-left: 0; }
   }
+/* foto do piloto (banco do kartódromo) */
+.linha .nome .foto{width:1.25em;height:1.25em;border-radius:50%;object-fit:cover;vertical-align:-.25em;margin-right:.35em;border:2px solid rgba(255,255,255,.35)}
+.foto-podio{display:block;width:4.2em;height:4.2em;margin:0 auto .3em;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,.8);box-shadow:0 6px 18px rgba(0,0,0,.5)}
+.foto-vencedor{display:block;width:9em;height:9em;margin:.2em auto .4em;border-radius:50%;object-fit:cover;border:5px solid #ffd24a;box-shadow:0 0 40px rgba(255,210,74,.55)}
 </style>
 </head>
 <body>
@@ -240,6 +244,8 @@
 <script>
 // aovivo.* (ou ?publico=1): para quem assiste de fora. A TV do kartódromo segue com rolagem automática e sem ponteiro.
 const PUBLICO = location.hostname.startsWith('aovivo.') || new URLSearchParams(location.search).has('publico');
+// foto do piloto (do banco do kartódromo, pelo kart da bateria): só na TV da rede local; sem foto, a imagem some
+const fotoHtml = (kart, sessao, cls, mini) => (PUBLICO || !kart ? '' : `<img class="${cls}" src="/foto-piloto?kart=${encodeURIComponent(kart)}&b=${encodeURIComponent(sessao || '')}${mini ? '&mini=1' : ''}" alt="" onerror="this.remove()">`);
 if (PUBLICO) document.body.classList.add('publico');
 const fmt = (ms) => { if (ms == null) return '–'; const s = ms / 1000, m = Math.floor(s / 60); const r = (s - m * 60).toFixed(3); return m ? `${m}:${r.padStart(6, '0')}` : r; };
 const relogio = (ms) => { const t = Math.max(0, Math.ceil((ms || 0) / 1000)); return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
@@ -331,10 +337,10 @@ function montarFim(v, forcar) {
   if (!p1) return;
   let confete = '';
   for (let i = 0; i < 46; i++) confete += `<i class="confete" style="left:${(i * 37) % 100}vw;background:${CORES_CONFETE[i % CORES_CONFETE.length]};animation-duration:${4 + (i % 7) * 0.7}s;animation-delay:-${(i * 0.53) % 6}s"></i>`;
-  $('vencedor').innerHTML = `${confete}<div class="rot">Vencedor</div><div class="trofeu">🏆</div><div class="quem">${esc(curto(p1.name) || 'Kart ' + p1.kart)}</div>
+  $('vencedor').innerHTML = `${confete}<div class="rot">Vencedor</div><div class="trofeu">🏆</div>${fotoHtml(p1.kart, v.id, 'foto-vencedor', false)}<div class="quem">${esc(curto(p1.name) || 'Kart ' + p1.kart)}</div>
     <div class="det num"><b>KART ${esc(p1.kart)}</b><span>${p1.laps} voltas</span>${p1.totalMs ? `<span>${fmt(p1.totalMs)}</span>` : ''}${p1.bestLapMs ? `<em>■ ${fmt(p1.bestLapMs)}</em>` : ''}</div>`;
   const degrau = (r, n) => !r ? `<div class="degrau d${n}" style="visibility:hidden"><div class="bloco"></div></div>` :
-    `<div class="degrau d${n}"><div class="quem num"><b>${esc(r.kart)}</b><div>${esc(curto(r.name) || 'Kart ' + r.kart)}</div><small>${n === 1 ? (r.totalMs ? fmt(r.totalMs) : `${r.laps} voltas`) : diferenca(r)}</small></div><div class="bloco">${n}</div></div>`;
+    `<div class="degrau d${n}"><div class="quem num">${fotoHtml(r.kart, v.id, 'foto-podio', false)}<b>${esc(r.kart)}</b><div>${esc(curto(r.name) || 'Kart ' + r.kart)}</div><small>${n === 1 ? (r.totalMs ? fmt(r.totalMs) : `${r.laps} voltas`) : diferenca(r)}</small></div><div class="bloco">${n}</div></div>`;
   $('podio').innerHTML = `<div class="faixa"><span>PÓDIO</span></div><div class="evento">${esc(v.name)}</div>
     <div class="degraus">${degrau(p2, 2)}${degrau(p1, 1)}${degrau(p3, 3)}</div>
     ${resto.length ? `<div class="seguintes num">${resto.map((r) => `<div><span class="p">${r.position}º</span><b>${esc(r.kart)}</b>${esc(curto(r.name) || 'Kart ' + r.kart)}<span class="g">${diferenca(r)}</span></div>`).join('')}</div>` : ''}`;
@@ -474,7 +480,7 @@ function render(st) {
     texto(c[0].firstChild, String(r.position));
     texto(c[1].firstChild, r.kart ? String(r.kart) : '–');
     const tags = (r.desclassificado ? '<span class="tag dc">DC</span>' : '') + (r.penaltyMs ? `<span class="tag pen">+${Math.round(r.penaltyMs / 1000)}s</span>` : '') + (r.finished ? '<span class="tag fim">🏁</span>' : '');
-    const nomeHtml = esc(curto(r.name) || 'Kart ' + r.kart) + tags;
+    const nomeHtml = fotoHtml(r.kart, v.id, 'foto', true) + esc(curto(r.name) || 'Kart ' + r.kart) + tags;
     if (c[2].innerHTML !== nomeHtml) c[2].innerHTML = nomeHtml;
     texto(c[3], r.laps == null ? '' : String(r.laps));
     if (texto(c[4], r.laps == null ? '' : fmt(r.lastLapMs)) && d.ultima !== undefined) anima(c[4], 'mudou');

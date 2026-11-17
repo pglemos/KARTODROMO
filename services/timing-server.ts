@@ -1360,6 +1360,27 @@ function transmissaoStatus() {
  * sem kart na pista: tomada encerrada = classificação para montar o grid; corrida encerrada = pódio (TB50) e o
  * resultado final (painel). Antes era a última CRIADA, e em 02/10 voltava sempre para a equalização do Edu.
  */
+/**
+ * Foto do piloto no banco do kartódromo (SRVKART, /api/crono/foto/:cliente), guardada 5 min em memória: o pódio e a TV
+ * pedem várias vezes a mesma foto. Sem foto também fica guardado (1 min), para não bater no servidor a cada quadro.
+ */
+const fotosEmMemoria = new Map<string, { em: number; f: { bytes: Buffer; tipo: string } | null }>();
+async function fotoDoPiloto(cliente: string, mini: boolean): Promise<{ bytes: Buffer; tipo: string } | null> {
+  const chave = `${cliente}:${mini ? 1 : 0}`;
+  const g = fotosEmMemoria.get(chave);
+  if (g && Date.now() - g.em < (g.f ? 300_000 : 60_000)) return g.f;
+  let f: { bytes: Buffer; tipo: string } | null = null;
+  try {
+    const r = await fetch(`${OPS_URL}/api/crono/foto/${cliente}${mini ? '?mini=1' : ''}`, { headers: { 'x-ops-key': process.env.OPS_RECEPCAO_KEY || '' }, signal: AbortSignal.timeout(6000) });
+    if (r.ok) f = { bytes: Buffer.from(await r.arrayBuffer()), tipo: r.headers.get('content-type') || 'image/jpeg' };
+  } catch {
+    if (g) return g.f; // servidor fora: segue com o que tinha
+  }
+  if (fotosEmMemoria.size > 2000) fotosEmMemoria.clear();
+  fotosEmMemoria.set(chave, { em: Date.now(), f });
+  return f;
+}
+
 function ultimaEncerrada() {
   const fimDe = (s: Session) => s.finishedAt ?? s.startedAt ?? s.createdAt;
   return [...sessions.values()].filter((s) => s.state === 'encerrada' && s.type !== 'equalizacao').sort((a, b) => fimDe(b) - fimDe(a))[0] ?? null;
@@ -2692,6 +2713,18 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
   }
 
   if (path === '/api/state') return send(res, 200, veioDaInternet(req) ? JSON.parse(jsonPublico(stateView())) : stateView());
+  // foto do piloto do kart (TV, telão TB50, pódio): só na rede do kartódromo; o id do cadastro nunca sai para a tela
+  if (path === '/foto-piloto' && method === 'GET') {
+    if (veioDaInternet(req)) return send(res, 404, { error: 'Não encontrado.' });
+    const sessao = (url.searchParams.get('b') && sessions.get(String(url.searchParams.get('b')))) || runningSession() || ultimaEncerrada();
+    const kart = String(url.searchParams.get('kart') ?? '').trim();
+    const cid = sessao?.competitors.find((c) => String(c.kart).trim() === kart)?.customerId;
+    if (!cid || !/^\d{1,12}$/.test(String(cid))) return send(res, 404, { error: 'Sem foto.' });
+    const f = await fotoDoPiloto(String(cid), url.searchParams.get('mini') === '1');
+    if (!f) return send(res, 404, { error: 'Sem foto.' });
+    res.writeHead(200, { 'content-type': f.tipo, 'content-length': f.bytes.length, 'cache-control': 'private, max-age=300' });
+    return res.end(f.bytes);
+  }
   if (path === '/api/livetime-snapshot') return send(res, 200, liveSnapshot(url.searchParams.get('painel') === 'tb50'));
   if (path === '/api/painel-led-page' && method === 'GET') return send(res, 200, painelLedPage);
   if (path === '/api/painel-led-page' && (method === 'PUT' || method === 'POST')) {

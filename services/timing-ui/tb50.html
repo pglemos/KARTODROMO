@@ -644,6 +644,10 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 #pat-slogan{margin-top:16px;font-size:38px;font-weight:700;color:#ffb300}
 #pat-chips{margin-top:34px;font-size:28px;font-weight:800;color:#e5e7eb}
 .pat-chip{display:inline-block;margin:0 14px;padding:12px 28px;border-radius:10px;background:rgba(255,255,255,.08);border:2px solid #00e676}
+/* foto do piloto no lugar do capacete (redonda; sem foto volta o capacete) */
+.live-podium-helmet-img.foto-piloto{object-fit:cover;border-radius:50%;border:6px solid rgba(255,255,255,.9);box-sizing:border-box}
+.live-podium-card-rank-1 .live-podium-helmet-img.foto-piloto{border-color:#ffd24a}
+.final-racer-image.foto-piloto{width:auto;height:74%;max-width:100%;margin:auto;display:block;object-fit:cover;border-radius:50%;border:5px solid var(--suit-color);box-sizing:border-box}
 </style>
 </head>
 <body>
@@ -877,7 +881,16 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
     return w[0] || '';
   }
 
-  function shortPodiumName(nome, dupFirst) {
+  // foto do piloto (banco do kartódromo, pelo kart da corrida). Sem foto, o navegador troca pelo capacete de sempre.
+function fotoOuCapacete(cls, kart, sessao, estilo) {
+  var k = String(kart || '').replace(/^\s+|\s+$/g, '');
+  var st = estilo ? ' style="' + estilo + '"' : '';
+  if (!k || k === '-') return '<img class="' + cls + '" src="/podio-final/helmet-premium.png" alt=""' + st + '>';
+  var src = '/foto-piloto?kart=' + encodeURIComponent(k) + '&b=' + encodeURIComponent(sessao || '');
+  return '<img class="' + cls + ' foto-piloto" src="' + src + '" alt=""' + st +
+    ' onerror="this.onerror=null;this.className=\'' + cls + '\';this.src=\'/podio-final/helmet-premium.png\'">';
+}
+function shortPodiumName(nome, dupFirst) {
     var words = String(nome || '').replace(/^\s+|\s+$/g, '').toUpperCase().split(/\s+/);
     var first = words[0] || '';
     var surname = '';
@@ -1251,7 +1264,7 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
       } else {
         visualHtml = '<div class="live-podium-helmet-stage" aria-hidden="true">' +
           '<div class="live-podium-rank-pillar"><span>P' + rank + '</span></div>' +
-          '<img class="live-podium-helmet-img" src="/podio-final/helmet-premium.png" alt="">' +
+          fotoOuCapacete('live-podium-helmet-img', d.kart, s.race && s.race.id) +
           '</div>';
       }
 
@@ -1343,7 +1356,7 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
             '<div class="final-pilot' + (rk === 1 ? ' final-pilot-winner' : '') + '" aria-hidden="true">' +
               '<div class="final-pilot-glow" style="background-color:' + suit + '"></div>' +
               (hasKart ? ('<span class="final-pilot-kart">' + esc(kartStr) + '</span>') : '') +
-              '<img class="final-racer-image" src="/podio-final/helmet-premium.png" alt="" style="--suit-color:' + suit + '">' +
+              fotoOuCapacete('final-racer-image', kartStr, s.race && s.race.id, '--suit-color:' + suit) +
             '</div>' +
             '<div class="final-podium-column">' +
               '<div class="final-driver-card">' +
