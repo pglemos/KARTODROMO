@@ -152,6 +152,41 @@ export function isLocalSQLiteAvailable(): boolean {
   return _available;
 }
 
+/**
+ * Produção fora da Cloudflare (VPS): abre o SQLite do D1 kartodromo-admin no caminho dado (KART_ADMIN_SQLITE), sem
+ * migrations nem seeds — o arquivo é o mesmo que o kart-edge usa para o admin. batch() roda numa transação.
+ */
+let _prod: { caminho: string; db: NodeSqliteDb } | null = null;
+export function getProducaoSQLiteDb(caminho: string): AdminD1Database | null {
+  try {
+    if (!_prod || _prod.caminho !== caminho) {
+      const { DatabaseSync } = (eval('require')('node:sqlite')) as { DatabaseSync: new (path: string) => NodeSqliteDb };
+      const db = new DatabaseSync(caminho);
+      db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+      _prod = { caminho, db };
+    }
+    const db = _prod.db;
+    return {
+      prepare: (query: string) => createD1Statement(db, query, []),
+      batch: async (statements: AdminD1Statement[]) => {
+        db.exec('BEGIN IMMEDIATE');
+        try {
+          const results: unknown[] = [];
+          for (const stmt of statements) results.push(await stmt.run());
+          db.exec('COMMIT');
+          return results;
+        } catch (e) {
+          db.exec('ROLLBACK');
+          throw e;
+        }
+      },
+    };
+  } catch (err) {
+    console.error('[sqlite-producao] falhou ao abrir', caminho, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 export function getLocalSQLiteDb(): AdminD1Database | null {
   try {
     const db = getDb();

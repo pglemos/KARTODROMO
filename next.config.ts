@@ -56,6 +56,8 @@ const nextConfig: NextConfig = {
     NEXT_PUBLICSUPABASE_URL: supabaseUrl,
     NEXT_PUBLICSUPABASE_ANON_KEY: supabaseAnonKey,
   },
+  // VPS: servidor Node próprio (NEXT_STANDALONE=1). Na Cloudflare o OpenNext cuida da saída.
+  ...(process.env.NEXT_STANDALONE === '1' ? { output: 'standalone' as const } : {}),
   reactStrictMode: true,
   experimental: {
     optimizePackageImports: ['lucide-react'],

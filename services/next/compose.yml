@@ -1,0 +1,17 @@
+# Next (app/) na VPS: chamado pelo kart-edge como serviço "kartodromo" (LEGACY do site-2026). Sem porta pública.
+services:
+  kart-next:
+    image: kart-next:atual
+    container_name: kart-next
+    env_file: [/srv/kart-next/next.env]
+    environment:
+      KART_ADMIN_SQLITE: /dados/d1/kartodromo-admin.sqlite
+    volumes:
+      - /srv/kart-edge/dados/d1:/dados/d1
+    user: "1000:1000"
+    networks: [caddy-sites]
+    mem_limit: 1g
+    restart: unless-stopped
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
+networks:
+  caddy-sites: { external: true, name: kartodromo-os_caddy-sites }
