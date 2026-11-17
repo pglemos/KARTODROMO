@@ -167,7 +167,7 @@
 <dialog id="mapDlg">
   <h2>Transponder desconhecido</h2>
   <p>Transponder <b id="mapRaw"></b> passou, mas não está ligado a nenhum kart.</p>
-  <label>Número do kart</label><input id="mapKart" type="text">
+  <label>Número do kart</label><input id="mapKart" type="text" inputmode="numeric" placeholder="ex.: 27 (Light) ou 127 (Super)">
   <div class="row" style="margin-top:10px"><button onclick="mapDlg.close()">Voltar</button><button class="b-blue" onclick="saveMap()">Salvar</button></div>
 </dialog>
 
@@ -445,7 +445,7 @@ async function toggleLap(kart, lap) {
   showLaps(kart);
 }
 function openMap(raw) { $('mapRaw').textContent = raw; $('mapKart').value = ''; mapDlg.showModal(); $('mapKart').focus(); }
-async function saveMap() { await api('/api/transponders', { method:'PUT', body:{ raw: $('mapRaw').textContent, kart: $('mapKart').value } }); mapDlg.close(); }
+async function saveMap() { try { await api('/api/transponders', { method:'PUT', body:{ raw: $('mapRaw').textContent, kart: $('mapKart').value.trim() } }); mapDlg.close(); } catch { /* api() já mostrou o erro */ } }
 
 function openManual() {
   if (!view) return;

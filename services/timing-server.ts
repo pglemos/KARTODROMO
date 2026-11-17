@@ -3799,8 +3799,13 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
   if (path === '/api/transponders' && method === 'PUT') {
     const body = await readBody(req);
     const raw = String(body.raw ?? '').trim();
-    const kart = String(body.kart ?? '').trim();
+    let kart = String(body.kart ?? '').trim();
     if (!/^\d+$/.test(raw)) return send(res, 400, { error: 'Transponder invalido.' });
+    if (kart) {
+      // número do kart: só dígitos, sem zero à esquerda ("07" vira "7"), de 1 a 999 (1-99 Light, 100+ Super)
+      if (!/^\d{1,3}$/.test(kart) || Number(kart) < 1) return send(res, 400, { error: 'Número do kart inválido: use só números de 1 a 999.' });
+      kart = String(Number(kart));
+    }
     if (kart) {
       for (const [k, v] of Object.entries(transponderMap)) if (v === kart) delete transponderMap[k]; // 1 transponder por kart
       transponderMap[raw] = kart;
