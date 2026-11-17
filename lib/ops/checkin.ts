@@ -3,7 +3,7 @@
  * guarda o pedido; aqui as vagas da reserva ganham Inscricao.CheckinEm e o termo de cada piloto entra na fila de
  * impressão da Recepção (o mesmo caminho do totem), para estar impresso quando ele chegar ao balcão.
  */
-import { query } from './db';
+import { DATA_HORA, query } from './db';
 
 type Log = (...args: unknown[]) => void;
 type Checkin = { key: string; pedidoId?: string; codigo?: string; em?: string; tipo?: string; token?: string; cpf?: string };
@@ -25,15 +25,15 @@ export async function aplicarCheckins(log: Log, imprimirTermo: (inscricaoId: num
   for (const c of checkins) {
     if (c.tipo === 'grupo') { feitos.push({ key: c.key, erro: await checkinDoGrupo(c, log, imprimirTermo).catch((e) => (e as Error).message) }); continue; }
     try {
-      const [r] = await query<{ ids: string }>(`SELECT InscricaoIds ids FROM dbo.ReservaOnline WHERE PedidoId = @p AND Status = 'pago'`, { p: c.pedidoId });
+      const [r] = await query<{ ids: string }>(`select inscricao_ids ids from kart.reserva_online where pedido_id = @p and status = 'pago'`, { p: c.pedidoId });
       if (!r) { feitos.push({ key: c.key, erro: 'reserva não encontrada ou não paga' }); continue; }
       const ids = String(r.ids).split(',').map(Number).filter((n) => n > 0);
       if (!ids.length) { feitos.push({ key: c.key, erro: 'reserva sem vagas' }); continue; }
       const lista = ids.join(',');
       const vagas = await query<{ id: number; termo: string | null }>(
-        `UPDATE dbo.Inscricao SET CheckinEm = COALESCE(CheckinEm, SYSDATETIME()), CheckinOrigem = COALESCE(CheckinOrigem, 'celular'), AtualizadoEm = SYSDATETIME()
-         OUTPUT inserted.Id id, CONVERT(varchar(19), inserted.TermoImpressoEm, 126) termo
-         WHERE Id IN (${lista}) AND Status <> 'cancelada'`,
+        `update kart.inscricao set checkin_em = coalesce(checkin_em, now()), checkin_origem = coalesce(checkin_origem, 'celular')
+         where id in (${lista}) and status <> 'cancelada'
+         returning id, to_char(termo_impresso_em, ${DATA_HORA}) termo`,
       );
       for (const v of vagas) if (!v.termo) imprimirTermo(Number(v.id));
       log(`check-in pelo celular: reserva ${c.codigo ?? c.pedidoId} (${vagas.length} vaga(s), ${vagas.filter((v) => !v.termo).length} termo(s) na fila)`);
@@ -52,17 +52,18 @@ async function checkinDoGrupo(c: Checkin, log: Log, imprimirTermo: (inscricaoId:
   const cpf = String(c.cpf ?? '').replace(/\D/g, '');
   if (!/^[A-Za-z0-9]{10,24}$/.test(String(c.token ?? '')) || cpf.length !== 11) return 'check-in de grupo inválido';
   const [v] = await query<{ id: number; termo: string | null; pago: number; modo: string; codigo: string }>(
-    `SELECT TOP 1 i.Id id, CONVERT(varchar(19), i.TermoImpressoEm, 126) termo, i.Pago pago, g.Modo modo, g.Codigo codigo
-       FROM dbo.ReservaGrupoPiloto t JOIN dbo.ReservaGrupo g ON g.Id = t.GrupoId AND g.Status = 'ativa'
-       JOIN dbo.ReservaGrupoPiloto p ON p.GrupoId = g.Id
-       JOIN dbo.Cliente cl ON cl.Id = COALESCE(p.ClienteId, CASE WHEN p.Responsavel = 1 THEN g.ResponsavelId END)
-       JOIN dbo.Inscricao i ON i.Id = p.InscricaoId AND i.Status <> 'cancelada'
-      WHERE t.Token = @token AND (cl.DocumentoNum = @cpf OR REPLACE(REPLACE(cl.Documento, '.', ''), '-', '') = @cpf)`,
+    `select i.id, to_char(i.termo_impresso_em, ${DATA_HORA}) termo, i.pago, g.modo, g.codigo
+       from kart.reserva_grupo_piloto t join kart.reserva_grupo g on g.id = t.grupo_id and g.status = 'ativa'
+       join kart.reserva_grupo_piloto p on p.grupo_id = g.id
+       join kart.cliente cl on cl.id = coalesce(p.cliente_id, case when p.responsavel then g.responsavel_id end)
+       join kart.inscricao i on i.id = p.inscricao_id and i.status <> 'cancelada'
+      where t.token = @token and (cl.documento_num = @cpf or replace(replace(cl.documento, '.', ''), '-', '') = @cpf)
+      limit 1`,
     { token: c.token, cpf },
   );
   if (!v) return 'CPF sem vaga neste grupo';
   if (v.modo === 'individual' && !v.pago) return 'vaga ainda não paga';
-  await query(`UPDATE dbo.Inscricao SET CheckinEm = COALESCE(CheckinEm, SYSDATETIME()), CheckinOrigem = COALESCE(CheckinOrigem, 'celular'), AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id: v.id });
+  await query(`update kart.inscricao set checkin_em = coalesce(checkin_em, now()), checkin_origem = coalesce(checkin_origem, 'celular') where id = @id`, { id: v.id });
   if (!v.termo) imprimirTermo(Number(v.id));
   log(`check-in pelo celular: grupo ${v.codigo}, vaga ${v.id}${v.termo ? '' : ' (termo na fila)'}`);
   return null;
@@ -78,15 +79,16 @@ export async function aplicarCancelamentos(log: Log) {
   const feitos: { key: string; erro: string | null }[] = [];
   for (const c of cancelamentos) {
     try {
-      const [r] = await query<{ id: number; ids: string }>(`SELECT Id id, InscricaoIds ids FROM dbo.ReservaOnline WHERE PedidoId = @p AND Status IN ('pago', 'cancelado')`, { p: c.pedidoId });
+      const [r] = await query<{ id: number; ids: string }>(`select id, inscricao_ids ids from kart.reserva_online where pedido_id = @p and status in ('pago', 'cancelado')`, { p: c.pedidoId });
       if (!r) { feitos.push({ key: c.key, erro: 'reserva não encontrada ou não paga' }); continue; }
       const lista = String(r.ids).split(',').map(Number).filter((n) => n > 0).join(',') || '0';
-      const presas = await query<{ id: number }>(`SELECT Id id FROM dbo.Inscricao WHERE Id IN (${lista}) AND Status <> 'cancelada' AND (CheckinEm IS NOT NULL OR TermoImpressoEm IS NOT NULL OR Kart IS NOT NULL)`);
+      const presas = await query<{ id: number }>(`select id from kart.inscricao where id in (${lista}) and status <> 'cancelada' and (checkin_em is not null or termo_impresso_em is not null or kart is not null)`);
       const canceladas = await query<{ id: number }>(
-        `UPDATE dbo.Inscricao SET Status = 'cancelada', Pago = 0, AtualizadoEm = SYSDATETIME() OUTPUT inserted.Id id
-         WHERE Id IN (${lista}) AND Status <> 'cancelada' AND CheckinEm IS NULL AND TermoImpressoEm IS NULL AND Kart IS NULL`,
+        `update kart.inscricao set status = 'cancelada', pago = false
+         where id in (${lista}) and status <> 'cancelada' and checkin_em is null and termo_impresso_em is null and kart is null
+         returning id`,
       );
-      await query(`UPDATE dbo.ReservaOnline SET Status = 'cancelado' WHERE Id = @id`, { id: r.id });
+      await query(`update kart.reserva_online set status = 'cancelado' where id = @id`, { id: r.id });
       log(`reserva online ${c.codigo ?? c.pedidoId} cancelada pelo cliente: ${canceladas.length} vaga(s) liberada(s)${presas.length ? `, ${presas.length} já na recepção (conferir)` : ''}`);
       feitos.push({ key: c.key, erro: presas.length ? `${presas.length} vaga(s) já na recepção` : null });
     } catch (e) { log(`cancelamento ${c.codigo ?? c.pedidoId}: erro ${(e as Error).message}`); }

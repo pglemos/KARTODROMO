@@ -1,6 +1,6 @@
 /**
  * Termo de responsabilidade aceito online. O SRVKART publica no site o mesmo texto da impressão (com versão = hash do
- * texto); o pré-cadastro devolve o aceite (versão, data, autorização de imagem) e aqui ele vira dbo.ClienteTermoAceite.
+ * texto); o pré-cadastro devolve o aceite (versão, data, autorização de imagem) e aqui ele vira kart.cliente_termo_aceite.
  * A assinatura no papel na recepção continua; o aceite online adianta a fila e aparece no painel do grupo.
  */
 import { createHash } from 'node:crypto';
@@ -15,7 +15,7 @@ const siteUrl = () => (process.env.PRECADASTRO_URL || '').replace(/\/+$/, '');
 const siteChave = () => process.env.PRECADASTRO_KEY || '';
 
 export async function termoAtual(arquivo: string | null) {
-  const empresa = await one<{ nome: string; razaoSocial: string | null }>('SELECT Nome nome, RazaoSocial razaoSocial FROM dbo.Empresa WHERE Id = 1');
+  const empresa = await one<{ nome: string; razaoSocial: string | null }>('select nome, razao_social "razaoSocial" from kart.empresa where id = 1');
   const nome = empresa?.razaoSocial?.trim() || empresa?.nome || 'Kartódromo';
   const personalizado = arquivo && existsSync(arquivo) ? readFileSync(arquivo, 'utf8') : undefined;
   const paragrafos = paragrafosDoTermo(nome, personalizado);
@@ -41,10 +41,10 @@ export async function publicarTermoNoSite(arquivo: string | null, log: Log) {
 export async function gravarAceiteTermo(clienteId: number, a: AceiteTermo | undefined, log: Log) {
   if (!a || !/^[a-f0-9]{12}$/.test(String(a.versao ?? ''))) return false;
   const quando = Date.parse(String(a.aceitoEm ?? '')) ? new Date(String(a.aceitoEm)) : new Date();
-  const ja = await one(`SELECT 1 x FROM dbo.ClienteTermoAceite WHERE ClienteId = @c AND Versao = @v AND ABS(DATEDIFF(minute, AceitoEm, @q)) < 1`, { c: clienteId, v: a.versao, q: quando });
+  const ja = await one(`select 1 x from kart.cliente_termo_aceite where cliente_id = @c and versao = @v and abs(extract(epoch from (aceito_em - @q::timestamp at time zone 'America/Sao_Paulo'))) < 60`, { c: clienteId, v: a.versao, q: quando });
   if (ja) return true;
-  await query(`INSERT INTO dbo.ClienteTermoAceite (ClienteId, Versao, AceitoEm, AutorizaImagem, Origem, Ip) VALUES (@c, @v, @q, @img, 'site', @ip)`,
-    { c: clienteId, v: String(a.versao), q: quando, img: a.imagem === false ? 0 : 1, ip: String(a.ip ?? '').slice(0, 45) || null });
+  await query(`insert into kart.cliente_termo_aceite (cliente_id, versao, aceito_em, autoriza_imagem, origem, ip) values (@c, @v, @q, @img, 'site', @ip)`,
+    { c: clienteId, v: String(a.versao), q: quando, img: a.imagem !== false, ip: String(a.ip ?? '').slice(0, 45) || null });
   log(`termo: cliente ${clienteId} aceitou a versão ${a.versao} pelo site`);
   return true;
 }

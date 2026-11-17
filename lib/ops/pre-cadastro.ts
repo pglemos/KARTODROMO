@@ -1,9 +1,9 @@
 /**
  * Pré-cadastro online (QR code): o site guarda o cadastro na Cloudflare até este servidor buscar,
- * gravar em dbo.Cliente (a mesma tabela que o totem consulta) e apagar de lá.
+ * gravar em kart.cliente (a mesma tabela que o totem consulta) e apagar de lá.
  * Env: PRECADASTRO_URL (https://cadastro.kartodromodebetim.com.br) e PRECADASTRO_KEY (segredo do /api/sync).
  */
-import { insertCliente, one, onlyDigits, updateCliente, type ClienteInput } from './db';
+import { DATA, insertCliente, one, onlyDigits, updateCliente, type ClienteInput } from './db';
 import { registrarCobrancaDoLink, vincularCadastroDoLink } from './grupos';
 import { registrarPreCadastro } from './painel';
 import { gravarAceiteTermo, type AceiteTermo } from './termo-online';
@@ -88,12 +88,12 @@ export function dadosDoCliente(p: PreCadastro, existente: { nascimento: string |
   return { nome: p.nome, tipoDocumento: p.tipoDocumento, documento: p.documento, nascimento: p.nascimento, ...contato };
 }
 
-/** Grava um pré-cadastro (e os menores dele) em dbo.Cliente. Devolve o id do cliente. */
+/** Grava um pré-cadastro (e os menores dele) em kart.cliente. Devolve o id do cliente. */
 export async function gravarPreCadastro(p: PreCadastro, log: Log): Promise<number> {
   const doc = p.chave || onlyDigits(p.documento);
   const existente = await one<{ id: number; nascimento: string | null; nome: string | null }>(
-    `SELECT TOP 1 Id id, CONVERT(varchar(10), Nascimento, 126) nascimento, Nome nome FROM dbo.Cliente
-      WHERE (DocumentoNum = @d OR Documento = @d) AND ResponsavelId IS NULL ORDER BY AtualizadoEm DESC`,
+    `select id, to_char(nascimento, ${DATA}) nascimento, nome from kart.cliente
+      where (documento_num = @d or documento = @d) and responsavel_id is null order by atualizado_em desc limit 1`,
     { d: doc },
   );
   let id: number;
@@ -109,7 +109,7 @@ export async function gravarPreCadastro(p: PreCadastro, log: Log): Promise<numbe
   await gravarAceiteTermo(id, p.termo, log).catch((e) => log(`termo: aceite do cliente ${id} não gravado (${(e as Error).message})`));
   for (const m of p.menores ?? []) {
     const filho = await one<{ id: number }>(
-      `SELECT TOP 1 Id id FROM dbo.Cliente WHERE ResponsavelId = @r AND UPPER(LTRIM(RTRIM(Nome))) = UPPER(@n)`,
+      `select id from kart.cliente where responsavel_id = @r and upper(trim(nome)) = upper(@n) limit 1`,
       { r: id, n: m.nome.trim() },
     );
     const dados: ClienteInput = { nascimento: m.nascimento, ...(m.documento ? { tipoDocumento: 'RG', documento: m.documento } : {}), lgpd: true };
@@ -127,8 +127,8 @@ export async function gravarPreCadastro(p: PreCadastro, log: Log): Promise<numbe
 export async function gravarAcompanhante(a: AcompanhanteSite & { chave?: string }, log: Log): Promise<number> {
   const doc = a.chave || onlyDigits(a.documento);
   const existente = await one<{ id: number; nascimento: string | null }>(
-    `SELECT TOP 1 Id id, CONVERT(varchar(10), Nascimento, 126) nascimento FROM dbo.Cliente
-      WHERE (DocumentoNum = @d OR Documento = @d) AND ResponsavelId IS NULL ORDER BY AtualizadoEm DESC`,
+    `select id, to_char(nascimento, ${DATA}) nascimento from kart.cliente
+      where (documento_num = @d or documento = @d) and responsavel_id is null order by atualizado_em desc limit 1`,
     { d: doc },
   );
   // os mesmos campos do cadastro do totem (e-mail, celular, peso, endereço, Instagram); o que vier em branco não apaga

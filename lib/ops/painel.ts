@@ -9,7 +9,7 @@
 import { readFileSync } from 'node:fs';
 import { Socket } from 'node:net';
 import { join, resolve } from 'node:path';
-import { one, query } from './db';
+import { DATA, one, query } from './db';
 import { HttpError } from './office';
 import type { Sessao } from './auth';
 
@@ -97,12 +97,12 @@ const listaIds = (v: unknown) => (Array.isArray(v) ? v : String(v ?? '').split('
 
 async function campeonatos() {
   const camps = await query(
-    `SELECT Id id, Nome nome, Temporada temporada, Regra regra, Pontos pontos, BonusPole bonusPole, BonusMelhorVolta bonusMelhorVolta,
-            PenalidadePontos penalidadePontos, Descartes descartes, Ativo ativo FROM dbo.Campeonato ORDER BY Ativo DESC, Id DESC`,
+    `select id, nome, temporada, regra, pontos, bonus_pole "bonusPole", bonus_melhor_volta "bonusMelhorVolta",
+            penalidade_pontos "penalidadePontos", descartes, ativo from kart.campeonato order by ativo desc, id desc`,
   );
   const etapas = await query(
-    `SELECT Id id, CampeonatoId campeonatoId, Ordem ordem, Nome nome, CONVERT(varchar(10), Data, 126) data, SessoesCorrida sessoesCorrida,
-            SessoesPole sessoesPole, Publicada publicada FROM dbo.CampeonatoEtapa ORDER BY CampeonatoId, Ordem, Id`,
+    `select id, campeonato_id "campeonatoId", ordem, nome, to_char(data, ${DATA}) data, sessoes_corrida "sessoesCorrida",
+            sessoes_pole "sessoesPole", publicada from kart.campeonato_etapa order by campeonato_id, ordem, id`,
   );
   return camps.map((c) => ({
     ...c,
@@ -140,9 +140,9 @@ export async function painelRoutes(req: Req, send: Res): Promise<boolean> {
     const mapa = (await timing('/api/transponders')) as Record<string, unknown>;
     const karts = [...new Set(Object.values(mapa).map((k) => String(k).trim()).filter((k) => /^\d+$/.test(k)))].sort((a, b) => Number(a) - Number(b));
     const oficina = await query<{ kart: string; itens: number; vencidos: number; minutos: number }>(
-      `SELECT LTRIM(RTRIM(m.Kart)) kart, COUNT(*) itens, SUM(CASE WHEN m.Realizada = 0 AND ISNULL(it.TempoHoras, 0) > 0 AND m.MinutosUso >= it.TempoHoras * 60 THEN 1 ELSE 0 END) vencidos,
-              MAX(m.MinutosUso) minutos
-         FROM dbo.Manutencao m LEFT JOIN dbo.ItemManutencao it ON it.Id = m.ItemId GROUP BY LTRIM(RTRIM(m.Kart))`,
+      `select trim(m.kart) kart, count(*) itens, sum(case when not m.realizada and coalesce(it.tempo_horas, 0) > 0 and m.minutos_uso >= it.tempo_horas * 60 then 1 else 0 end) vencidos,
+              max(m.minutos_uso) minutos
+         from kart.manutencao m left join kart.item_manutencao it on it.id = m.item_id group by trim(m.kart)`,
     );
     send(200, { karts, oficina });
     return true;
@@ -168,8 +168,8 @@ export async function painelRoutes(req: Req, send: Res): Promise<boolean> {
     const nome = txt(b.nome, 120);
     if (!nome) throw new HttpError(400, 'Informe o nome do campeonato.');
     await query(
-      `INSERT INTO dbo.Campeonato (Nome, Temporada, Regra, Pontos, BonusPole, BonusMelhorVolta, PenalidadePontos, Descartes)
-       VALUES (@nome, @temp, @regra, @pontos, @pole, @mv, @pen, @desc)`,
+      `insert into kart.campeonato (nome, temporada, regra, pontos, bonus_pole, bonus_melhor_volta, penalidade_pontos, descartes)
+       values (@nome, @temp, @regra, @pontos, @pole, @mv, @pen, @desc)`,
       {
         nome, temp: txt(b.temporada, 60), regra: b.regra === 'geral' ? 'geral' : 'categoria',
         pontos: String(b.pontos ?? '50,45,42,40,38').split(',').map((x) => inteiro(x, 0, 0, 500)).filter((x) => x > 0).join(',') || '50,45,42,40,38',
@@ -181,18 +181,18 @@ export async function painelRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if ((m = path.match(/^\/campeonatos\/(\d+)$/)) && method === 'PUT') {
     const b = await req.body();
-    const atual = await one<Record<string, unknown>>(`SELECT * FROM dbo.Campeonato WHERE Id = @id`, { id: Number(m[1]) });
+    const atual = await one<Record<string, unknown>>(`select * from kart.campeonato where id = @id`, { id: Number(m[1]) });
     if (!atual) throw new HttpError(404, 'Campeonato não encontrado.');
     await query(
-      `UPDATE dbo.Campeonato SET Nome = @nome, Temporada = @temp, Regra = @regra, Pontos = @pontos, BonusPole = @pole, BonusMelhorVolta = @mv,
-         PenalidadePontos = @pen, Descartes = @desc, Ativo = @ativo WHERE Id = @id`,
+      `update kart.campeonato set nome = @nome, temporada = @temp, regra = @regra, pontos = @pontos, bonus_pole = @pole, bonus_melhor_volta = @mv,
+         penalidade_pontos = @pen, descartes = @desc, ativo = @ativo where id = @id`,
       {
-        id: Number(m[1]), nome: txt(b.nome, 120) ?? atual.Nome, temp: b.temporada !== undefined ? txt(b.temporada, 60) : atual.Temporada,
-        regra: b.regra === 'geral' || b.regra === 'categoria' ? b.regra : atual.Regra,
-        pontos: b.pontos !== undefined ? String(b.pontos).split(',').map((x) => inteiro(x, 0, 0, 500)).filter((x) => x > 0).join(',') || atual.Pontos : atual.Pontos,
-        pole: b.bonusPole !== undefined ? inteiro(b.bonusPole, 1, 0, 50) : atual.BonusPole, mv: b.bonusMelhorVolta !== undefined ? inteiro(b.bonusMelhorVolta, 1, 0, 50) : atual.BonusMelhorVolta,
-        pen: b.penalidadePontos !== undefined ? inteiro(b.penalidadePontos, 10, 0, 100) : atual.PenalidadePontos, desc: b.descartes !== undefined ? inteiro(b.descartes, 2, 0, 20) : atual.Descartes,
-        ativo: b.ativo === undefined ? atual.Ativo : b.ativo ? 1 : 0,
+        id: Number(m[1]), nome: txt(b.nome, 120) ?? atual.nome, temp: b.temporada !== undefined ? txt(b.temporada, 60) : atual.temporada,
+        regra: b.regra === 'geral' || b.regra === 'categoria' ? b.regra : atual.regra,
+        pontos: b.pontos !== undefined ? String(b.pontos).split(',').map((x) => inteiro(x, 0, 0, 500)).filter((x) => x > 0).join(',') || atual.pontos : atual.pontos,
+        pole: b.bonusPole !== undefined ? inteiro(b.bonusPole, 1, 0, 50) : atual.bonus_pole, mv: b.bonusMelhorVolta !== undefined ? inteiro(b.bonusMelhorVolta, 1, 0, 50) : atual.bonus_melhor_volta,
+        pen: b.penalidadePontos !== undefined ? inteiro(b.penalidadePontos, 10, 0, 100) : atual.penalidade_pontos, desc: b.descartes !== undefined ? inteiro(b.descartes, 2, 0, 20) : atual.descartes,
+        ativo: b.ativo === undefined ? atual.ativo : !!b.ativo,
       },
     );
     send(200, await campeonatos());
@@ -201,9 +201,9 @@ export async function painelRoutes(req: Req, send: Res): Promise<boolean> {
   if ((m = path.match(/^\/campeonatos\/(\d+)\/etapas$/)) && method === 'POST') {
     const b = await req.body();
     const cid = Number(m[1]);
-    const n = await one<{ n: number }>(`SELECT ISNULL(MAX(Ordem), 0) n FROM dbo.CampeonatoEtapa WHERE CampeonatoId = @c`, { c: cid });
+    const n = await one<{ n: number }>(`select coalesce(max(ordem), 0) n from kart.campeonato_etapa where campeonato_id = @c`, { c: cid });
     await query(
-      `INSERT INTO dbo.CampeonatoEtapa (CampeonatoId, Ordem, Nome, Data, SessoesCorrida, SessoesPole) VALUES (@c, @o, @nome, @data, @corr, @pole)`,
+      `insert into kart.campeonato_etapa (campeonato_id, ordem, nome, data, sessoes_corrida, sessoes_pole) values (@c, @o, @nome, @data, @corr, @pole)`,
       { c: cid, o: (n?.n ?? 0) + 1, nome: txt(b.nome, 120) ?? `${(n?.n ?? 0) + 1}ª etapa`, data: /^\d{4}-\d{2}-\d{2}$/.test(String(b.data ?? '')) ? b.data : null, corr: listaIds(b.sessoesCorrida), pole: listaIds(b.sessoesPole) },
     );
     send(201, await campeonatos());
@@ -211,13 +211,13 @@ export async function painelRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if ((m = path.match(/^\/campeonatos\/(\d+)\/etapas\/(\d+)$/))) {
     const params = { c: Number(m[1]), id: Number(m[2]) };
-    if (method === 'DELETE') { await query(`DELETE FROM dbo.CampeonatoEtapa WHERE Id = @id AND CampeonatoId = @c`, params); send(200, await campeonatos()); return true; }
+    if (method === 'DELETE') { await query(`delete from kart.campeonato_etapa where id = @id and campeonato_id = @c`, params); send(200, await campeonatos()); return true; }
     if (method === 'PUT') {
       const b = await req.body();
       await query(
-        `UPDATE dbo.CampeonatoEtapa SET Nome = COALESCE(@nome, Nome), Data = COALESCE(@data, Data), SessoesCorrida = COALESCE(@corr, SessoesCorrida),
-           SessoesPole = COALESCE(@pole, SessoesPole), Publicada = COALESCE(@pub, Publicada) WHERE Id = @id AND CampeonatoId = @c`,
-        { ...params, nome: txt(b.nome, 120), data: /^\d{4}-\d{2}-\d{2}$/.test(String(b.data ?? '')) ? b.data : null, corr: b.sessoesCorrida !== undefined ? listaIds(b.sessoesCorrida) : null, pole: b.sessoesPole !== undefined ? listaIds(b.sessoesPole) : null, pub: b.publicada === undefined ? null : b.publicada ? 1 : 0 },
+        `update kart.campeonato_etapa set nome = coalesce(@nome, nome), data = coalesce(@data::date, data), sessoes_corrida = coalesce(@corr, sessoes_corrida),
+           sessoes_pole = coalesce(@pole, sessoes_pole), publicada = coalesce(@pub::boolean, publicada) where id = @id and campeonato_id = @c`,
+        { ...params, nome: txt(b.nome, 120), data: /^\d{4}-\d{2}-\d{2}$/.test(String(b.data ?? '')) ? b.data : null, corr: b.sessoesCorrida !== undefined ? listaIds(b.sessoesCorrida) : null, pole: b.sessoesPole !== undefined ? listaIds(b.sessoesPole) : null, pub: b.publicada === undefined ? null : !!b.publicada },
       );
       send(200, await campeonatos());
       return true;

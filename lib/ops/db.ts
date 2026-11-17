@@ -1,61 +1,28 @@
 /**
- * Acesso ao banco operacional KartodromoOps (SRVKART\SQLEXPRESS).
+ * Acesso ao banco operacional: Postgres, schema `kart` (Kartódromo OS na VPS, réplica no SRVKART).
  *
- * Datas: as colunas DATETIME2 guardam horario LOCAL de Brasilia (igual ao LapTime). Pra nao
- * brigar com fuso no driver, toda data sai do banco ja como texto 'YYYY-MM-DDTHH:mm:ss' via
- * CONVERT(...,126) e entra como texto, e "agora" e sempre SYSDATETIME() do servidor SQL.
+ * Datas: guardadas como timestamptz; a sessão roda em America/Sao_Paulo, então `now()` e
+ * `to_char(x, 'YYYY-MM-DD"T"HH24:MI:SS')` devolvem o horário local de Brasília (o mesmo texto que o
+ * banco anterior entregava). Ver `db-pg.ts` para o contrato do driver.
+ * Conexão: OPS_PG_URL (usuário `ops_app`, senha no cofre).
  */
-import sql from 'mssql';
 import { corrigeEmail } from './email-dominio';
 import { normalizarInstagram } from './instagram';
 import { nomeProprio } from '../nomes';
-
-let pool: sql.ConnectionPool | null = null;
-
-export async function getPool(): Promise<sql.ConnectionPool> {
-  if (pool?.connected) return pool;
-  const env = process.env;
-  const encrypt = env.OPS_SQL_ENCRYPT === 'true' || env.OPS_SQL_ENCRYPT === '1';
-  const trustServerCertificate = env.OPS_SQL_TRUST_CERT !== 'false' && env.OPS_SQL_TRUST_CERT !== '0';
-  const instanceName = env.OPS_SQL_INSTANCE !== undefined ? env.OPS_SQL_INSTANCE : (env.OPS_SQL_SERVER?.includes('.rds.') ? undefined : 'SQLEXPRESS');
-
-  const config: sql.config = {
-    server: env.OPS_SQL_SERVER || '127.0.0.1',
-    database: env.OPS_SQL_DATABASE || 'KartodromoOps',
-    user: env.OPS_SQL_USER,
-    password: env.OPS_SQL_PASSWORD,
-    options: {
-      ...(instanceName ? { instanceName } : {}),
-      encrypt,
-      trustServerCertificate,
-      enableArithAbort: true,
-    },
-    pool: { max: 10, idleTimeoutMillis: 60_000 },
-    requestTimeout: 30_000,
-    connectionTimeout: 15_000,
-  };
-
-  pool = await new sql.ConnectionPool(config).connect();
-  return pool;
-}
+import { getPgPool, pgQuery, pgTx } from './db-pg';
 
 type Params = Record<string, unknown>;
 
+/** Formatos de data usados nas respostas (equivalentes ao CONVERT(...,126) do banco anterior). */
+export const DATA_HORA = `'YYYY-MM-DD"T"HH24:MI:SS'`;
+export const DATA = `'YYYY-MM-DD'`;
+
+export function getPool() {
+  return getPgPool();
+}
+
 export async function query<T = Record<string, unknown>>(text: string, params: Params = {}): Promise<T[]> {
-  try {
-    const req = (await getPool()).request();
-    for (const [k, v] of Object.entries(params)) req.input(k, v as never);
-    return (await req.query(text)).recordset as T[];
-  } catch (err: unknown) {
-    const code = (err as { code?: string })?.code;
-    if (code === 'ECONNCLOSED' || code === 'ECONNRESET' || code === 'ETIMEOUT') {
-      pool = null;
-      const req = (await getPool()).request();
-      for (const [k, v] of Object.entries(params)) req.input(k, v as never);
-      return (await req.query(text)).recordset as T[];
-    }
-    throw err;
-  }
+  return pgQuery<T>(text, params);
 }
 
 export async function one<T = Record<string, unknown>>(text: string, params: Params = {}): Promise<T | null> {
@@ -63,21 +30,7 @@ export async function one<T = Record<string, unknown>>(text: string, params: Par
 }
 
 export async function tx<T>(fn: (run: (text: string, params?: Params) => Promise<Record<string, unknown>[]>) => Promise<T>): Promise<T> {
-  const t = new sql.Transaction(await getPool());
-  await t.begin();
-  try {
-    const run = async (text: string, params: Params = {}) => {
-      const req = new sql.Request(t);
-      for (const [k, v] of Object.entries(params)) req.input(k, v as never);
-      return (await req.query(text)).recordset ?? [];
-    };
-    const out = await fn(run);
-    await t.commit();
-    return out;
-  } catch (err) {
-    await t.rollback().catch(() => undefined);
-    throw err;
-  }
+  return pgTx(fn);
 }
 
 export const onlyDigits = (v: unknown) => (typeof v === 'string' || typeof v === 'number' ? String(v).replace(/\D/g, '') : '');
@@ -95,11 +48,11 @@ export function isValidCpf(value: string): boolean {
   return calc(9) === Number(cpf[9]) && calc(10) === Number(cpf[10]);
 }
 
-export const CLIENTE_COLS = `c.Id id, c.Nome nome, c.TipoDocumento tipoDocumento, c.Documento documento, c.Email email, c.Instagram instagram, c.Telefone telefone,
-  CONVERT(varchar(10), c.Nascimento, 126) nascimento, c.Sexo sexo, c.Peso peso, c.Cep cep, c.Endereco endereco, c.Numero numero,
-  c.Complemento complemento, c.Bairro bairro, c.Cidade cidade, c.Estado estado, c.ResponsavelId responsavelId,
-  CONVERT(varchar(19), c.LgpdAceiteEm, 126) lgpdAceiteEm, c.Bloqueado bloqueado, c.Observacao observacao, c.Origem origem, c.TipoSanguineo tipoSanguineo, c.Ibge ibge, c.Pais pais,
-  CONVERT(varchar(19), c.CriadoEm, 126) criadoEm`;
+export const CLIENTE_COLS = `c.id, c.nome, c.tipo_documento "tipoDocumento", c.documento, c.email, c.instagram, c.telefone,
+  to_char(c.nascimento, ${DATA}) nascimento, c.sexo, c.peso, c.cep, c.endereco, c.numero,
+  c.complemento, c.bairro, c.cidade, c.estado, c.responsavel_id "responsavelId",
+  to_char(c.lgpd_aceite_em, ${DATA_HORA}) "lgpdAceiteEm", c.bloqueado, c.observacao, c.origem, c.tipo_sanguineo "tipoSanguineo", c.ibge, c.pais,
+  to_char(c.criado_em, ${DATA_HORA}) "criadoEm"`;
 
 export type ClienteInput = {
   nome?: string;
@@ -128,23 +81,23 @@ export type ClienteInput = {
 };
 
 const FIELD_MAP: Record<string, [string, number]> = {
-  nome: ['Nome', 200],
-  tipoDocumento: ['TipoDocumento', 20],
-  documento: ['Documento', 60],
-  email: ['Email', 200],
-  instagram: ['Instagram', 31],
-  telefone: ['Telefone', 40],
-  cep: ['Cep', 12],
-  endereco: ['Endereco', 200],
-  numero: ['Numero', 20],
-  complemento: ['Complemento', 100],
-  bairro: ['Bairro', 100],
-  cidade: ['Cidade', 100],
-  estado: ['Estado', 4],
-  observacao: ['Observacao', 400],
-  tipoSanguineo: ['TipoSanguineo', 3],
-  ibge: ['Ibge', 10],
-  pais: ['Pais', 60],
+  nome: ['nome', 200],
+  tipoDocumento: ['tipo_documento', 20],
+  documento: ['documento', 60],
+  email: ['email', 200],
+  instagram: ['instagram', 31],
+  telefone: ['telefone', 40],
+  cep: ['cep', 12],
+  endereco: ['endereco', 200],
+  numero: ['numero', 20],
+  complemento: ['complemento', 100],
+  bairro: ['bairro', 100],
+  cidade: ['cidade', 100],
+  estado: ['estado', 4],
+  observacao: ['observacao', 400],
+  tipoSanguineo: ['tipo_sanguineo', 3],
+  ibge: ['ibge', 10],
+  pais: ['pais', 60],
 };
 
 /**
@@ -167,29 +120,29 @@ export function clienteColumns(input: ClienteInput, partial: boolean): Record<st
     if (key === 'estado' && typeof v === 'string') v = v.toUpperCase();
     set(col, v);
   }
-  if ('documento' in input) set('DocumentoNum', onlyDigits(input.documento).slice(0, 30) || null);
-  if ('telefone' in input) set('TelefoneNum', onlyDigits(input.telefone).slice(-20) || null);
-  if ('nascimento' in input) set('Nascimento', /^\d{4}-\d{2}-\d{2}$/.test(String(input.nascimento ?? '')) ? input.nascimento : null);
-  if ('sexo' in input) set('Sexo', input.sexo === 'M' || input.sexo === 'F' ? input.sexo : null);
+  if ('documento' in input) set('documento_num', onlyDigits(input.documento).slice(0, 30) || null);
+  if ('telefone' in input) set('telefone_num', onlyDigits(input.telefone).slice(-20) || null);
+  if ('nascimento' in input) set('nascimento', /^\d{4}-\d{2}-\d{2}$/.test(String(input.nascimento ?? '')) ? input.nascimento : null);
+  if ('sexo' in input) set('sexo', input.sexo === 'M' || input.sexo === 'F' ? input.sexo : null);
   if ('peso' in input) {
     const p = Number(String(input.peso ?? '').replace(',', '.'));
-    set('Peso', p > 0 && p < 500 ? p : null);
+    set('peso', p > 0 && p < 500 ? p : null);
   }
-  if ('responsavelId' in input) set('ResponsavelId', input.responsavelId ? Number(input.responsavelId) : null);
-  if ('bloqueado' in input) out.Bloqueado = input.bloqueado ? 1 : 0;
+  if ('responsavelId' in input) set('responsavel_id', input.responsavelId ? Number(input.responsavelId) : null);
+  if ('bloqueado' in input) out.bloqueado = !!input.bloqueado;
   return out;
 }
 
 export async function insertCliente(input: ClienteInput, origem: string): Promise<number> {
   const cols = clienteColumns(input, false);
-  if (!cols.Nome) throw new Error('Nome e obrigatorio.');
-  cols.Origem = origem;
+  if (!cols.nome) throw new Error('Nome e obrigatorio.');
+  cols.origem = origem;
   const names = Object.keys(cols);
   const params = Object.fromEntries(names.map((n) => [n, cols[n]]));
-  const lgpd = input.lgpd ? ', LgpdAceiteEm' : '';
-  const lgpdV = input.lgpd ? ', SYSDATETIME()' : '';
+  const lgpd = input.lgpd ? ', lgpd_aceite_em' : '';
+  const lgpdV = input.lgpd ? ', now()' : '';
   const row = await one<{ id: number }>(
-    `INSERT INTO dbo.Cliente (${names.join(', ')}${lgpd}) OUTPUT inserted.Id id VALUES (${names.map((n) => '@' + n).join(', ')}${lgpdV})`,
+    `insert into kart.cliente (${names.join(', ')}${lgpd}) values (${names.map((n) => '@' + n).join(', ')}${lgpdV}) returning id`,
     params,
   );
   return row!.id;
@@ -197,11 +150,10 @@ export async function insertCliente(input: ClienteInput, origem: string): Promis
 
 export async function updateCliente(id: number, input: ClienteInput, partial: boolean) {
   const cols = clienteColumns(input, partial);
-  if ('Nome' in cols && !cols.Nome) throw new Error('Nome e obrigatorio.');
+  if ('nome' in cols && !cols.nome) throw new Error('Nome e obrigatorio.');
   const sets = Object.keys(cols).map((n) => `${n} = @${n}`);
-  if (input.lgpd) sets.push('LgpdAceiteEm = COALESCE(LgpdAceiteEm, SYSDATETIME())');
-  sets.push('AtualizadoEm = SYSDATETIME()');
-  await query(`UPDATE dbo.Cliente SET ${sets.join(', ')} WHERE Id = @id`, { ...cols, id });
+  if (input.lgpd) sets.push('lgpd_aceite_em = coalesce(lgpd_aceite_em, now())');
+  await query(`update kart.cliente set ${sets.join(', ')} where id = @id`, { ...cols, id });
 }
 
 /** Precos em centavos (tabela passada pelo dono em 25/09/2026). Sobrescreviveis por env. */
