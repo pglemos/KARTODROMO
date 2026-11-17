@@ -14,6 +14,7 @@
  * Banco: KartodromoOps (lib/ops/db.ts). So LAN: firewall do SRVKART libera a porta pra rede local.
  */
 import http from 'node:http';
+import { apagarFotoDoApp, fotoDoBanco, gravarFotoDoApp } from '../lib/ops/foto-app';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { pipeline } from 'node:stream';
@@ -172,6 +173,29 @@ function requireKey(req: http.IncomingMessage) {
   const got = Buffer.from(String(req.headers['x-ops-key'] ?? ''));
   const want = Buffer.from(KEY);
   if (got.length !== want.length || !timingSafeEqual(got, want)) throw new HttpError(401, 'Chave inválida.');
+}
+
+/** Chamada do servidor do app (worker de cadastro): mesma chave que o ops-server usa para falar com o app. */
+function requireChaveDoApp(req: http.IncomingMessage) {
+  const want = Buffer.from(process.env.MOBILE_ADMIN_TOKEN || '');
+  const got = Buffer.from(String(req.headers['x-mobile-admin-token'] ?? ''));
+  if (!want.length || got.length !== want.length || !timingSafeEqual(got, want)) throw new HttpError(401, 'Chave inválida.');
+}
+
+async function readBytes(req: http.IncomingMessage, max: number): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    if (size > max) throw new HttpError(413, 'Arquivo grande demais.');
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks);
+}
+
+function sendImagem(res: http.ServerResponse, bytes: Buffer, tipo: string) {
+  res.writeHead(200, { 'content-type': tipo, 'content-length': bytes.length, 'cache-control': 'no-store' });
+  res.end(bytes);
 }
 
 const sign = (text: string) => createHmac('sha256', KEY || 'sem-chave').update(text).digest('base64url').slice(0, 22);
@@ -773,6 +797,29 @@ async function atender(req: http.IncomingMessage, res: http.ServerResponse) {
       const r = await one<{ agora: string }>(`SELECT to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS') agora`);
       return send(res, 200, { ok: true, sqlAgora: r?.agora });
     }
+    // foto que o piloto enviou (ou tirou) no app: o worker de cadastro chama na hora e a foto vai para o banco
+    {
+      const mf = path.match(/^\/api\/app\/foto\/(\d{1,12})$/);
+      if (mf && (method === 'PUT' || method === 'DELETE')) {
+        requireChaveDoApp(req);
+        const clienteId = Number(mf[1]);
+        if (method === 'DELETE') {
+          await apagarFotoDoApp(clienteId);
+          console.log(`app: cliente ${clienteId} tirou a foto no app`);
+          return send(res, 200, { ok: true });
+        }
+        try {
+          const r = await gravarFotoDoApp(clienteId, await readBytes(req, 2_000_000));
+          console.log(`app: foto do cliente ${clienteId} gravada no banco (${r.bytes} bytes)`);
+          return send(res, 200, r);
+        } catch (e) {
+          const st = (e as { status?: number }).status;
+          if (st === 404) return send(res, 404, { error: 'Cliente não encontrado.' });
+          if (e instanceof HttpError) throw e;
+          return send(res, 400, { error: (e as Error).message });
+        }
+      }
+    }
     if (path === '/termo') {
       if (url.searchParams.get('branco') === '1') {
         sessaoDe(req, url);
@@ -871,6 +918,13 @@ async function atender(req: http.IncomingMessage, res: http.ServerResponse) {
     }
     if (path.startsWith('/api/crono/')) {
       requireKey(req);
+      // foto do piloto do banco para TV, telão TB50 e pódio (?mini=1 = miniatura 160 px)
+      const mfc = path.match(/^\/api\/crono\/foto\/(\d{1,12})$/);
+      if (mfc && method === 'GET') {
+        const f = await fotoDoBanco(Number(mfc[1]), url.searchParams.get('mini') === '1');
+        if (!f) return send(res, 404, { error: 'Piloto sem foto.' });
+        return sendImagem(res, f.bytes, f.tipo);
+      }
       if (path === '/api/crono/baterias' || path.startsWith('/api/crono/baterias/')) await sincronizarTracadosDaCronometragem();
       let m = path.match(/^\/api\/crono\/baterias\/(\d+)\/grid$/);
       if (m) {

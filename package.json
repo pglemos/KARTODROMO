@@ -42,6 +42,7 @@
     "@aws-sdk/client-s3": "^3.1075.0",
     "@remotion/player": "^4.0.459",
     "@supabase/supabase-js": "^2.108.2",
+    "jpeg-js": "^0.4.4",
     "lucide-react": "^1.21.0",
     "mssql": "^12.5.5",
     "next": "^16.4.6",

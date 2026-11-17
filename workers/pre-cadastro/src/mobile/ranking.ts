@@ -17,6 +17,31 @@ export interface MobileRankingEnv extends MobileAuthEnv {
   MOBILE_DB?: D1Database;
   MOBILE_ADMIN_TOKEN?: string;
   PRE?: R2Bucket;
+  /** servidor da operação (SRVKART): recebe a foto na hora e grava no banco do kartódromo */
+  OPS_URL?: string;
+}
+
+/**
+ * Avisa o servidor do kartódromo na hora (foto nova ou tirada): ele grava em kart.cliente_foto, de onde a Recepção, o CRM,
+ * a TV, o telão e o pódio leem. Se o kartódromo estiver fora do ar, a foto continua no app e o aviso fica no log; a
+ * próxima troca de foto reenvia.
+ */
+export async function avisarKartodromo(env: MobileRankingEnv, cliente: string, bytes: Uint8Array | null): Promise<boolean> {
+  if (!env.MOBILE_ADMIN_TOKEN) return false;
+  const ops = (env.OPS_URL || 'https://ops.kartodromodebetim.com.br').replace(/\/+$/, '');
+  try {
+    const r = await fetch(`${ops}/api/app/foto/${cliente}`, {
+      method: bytes ? 'PUT' : 'DELETE',
+      headers: { 'x-mobile-admin-token': env.MOBILE_ADMIN_TOKEN, ...(bytes ? { 'content-type': 'image/jpeg' } : {}) },
+      body: bytes ? (bytes as unknown as BodyInit) : undefined,
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!r.ok) console.log(`foto do app ${cliente}: o kartódromo recusou (${r.status})`);
+    return r.ok;
+  } catch (e) {
+    console.log(`foto do app ${cliente}: o kartódromo não respondeu (${(e as Error).message})`);
+    return false;
+  }
 }
 
 // foto do piloto (enviada pelo próprio app): imagem de até 1,5 MB no R2, em fotos-app/<cliente>.jpg
@@ -47,7 +72,9 @@ async function enviarFoto(request: Request, env: MobileRankingEnv, cliente: stri
   if (bytes.length < 100 || bytes.length > FOTO_MAX || !detectado) return json(400, { erro: 'Arquivo de imagem inválido.', codigo: 'INVALID_IMAGE' });
   // o tipo gravado vem do conteúdo, não do que o aparelho declarou
   await env.PRE.put(fotoChave(cliente), bytes, { httpMetadata: { contentType: detectado }, customMetadata: { enviadaEm: new Date().toISOString() } });
-  return json(200, { ok: true, versao: Date.now() });
+  // na hora: a foto vai para o banco do kartódromo (só JPEG, que é o que o app manda)
+  const noKartodromo = detectado === 'image/jpeg' ? await avisarKartodromo(env, cliente, bytes) : false;
+  return json(200, { ok: true, versao: Date.now(), noKartodromo });
 }
 
 /**
@@ -280,7 +307,11 @@ export async function handleMobileRanking(request: Request, env: MobileRankingEn
       if (cliente instanceof Response) return cliente;
       if (!cliente) return json(404, { erro: 'Sua conta ainda não está ligada ao seu cadastro no kartódromo.' });
       if (request.method === 'PUT') return await enviarFoto(request, env, cliente);
-      if (request.method === 'DELETE') { await env.PRE?.delete(fotoChave(cliente)); return json(200, { ok: true }); }
+      if (request.method === 'DELETE') {
+        await env.PRE?.delete(fotoChave(cliente));
+        await avisarKartodromo(env, cliente, null);
+        return json(200, { ok: true });
+      }
       return json(405, { erro: 'Método não permitido.' });
     }
     if (p === '/api/mobile/v1/ranking/interno/clientes' && request.method === 'POST') {
