@@ -1,6 +1,6 @@
 /**
  * Reserva em grupo (painel web · Agenda): cada piloto do grupo com nome, WhatsApp e link de cadastro próprio, e o
- * pagamento de cada um. As vagas continuam sendo dbo.Inscricao (uma por piloto, no nome do responsável até a pessoa
+ * pagamento de cada um. As vagas continuam sendo kart.inscricao (uma por piloto, no nome do responsável até a pessoa
  * se cadastrar pelo link), então Recepção, totem, site, sorteio e cronometragem enxergam a reserva como sempre.
  *
  * Modos de pagamento:
@@ -82,38 +82,38 @@ export function precoDoPiloto(g: Pick<GrupoRow, 'preco' | 'aniversario' | 'preco
 
 export async function carregarGrupos(where: string, params: Record<string, unknown>) {
   const grupos = await query<GrupoRow>(
-    `SELECT g.Id id, g.Codigo codigo, g.BateriaId bateriaId, b.Vagas vagas, b.Vagas - (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') disponiveis, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Nome bateria, g.ResponsavelId responsavelId,
-            r.Nome responsavel, r.Telefone responsavelTelefone, g.Origem origem, g.Modo modo, g.PrecoCentavos preco, g.SinalPct sinalPct, g.Observacao observacao,
-            g.Status status, CONVERT(varchar(16), g.CriadoEm, 126) criadoEm, u.Nome criadoPor,
-            g.Aniversario aniversario, g.PrecoAniversarianteCentavos precoAniversariante, b.Campeonato campeonato
-       FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente r ON r.Id = g.ResponsavelId LEFT JOIN dbo.Usuario u ON u.Id = g.CriadoPor
-      WHERE ${where} ORDER BY b.Inicio, g.Id`,
+    `SELECT g.id id, g.codigo codigo, g.bateria_id "bateriaId", b.vagas vagas, b.vagas - (SELECT COUNT(*) FROM kart.inscricao i WHERE i.bateria_id = b.id AND i.status <> 'cancelada') disponiveis, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio, b.nome bateria, g.responsavel_id "responsavelId",
+            r.nome responsavel, r.telefone "responsavelTelefone", g.origem origem, g.modo modo, g.preco_centavos preco, g.sinal_pct "sinalPct", g.observacao observacao,
+            g.status status, to_char(g.criado_em, 'YYYY-MM-DD"T"HH24:MI') "criadoEm", u.nome "criadoPor",
+            g.aniversario aniversario, g.preco_aniversariante_centavos "precoAniversariante", b.campeonato campeonato
+       FROM kart.reserva_grupo g JOIN kart.bateria b ON b.id = g.bateria_id JOIN kart.cliente r ON r.id = g.responsavel_id LEFT JOIN kart.usuario u ON u.id = g.criado_por
+      WHERE ${where} ORDER BY b.inicio, g.id`,
     params,
   );
   if (!grupos.length) return [];
   const ids = grupos.map((g) => Number(g.id));
   const lista = ids.join(',');
   const pilotos = await query(
-    `SELECT p.Id id, p.GrupoId grupoId, p.Ordem ordem, p.Nome nome, p.Telefone telefone, p.Menor menor, p.Responsavel responsavel, p.ClienteId clienteId,
-            p.InscricaoId inscricaoId, p.Token token, p.PagoPeloGrupo pagoPeloGrupo, p.PrecoCentavos precoProprio, CONVERT(varchar(16), p.LinkEnviadoEm, 126) linkEnviadoEm,
-            CONVERT(varchar(16), p.CadastroEm, 126) cadastroEm, i.Pago inscricaoPaga, i.Status inscricaoStatus, i.VendaId vendaId, i.Origem inscricaoOrigem,
-            i.TermoImpressoEm termoEm, i.Kart kart,
-            c.Nome clienteNome, c.Documento documento, c.Email email, c.Peso peso, c.Telefone clienteTelefone,
-            CASE WHEN EXISTS (SELECT 1 FROM dbo.ClienteTermoAceite ta WHERE ta.ClienteId = c.Id) THEN 1 ELSE 0 END termoOnline
-       FROM dbo.ReservaGrupoPiloto p
-       LEFT JOIN dbo.Inscricao i ON i.Id = p.InscricaoId
-       LEFT JOIN dbo.ReservaGrupo rg ON rg.Id = p.GrupoId
-       LEFT JOIN dbo.Cliente c ON c.Id = COALESCE(p.ClienteId, CASE WHEN p.Responsavel = 1 THEN rg.ResponsavelId END)
-      WHERE p.GrupoId IN (${lista}) ORDER BY p.GrupoId, p.Ordem, p.Id`,
+    `SELECT p.id id, p.grupo_id "grupoId", p.ordem ordem, p.nome nome, p.telefone telefone, p.menor menor, p.responsavel responsavel, p.cliente_id "clienteId",
+            p.inscricao_id "inscricaoId", p.token token, p.pago_pelo_grupo "pagoPeloGrupo", p.preco_centavos "precoProprio", to_char(p.link_enviado_em, 'YYYY-MM-DD"T"HH24:MI') "linkEnviadoEm",
+            to_char(p.cadastro_em, 'YYYY-MM-DD"T"HH24:MI') "cadastroEm", i.pago "inscricaoPaga", i.status "inscricaoStatus", i.venda_id "vendaId", i.origem "inscricaoOrigem",
+            i.termo_impresso_em "termoEm", i.kart kart,
+            c.nome "clienteNome", c.documento documento, c.email email, c.peso peso, c.telefone "clienteTelefone",
+            CASE WHEN EXISTS (SELECT 1 FROM kart.cliente_termo_aceite ta WHERE ta.cliente_id = c.id) THEN 1 ELSE 0 END "termoOnline"
+       FROM kart.reserva_grupo_piloto p
+       LEFT JOIN kart.inscricao i ON i.id = p.inscricao_id
+       LEFT JOIN kart.reserva_grupo rg ON rg.id = p.grupo_id
+       LEFT JOIN kart.cliente c ON c.id = COALESCE(p.cliente_id, CASE WHEN p.responsavel = true THEN rg.responsavel_id END)
+      WHERE p.grupo_id IN (${lista}) ORDER BY p.grupo_id, p.ordem, p.id`,
   );
   const pagamentos = await query(
-    `SELECT pg.Id id, pg.GrupoId grupoId, pg.PilotoId pilotoId, pg.ValorCentavos valor, pg.Forma forma, pg.Origem origem, CONVERT(varchar(16), pg.CriadoEm, 126) criadoEm, u.Nome usuario
-       FROM dbo.ReservaGrupoPagamento pg LEFT JOIN dbo.Usuario u ON u.Id = pg.UsuarioId
-      WHERE pg.GrupoId IN (${lista}) AND pg.Cancelado = 0 ORDER BY pg.CriadoEm`,
+    `SELECT pg.id id, pg.grupo_id "grupoId", pg.piloto_id "pilotoId", pg.valor_centavos valor, pg.forma forma, pg.origem origem, to_char(pg.criado_em, 'YYYY-MM-DD"T"HH24:MI') "criadoEm", u.nome usuario
+       FROM kart.reserva_grupo_pagamento pg LEFT JOIN kart.usuario u ON u.id = pg.usuario_id
+      WHERE pg.grupo_id IN (${lista}) AND pg.cancelado = false ORDER BY pg.criado_em`,
   );
   const cobrancas = await query(
-    `SELECT Id id, GrupoId grupoId, PilotoId pilotoId, ValorCentavos valor, Link link, Status status, CONVERT(varchar(16), CriadoEm, 126) criadoEm
-       FROM dbo.ReservaGrupoCobranca WHERE GrupoId IN (${lista}) AND Status IN ('aguardando', 'pago') ORDER BY Id`,
+    `SELECT id id, grupo_id "grupoId", piloto_id "pilotoId", valor_centavos valor, link link, status status, to_char(criado_em, 'YYYY-MM-DD"T"HH24:MI') "criadoEm"
+       FROM kart.reserva_grupo_cobranca WHERE grupo_id IN (${lista}) AND status IN ('aguardando', 'pago') ORDER BY id`,
   );
   const agruparPor = (linhas: Linha[]) => {
     const mapa = new Map<number, Linha[]>();
@@ -143,7 +143,7 @@ export async function carregarGrupos(where: string, params: Record<string, unkno
 async function pilotoDaCobranca(asaasId: string | null | undefined) {
   if (!asaasId) return null;
   const c = await one<{ grupoId: number; pilotoId: number | null }>(
-    `SELECT TOP 1 GrupoId grupoId, PilotoId pilotoId FROM dbo.ReservaGrupoCobranca WHERE AsaasId = @a`, { a: asaasId });
+    `SELECT grupo_id "grupoId", piloto_id "pilotoId" FROM kart.reserva_grupo_cobranca WHERE asaas_id = @a limit 1`, { a: asaasId });
   return c ? { grupoId: Number(c.grupoId), pilotoId: c.pilotoId == null ? null : Number(c.pilotoId) } : null;
 }
 
@@ -245,7 +245,7 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
 }
 
 export async function grupo(id: number) {
-  const [g] = await carregarGrupos('g.Id = @id', { id });
+  const [g] = await carregarGrupos('g.id = @id', { id });
   if (!g) throw new HttpError(404, 'Reserva em grupo não encontrada.');
   return g;
 }
@@ -259,23 +259,23 @@ export async function aplicarPagos(grupoId: number) {
   for (const p of g.pilotos) {
     if (!p.inscricaoId || p.pagoNoCaixa) continue;
     // o caixa da Recepção cobra Inscricao.PrecoCentavos: a vaga do aniversariante acompanha a promoção
-    await query(`UPDATE dbo.Inscricao SET PrecoCentavos = @preco, AtualizadoEm = SYSDATETIME()
-      WHERE Id = @id AND Pago = 0 AND Status <> 'cancelada' AND ISNULL(PrecoCentavos, -1) <> @preco`, { id: p.inscricaoId, preco: p.preco });
+    await query(`UPDATE kart.inscricao SET preco_centavos = @preco, atualizado_em = now()
+      WHERE id = @id AND pago = false AND status <> 'cancelada' AND coalesce(preco_centavos, -1) <> @preco`, { id: p.inscricaoId, preco: p.preco });
     if (p.pago) {
       const feito = await one<{ Id: number }>(
-        `UPDATE dbo.Inscricao SET Pago = 1, ValorCentavos = @preco, Status = 'confirmada', AtualizadoEm = SYSDATETIME()
-           OUTPUT inserted.Id WHERE Id = @id AND Pago = 0 AND Status <> 'cancelada'`,
+        `UPDATE kart.inscricao SET pago = true, valor_centavos = @preco, status = 'confirmada', atualizado_em = now()
+            WHERE id = @id AND pago = false AND status <> 'cancelada' returning id`,
         { id: p.inscricaoId, preco: p.preco },
       );
-      if (feito) await query(`UPDATE dbo.ReservaGrupoPiloto SET PagoPeloGrupo = 1 WHERE Id = @id`, { id: p.id });
+      if (feito) await query(`UPDATE kart.reserva_grupo_piloto SET pago_pelo_grupo = true WHERE id = @id`, { id: p.id });
     } else {
       const desfeito = await one<{ Id: number }>(
-        `UPDATE i SET Pago = 0, ValorCentavos = NULL, Status = 'reservada', AtualizadoEm = SYSDATETIME() OUTPUT inserted.Id
-           FROM dbo.Inscricao i JOIN dbo.ReservaGrupoPiloto p ON p.InscricaoId = i.Id
-          WHERE p.Id = @pid AND p.PagoPeloGrupo = 1 AND i.VendaId IS NULL AND i.Pago = 1 AND i.Status <> 'cancelada'`,
+        `UPDATE kart.inscricao i SET pago = false, valor_centavos = NULL, status = 'reservada'
+           FROM kart.reserva_grupo_piloto p
+          WHERE p.inscricao_id = i.id AND p.id = @pid AND p.pago_pelo_grupo = true AND i.venda_id IS NULL AND i.pago = true AND i.status <> 'cancelada' returning i.id "Id"`,
         { pid: p.id },
       );
-      if (desfeito) await query(`UPDATE dbo.ReservaGrupoPiloto SET PagoPeloGrupo = 0 WHERE Id = @id`, { id: p.id });
+      if (desfeito) await query(`UPDATE kart.reserva_grupo_piloto SET pago_pelo_grupo = false WHERE id = @id`, { id: p.id });
     }
   }
 }
@@ -290,76 +290,76 @@ export async function vincularCadastroDoLink(token: string, clienteId: number, l
   if (!/^[A-Za-z0-9]{10,24}$/.test(token)) return false;
   type Vaga = { id: number; grupoId: number; inscricaoId: number | null; responsavel: boolean; bateriaId: number; nome: string | null };
   let p = await one<Vaga>(
-    `SELECT p.Id id, p.GrupoId grupoId, p.InscricaoId inscricaoId, p.Responsavel responsavel, g.BateriaId bateriaId, p.Nome nome
-       FROM dbo.ReservaGrupoPiloto p JOIN dbo.ReservaGrupo g ON g.Id = p.GrupoId WHERE p.Token = @token AND g.Status = 'ativa' AND (p.Responsavel = 1 OR EXISTS (SELECT 1 FROM dbo.Inscricao i WHERE i.Id = p.InscricaoId AND i.Status <> 'cancelada'))`,
+    `SELECT p.id id, p.grupo_id "grupoId", p.inscricao_id "inscricaoId", p.responsavel responsavel, g.bateria_id "bateriaId", p.nome nome
+       FROM kart.reserva_grupo_piloto p JOIN kart.reserva_grupo g ON g.id = p.grupo_id WHERE p.token = @token AND g.status = 'ativa' AND (p.responsavel = true OR EXISTS (SELECT 1 FROM kart.inscricao i WHERE i.id = p.inscricao_id AND i.status <> 'cancelada'))`,
     { token },
   );
   if (!p) { log(`grupo: link ${token.slice(0, 4)}… não pertence a nenhuma reserva ativa`); return false; }
   if (p.responsavel) {
     // LINK ÚNICO DO GRUPO: o código do responsável serve para todo mundo. Quem se cadastra ocupa a primeira vaga livre
     // (de preferência a que já tem o nome dela). Os links individuais antigos continuam valendo.
-    const jaNoGrupo = await one<{ id: number }>(`SELECT TOP 1 p.Id id FROM dbo.ReservaGrupoPiloto p JOIN dbo.Inscricao i ON i.Id = p.InscricaoId AND i.Status <> 'cancelada' WHERE p.GrupoId = @g AND p.ClienteId = @c`, { g: p.grupoId, c: clienteId });
+    const jaNoGrupo = await one<{ id: number }>(`SELECT p.id id FROM kart.reserva_grupo_piloto p JOIN kart.inscricao i ON i.id = p.inscricao_id AND i.status <> 'cancelada' WHERE p.grupo_id = @g AND p.cliente_id = @c limit 1`, { g: p.grupoId, c: clienteId });
     if (jaNoGrupo) {
-      await query(`UPDATE dbo.ReservaGrupoPiloto SET CadastroEm = COALESCE(CadastroEm, SYSDATETIME()) WHERE Id = @id`, { id: jaNoGrupo.id });
+      await query(`UPDATE kart.reserva_grupo_piloto SET cadastro_em = COALESCE(cadastro_em, now()) WHERE id = @id`, { id: jaNoGrupo.id });
       log(`grupo ${p.grupoId}: cliente ${clienteId} já está no grupo (vaga ${jaNoGrupo.id}), cadastro confirmado`);
       return true;
     }
     // o responsável ainda é provisório (só nome e WhatsApp)? Se quem abriu o link é ele (mesmo WhatsApp ou mesmo nome), o cadastro
     // dele substitui o provisório em toda a reserva (vagas, grupo e vaga do responsável).
     const prov = await one<{ slotId: number; clienteId: number; nome: string; telefone: string | null; documento: string | null }>(
-      `SELECT p.Id slotId, p.ClienteId clienteId, c.Nome nome, c.Telefone telefone, c.Documento documento
-         FROM dbo.ReservaGrupoPiloto p JOIN dbo.Cliente c ON c.Id = p.ClienteId WHERE p.Id = @id`, { id: p.id },
+      `SELECT p.id "slotId", p.cliente_id "clienteId", c.nome nome, c.telefone telefone, c.documento documento
+         FROM kart.reserva_grupo_piloto p JOIN kart.cliente c ON c.id = p.cliente_id WHERE p.id = @id`, { id: p.id },
     );
     if (prov && !prov.documento) {
-      const quem = await one<{ nome: string; telefone: string | null }>(`SELECT Nome nome, Telefone telefone FROM dbo.Cliente WHERE Id = @c`, { c: clienteId });
+      const quem = await one<{ nome: string; telefone: string | null }>(`SELECT nome nome, telefone telefone FROM kart.cliente WHERE id = @c`, { c: clienteId });
       const fim = (v: string | null | undefined) => onlyDigits(v).slice(-8);
       const mesmoFone = !!quem && fim(quem.telefone).length >= 8 && fim(quem.telefone) === fim(prov.telefone);
       const a = semAcento(quem?.nome).split(' '), b2 = semAcento(prov.nome).split(' ');
       const mesmoNome = !!quem && (semAcento(quem.nome) === semAcento(prov.nome) || (a.length > 1 && b2.length > 1 && a[0] === b2[0] && a[a.length - 1] === b2[b2.length - 1]));
       if (mesmoFone || mesmoNome) {
         const antigo = prov.clienteId;
-        await query(`UPDATE dbo.Inscricao SET ClienteId = @c, AtualizadoEm = SYSDATETIME() WHERE ClienteId = @a AND Id IN (SELECT InscricaoId FROM dbo.ReservaGrupoPiloto WHERE GrupoId = @g AND InscricaoId IS NOT NULL)`, { c: clienteId, a: antigo, g: p.grupoId });
-        await query(`UPDATE dbo.Inscricao SET ResponsavelId = @c WHERE ResponsavelId = @a AND Id IN (SELECT InscricaoId FROM dbo.ReservaGrupoPiloto WHERE GrupoId = @g AND InscricaoId IS NOT NULL)`, { c: clienteId, a: antigo, g: p.grupoId }).catch(() => undefined);
-        await query(`UPDATE dbo.ReservaGrupo SET ResponsavelId = @c, AtualizadoEm = SYSDATETIME() WHERE Id = @g`, { c: clienteId, g: p.grupoId });
+        await query(`UPDATE kart.inscricao SET cliente_id = @c, atualizado_em = now() WHERE cliente_id = @a AND id IN (SELECT inscricao_id "InscricaoId" FROM kart.reserva_grupo_piloto WHERE grupo_id = @g AND inscricao_id IS NOT NULL)`, { c: clienteId, a: antigo, g: p.grupoId });
+        await query(`UPDATE kart.inscricao SET responsavel_id = @c WHERE responsavel_id = @a AND id IN (SELECT inscricao_id "InscricaoId" FROM kart.reserva_grupo_piloto WHERE grupo_id = @g AND inscricao_id IS NOT NULL)`, { c: clienteId, a: antigo, g: p.grupoId }).catch(() => undefined);
+        await query(`UPDATE kart.reserva_grupo SET responsavel_id = @c, atualizado_em = now() WHERE id = @g`, { c: clienteId, g: p.grupoId });
         await query(
-          `UPDATE p SET ClienteId = @c, CadastroEm = SYSDATETIME(),
-                        Nome = COALESCE(NULLIF(c.Nome, ''), p.Nome),
-                        Telefone = COALESCE(NULLIF(c.Telefone, ''), p.Telefone)
-             FROM dbo.ReservaGrupoPiloto p JOIN dbo.Cliente c ON c.Id = @c WHERE p.Id = @id`,
+          `UPDATE kart.reserva_grupo_piloto p SET cliente_id = @c, cadastro_em = now(),
+                        nome = COALESCE(NULLIF(c.nome, ''), p.nome),
+                        telefone = COALESCE(NULLIF(c.telefone, ''), p.telefone)
+             FROM kart.cliente c WHERE c.id = @c AND p.id = @id`,
           { c: clienteId, id: p.id },
         );
         await query(
-          `DELETE FROM dbo.Cliente WHERE Id = @a AND Documento IS NULL
-             AND NOT EXISTS (SELECT 1 FROM dbo.Inscricao WHERE ClienteId = @a) AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupo WHERE ResponsavelId = @a)
-             AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto WHERE ClienteId = @a)`, { a: antigo },
+          `DELETE FROM kart.cliente WHERE id = @a AND documento IS NULL
+             AND NOT EXISTS (SELECT 1 FROM kart.inscricao WHERE cliente_id = @a) AND NOT EXISTS (SELECT 1 FROM kart.reserva_grupo WHERE responsavel_id = @a)
+             AND NOT EXISTS (SELECT 1 FROM kart.reserva_grupo_piloto WHERE cliente_id = @a)`, { a: antigo },
         ).catch(() => log(`grupo ${p?.grupoId}: cadastro provisório ${antigo} ficou (tem outros vínculos)`));
         log(`grupo ${p.grupoId}: responsável cadastrou-se pelo link (cliente ${clienteId} no lugar do provisório ${antigo})`);
         return true;
       }
     }
     const livre = await one<Vaga>(
-      `SELECT TOP 1 v.Id id, v.GrupoId grupoId, v.InscricaoId inscricaoId, v.Responsavel responsavel, g.BateriaId bateriaId, v.Nome nome
-         FROM dbo.ReservaGrupoPiloto v JOIN dbo.ReservaGrupo g ON g.Id = v.GrupoId JOIN dbo.Cliente c ON c.Id = @c
-        WHERE v.GrupoId = @g AND EXISTS (SELECT 1 FROM dbo.Inscricao i WHERE i.Id = v.InscricaoId AND i.Status <> 'cancelada') AND (v.ClienteId IS NULL OR v.ClienteId IN (SELECT Id FROM dbo.Cliente WHERE Origem = 'grupo' AND Documento IS NULL)) AND v.Responsavel = 0
-        ORDER BY CASE WHEN v.Nome IS NOT NULL AND LOWER(v.Nome) = LOWER(c.Nome) THEN 0 ELSE 1 END, v.Ordem`,
+      `SELECT v.id id, v.grupo_id "grupoId", v.inscricao_id "inscricaoId", v.responsavel responsavel, g.bateria_id "bateriaId", v.nome nome
+         FROM kart.reserva_grupo_piloto v JOIN kart.reserva_grupo g ON g.id = v.grupo_id JOIN kart.cliente c ON c.id = @c
+        WHERE v.grupo_id = @g AND EXISTS (SELECT 1 FROM kart.inscricao i WHERE i.id = v.inscricao_id AND i.status <> 'cancelada') AND (v.cliente_id IS NULL OR v.cliente_id IN (SELECT id "Id" FROM kart.cliente WHERE origem = 'grupo' AND documento IS NULL)) AND v.responsavel = false
+        ORDER BY CASE WHEN v.nome IS NOT NULL AND LOWER(v.nome) = LOWER(c.nome) THEN 0 ELSE 1 END, v.ordem limit 1`,
       { g: p.grupoId, c: clienteId },
     );
     if (!livre) { log(`grupo ${p.grupoId}: link do grupo usado pelo cliente ${clienteId}, mas não há vaga livre (aumente a quantidade de pilotos na reserva)`); return false; }
     p = livre;
   }
   const outra = await one<{ Id: number }>(
-    `SELECT TOP 1 Id FROM dbo.Inscricao WHERE BateriaId = @b AND ClienteId = @c AND Status <> 'cancelada' AND Id <> ISNULL(@i, 0)`,
+    `SELECT id "Id" FROM kart.inscricao WHERE bateria_id = @b AND cliente_id = @c AND status <> 'cancelada' AND id <> coalesce(@i, 0) limit 1`,
     { b: p.bateriaId, c: clienteId, i: p.inscricaoId },
   );
   if (p.inscricaoId && !outra) {
-    await query(`UPDATE dbo.Inscricao SET ClienteId = @c, AtualizadoEm = SYSDATETIME() WHERE Id = @i AND Status <> 'cancelada'`, { c: clienteId, i: p.inscricaoId });
+    await query(`UPDATE kart.inscricao SET cliente_id = @c, atualizado_em = now() WHERE id = @i AND status <> 'cancelada'`, { c: clienteId, i: p.inscricaoId });
     await limparProvisorios();
   }
   await query(
-    `UPDATE p SET ClienteId = @c, CadastroEm = SYSDATETIME(),
-                  Nome = CASE WHEN p.Nome IS NULL OR LTRIM(RTRIM(p.Nome)) = '' OR LTRIM(RTRIM(p.Nome)) LIKE '% .' THEN COALESCE(NULLIF(c.Nome, ''), p.Nome) ELSE p.Nome END,
-                  Telefone = CASE WHEN p.Telefone IS NULL OR LTRIM(RTRIM(p.Telefone)) = '' OR (LEN(REPLACE(REPLACE(REPLACE(REPLACE(c.Telefone,'(',''),')',''),'-',''),' ','')) >= 11 AND LEN(REPLACE(REPLACE(REPLACE(REPLACE(p.Telefone,'(',''),')',''),'-',''),' ','')) < 11) THEN COALESCE(NULLIF(c.Telefone, ''), p.Telefone) ELSE p.Telefone END
-       FROM dbo.ReservaGrupoPiloto p JOIN dbo.Cliente c ON c.Id = @c WHERE p.Id = @id`,
+    `UPDATE kart.reserva_grupo_piloto p SET cliente_id = @c, cadastro_em = now(),
+                  nome = CASE WHEN p.nome IS NULL OR trim(p.nome) = '' OR trim(p.nome) LIKE '% .' THEN COALESCE(NULLIF(c.nome, ''), p.nome) ELSE p.nome END,
+                  telefone = CASE WHEN p.telefone IS NULL OR trim(p.telefone) = '' OR (length(REPLACE(REPLACE(REPLACE(REPLACE(c.telefone,'(',''),')',''),'-',''),' ','')) >= 11 AND length(REPLACE(REPLACE(REPLACE(REPLACE(p.telefone,'(',''),')',''),'-',''),' ','')) < 11) THEN COALESCE(NULLIF(c.telefone, ''), p.telefone) ELSE p.telefone END
+       FROM kart.cliente c WHERE c.id = @c AND p.id = @id`,
     { c: clienteId, id: p.id },
   );
   log(`grupo ${p.grupoId}: piloto ${p.id} cadastrado pelo link (cliente ${clienteId})${outra ? ' — já tinha outra vaga na bateria, vaga do grupo mantida' : ''}`);
@@ -373,9 +373,9 @@ type VagaLivre = { id: number; ordem: number; nome: string | null; telefone: str
 /** Vagas do grupo que ainda aguardam um cadastro de verdade (o "Amigo N de..." provisório). */
 async function vagasAguardando(grupoId: number): Promise<VagaLivre[]> {
   return query<VagaLivre>(
-    `SELECT v.Id id, v.Ordem ordem, v.Nome nome, v.Telefone telefone, v.InscricaoId inscricaoId
-       FROM dbo.ReservaGrupoPiloto v JOIN dbo.Inscricao i ON i.Id = v.InscricaoId AND i.Status <> 'cancelada'
-      WHERE v.GrupoId = @g AND EXISTS (SELECT 1 FROM dbo.Inscricao i WHERE i.Id = v.InscricaoId AND i.Status <> 'cancelada') AND v.ClienteId IS NULL AND v.Responsavel = 0 ORDER BY v.Ordem`,
+    `SELECT v.id id, v.ordem ordem, v.nome nome, v.telefone telefone, v.inscricao_id "inscricaoId"
+       FROM kart.reserva_grupo_piloto v JOIN kart.inscricao i ON i.id = v.inscricao_id AND i.status <> 'cancelada'
+      WHERE v.grupo_id = @g AND EXISTS (SELECT 1 FROM kart.inscricao i WHERE i.id = v.inscricao_id AND i.status <> 'cancelada') AND v.cliente_id IS NULL AND v.responsavel = false ORDER BY v.ordem`,
     { g: grupoId },
   );
 }
@@ -386,31 +386,31 @@ async function vagasAguardando(grupoId: number): Promise<VagaLivre[]> {
  * essa pré-reserva sai (a vaga do grupo é a dela). Reserva paga duplicada fica para a recepção resolver.
  */
 export async function vincularClienteAoGrupo(grupoId: number, clienteId: number, pilotoId: number | null, log: Log, puxarDados = false) {
-  const g = await one<{ bateriaId: number }>(`SELECT BateriaId bateriaId FROM dbo.ReservaGrupo WHERE Id = @g AND Status = 'ativa'`, { g: grupoId });
+  const g = await one<{ bateriaId: number }>(`SELECT bateria_id "bateriaId" FROM kart.reserva_grupo WHERE id = @g AND status = 'ativa'`, { g: grupoId });
   if (!g) throw new HttpError(404, 'Reserva em grupo não encontrada.');
-  const c = await one<{ id: number }>(`SELECT Id id FROM dbo.Cliente WHERE Id = @c`, { c: clienteId });
+  const c = await one<{ id: number }>(`SELECT id id FROM kart.cliente WHERE id = @c`, { c: clienteId });
   if (!c) throw new HttpError(404, 'Cadastro não encontrado.');
-  const ja = await one<{ id: number }>(`SELECT TOP 1 p.Id id FROM dbo.ReservaGrupoPiloto p JOIN dbo.Inscricao i ON i.Id = p.InscricaoId AND i.Status <> 'cancelada' WHERE p.GrupoId = @g AND p.ClienteId = @c`, { g: grupoId, c: clienteId });
+  const ja = await one<{ id: number }>(`SELECT p.id id FROM kart.reserva_grupo_piloto p JOIN kart.inscricao i ON i.id = p.inscricao_id AND i.status <> 'cancelada' WHERE p.grupo_id = @g AND p.cliente_id = @c limit 1`, { g: grupoId, c: clienteId });
   if (ja) return { ok: true, jaVinculado: true, pilotoId: ja.id, inscricaoId: null as number | null };
   const livres = await vagasAguardando(grupoId);
   const vaga = pilotoId ? livres.find((v) => v.id === pilotoId) : livres[0];
   if (!vaga || !vaga.inscricaoId) throw new HttpError(409, 'Não há vaga aguardando cadastro neste grupo.');
   await tx(async (run) => {
     const outras = await run(
-      `SELECT Id, Pago, VendaId FROM dbo.Inscricao WITH (UPDLOCK) WHERE BateriaId = @b AND ClienteId = @c AND Status <> 'cancelada' AND Id <> @i`,
+      `SELECT id "Id", pago "Pago", venda_id "VendaId" FROM kart.inscricao WHERE bateria_id = @b AND cliente_id = @c AND status <> 'cancelada' AND id <> @i for update`,
       { b: g.bateriaId, c: clienteId, i: vaga.inscricaoId },
     );
     for (const o of outras) {
       if (o.Pago || o.VendaId) throw new HttpError(409, 'Esta pessoa já tem reserva paga nesta bateria. Resolva na recepção (estorno ou mover).');
     }
-    for (const o of outras) await run(`UPDATE dbo.Inscricao SET Status = 'cancelada', Pago = 0, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id: o.Id });
-    await run(`UPDATE dbo.Inscricao SET ClienteId = @c, AtualizadoEm = SYSDATETIME() WHERE Id = @i AND Status <> 'cancelada'`, { c: clienteId, i: vaga.inscricaoId });
+    for (const o of outras) await run(`UPDATE kart.inscricao SET status = 'cancelada', pago = false, atualizado_em = now() WHERE id = @id`, { id: o.Id });
+    await run(`UPDATE kart.inscricao SET cliente_id = @c, atualizado_em = now() WHERE id = @i AND status <> 'cancelada'`, { c: clienteId, i: vaga.inscricaoId });
     await run(
-      `UPDATE p SET ClienteId = @c, CadastroEm = SYSDATETIME(),
-              Nome = CASE WHEN @puxar = 1 THEN COALESCE(NULLIF(c.Nome, ''), p.Nome) ELSE COALESCE(NULLIF(p.Nome, ''), c.Nome) END,
-              Telefone = CASE WHEN @puxar = 1 THEN COALESCE(NULLIF(c.Telefone, ''), p.Telefone) ELSE COALESCE(NULLIF(p.Telefone, ''), c.Telefone) END,
-              Menor = CASE WHEN @puxar = 1 AND c.Nascimento IS NOT NULL THEN CASE WHEN DATEADD(year, 18, c.Nascimento) > CAST(SYSDATETIME() AS date) THEN 1 ELSE 0 END ELSE p.Menor END
-         FROM dbo.ReservaGrupoPiloto p JOIN dbo.Cliente c ON c.Id = @c WHERE p.Id = @id`,
+      `UPDATE kart.reserva_grupo_piloto p SET cliente_id = @c, cadastro_em = now(),
+              nome = CASE WHEN @puxar = 1 THEN COALESCE(NULLIF(c.nome, ''), p.nome) ELSE COALESCE(NULLIF(p.nome, ''), c.nome) END,
+              telefone = CASE WHEN @puxar = 1 THEN COALESCE(NULLIF(c.telefone, ''), p.telefone) ELSE COALESCE(NULLIF(p.telefone, ''), c.telefone) END,
+              menor = CASE WHEN @puxar = 1 AND c.nascimento IS NOT NULL THEN (c.nascimento + interval '18 years') > current_date ELSE p.menor END
+         FROM kart.cliente c WHERE c.id = @c AND p.id = @id`,
       { c: clienteId, id: vaga.id, puxar: puxarDados ? 1 : 0 },
     );
   });
@@ -425,9 +425,9 @@ export async function vincularClienteAoGrupo(grupoId: number, clienteId: number,
  * Devolve o id da inscrição da vaga, ou null.
  */
 export async function vincularPorDados(bateriaId: number, clienteId: number, log: Log): Promise<number | null> {
-  const quem = await one<{ nome: string; telefone: string | null }>(`SELECT Nome nome, Telefone telefone FROM dbo.Cliente WHERE Id = @c`, { c: clienteId });
+  const quem = await one<{ nome: string; telefone: string | null }>(`SELECT nome nome, telefone telefone FROM kart.cliente WHERE id = @c`, { c: clienteId });
   if (!quem) return null;
-  const grupos = await query<{ id: number }>(`SELECT Id id FROM dbo.ReservaGrupo WHERE BateriaId = @b AND Status = 'ativa'`, { b: bateriaId });
+  const grupos = await query<{ id: number }>(`SELECT id id FROM kart.reserva_grupo WHERE bateria_id = @b AND status = 'ativa'`, { b: bateriaId });
   const fim = (v: string | null | undefined) => onlyDigits(v).slice(-8);
   const a = semAcento(quem.nome).split(' ');
   for (const gr of grupos) {
@@ -438,7 +438,7 @@ export async function vincularPorDados(bateriaId: number, clienteId: number, log
       if (!mesmoFone && !mesmoNome) continue;
       const r = await vincularClienteAoGrupo(gr.id, clienteId, v.id, log).catch(() => null);
       if (r?.inscricaoId) return r.inscricaoId;
-      if (r?.jaVinculado) return (await one<{ i: number }>(`SELECT InscricaoId i FROM dbo.ReservaGrupoPiloto WHERE Id = @id`, { id: r.pilotoId }))?.i ?? null;
+      if (r?.jaVinculado) return (await one<{ i: number }>(`SELECT inscricao_id i FROM kart.reserva_grupo_piloto WHERE id = @id`, { id: r.pilotoId }))?.i ?? null;
     }
   }
   return null;
@@ -465,12 +465,12 @@ const primeiroNome = (nome: string) => {
  */
 export async function gruposDoDiaNoTotem() {
   const rows = await query<{ id: number; responsavel: string; bateriaId: number; inicio: string; total: number; aniversario: boolean; bateria: string; campeonato: boolean }>(
-    `SELECT g.Id id, r.Nome responsavel, g.BateriaId bateriaId, CONVERT(varchar(16), b.Inicio, 126) inicio, g.Aniversario aniversario, b.Nome bateria, b.Campeonato campeonato,
-            (SELECT COUNT(*) FROM dbo.ReservaGrupoPiloto p JOIN dbo.Inscricao i ON i.Id = p.InscricaoId AND i.Status <> 'cancelada' WHERE p.GrupoId = g.Id) total
-       FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente r ON r.Id = g.ResponsavelId
-      WHERE g.Status = 'ativa' AND b.Status <> 'cancelada' AND CONVERT(date, b.Inicio) = CONVERT(date, SYSDATETIME())
-        AND b.Inicio >= DATEADD(MINUTE, -45, SYSDATETIME())
-      ORDER BY b.Inicio, g.Id`,
+    `SELECT g.id id, r.nome responsavel, g.bateria_id "bateriaId", to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio, g.aniversario aniversario, b.nome bateria, b.campeonato campeonato,
+            (SELECT COUNT(*) FROM kart.reserva_grupo_piloto p JOIN kart.inscricao i ON i.id = p.inscricao_id AND i.status <> 'cancelada' WHERE p.grupo_id = g.id) total
+       FROM kart.reserva_grupo g JOIN kart.bateria b ON b.id = g.bateria_id JOIN kart.cliente r ON r.id = g.responsavel_id
+      WHERE g.status = 'ativa' AND b.status <> 'cancelada' AND (b.inicio)::date = (now())::date
+        AND b.inicio >= (now() + make_interval(mins => (-45)::int))
+      ORDER BY b.inicio, g.id`,
   );
   const out: { id: number; responsavel: string; inicio: string; total: number; aguardando: number; bateriaId: number; aniversario: boolean; titulo: string }[] = [];
   for (const g of rows) {
@@ -487,9 +487,9 @@ export async function gruposDoDiaNoTotem() {
 export async function entrarNoGrupoPeloTotem(grupoId: number, clienteId: number, log: Log) {
   const r = await vincularClienteAoGrupo(grupoId, clienteId, null, log);
   const g = await one<{ responsavel: string; bateriaId: number; inicio: string; total: number }>(
-    `SELECT rc.Nome responsavel, g.BateriaId bateriaId, CONVERT(varchar(16), b.Inicio, 126) inicio,
-            (SELECT COUNT(*) FROM dbo.ReservaGrupoPiloto p JOIN dbo.Inscricao i ON i.Id = p.InscricaoId AND i.Status <> 'cancelada' WHERE p.GrupoId = g.Id) total
-       FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente rc ON rc.Id = g.ResponsavelId WHERE g.Id = @g`,
+    `SELECT rc.nome responsavel, g.bateria_id "bateriaId", to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio,
+            (SELECT COUNT(*) FROM kart.reserva_grupo_piloto p JOIN kart.inscricao i ON i.id = p.inscricao_id AND i.status <> 'cancelada' WHERE p.grupo_id = g.id) total
+       FROM kart.reserva_grupo g JOIN kart.bateria b ON b.id = g.bateria_id JOIN kart.cliente rc ON rc.id = g.responsavel_id WHERE g.id = @g`,
     { g: grupoId },
   );
   if (!g) throw new HttpError(404, 'Reserva em grupo não encontrada.');
@@ -521,12 +521,12 @@ async function criarCobranca(grupoId: number, pilotoId: number | null) {
   const valor = p ? p.falta_centavos : g.modo === 'sinal' ? Math.max(0, g.sinal - g.pago) : g.falta;
   if (valor <= 0) throw new HttpError(409, p ? 'Este piloto já está pago.' : 'O grupo já está pago.');
   const quem = await one<{ nome: string; documento: string | null; email: string | null; telefone: string | null }>(
-    `SELECT Nome nome, Documento documento, Email email, Telefone telefone FROM dbo.Cliente WHERE Id = @id`,
+    `SELECT nome nome, documento documento, email email, telefone telefone FROM kart.cliente WHERE id = @id`,
     { id: (p?.clienteId as number | null) ?? (g.responsavelId as number) },
   );
   const doc = onlyDigits(quem?.documento);
   const pagador = doc.length === 11 ? quem! : await one<{ nome: string; documento: string | null; email: string | null; telefone: string | null }>(
-    `SELECT Nome nome, Documento documento, Email email, Telefone telefone FROM dbo.Cliente WHERE Id = @id`, { id: g.responsavelId },
+    `SELECT nome nome, documento documento, email email, telefone telefone FROM kart.cliente WHERE id = @id`, { id: g.responsavelId },
   );
   if (onlyDigits(pagador?.documento).length !== 11) throw new HttpError(409, 'Para gerar o Pix o responsável precisa ter CPF no cadastro.');
   const antiga = p ? p.cobranca : g.cobrancaGrupo;
@@ -541,10 +541,10 @@ async function criarCobranca(grupoId: number, pilotoId: number | null) {
     }),
   });
   await query(
-    `INSERT INTO dbo.ReservaGrupoCobranca (GrupoId, PilotoId, ValorCentavos, AsaasId, Link) VALUES (@g, @p, @v, @a, @l)`,
+    `INSERT INTO kart.reserva_grupo_cobranca (grupo_id, piloto_id, valor_centavos, asaas_id, link) VALUES (@g, @p, @v, @a, @l)`,
     { g: g.id, p: pilotoId, v: valor, a: String(c.id), l: String(c.link) },
   );
-  if (antiga) await query(`UPDATE dbo.ReservaGrupoCobranca SET Status = 'cancelada' WHERE Id = @id`, { id: antiga.id });
+  if (antiga) await query(`UPDATE kart.reserva_grupo_cobranca SET status = 'cancelada' WHERE id = @id`, { id: antiga.id });
   return { link: String(c.link), valor, reaproveitada: false };
 }
 
@@ -563,17 +563,17 @@ export async function conferirCobrancas(log: Log, grupoId?: number): Promise<num
   }
   const abertas = grupoId
     ? await query<{ id: number; grupoId: number; pilotoId: number | null; valor: number; asaasId: string; criadoEm: Date }>(
-        `SELECT Id id, GrupoId grupoId, PilotoId pilotoId, ValorCentavos valor, AsaasId asaasId, CriadoEm criadoEm
-           FROM dbo.ReservaGrupoCobranca
-          WHERE GrupoId = @grupoId AND Status = 'aguardando'
-          ORDER BY Id DESC`,
+        `SELECT id id, grupo_id "grupoId", piloto_id "pilotoId", valor_centavos valor, asaas_id "asaasId", criado_em "criadoEm"
+           FROM kart.reserva_grupo_cobranca
+          WHERE grupo_id = @grupoId AND status = 'aguardando'
+          ORDER BY id DESC`,
         { grupoId },
       )
     : await query<{ id: number; grupoId: number; pilotoId: number | null; valor: number; asaasId: string; criadoEm: Date }>(
-        `SELECT TOP 50 Id id, GrupoId grupoId, PilotoId pilotoId, ValorCentavos valor, AsaasId asaasId, CriadoEm criadoEm
-           FROM dbo.ReservaGrupoCobranca
-          WHERE Status = 'aguardando' AND CriadoEm > DATEADD(day, -4, SYSDATETIME())
-          ORDER BY CASE WHEN CriadoEm > DATEADD(hour, -12, SYSDATETIME()) THEN 0 ELSE 1 END, Id DESC`,
+        `SELECT id id, grupo_id "grupoId", piloto_id "pilotoId", valor_centavos valor, asaas_id "asaasId", criado_em "criadoEm"
+           FROM kart.reserva_grupo_cobranca
+          WHERE status = 'aguardando' AND criado_em > (now() + make_interval(days => (-4)::int))
+          ORDER BY CASE WHEN criado_em > (now() + make_interval(hours => (-12)::int)) THEN 0 ELSE 1 END, id DESC limit 50`,
       );
 
   let pagas = 0;
@@ -584,14 +584,14 @@ export async function conferirCobrancas(log: Log, grupoId?: number): Promise<num
       const s = (await site(`/api/sync/cobranca/${encodeURIComponent(c.asaasId)}`)) as { pago?: boolean; forma?: string; status?: string };
       if (s.pago) {
         const ok = await one<{ Id: number }>(
-          `UPDATE dbo.ReservaGrupoCobranca SET Status = 'pago', PagoEm = SYSDATETIME() OUTPUT inserted.Id WHERE Id = @id AND Status = 'aguardando'`,
+          `UPDATE kart.reserva_grupo_cobranca SET status = 'pago', pago_em = now()  WHERE id = @id AND status = 'aguardando' returning id`,
           { id: c.id },
         );
         if (ok) {
-          const ja = await one<{ Id: number }>(`SELECT Id FROM dbo.ReservaGrupoPagamento WHERE AsaasId = @a AND Cancelado = 0`, { a: c.asaasId });
+          const ja = await one<{ Id: number }>(`SELECT id "Id" FROM kart.reserva_grupo_pagamento WHERE asaas_id = @a AND cancelado = false`, { a: c.asaasId });
           if (!ja) {
             await query(
-              `INSERT INTO dbo.ReservaGrupoPagamento (GrupoId, PilotoId, ValorCentavos, Forma, Origem, AsaasId) VALUES (@g, @p, @v, @f, 'asaas', @a)`,
+              `INSERT INTO kart.reserva_grupo_pagamento (grupo_id, piloto_id, valor_centavos, forma, origem, asaas_id) VALUES (@g, @p, @v, @f, 'asaas', @a)`,
               { g: c.grupoId, p: c.pilotoId, v: c.valor, f: s.forma === 'PIX' ? 'Pix (Asaas)' : s.forma === 'CREDIT_CARD' ? 'Cartão (Asaas)' : 'Asaas', a: c.asaasId },
             );
           }
@@ -600,9 +600,9 @@ export async function conferirCobrancas(log: Log, grupoId?: number): Promise<num
           log(`grupo ${c.grupoId}: pagamento Asaas ${c.asaasId} recebido`);
         }
       } else if (['REFUNDED', 'DELETED', 'OVERDUE'].includes(String(s.status))) {
-        await query(`UPDATE dbo.ReservaGrupoCobranca SET Status = @s WHERE Id = @id`, { id: c.id, s: s.status === 'OVERDUE' ? 'vencida' : 'cancelada' });
+        await query(`UPDATE kart.reserva_grupo_cobranca SET status = @s WHERE id = @id`, { id: c.id, s: s.status === 'OVERDUE' ? 'vencida' : 'cancelada' });
       } else if (Date.now() - new Date(c.criadoEm).getTime() > 48 * 3600_000 && String(s.status) === 'PENDING') {
-        await query(`UPDATE dbo.ReservaGrupoCobranca SET Status = 'vencida' WHERE Id = @id`, { id: c.id });
+        await query(`UPDATE kart.reserva_grupo_cobranca SET status = 'vencida' WHERE id = @id`, { id: c.id });
       }
     } catch (e) {
       log(`grupo ${c.grupoId}: conferência da cobrança falhou (${(e as Error).message})`);
@@ -640,20 +640,20 @@ async function resolverGrupoEPilotoAsaas(asaasId: string, externalReference?: st
   } else {
     const mCod = String(externalReference ?? '').match(/^grupo-([A-Z0-9]{8})-(.+)$/);
     if (mCod) {
-      const grp = await one<{ Id: number; Modo: string }>(`SELECT Id, Modo FROM dbo.ReservaGrupo WHERE Codigo = @c`, { c: mCod[1] });
+      const grp = await one<{ Id: number; Modo: string }>(`SELECT id "Id", modo "Modo" FROM kart.reserva_grupo WHERE codigo = @c`, { c: mCod[1] });
       if (grp) {
         gid = Number(grp.Id);
         modo = grp.Modo;
         const cpfDig = onlyDigits(mCod[2]);
         if (cpfDig.length >= 11) {
           const pil = await one<{ Id: number }>(
-            `SELECT TOP 1 p.Id
-               FROM dbo.ReservaGrupoPiloto p
-               JOIN dbo.ReservaGrupo rg ON rg.Id = p.GrupoId
-               JOIN dbo.Cliente c ON c.Id = COALESCE(p.ClienteId, CASE WHEN p.Responsavel = 1 THEN rg.ResponsavelId END)
-               LEFT JOIN dbo.Inscricao i ON i.Id = p.InscricaoId
-              WHERE p.GrupoId = @g AND (c.DocumentoNum = @cpf OR c.Documento LIKE '%' + @cpf + '%')
-              ORDER BY CASE WHEN i.Status IS NULL OR i.Status <> 'cancelada' THEN 0 ELSE 1 END, p.Responsavel DESC, p.Ordem`,
+            `SELECT p.id "Id"
+               FROM kart.reserva_grupo_piloto p
+               JOIN kart.reserva_grupo rg ON rg.id = p.grupo_id
+               JOIN kart.cliente c ON c.id = COALESCE(p.cliente_id, CASE WHEN p.responsavel = true THEN rg.responsavel_id END)
+               LEFT JOIN kart.inscricao i ON i.id = p.inscricao_id
+              WHERE p.grupo_id = @g AND (c.documento_num = @cpf OR c.documento LIKE '%' || @cpf || '%')
+              ORDER BY CASE WHEN i.status IS NULL OR i.status <> 'cancelada' THEN 0 ELSE 1 END, p.responsavel DESC, p.ordem limit 1`,
             { g: gid, cpf: cpfDig },
           );
           if (pil) pid = Number(pil.Id);
@@ -662,7 +662,7 @@ async function resolverGrupoEPilotoAsaas(asaasId: string, externalReference?: st
     } else if (description) {
       const mDesc = String(description).match(/\breserva\s+(G[A-Z0-9]{7})\b/i);
       if (mDesc) {
-        const grp = await one<{ Id: number; Modo: string }>(`SELECT Id, Modo FROM dbo.ReservaGrupo WHERE Codigo = @c`, { c: mDesc[1] });
+        const grp = await one<{ Id: number; Modo: string }>(`SELECT id "Id", modo "Modo" FROM kart.reserva_grupo WHERE codigo = @c`, { c: mDesc[1] });
         if (grp) {
           gid = Number(grp.Id);
           modo = grp.Modo;
@@ -678,7 +678,7 @@ async function resolverGrupoEPilotoAsaas(asaasId: string, externalReference?: st
     pid = cobDoPiloto.pilotoId ?? pid;
   }
   if (gid && !modo) {
-    const grp = await one<{ Modo: string }>(`SELECT Modo FROM dbo.ReservaGrupo WHERE Id = @g`, { g: gid });
+    const grp = await one<{ Modo: string }>(`SELECT modo "Modo" FROM kart.reserva_grupo WHERE id = @g`, { g: gid });
     modo = grp?.Modo ?? null;
   }
   return { gid, pid, modo };
@@ -699,7 +699,7 @@ export async function puxarPagamentosDiretoDoAsaas(log: Log, grupoId?: number, s
     if (Array.isArray(webhookNotifs) && webhookNotifs.length) {
       for (const n of webhookNotifs) {
         if (!n.asaasId || !n.externalReference) continue;
-        const ja = await one<{ Id: number }>(`SELECT Id FROM dbo.ReservaGrupoPagamento WHERE AsaasId = @a AND Cancelado = 0`, { a: n.asaasId });
+        const ja = await one<{ Id: number }>(`SELECT id "Id" FROM kart.reserva_grupo_pagamento WHERE asaas_id = @a AND cancelado = false`, { a: n.asaasId });
         if (ja) {
           processadosIds.push(n.asaasId);
           continue;
@@ -720,28 +720,28 @@ export async function puxarPagamentosDiretoDoAsaas(log: Log, grupoId?: number, s
             log(`grupo ${gid}: aviso — pagamento webhook ${n.asaasId} sem piloto vinculado no modo individual (não será rateado)`);
           }
           await query(
-            `INSERT INTO dbo.ReservaGrupoPagamento (GrupoId, PilotoId, ValorCentavos, Forma, Origem, AsaasId) VALUES (@g, @p, @v, @f, @origem, @a)`,
+            `INSERT INTO kart.reserva_grupo_pagamento (grupo_id, piloto_id, valor_centavos, forma, origem, asaas_id) VALUES (@g, @p, @v, @f, @origem, @a)`,
             { g: gid, p: pid, v: valorCentavos, f: forma, origem: isVoucher ? 'voucher' : 'asaas', a: n.asaasId },
           );
           if (isVoucher && (n as Record<string, unknown>).cupom) {
             const codCupom = String((n as Record<string, unknown>).cupom).trim().toUpperCase();
-            const [vch] = await query<{ Id: number }>(`SELECT Id FROM dbo.Voucher WHERE Codigo = @c`, { c: codCupom });
+            const [vch] = await query<{ Id: number }>(`SELECT id "Id" FROM kart.voucher WHERE codigo = @c`, { c: codCupom });
             if (vch && pid) {
-              const [pil] = await query<{ ClienteId: number | null; InscricaoId: number | null }>(`SELECT ClienteId, InscricaoId FROM dbo.ReservaGrupoPiloto WHERE Id = @pid`, { pid });
-              const [jaUso] = await query<{ Id: number }>(`SELECT Id FROM dbo.ReservaGrupoVoucherUso WHERE AsaasId = @a`, { a: n.asaasId });
+              const [pil] = await query<{ ClienteId: number | null; InscricaoId: number | null }>(`SELECT cliente_id "ClienteId", inscricao_id "InscricaoId" FROM kart.reserva_grupo_piloto WHERE id = @pid`, { pid });
+              const [jaUso] = await query<{ Id: number }>(`SELECT id "Id" FROM kart.reserva_grupo_voucher_uso WHERE asaas_id = @a`, { a: n.asaasId });
               if (!jaUso && pil?.ClienteId) {
                 await query(
-                  `INSERT INTO dbo.ReservaGrupoVoucherUso (AsaasId, GrupoId, PilotoId, VoucherId, ClienteId, DescontoCentavos, Estado)
+                  `INSERT INTO kart.reserva_grupo_voucher_uso (asaas_id, grupo_id, piloto_id, voucher_id, cliente_id, desconto_centavos, estado)
                    VALUES (@a, @g, @p, @vid, @cid, @d, 'consumido')`,
                   { a: n.asaasId, g: gid, p: pid, vid: vch.Id, cid: pil.ClienteId, d: valorCentavos },
                 ).catch(() => undefined);
               }
               if (pil?.InscricaoId) {
-                await query(`UPDATE dbo.Inscricao SET VoucherId = @vid WHERE Id = @insId`, { vid: vch.Id, insId: pil.InscricaoId }).catch(() => undefined);
+                await query(`UPDATE kart.inscricao SET voucher_id = @vid WHERE id = @insId`, { vid: vch.Id, insId: pil.InscricaoId }).catch(() => undefined);
               }
             }
           }
-          await query(`UPDATE dbo.ReservaGrupoCobranca SET Status = 'pago', PagoEm = SYSDATETIME() WHERE AsaasId = @a AND Status = 'aguardando'`, { a: n.asaasId });
+          await query(`UPDATE kart.reserva_grupo_cobranca SET status = 'pago', pago_em = now() WHERE asaas_id = @a AND status = 'aguardando'`, { a: n.asaasId });
           gruposAfetados.add(gid);
           novos++;
           processadosIds.push(n.asaasId);
@@ -767,21 +767,21 @@ export async function puxarPagamentosDiretoDoAsaas(log: Log, grupoId?: number, s
     if (Array.isArray(pagas)) {
       for (const p of pagas) {
         if (!p.id || !['RECEIVED', 'CONFIRMED'].includes(p.status)) continue;
-        const ja = await one<{ Id: number }>(`SELECT Id FROM dbo.ReservaGrupoPagamento WHERE AsaasId = @a AND Cancelado = 0`, { a: p.id });
+        const ja = await one<{ Id: number }>(`SELECT id "Id" FROM kart.reserva_grupo_pagamento WHERE asaas_id = @a AND cancelado = false`, { a: p.id });
         if (ja) continue;
 
         // Bate por AsaasId direto na cobrança gerada pelo sistema
         const cob = await one<{ Id: number; GrupoId: number; PilotoId: number | null; ValorCentavos: number }>(
-          `SELECT Id, GrupoId, PilotoId, ValorCentavos FROM dbo.ReservaGrupoCobranca WHERE AsaasId = @a`, { a: p.id },
+          `SELECT id "Id", grupo_id "GrupoId", piloto_id "PilotoId", valor_centavos "ValorCentavos" FROM kart.reserva_grupo_cobranca WHERE asaas_id = @a`, { a: p.id },
         );
         if (cob) {
           const valorCentavos = Math.round(Number(p.value) * 100) || cob.ValorCentavos;
           const forma = p.billingType === 'PIX' ? 'Pix (Asaas)' : p.billingType === 'CREDIT_CARD' ? 'Cartão (Asaas)' : 'Asaas';
           await query(
-            `INSERT INTO dbo.ReservaGrupoPagamento (GrupoId, PilotoId, ValorCentavos, Forma, Origem, AsaasId) VALUES (@g, @p, @v, @f, 'asaas', @a)`,
+            `INSERT INTO kart.reserva_grupo_pagamento (grupo_id, piloto_id, valor_centavos, forma, origem, asaas_id) VALUES (@g, @p, @v, @f, 'asaas', @a)`,
             { g: cob.GrupoId, p: cob.PilotoId, v: valorCentavos, f: forma, a: p.id },
           );
-          await query(`UPDATE dbo.ReservaGrupoCobranca SET Status = 'pago', PagoEm = SYSDATETIME() WHERE Id = @id AND Status = 'aguardando'`, { id: cob.Id });
+          await query(`UPDATE kart.reserva_grupo_cobranca SET status = 'pago', pago_em = now() WHERE id = @id AND status = 'aguardando'`, { id: cob.Id });
           gruposAfetados.add(cob.GrupoId);
           novos++;
           log(`grupo ${cob.GrupoId}: pagamento Asaas ${p.id} conciliado diretamente`);
@@ -799,10 +799,10 @@ export async function puxarPagamentosDiretoDoAsaas(log: Log, grupoId?: number, s
             log(`grupo ${gid}: aviso — pagamento Asaas ${p.id} sem piloto vinculado no modo individual (não será rateado)`);
           }
           await query(
-            `INSERT INTO dbo.ReservaGrupoPagamento (GrupoId, PilotoId, ValorCentavos, Forma, Origem, AsaasId) VALUES (@g, @p, @v, @f, 'asaas', @a)`,
+            `INSERT INTO kart.reserva_grupo_pagamento (grupo_id, piloto_id, valor_centavos, forma, origem, asaas_id) VALUES (@g, @p, @v, @f, 'asaas', @a)`,
             { g: gid, p: pid, v: valorCentavos, f: forma, a: p.id },
           );
-          await query(`UPDATE dbo.ReservaGrupoCobranca SET Status = 'pago', PagoEm = SYSDATETIME() WHERE AsaasId = @a AND Status = 'aguardando'`, { a: p.id });
+          await query(`UPDATE kart.reserva_grupo_cobranca SET status = 'pago', pago_em = now() WHERE asaas_id = @a AND status = 'aguardando'`, { a: p.id });
           gruposAfetados.add(gid);
           novos++;
           log(`grupo ${gid}: pagamento Asaas ${p.id} (${forma}, R$ ${(valorCentavos / 100).toFixed(2)}) conciliado`);
@@ -824,7 +824,7 @@ export async function puxarPagamentosDiretoDoAsaas(log: Log, grupoId?: number, s
 
 async function novoPiloto(run: (t: string, p?: Record<string, unknown>) => Promise<Linha[]>, grupoId: number, ordem: number, p: PilotoIn, inscricaoId: number, responsavel: boolean, clienteId: number | null) {
   await run(
-    `INSERT INTO dbo.ReservaGrupoPiloto (GrupoId, Ordem, Nome, Telefone, Menor, Responsavel, ClienteId, InscricaoId, Token)
+    `INSERT INTO kart.reserva_grupo_piloto (grupo_id, ordem, nome, telefone, menor, responsavel, cliente_id, inscricao_id, token)
      VALUES (@g, @o, @n, @t, @m, @r, @c, @i, @k)`,
     { g: grupoId, o: ordem, n: txt(p.nome, 120), t: fone(p.telefone), m: p.menor ? 1 : 0, r: responsavel ? 1 : 0, c: clienteId, i: inscricaoId, k: tokenNovo() },
   );
@@ -844,7 +844,7 @@ export async function responsavelProvisorio(r?: { nome?: unknown; telefone?: unk
   if (!tel) throw new HttpError(400, 'Informe o WhatsApp do responsável, com DDD.');
   const fim = onlyDigits(tel).slice(-9);
   const iguais = await query<{ id: number; nome: string; telefone: string | null }>(
-    `SELECT TOP 20 Id id, Nome nome, Telefone telefone FROM dbo.Cliente WHERE Telefone IS NOT NULL AND Telefone LIKE '%' + @fim ORDER BY Id DESC`, { fim: fim.slice(-4) },
+    `SELECT id id, nome nome, telefone telefone FROM kart.cliente WHERE telefone IS NOT NULL AND telefone LIKE '%' || @fim ORDER BY id DESC limit 20`, { fim: fim.slice(-4) },
   );
   const ja = iguais.find((c) => onlyDigits(c.telefone).slice(-9) === fim && semAcento(c.nome) === semAcento(nome));
   if (ja) return ja.id;
@@ -859,10 +859,10 @@ type Executa = (t: string, p?: Record<string, unknown>) => Promise<Linha[]>;
  * (e os amigos ficam sem kart). Quando o amigo se cadastra pelo link, o cadastro dele substitui este (vincularCadastroDoLink).
  */
 async function cadastroDaVaga(run: Executa, responsavelId: number, ordem: number, nome: string | null, telefone: string | null) {
-  const [r] = await run(`SELECT Nome FROM dbo.Cliente WHERE Id = @id`, { id: responsavelId });
+  const [r] = await run(`SELECT nome "Nome" FROM kart.cliente WHERE id = @id`, { id: responsavelId });
   const rotulo = (nome && nome.trim()) || `Amigo ${ordem} de ${String(r?.Nome ?? 'responsável')}`;
   const [c] = await run(
-    `INSERT INTO dbo.Cliente (Nome, Telefone, TelefoneNum, Origem) OUTPUT inserted.Id id VALUES (@n, @t, @tn, 'grupo')`,
+    `INSERT INTO kart.cliente (nome, telefone, telefone_num, origem)  VALUES (@n, @t, @tn, 'grupo') returning id id`,
     { n: rotulo.slice(0, 200), t: telefone, tn: telefone ? onlyDigits(telefone).slice(-20) || null : null },
   );
   return Number(c.id);
@@ -871,10 +871,10 @@ async function cadastroDaVaga(run: Executa, responsavelId: number, ordem: number
 /** Apaga os cadastros provisórios de vaga que ninguém mais usa (o amigo se cadastrou e a reserva passou para ele). */
 async function limparProvisorios() {
   await query(
-    `DELETE FROM dbo.Cliente WHERE Origem = 'grupo' AND Documento IS NULL
-       AND NOT EXISTS (SELECT 1 FROM dbo.Inscricao i WHERE i.ClienteId = Cliente.Id)
-       AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupo g WHERE g.ResponsavelId = Cliente.Id)
-       AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto p WHERE p.ClienteId = Cliente.Id)`,
+    `DELETE FROM kart.cliente WHERE origem = 'grupo' AND documento IS NULL
+       AND NOT EXISTS (SELECT 1 FROM kart.inscricao i WHERE i.cliente_id = cliente.id)
+       AND NOT EXISTS (SELECT 1 FROM kart.reserva_grupo g WHERE g.responsavel_id = cliente.id)
+       AND NOT EXISTS (SELECT 1 FROM kart.reserva_grupo_piloto p WHERE p.cliente_id = cliente.id)`,
   ).catch(() => undefined);
 }
 
@@ -893,14 +893,14 @@ export async function desvincularPilotoDoGrupo(
 ) {
   return await tx(async (run) => {
     const [g] = await run(
-      `SELECT Id id, BateriaId bateriaId, ResponsavelId responsavelId, Codigo codigo FROM dbo.ReservaGrupo WITH (UPDLOCK, HOLDLOCK) WHERE Id = @g AND Status = 'ativa'`,
+      `SELECT id id, bateria_id "bateriaId", responsavel_id "responsavelId", codigo codigo FROM kart.reserva_grupo WHERE id = @g AND status = 'ativa' for update`,
       { g: grupoId },
     );
     if (!g) throw new HttpError(404, 'Reserva em grupo não encontrada.');
 
     const [p] = await run(
-      `SELECT Id id, Ordem ordem, Nome nome, Telefone telefone, ClienteId clienteId, InscricaoId inscricaoId, Responsavel responsavel
-         FROM dbo.ReservaGrupoPiloto WITH (UPDLOCK, HOLDLOCK) WHERE Id = @pid AND GrupoId = @g`,
+      `SELECT id id, ordem ordem, nome nome, telefone telefone, cliente_id "clienteId", inscricao_id "inscricaoId", responsavel responsavel
+         FROM kart.reserva_grupo_piloto WHERE id = @pid AND grupo_id = @g for update`,
       { pid: pilotoId, g: grupoId },
     );
     if (!p) throw new HttpError(404, 'Piloto não encontrado no grupo.');
@@ -913,11 +913,11 @@ export async function desvincularPilotoDoGrupo(
     if (opts.destino === 'sozinho') {
       if (inscricaoId) {
         await run(
-          `UPDATE dbo.Inscricao
-              SET ResponsavelId = NULL,
-                  Observacao = LEFT('Inscrição avulsa / individual (desvinculado do grupo ' + @cod + ')' + CASE WHEN Observacao IS NOT NULL AND Observacao <> '' THEN ' · ' + Observacao ELSE '' END, 400),
-                  AtualizadoEm = SYSDATETIME()
-            WHERE Id = @i`,
+          `UPDATE kart.inscricao
+              SET responsavel_id = NULL,
+                  observacao = LEFT('Inscrição avulsa / individual (desvinculado do grupo ' || @cod || ')' || CASE WHEN observacao IS NOT NULL AND observacao <> '' THEN ' · ' || observacao ELSE '' END, 400),
+                  atualizado_em = now()
+            WHERE id = @i`,
           { i: inscricaoId, cod: g.codigo },
         );
         if (opts.novaBateriaId && Number(opts.novaBateriaId) !== Number(g.bateriaId)) {
@@ -928,11 +928,11 @@ export async function desvincularPilotoDoGrupo(
       // Restaura a vaga no grupo de origem
       const cid = await cadastroDaVaga(run, Number(g.responsavelId), ordem, null, null);
       const [novaInsc] = await inscreverN(Number(g.bateriaId), Number(g.responsavelId), 1, 'recepcao', sessaoUid, 'Reserva em grupo pelo painel web', false, { vagaDoGrupo: true, run });
-      await run(`UPDATE dbo.Inscricao SET ClienteId = @c WHERE Id = @i`, { c: cid, i: novaInsc });
+      await run(`UPDATE kart.inscricao SET cliente_id = @c WHERE id = @i`, { c: cid, i: novaInsc });
       await run(
-        `UPDATE dbo.ReservaGrupoPiloto
-            SET ClienteId = @c, Nome = '', Telefone = NULL, CadastroEm = NULL, InscricaoId = @novaInsc, PagoPeloGrupo = 0
-          WHERE Id = @pid`,
+        `UPDATE kart.reserva_grupo_piloto
+            SET cliente_id = @c, nome = '', telefone = NULL, cadastro_em = NULL, inscricao_id = @novaInsc, pago_pelo_grupo = false
+          WHERE id = @pid`,
         { c: cid, novaInsc, pid: p.id },
       );
 
@@ -942,7 +942,7 @@ export async function desvincularPilotoDoGrupo(
       if (!novoGrupoId || novoGrupoId === grupoId) throw new HttpError(400, 'Selecione um grupo de destino diferente do atual.');
 
       const [ng] = await run(
-        `SELECT Id id, BateriaId bateriaId, ResponsavelId responsavelId, Codigo codigo FROM dbo.ReservaGrupo WITH (UPDLOCK, HOLDLOCK) WHERE Id = @ng AND Status = 'ativa'`,
+        `SELECT id id, bateria_id "bateriaId", responsavel_id "responsavelId", codigo codigo FROM kart.reserva_grupo WHERE id = @ng AND status = 'ativa' for update`,
         { ng: novoGrupoId },
       );
       if (!ng) throw new HttpError(404, 'Grupo de destino não encontrado ou inativo.');
@@ -954,55 +954,54 @@ export async function desvincularPilotoDoGrupo(
       // Restaura a vaga no grupo de origem
       const cidOrigem = await cadastroDaVaga(run, Number(g.responsavelId), ordem, null, null);
       const [novaInscOrigem] = await inscreverN(Number(g.bateriaId), Number(g.responsavelId), 1, 'recepcao', sessaoUid, 'Reserva em grupo pelo painel web', false, { vagaDoGrupo: true, run });
-      await run(`UPDATE dbo.Inscricao SET ClienteId = @c WHERE Id = @i`, { c: cidOrigem, i: novaInscOrigem });
+      await run(`UPDATE kart.inscricao SET cliente_id = @c WHERE id = @i`, { c: cidOrigem, i: novaInscOrigem });
       await run(
-        `UPDATE dbo.ReservaGrupoPiloto
-            SET ClienteId = @c, Nome = '', Telefone = NULL, CadastroEm = NULL, InscricaoId = @novaInsc, PagoPeloGrupo = 0
-          WHERE Id = @pid`,
+        `UPDATE kart.reserva_grupo_piloto
+            SET cliente_id = @c, nome = '', telefone = NULL, cadastro_em = NULL, inscricao_id = @novaInsc, pago_pelo_grupo = false
+          WHERE id = @pid`,
         { c: cidOrigem, novaInsc: novaInscOrigem, pid: p.id },
       );
 
       // No novo grupo: procura vaga aguardando
       const [vagaDestino] = await run(
-        `SELECT TOP 1 v.Id id, v.InscricaoId inscricaoId
-           FROM dbo.ReservaGrupoPiloto v
-          WHERE v.GrupoId = @ng
-            AND v.Responsavel = 0
-            AND v.ClienteId IS NOT NULL
-            AND EXISTS (SELECT 1 FROM dbo.Cliente c WHERE c.Id = v.ClienteId AND c.Origem = 'grupo')
-          ORDER BY v.Ordem`,
+        `SELECT v.id id, v.inscricao_id "inscricaoId"
+           FROM kart.reserva_grupo_piloto v
+          WHERE v.grupo_id = @ng
+            AND v.responsavel = false
+            AND v.cliente_id IS NOT NULL
+            AND EXISTS (SELECT 1 FROM kart.cliente c WHERE c.id = v.cliente_id AND c.origem = 'grupo')
+          ORDER BY v.ordem limit 1`,
         { ng: novoGrupoId },
       );
 
       if (vagaDestino) {
         if (inscricaoId) {
           if (vagaDestino.inscricaoId && vagaDestino.inscricaoId !== inscricaoId) {
-            await run(`UPDATE dbo.Inscricao SET Status = 'cancelada', Pago = 0, AtualizadoEm = SYSDATETIME() WHERE Id = @oldInsc`, { oldInsc: vagaDestino.inscricaoId });
+            await run(`UPDATE kart.inscricao SET status = 'cancelada', pago = false, atualizado_em = now() WHERE id = @oldInsc`, { oldInsc: vagaDestino.inscricaoId });
           }
           await run(
-            `UPDATE dbo.Inscricao
-                SET ResponsavelId = @resp,
-                    Observacao = LEFT('Reserva em grupo ' + @cod + ' pelo painel web' + CASE WHEN Observacao IS NOT NULL AND Observacao <> '' THEN ' · ' + Observacao ELSE '' END, 400),
-                    AtualizadoEm = SYSDATETIME()
-              WHERE Id = @i`,
+            `UPDATE kart.inscricao
+                SET responsavel_id = @resp,
+                    observacao = LEFT('Reserva em grupo ' || @cod || ' pelo painel web' || CASE WHEN observacao IS NOT NULL AND observacao <> '' THEN ' · ' || observacao ELSE '' END, 400),
+                    atualizado_em = now()
+              WHERE id = @i`,
             { resp: ng.responsavelId, cod: ng.codigo, i: inscricaoId },
           );
         }
 
         await run(
-          `UPDATE p
-              SET ClienteId = @c,
-                  InscricaoId = COALESCE(@insc, p.InscricaoId),
-                  CadastroEm = SYSDATETIME(),
-                  Nome = COALESCE(NULLIF(c.Nome, ''), p.Nome),
-                  Telefone = COALESCE(NULLIF(c.Telefone, ''), p.Telefone)
-             FROM dbo.ReservaGrupoPiloto p
-             LEFT JOIN dbo.Cliente c ON c.Id = @c
-            WHERE p.Id = @vagaId`,
+          `UPDATE kart.reserva_grupo_piloto p
+              SET cliente_id = @c,
+                  inscricao_id = COALESCE(@insc::int, p.inscricao_id),
+                  cadastro_em = now(),
+                  nome = COALESCE(NULLIF(c.nome, ''), p.nome),
+                  telefone = COALESCE(NULLIF(c.telefone, ''), p.telefone)
+             FROM (SELECT 1) um LEFT JOIN kart.cliente c ON c.id = @c
+            WHERE p.id = @vagaId`,
           { c: clienteId, insc: inscricaoId, vagaId: vagaDestino.id },
         );
       } else {
-        const [ordemNova] = await run(`SELECT ISNULL(MAX(Ordem), 0) + 1 proxima FROM dbo.ReservaGrupoPiloto WHERE GrupoId = @ng`, { ng: novoGrupoId });
+        const [ordemNova] = await run(`SELECT coalesce(MAX(ordem), 0) + 1 proxima FROM kart.reserva_grupo_piloto WHERE grupo_id = @ng`, { ng: novoGrupoId });
         const proxima = Number(ordemNova.proxima);
         let finalInsc = inscricaoId;
         if (!finalInsc) {
@@ -1010,16 +1009,16 @@ export async function desvincularPilotoDoGrupo(
           finalInsc = insc;
         } else {
           await run(
-            `UPDATE dbo.Inscricao
-                SET ResponsavelId = @resp,
-                    Observacao = LEFT('Reserva em grupo ' + @cod + ' pelo painel web' + CASE WHEN Observacao IS NOT NULL AND Observacao <> '' THEN ' · ' + Observacao ELSE '' END, 400),
-                    AtualizadoEm = SYSDATETIME()
-              WHERE Id = @i`,
+            `UPDATE kart.inscricao
+                SET responsavel_id = @resp,
+                    observacao = LEFT('Reserva em grupo ' || @cod || ' pelo painel web' || CASE WHEN observacao IS NOT NULL AND observacao <> '' THEN ' · ' || observacao ELSE '' END, 400),
+                    atualizado_em = now()
+              WHERE id = @i`,
             { resp: ng.responsavelId, cod: ng.codigo, i: finalInsc },
           );
         }
         await novoPiloto(run, novoGrupoId, proxima, { nome: p.nome ?? '', telefone: p.telefone ?? '', menor: false }, finalInsc, false, clienteId);
-        await run(`UPDATE dbo.ReservaGrupoPiloto SET CadastroEm = SYSDATETIME() WHERE GrupoId = @ng AND Ordem = @o`, { ng: novoGrupoId, o: proxima });
+        await run(`UPDATE kart.reserva_grupo_piloto SET cadastro_em = now() WHERE grupo_id = @ng AND ordem = @o`, { ng: novoGrupoId, o: proxima });
       }
 
       log(`grupo ${grupoId}: piloto ${p.id} transferido para o grupo ${novoGrupoId} (${ng.codigo})`);
@@ -1074,10 +1073,10 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
 
   if (path === '/grupos' && method === 'GET') {
     const bat = url.searchParams.get('bateriaId');
-    if (bat) { send(200, await carregarGrupos(`g.BateriaId = @b AND g.Status = 'ativa'`, { b: int(bat, 'Bateria') })); return true; }
+    if (bat) { send(200, await carregarGrupos(`g.bateria_id = @b AND g.status = 'ativa'`, { b: int(bat, 'Bateria') })); return true; }
     const de = String(url.searchParams.get('de') ?? ''), ate = String(url.searchParams.get('ate') ?? '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(de) || !/^\d{4}-\d{2}-\d{2}$/.test(ate)) throw new HttpError(400, 'Informe o período.');
-    send(200, await carregarGrupos(`g.Status = 'ativa' AND b.Inicio >= @de AND b.Inicio < DATEADD(day, 1, @ate)`, { de, ate }));
+    send(200, await carregarGrupos(`g.status = 'ativa' AND b.inicio >= @de::date AND b.inicio < @ate::date + 1`, { de, ate }));
     return true;
   }
 
@@ -1085,17 +1084,17 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     // quem chegou/reservou sozinho na bateria e as vagas de grupo que aguardam cadastro: a recepção liga uma coisa à outra
     const b = int(url.searchParams.get('bateriaId'), 'Bateria');
     const grupos = await query<{ id: number; codigo: string; responsavel: string }>(
-      `SELECT g.Id id, g.Codigo codigo, r.Nome responsavel FROM dbo.ReservaGrupo g JOIN dbo.Cliente r ON r.Id = g.ResponsavelId WHERE g.BateriaId = @b AND g.Status = 'ativa'`, { b });
+      `SELECT g.id id, g.codigo codigo, r.nome responsavel FROM kart.reserva_grupo g JOIN kart.cliente r ON r.id = g.responsavel_id WHERE g.bateria_id = @b AND g.status = 'ativa'`, { b });
     const comVagas = [];
     for (const g of grupos) { const livres = await vagasAguardando(g.id); if (livres.length) comVagas.push({ ...g, vagas: livres.map((v) => ({ id: v.id, ordem: v.ordem, nome: v.nome })) }); }
     const candidatos = comVagas.length ? await query(
-      `SELECT i.Id inscricaoId, c.Id clienteId, c.Nome nome, i.Origem origem, i.Pago pago
-         FROM dbo.Inscricao i JOIN dbo.Cliente c ON c.Id = i.ClienteId
-        WHERE i.BateriaId = @b AND i.Status <> 'cancelada'
-          AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto p JOIN dbo.ReservaGrupo g ON g.Id = p.GrupoId AND g.Status = 'ativa' WHERE p.InscricaoId = i.Id)
-          AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto p JOIN dbo.ReservaGrupo g ON g.Id = p.GrupoId AND g.Status = 'ativa' WHERE p.ClienteId = c.Id AND g.BateriaId = @b)
-          AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupo g WHERE g.Status = 'ativa' AND g.BateriaId = @b AND g.ResponsavelId = c.Id)
-        ORDER BY c.Nome`, { b }) : [];
+      `SELECT i.id "inscricaoId", c.id "clienteId", c.nome nome, i.origem origem, i.pago pago
+         FROM kart.inscricao i JOIN kart.cliente c ON c.id = i.cliente_id
+        WHERE i.bateria_id = @b AND i.status <> 'cancelada'
+          AND NOT EXISTS (SELECT 1 FROM kart.reserva_grupo_piloto p JOIN kart.reserva_grupo g ON g.id = p.grupo_id AND g.status = 'ativa' WHERE p.inscricao_id = i.id)
+          AND NOT EXISTS (SELECT 1 FROM kart.reserva_grupo_piloto p JOIN kart.reserva_grupo g ON g.id = p.grupo_id AND g.status = 'ativa' WHERE p.cliente_id = c.id AND g.bateria_id = @b)
+          AND NOT EXISTS (SELECT 1 FROM kart.reserva_grupo g WHERE g.status = 'ativa' AND g.bateria_id = @b AND g.responsavel_id = c.id)
+        ORDER BY c.nome`, { b }) : [];
     send(200, { grupos: comVagas, candidatos });
     return true;
   }
@@ -1114,7 +1113,7 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     const modo = MODOS.find((x) => x === b.modo) ?? 'individual';
     const origem = ORIGENS.find((x) => x === b.origem) ?? 'recepcao';
     const bat = await one<{ preco: number | null; produtoId: number | null }>(
-      `SELECT p.PrecoCentavos preco, b.ProdutoId produtoId FROM dbo.Bateria b LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @id`, { id: bateriaId },
+      `SELECT p.preco_centavos preco, b.produto_id "produtoId" FROM kart.bateria b LEFT JOIN kart.produto p ON p.id = b.produto_id WHERE b.id = @id`, { id: bateriaId },
     );
     if (!bat) throw new HttpError(404, 'Bateria não encontrada.');
     const preco = b.precoCentavos != null && b.precoCentavos !== '' ? cents(b.precoCentavos, 'Preço por piloto') : Number(bat.preco) || 0;
@@ -1123,21 +1122,21 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     const obs = txt(b.observacao, 300);
     // as vagas: o mesmo caminho da Recepção (confere vaga, cliente bloqueado, bateria passada)
     const id = await tx(async (run) => {
-      const [aberta] = await run(`SELECT Status status, ReservaFechada fechada FROM dbo.Bateria WITH (UPDLOCK, HOLDLOCK) WHERE Id = @id`, { id: bateriaId });
+      const [aberta] = await run(`SELECT status status, reserva_fechada fechada FROM kart.bateria WHERE id = @id for update`, { id: bateriaId });
       if (!aberta || aberta.status !== 'aberta' || aberta.fechada) throw new HttpError(409, 'Abra a bateria antes de criar outro grupo.');
       const insc = await inscreverN(bateriaId, responsavelId, pilotos.length, origem === 'site' ? 'site' : 'recepcao', sessao.uid, `Reserva em grupo pelo painel web${obs ? ` · ${obs}` : ''}`.slice(0, 400), false, { produtoId: bat.produtoId, vagaDoGrupo: true, run });
         const [g] = await run(
-          `INSERT INTO dbo.ReservaGrupo (Codigo, BateriaId, ResponsavelId, Origem, Modo, PrecoCentavos, SinalPct, Observacao, CriadoPor, Aniversario, PrecoAniversarianteCentavos)
-           OUTPUT inserted.Id id VALUES (@codigo, @b, @r, @o, @m, @preco, @sinal, @obs, @u, @aniv, @precoAniv)`,
+          `INSERT INTO kart.reserva_grupo (codigo, bateria_id, responsavel_id, origem, modo, preco_centavos, sinal_pct, observacao, criado_por, aniversario, preco_aniversariante_centavos)
+            VALUES (@codigo, @b, @r, @o, @m, @preco, @sinal, @obs, @u, @aniv, @precoAniv) returning id id`,
           { codigo: codigoNovo(), b: bateriaId, r: responsavelId, o: origem, m: modo, preco, sinal: sinalPct, obs, u: sessao.uid, ...aniversarioDe(b) },
         );
         for (let k = 0; k < pilotos.length; k++) await novoPiloto(run, Number(g.id), k + 1, pilotos[k], insc[k], k === 0, k === 0 ? responsavelId : null);
         // cada amigo é uma pessoa: a vaga nasce com cadastro provisório próprio, não no nome do responsável
         for (let k = 1; k < pilotos.length; k++) {
           const cid = await cadastroDaVaga(run, responsavelId, k + 1, txt(pilotos[k].nome, 120) ?? null, fone(pilotos[k].telefone) ?? null);
-          await run(`UPDATE dbo.Inscricao SET ClienteId = @c WHERE Id = @i`, { c: cid, i: insc[k] });
+          await run(`UPDATE kart.inscricao SET cliente_id = @c WHERE id = @i`, { c: cid, i: insc[k] });
         }
-        await run(`UPDATE dbo.Inscricao SET PrecoCentavos = @preco WHERE Id IN (${insc.map(Number).join(',')})`, { preco });
+        await run(`UPDATE kart.inscricao SET preco_centavos = @preco WHERE id IN (${insc.map(Number).join(',')})`, { preco });
         return Number(g.id);
     });
     await aplicarPagos(id);
@@ -1175,25 +1174,25 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
       const preco = b.precoCentavos != null ? cents(b.precoCentavos, 'Preço por piloto') : Number(atual.preco);
       const sinal = b.sinalPct != null ? Math.max(0, Math.min(100, Math.round(Number(b.sinalPct)) || 0)) : Number(atual.sinalPct);
       await tx(async (run) => {
-        const [vigente] = await run(`SELECT PrecoCentavos preco, Modo modo FROM dbo.ReservaGrupo WITH (UPDLOCK, HOLDLOCK) WHERE Id = @id AND Status = 'ativa'`, { id });
+        const [vigente] = await run(`SELECT preco_centavos preco, modo modo FROM kart.reserva_grupo WHERE id = @id AND status = 'ativa' for update`, { id });
         if (!vigente) throw new HttpError(409, 'Esta reserva não está ativa.');
         if (preco !== Number(vigente.preco) || modo !== vigente.modo) {
           const [financeiro] = await run(`SELECT
-            (SELECT COUNT(*) FROM dbo.ReservaGrupoPagamento WHERE GrupoId = @id AND Cancelado = 0) pagamentos,
-            (SELECT COUNT(*) FROM dbo.ReservaGrupoCobranca WHERE GrupoId = @id AND Status IN ('aguardando', 'pago')) cobrancas,
-            (SELECT COUNT(*) FROM dbo.ReservaGrupoPiloto p JOIN dbo.Inscricao i ON i.Id = p.InscricaoId WHERE p.GrupoId = @id AND i.Pago = 1 AND i.Status <> 'cancelada') pagos`, { id });
+            (SELECT COUNT(*) FROM kart.reserva_grupo_pagamento WHERE grupo_id = @id AND cancelado = false) pagamentos,
+            (SELECT COUNT(*) FROM kart.reserva_grupo_cobranca WHERE grupo_id = @id AND status IN ('aguardando', 'pago')) cobrancas,
+            (SELECT COUNT(*) FROM kart.reserva_grupo_piloto p JOIN kart.inscricao i ON i.id = p.inscricao_id WHERE p.grupo_id = @id AND i.pago = true AND i.status <> 'cancelada') pagos`, { id });
           if (financeiro && (financeiro.pagamentos || financeiro.cobrancas || financeiro.pagos))
             throw new HttpError(409, 'Há pagamentos ou cobranças neste grupo. Resolva-os antes de alterar preço ou forma de divisão.');
         }
-        await run(`UPDATE dbo.ReservaGrupo SET Modo = @modo, PrecoCentavos = @preco, SinalPct = @sinal, Observacao = @obs, AtualizadoEm = SYSDATETIME() WHERE Id = @id`,
+        await run(`UPDATE kart.reserva_grupo SET modo = @modo, preco_centavos = @preco, sinal_pct = @sinal, observacao = @obs, atualizado_em = now() WHERE id = @id`,
           { id, modo, preco, sinal, obs: b.observacao !== undefined ? txt(b.observacao, 300) : atual.observacao ?? null });
         if (b.aniversario !== undefined || b.precoAniversarianteCentavos !== undefined) {
           const a = aniversarioDe({ aniversario: b.aniversario !== undefined ? b.aniversario : atual.aniversario, precoAniversarianteCentavos: b.precoAniversarianteCentavos ?? atual.promocao?.precoAniversariante });
-          await run(`UPDATE dbo.ReservaGrupo SET Aniversario = @aniv, PrecoAniversarianteCentavos = @precoAniv, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id, ...a });
+          await run(`UPDATE kart.reserva_grupo SET aniversario = @aniv, preco_aniversariante_centavos = @precoAniv, atualizado_em = now() WHERE id = @id`, { id, ...a });
         }
-        if (preco !== Number(vigente.preco)) await run(`UPDATE i SET PrecoCentavos = @preco, DescontoCentavos = 0, AtualizadoEm = SYSDATETIME()
-          FROM dbo.Inscricao i JOIN dbo.ReservaGrupoPiloto p ON p.InscricaoId = i.Id
-          WHERE p.GrupoId = @id AND i.Status <> 'cancelada' AND i.Pago = 0`, { id, preco });
+        if (preco !== Number(vigente.preco)) await run(`UPDATE kart.inscricao i SET preco_centavos = @preco, desconto_centavos = 0
+          FROM kart.reserva_grupo_piloto p
+          WHERE p.inscricao_id = i.id AND p.grupo_id = @id AND i.status <> 'cancelada' AND i.pago = false`, { id, preco });
       });
       await aplicarPagos(id);
       send(200, await grupo(id));
@@ -1202,9 +1201,9 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     if (method === 'DELETE') {
       await grupo(id);
       await tx(async (run) => {
-        await run(`SELECT Id FROM dbo.ReservaGrupo WITH (UPDLOCK, HOLDLOCK) WHERE Id = @id`, { id });
-        await run(`UPDATE dbo.Inscricao SET Status = 'cancelada', AtualizadoEm = SYSDATETIME() WHERE Id IN (SELECT InscricaoId FROM dbo.ReservaGrupoPiloto WHERE GrupoId = @id)`, { id });
-        await run(`UPDATE dbo.ReservaGrupo SET Status = 'cancelada', AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id });
+        await run(`SELECT id "Id" FROM kart.reserva_grupo WHERE id = @id for update`, { id });
+        await run(`UPDATE kart.inscricao SET status = 'cancelada', atualizado_em = now() WHERE id IN (SELECT inscricao_id "InscricaoId" FROM kart.reserva_grupo_piloto WHERE grupo_id = @id)`, { id });
+        await run(`UPDATE kart.reserva_grupo SET status = 'cancelada', atualizado_em = now() WHERE id = @id`, { id });
       });
       send(200, { ok: true });
       return true;
@@ -1216,14 +1215,14 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     const g = await grupo(id);
     const p = (await req.body()) as PilotoIn;
     await tx(async (run) => {
-      const [atual] = await run(`SELECT Id, BateriaId bateriaId, PrecoCentavos preco FROM dbo.ReservaGrupo WITH (UPDLOCK, HOLDLOCK) WHERE Id = @id AND Status = 'ativa'`, { id });
+      const [atual] = await run(`SELECT id "Id", bateria_id "bateriaId", preco_centavos preco FROM kart.reserva_grupo WHERE id = @id AND status = 'ativa' for update`, { id });
       if (!atual) throw new HttpError(409, 'Esta reserva não está ativa.');
-      const [ordem] = await run(`SELECT ISNULL(MAX(Ordem), 0) + 1 proxima FROM dbo.ReservaGrupoPiloto WHERE GrupoId = @id`, { id });
+      const [ordem] = await run(`SELECT coalesce(MAX(ordem), 0) + 1 proxima FROM kart.reserva_grupo_piloto WHERE grupo_id = @id`, { id });
       const proxima = Number(ordem.proxima);
       const [insc] = await inscreverN(Number(atual.bateriaId), Number(g.responsavelId), 1, 'recepcao', sessao.uid, `Reserva em grupo ${g.codigo} pelo painel web`, false, { vagaDoGrupo: true, run });
       await novoPiloto(run, id, proxima, p, insc, false, null);
       const cid = await cadastroDaVaga(run, Number(g.responsavelId), proxima, txt(p.nome, 120) ?? null, fone(p.telefone) ?? null);
-      await run(`UPDATE dbo.Inscricao SET ClienteId = @c, ResponsavelId = @r, PrecoCentavos = @p WHERE Id = @i`, { c: cid, r: g.responsavelId, p: atual.preco, i: insc });
+      await run(`UPDATE kart.inscricao SET cliente_id = @c, responsavel_id = @r, preco_centavos = @p WHERE id = @i`, { c: cid, r: g.responsavelId, p: atual.preco, i: insc });
     });
     await aplicarPagos(id);
     send(201, await grupo(id));
@@ -1234,18 +1233,18 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     const id = Number(m[1]), pid = Number(m[2]);
     const g = await grupo(id);
     const p = g.pilotos.find((x) => x.id === pid);
-    if (!p && method === 'DELETE' && await one(`SELECT p.Id FROM dbo.ReservaGrupoPiloto p JOIN dbo.Inscricao i ON i.Id = p.InscricaoId WHERE p.Id = @pid AND p.GrupoId = @id AND i.Status = 'cancelada'`, { pid, id })) {
+    if (!p && method === 'DELETE' && await one(`SELECT p.id "Id" FROM kart.reserva_grupo_piloto p JOIN kart.inscricao i ON i.id = p.inscricao_id WHERE p.id = @pid AND p.grupo_id = @id AND i.status = 'cancelada'`, { pid, id })) {
       send(200, g);
       return true;
     }
     if (!p) throw new HttpError(404, 'Piloto não encontrado no grupo.');
     if (method === 'PUT') {
       const b = (await req.body()) as PilotoIn;
-      await query(`UPDATE dbo.ReservaGrupoPiloto SET Nome = @n, Telefone = @t, Menor = @m WHERE Id = @id`, { id: pid, n: txt(b.nome, 120), t: b.telefone === '' ? null : fone(b.telefone) ?? txt(b.telefone, 30), m: b.menor ? 1 : 0 });
+      await query(`UPDATE kart.reserva_grupo_piloto SET nome = @n, telefone = @t, menor = @m WHERE id = @id`, { id: pid, n: txt(b.nome, 120), t: b.telefone === '' ? null : fone(b.telefone) ?? txt(b.telefone, 30), m: b.menor ? 1 : 0 });
       if (!p.clienteId && p.inscricaoId) {
         await query(
-          `UPDATE c SET Nome = LEFT(COALESCE(NULLIF(LTRIM(RTRIM(@n)), ''), 'Amigo ' + CAST(@o AS varchar(5)) + ' de ' + r.Nome), 200), Telefone = COALESCE(@t, c.Telefone), AtualizadoEm = SYSDATETIME()
-             FROM dbo.Cliente c JOIN dbo.Inscricao i ON i.ClienteId = c.Id JOIN dbo.Cliente r ON r.Id = @r WHERE i.Id = @i AND c.Origem = 'grupo'`,
+          `UPDATE kart.cliente c SET nome = LEFT(COALESCE(NULLIF(trim(@n), ''), 'Amigo ' || (@o)::text || ' de ' || r.nome), 200), telefone = COALESCE(@t, c.telefone)
+             FROM kart.inscricao i, kart.cliente r WHERE i.cliente_id = c.id AND r.id = @r AND i.id = @i AND c.origem = 'grupo'`,
           { n: txt(b.nome, 120) ?? '', o: p.ordem, t: b.telefone === '' ? null : fone(b.telefone) ?? null, r: g.responsavelId, i: p.inscricaoId },
         ).catch(() => undefined);
       }
@@ -1289,7 +1288,7 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
       const pmap: Record<string, unknown> = { id };
       ids.forEach((pid: number, n: number) => { pmap[`pid${n}`] = pid; });
       const inClause = ids.map((_, n) => `@pid${n}`).join(',');
-      await query(`UPDATE dbo.ReservaGrupoPiloto SET LinkEnviadoEm = SYSDATETIME() WHERE GrupoId = @id AND Id IN (${inClause})`, pmap);
+      await query(`UPDATE kart.reserva_grupo_piloto SET link_enviado_em = now() WHERE grupo_id = @id AND id IN (${inClause})`, pmap);
     }
     send(200, await grupo(id));
     return true;
@@ -1317,10 +1316,10 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     if (isVoucher) {
       if (pilotoId) {
         const [row] = await query<{ clienteId: number | null; doc: string | null; inscricaoId: number | null }>(
-          `SELECT p.ClienteId clienteId, COALESCE(c.DocumentoNum, c.Documento) doc, p.InscricaoId inscricaoId
-           FROM dbo.ReservaGrupoPiloto p
-           LEFT JOIN dbo.Cliente c ON c.Id = p.ClienteId
-           WHERE p.Id = @pid`,
+          `SELECT p.cliente_id "clienteId", COALESCE(c.documento_num, c.documento) doc, p.inscricao_id "inscricaoId"
+           FROM kart.reserva_grupo_piloto p
+           LEFT JOIN kart.cliente c ON c.id = p.cliente_id
+           WHERE p.id = @pid`,
           { pid: pilotoId },
         );
         pilDb = row ?? null;
@@ -1336,7 +1335,10 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
         VigenciaOk?: number | boolean; InicioEm?: Date | string; FimEm?: Date | string;
         DescontoMaximoCentavos: number | null; PedidoMinimoCentavos: number | null;
         UsoUnico: boolean | number; UsoMaxTotal: number | null; UsoMaxCliente: number; RestritoClientes: boolean | number;
-      }>(`SELECT *, CASE WHEN CAST(SYSDATETIME() AS date) BETWEEN InicioEm AND FimEm THEN 1 ELSE 0 END AS VigenciaOk FROM dbo.Voucher WHERE Codigo = @c`, { c: codVch });
+      }>(`SELECT id "Id", codigo "Codigo", ativo "Ativo", parceiro_id "ParceiroId", fidelidade_conta_id "FidelidadeContaId", produto_id "ProdutoId", tipo "Tipo", valor "Valor",
+          inicio_em "InicioEm", fim_em "FimEm", desconto_maximo_centavos "DescontoMaximoCentavos", pedido_minimo_centavos "PedidoMinimoCentavos",
+          uso_unico "UsoUnico", uso_max_total "UsoMaxTotal", uso_max_cliente "UsoMaxCliente", restrito_clientes "RestritoClientes",
+          CASE WHEN current_date BETWEEN inicio_em AND fim_em THEN 1 ELSE 0 END AS "VigenciaOk" FROM kart.voucher WHERE upper(codigo) = upper(@c)`, { c: codVch });
       if (!v || !v.Ativo) throw new HttpError(400, 'Voucher não encontrado ou inativo.');
       if (v.VigenciaOk != null) {
         if (!Number(v.VigenciaOk)) throw new HttpError(400, 'Voucher expirado.');
@@ -1348,12 +1350,12 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
 
       const usosTotaisRow = await one<{ n: number; doCli: number }>(
         `SELECT
-          (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @vid AND Estornado = 0)
-          + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @vid AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
-          + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @vid AND Estado IN ('reservado', 'consumido')) n,
-          (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @vid AND ClienteId = @cid AND Estornado = 0)
-          + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @vid AND ClienteId = @cid AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
-          + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @vid AND ClienteId = @cid AND Estado IN ('reservado', 'consumido')) doCli`,
+          (SELECT COUNT(*) FROM kart.voucher_uso WHERE voucher_id = @vid AND estornado = false)
+          + (SELECT COUNT(*) FROM kart.reserva_online_voucher_uso WHERE voucher_id = @vid AND estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+          + (SELECT COUNT(*) FROM kart.reserva_grupo_voucher_uso WHERE voucher_id = @vid AND estado IN ('reservado', 'consumido')) n,
+          (SELECT COUNT(*) FROM kart.voucher_uso WHERE voucher_id = @vid AND cliente_id = @cid AND estornado = false)
+          + (SELECT COUNT(*) FROM kart.reserva_online_voucher_uso WHERE voucher_id = @vid AND cliente_id = @cid AND estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+          + (SELECT COUNT(*) FROM kart.reserva_grupo_voucher_uso WHERE voucher_id = @vid AND cliente_id = @cid AND estado IN ('reservado', 'consumido')) "doCli"`,
         { vid: v.Id, cid: pilDb?.clienteId ?? null },
       );
 
@@ -1379,27 +1381,27 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     }
 
     await tx(async (run) => {
-      const [ativo] = await run(`SELECT Id, ResponsavelId FROM dbo.ReservaGrupo WITH (UPDLOCK, HOLDLOCK) WHERE Id = @g AND Status = 'ativa'`, { g: id });
+      const [ativo] = await run(`SELECT id "Id", responsavel_id "ResponsavelId" FROM kart.reserva_grupo WHERE id = @g AND status = 'ativa' for update`, { g: id });
       if (!ativo) throw new HttpError(409, 'Esta reserva não está ativa.');
-      const [anterior] = await run(`SELECT PilotoId pilotoId, ValorCentavos valor, Forma forma, Cancelado cancelado FROM dbo.ReservaGrupoPagamento WHERE GrupoId = @g AND IdempotencyKey = @key`, { g: id, key });
+      const [anterior] = await run(`SELECT piloto_id "pilotoId", valor_centavos valor, forma forma, cancelado cancelado FROM kart.reserva_grupo_pagamento WHERE grupo_id = @g AND idempotency_key = @key`, { g: id, key });
       if (anterior) {
         if (anterior.cancelado || Number(anterior.valor) !== valor || (anterior.pilotoId ?? null) !== pilotoId || anterior.forma !== (isVoucher ? 'Voucher' : forma))
           throw new HttpError(409, 'Esta chave já pertence a outro recebimento.');
         return;
       }
       const aidVoucher = voucherAplicado ? ('vch_' + key).slice(0, 60) : null;
-      await run(`INSERT INTO dbo.ReservaGrupoPagamento (GrupoId, PilotoId, ValorCentavos, Forma, Origem, UsuarioId, IdempotencyKey, AsaasId)
+      await run(`INSERT INTO kart.reserva_grupo_pagamento (grupo_id, piloto_id, valor_centavos, forma, origem, usuario_id, idempotency_key, asaas_id)
         VALUES (@g, @p, @v, @f, 'manual', @u, @key, @aid)`, { g: id, p: pilotoId, v: valor, f: isVoucher ? 'Voucher' : forma, u: sessao.uid, key, aid: aidVoucher });
 
       if (voucherAplicado && aidVoucher) {
         const cidUso = pilDb?.clienteId ?? Number(ativo.ResponsavelId);
         await run(
-          `INSERT INTO dbo.ReservaGrupoVoucherUso (AsaasId, GrupoId, PilotoId, VoucherId, ClienteId, DescontoCentavos, Estado)
+          `INSERT INTO kart.reserva_grupo_voucher_uso (asaas_id, grupo_id, piloto_id, voucher_id, cliente_id, desconto_centavos, estado)
            VALUES (@aid, @g, @p, @vid, @cid, @d, 'consumido')`,
           { aid: aidVoucher, g: id, p: pilotoId, vid: voucherAplicado.id, cid: cidUso, d: voucherAplicado.descontoCentavos },
         );
         if (pilDb?.inscricaoId) {
-          await run(`UPDATE dbo.Inscricao SET VoucherId = @vid WHERE Id = @insId`, { vid: voucherAplicado.id, insId: pilDb.inscricaoId });
+          await run(`UPDATE kart.inscricao SET voucher_id = @vid WHERE id = @insId`, { vid: voucherAplicado.id, insId: pilDb.inscricaoId });
         }
       }
     });
@@ -1415,7 +1417,7 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     const pilotoId = b.pilotoId ? int(b.pilotoId, 'Piloto') : null;
     if (!pilotoId && g.modo === 'individual') throw new HttpError(400, 'Neste grupo cada um paga o seu: escolha a qual piloto vincular.');
     if (pilotoId && !g.pilotos.some((p) => p.id === pilotoId)) throw new HttpError(404, 'Piloto não encontrado no grupo.');
-    const r = await one<{ Id: number }>(`UPDATE dbo.ReservaGrupoPagamento SET PilotoId = @p OUTPUT inserted.Id WHERE Id = @pg AND GrupoId = @g AND Cancelado = 0`, { p: pilotoId, pg: pgId, g: id });
+    const r = await one<{ Id: number }>(`UPDATE kart.reserva_grupo_pagamento SET piloto_id = @p  WHERE id = @pg AND grupo_id = @g AND cancelado = false returning id`, { p: pilotoId, pg: pgId, g: id });
     if (!r) throw new HttpError(404, 'Pagamento não encontrado neste grupo.');
     await aplicarPagos(id);
     send(200, await grupo(id));
@@ -1424,12 +1426,12 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
 
   if ((m = path.match(/^\/grupos\/(\d+)\/pagamentos\/(\d+)$/)) && method === 'DELETE') {
     const id = Number(m[1]);
-    const r = await one<{ Id: number; AsaasId: string | null; PilotoId: number | null }>(`UPDATE dbo.ReservaGrupoPagamento SET Cancelado = 1 OUTPUT inserted.Id, inserted.AsaasId, inserted.PilotoId WHERE Id = @pg AND GrupoId = @g AND Cancelado = 0 AND Origem = 'manual'`, { pg: Number(m[2]), g: id });
+    const r = await one<{ Id: number; AsaasId: string | null; PilotoId: number | null }>(`UPDATE kart.reserva_grupo_pagamento SET cancelado = true  WHERE id = @pg AND grupo_id = @g AND cancelado = false AND origem = 'manual' returning id, asaas_id, piloto_id`, { pg: Number(m[2]), g: id });
     if (!r) throw new HttpError(409, 'Só dá para estornar aqui pagamento lançado à mão. Pagamento do Asaas se estorna no Asaas.');
     if (r.AsaasId && r.AsaasId.startsWith('vch_')) {
-      await query(`UPDATE dbo.ReservaGrupoVoucherUso SET Estado = 'liberado' WHERE AsaasId = @aid AND Estado IN ('reservado', 'consumido')`, { aid: r.AsaasId });
+      await query(`UPDATE kart.reserva_grupo_voucher_uso SET estado = 'liberado' WHERE asaas_id = @aid AND estado IN ('reservado', 'consumido')`, { aid: r.AsaasId });
       if (r.PilotoId) {
-        await query(`UPDATE dbo.Inscricao SET VoucherId = NULL WHERE Id = (SELECT InscricaoId FROM dbo.ReservaGrupoPiloto WHERE Id = @pid)`, { pid: r.PilotoId }).catch(() => undefined);
+        await query(`UPDATE kart.inscricao SET voucher_id = NULL WHERE id = (SELECT inscricao_id "InscricaoId" FROM kart.reserva_grupo_piloto WHERE id = @pid)`, { pid: r.PilotoId }).catch(() => undefined);
       }
     }
     await aplicarPagos(id);
@@ -1452,10 +1454,10 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
 export async function tipoDaBateria(bateriaId: number, tipo: string, anterior?: { status: string; reservaFechada: boolean; autoAtendimento: boolean }) {
   if (!['fechada', 'bloqueada', 'aberta'].includes(tipo)) throw new HttpError(400, 'Tipo inválido.');
   const estado = anterior ?? { status: 'aberta', reservaFechada: tipo === 'fechada', autoAtendimento: tipo === 'aberta' };
-  const rows = await query(`DECLARE @alteradas TABLE (Id int);
-    UPDATE dbo.Bateria SET Status = @status, ReservaFechada = @rf, AutoAtendimento = @aa
-    OUTPUT inserted.Id INTO @alteradas WHERE Id = @id AND Status <> 'cancelada';
-    SELECT Id id FROM @alteradas`,
+  const rows = await query(`DECLARE @alteradas TABLE (id int);
+    UPDATE kart.bateria SET status = @status, reserva_fechada = @rf, auto_atendimento = @aa
+     WHERE id = @id AND status <> 'cancelada';
+    SELECT id id FROM @alteradas returning id INTO @alteradas`,
     { id: bateriaId, status: estado.status, rf: estado.reservaFechada ? 1 : 0, aa: estado.autoAtendimento ? 1 : 0 });
   if (!rows.length) throw new HttpError(404, 'Bateria não encontrada ou cancelada.');
 }
@@ -1488,23 +1490,23 @@ export function resumoPainel(g: ReturnType<typeof montar>) {
 export async function publicarGruposNoSite(log: Log) {
   if (!siteUrl() || !siteChave()) return 0;
   const gs = await query<{ id: number; codigo: string; modo: string; preco: number; sinalPct: number; aniversario: boolean | number; precoAniv: number | null; status: string; bateria: string; inicio: string; responsavel: string; respDoc: string | null; respFone: string | null }>(
-    `SELECT g.Id id, g.Codigo codigo, g.Modo modo, g.PrecoCentavos preco, g.SinalPct sinalPct, g.Aniversario aniversario, g.PrecoAniversarianteCentavos precoAniv, g.Status status, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio, r.Nome responsavel,
-            r.Documento respDoc, r.Telefone respFone
-       FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente r ON r.Id = g.ResponsavelId
-      WHERE g.Status = 'ativa' AND b.Inicio > DATEADD(hour, -2, SYSDATETIME())`,
+    `SELECT g.id id, g.codigo codigo, g.modo modo, g.preco_centavos preco, g.sinal_pct "sinalPct", g.aniversario aniversario, g.preco_aniversariante_centavos "precoAniv", g.status status, b.nome bateria, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio, r.nome responsavel,
+            r.documento "respDoc", r.telefone "respFone"
+       FROM kart.reserva_grupo g JOIN kart.bateria b ON b.id = g.bateria_id JOIN kart.cliente r ON r.id = g.responsavel_id
+      WHERE g.status = 'ativa' AND b.inicio > (now() + make_interval(hours => (-2)::int))`,
   );
   if (!gs.length) return 0;
   const lista = gs.map((g) => g.id).join(',');
   const pagos = await query<{ grupoId: number; pago: number }>(
-    `SELECT GrupoId grupoId, SUM(ValorCentavos) pago FROM dbo.ReservaGrupoPagamento WHERE GrupoId IN (${lista}) AND Cancelado = 0 GROUP BY GrupoId`,
+    `SELECT grupo_id "grupoId", SUM(valor_centavos) pago FROM kart.reserva_grupo_pagamento WHERE grupo_id IN (${lista}) AND cancelado = false GROUP BY grupo_id`,
   );
   const vagas = await query<{ grupoId: number; token: string; livre: number; responsavel: number }>(
-    `SELECT v.GrupoId grupoId, v.Token token, v.Responsavel responsavel, CASE WHEN v.ClienteId IS NULL AND v.Responsavel = 0 AND i.Id IS NOT NULL THEN 1 ELSE 0 END livre
-       FROM dbo.ReservaGrupoPiloto v LEFT JOIN dbo.Inscricao i ON i.Id = v.InscricaoId AND i.Status <> 'cancelada'
-      WHERE v.GrupoId IN (${lista}) AND (v.Responsavel = 1 OR i.Id IS NOT NULL)`,
+    `SELECT v.grupo_id "grupoId", v.token token, v.responsavel responsavel, CASE WHEN v.cliente_id IS NULL AND v.responsavel = false AND i.id IS NOT NULL THEN 1 ELSE 0 END livre
+       FROM kart.reserva_grupo_piloto v LEFT JOIN kart.inscricao i ON i.id = v.inscricao_id AND i.status <> 'cancelada'
+      WHERE v.grupo_id IN (${lista}) AND (v.responsavel = true OR i.id IS NOT NULL)`,
   );
   // status por vaga para o painel do organizador (só primeiro nome; o painel só abre com a chave)
-  const completos = await carregarGrupos(`g.Id IN (${lista})`, {}).catch(() => []);
+  const completos = await carregarGrupos(`g.id IN (${lista})`, {}).catch(() => []);
   const grupos = gs.map((g) => {
     const dele = vagas.filter((v) => v.grupoId === g.id);
     const c = completos.find((x) => Number(x.id) === g.id);
@@ -1539,25 +1541,25 @@ type AcaoPainel = { key: string; codigo: string; acao: string; ordem: number; em
  */
 export async function liberarVagaPeloOrganizador(codigo: string, ordem: number, log: Log, saiu?: { nome?: string; email?: string | null; responsavel?: string; bateria?: string; inicio?: string }): Promise<string | null> {
   return await tx(async (run) => {
-    const [g] = await run(`SELECT g.Id id, g.ResponsavelId responsavelId, g.Modo modo, b.Inicio inicio, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicioIso,
-      (SELECT Nome FROM dbo.Cliente WHERE Id = g.ResponsavelId) responsavelNome, CASE WHEN b.Inicio < DATEADD(hour, 1, SYSDATETIME()) THEN 1 ELSE 0 END perto
-      FROM dbo.ReservaGrupo g WITH (UPDLOCK, HOLDLOCK) JOIN dbo.Bateria b ON b.Id = g.BateriaId WHERE g.Codigo = @c AND g.Status = 'ativa'`, { c: codigo });
+    const [g] = await run(`SELECT g.id id, g.responsavel_id "responsavelId", g.modo modo, b.inicio inicio, b.nome bateria, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') "inicioIso",
+      (SELECT nome FROM kart.cliente WHERE id = g.responsavel_id) "responsavelNome", CASE WHEN b.inicio < (now() + make_interval(hours => (1)::int)) THEN 1 ELSE 0 END perto
+      FROM kart.reserva_grupo g JOIN kart.bateria b ON b.id = g.bateria_id WHERE g.codigo = @c AND g.status = 'ativa' for update of g`, { c: codigo });
     if (!g) return 'grupo não encontrado';
     if (Number(g.perto)) return 'bateria começa em menos de 1 hora';
-    const [p] = await run(`SELECT p.Id id, p.Responsavel responsavel, p.ClienteId clienteId, p.InscricaoId inscricaoId, i.Pago pago, p.PagoPeloGrupo pagoPeloGrupo, i.TermoImpressoEm termo, i.Kart kart
-      FROM dbo.ReservaGrupoPiloto p WITH (UPDLOCK, HOLDLOCK) LEFT JOIN dbo.Inscricao i ON i.Id = p.InscricaoId
-      WHERE p.GrupoId = @g AND p.Ordem = @o AND (i.Id IS NULL OR i.Status <> 'cancelada')`, { g: g.id, o: ordem });
+    const [p] = await run(`SELECT p.id id, p.responsavel responsavel, p.cliente_id "clienteId", p.inscricao_id "inscricaoId", i.pago pago, p.pago_pelo_grupo "pagoPeloGrupo", i.termo_impresso_em termo, i.kart kart
+      FROM kart.reserva_grupo_piloto p LEFT JOIN kart.inscricao i ON i.id = p.inscricao_id
+      WHERE p.grupo_id = @g AND p.ordem = @o AND (i.id IS NULL OR i.status <> 'cancelada') for update of p`, { g: g.id, o: ordem });
     if (!p) return 'vaga não encontrada';
     if (p.responsavel) return 'vaga do responsável';
     if (p.termo || p.kart) return 'piloto já passou pela recepção';
     // cada um paga o seu: vaga paga é dinheiro da pessoa (reembolso/troca na recepção); nos outros modos o pagamento é do grupo
     if (g.modo === 'individual' && p.pago) return 'vaga já paga pela pessoa (reembolso é com a recepção)';
-    const [cli] = p.clienteId ? await run(`SELECT Origem origem, Documento documento, Nome nome, Email email FROM dbo.Cliente WHERE Id = @c`, { c: p.clienteId }) : [];
+    const [cli] = p.clienteId ? await run(`SELECT origem origem, documento documento, nome nome, email email FROM kart.cliente WHERE id = @c`, { c: p.clienteId }) : [];
     if (!p.clienteId || (cli && cli.origem === 'grupo' && !cli.documento)) return null; // já estava aberta
     const prov = await cadastroDaVaga(run, Number(g.responsavelId), ordem, null, null);
-    if (p.inscricaoId) await run(`UPDATE dbo.Inscricao SET ClienteId = @c, AtualizadoEm = SYSDATETIME() WHERE Id = @i`, { c: prov, i: p.inscricaoId });
+    if (p.inscricaoId) await run(`UPDATE kart.inscricao SET cliente_id = @c, atualizado_em = now() WHERE id = @i`, { c: prov, i: p.inscricaoId });
     // igual às vagas ainda não ocupadas: o grupo não aponta para ninguém e a inscrição fica no cadastro provisório "Amigo N"
-    await run(`UPDATE dbo.ReservaGrupoPiloto SET ClienteId = NULL, Nome = NULL, Telefone = NULL, CadastroEm = NULL, LinkEnviadoEm = NULL WHERE Id = @p`, { p: p.id });
+    await run(`UPDATE kart.reserva_grupo_piloto SET cliente_id = NULL, nome = NULL, telefone = NULL, cadastro_em = NULL, link_enviado_em = NULL WHERE id = @p`, { p: p.id });
     log(`grupo ${g.id}: organizador liberou a vaga ${ordem} pelo painel (cliente ${p.clienteId} saiu)`);
     if (saiu && cli) Object.assign(saiu, { nome: String(cli.nome ?? ''), email: cli.email ?? null, responsavel: String(g.responsavelNome ?? ''), bateria: String(g.bateria ?? ''), inicio: String(g.inicioIso ?? '') });
     return null;
@@ -1592,8 +1594,8 @@ export async function registrarCobrancaDoLink(token: string, clienteId: number, 
   const asaasId = String(cob.id ?? '');
   if (!/^pay_[A-Za-z0-9_]{6,45}$/.test(asaasId)) return false;
   const vaga = await one<{ id: number; grupoId: number; inscricaoId: number | null }>(
-    `SELECT TOP 1 v.Id id, v.GrupoId grupoId, v.InscricaoId inscricaoId FROM dbo.ReservaGrupoPiloto t JOIN dbo.ReservaGrupoPiloto v ON v.GrupoId = t.GrupoId
-      WHERE t.Token = @token AND v.ClienteId = @c ORDER BY v.Responsavel, v.Ordem`,
+    `SELECT v.id id, v.grupo_id "grupoId", v.inscricao_id "inscricaoId" FROM kart.reserva_grupo_piloto t JOIN kart.reserva_grupo_piloto v ON v.grupo_id = t.grupo_id
+      WHERE t.token = @token AND v.cliente_id = @c ORDER BY v.responsavel, v.ordem limit 1`,
     { token, c: clienteId },
   );
   if (!vaga) { log(`grupo: cobrança ${asaasId} do link sem vaga para o cliente ${clienteId} (conferir na recepção)`); return false; }
@@ -1602,29 +1604,29 @@ export async function registrarCobrancaDoLink(token: string, clienteId: number, 
   const cupom = (cob as { cupom?: { codigo?: unknown } }).cupom;
   const pagoPorVoucher = valorCob === 0 && Boolean(cob.pago) && Boolean(cupom?.codigo);
   if (cupom && /^[A-Z0-9_-]{1,40}$/.test(String(cupom.codigo ?? ''))) {
-    const cli = await one<{ documento: string | null }>(`SELECT Documento documento FROM dbo.Cliente WHERE Id = @c`, { c: clienteId });
+    const cli = await one<{ documento: string | null }>(`SELECT documento documento FROM kart.cliente WHERE id = @c`, { c: clienteId });
     const vale = await reservarCupomDoLink({
       asaasId, grupoId: vaga.grupoId, pilotoId: vaga.id, clienteId,
       documento: onlyDigits(cli?.documento), codigo: String(cupom.codigo),
       valorCobrado: valorCob, consumido: pagoPorVoucher,
     }, log);
-    if (vale !== null && vale > 0) await query(`UPDATE dbo.ReservaGrupoPiloto SET PrecoCentavos = @v WHERE Id = @p`, { v: vale, p: vaga.id });
+    if (vale !== null && vale > 0) await query(`UPDATE kart.reserva_grupo_piloto SET preco_centavos = @v WHERE id = @p`, { v: vale, p: vaga.id });
     if (vale !== null && pagoPorVoucher) {
       const uso = await one<{ VoucherId: number; DescontoCentavos: number }>(
-        `SELECT VoucherId, DescontoCentavos FROM dbo.ReservaGrupoVoucherUso WHERE AsaasId = @a`,
+        `SELECT voucher_id "VoucherId", desconto_centavos "DescontoCentavos" FROM kart.reserva_grupo_voucher_uso WHERE asaas_id = @a`,
         { a: asaasId },
       );
       if (uso) {
-        const jaPg = await one<{ Id: number }>(`SELECT Id FROM dbo.ReservaGrupoPagamento WHERE AsaasId = @a AND Cancelado = 0`, { a: asaasId });
+        const jaPg = await one<{ Id: number }>(`SELECT id "Id" FROM kart.reserva_grupo_pagamento WHERE asaas_id = @a AND cancelado = false`, { a: asaasId });
         if (!jaPg) {
           await query(
-            `INSERT INTO dbo.ReservaGrupoPagamento (GrupoId, PilotoId, ValorCentavos, Forma, Origem, AsaasId)
+            `INSERT INTO kart.reserva_grupo_pagamento (grupo_id, piloto_id, valor_centavos, forma, origem, asaas_id)
              VALUES (@g, @p, @v, 'Voucher', 'voucher', @a)`,
             { g: vaga.grupoId, p: vaga.id, v: uso.DescontoCentavos, a: asaasId },
           );
         }
         if (vaga.inscricaoId) {
-          await query(`UPDATE dbo.Inscricao SET VoucherId = @vid WHERE Id = @insId`, { vid: uso.VoucherId, insId: vaga.inscricaoId }).catch(() => undefined);
+          await query(`UPDATE kart.inscricao SET voucher_id = @vid WHERE id = @insId`, { vid: uso.VoucherId, insId: vaga.inscricaoId }).catch(() => undefined);
         }
         await aplicarPagos(vaga.grupoId);
         log(`grupo ${vaga.grupoId}: vaga do piloto ${vaga.id} quitada pelo voucher ${String(cupom.codigo)} (${asaasId})`);
@@ -1633,12 +1635,12 @@ export async function registrarCobrancaDoLink(token: string, clienteId: number, 
     }
   } else if (valorCob > 0) {
     const pv = await precoPrimeiraVezDoGrupo(vaga.grupoId);
-    if (pv && valorCob === pv) await query(`UPDATE dbo.ReservaGrupoPiloto SET PrecoCentavos = @v WHERE Id = @p AND PrecoCentavos IS NULL`, { v: pv, p: vaga.id });
+    if (pv && valorCob === pv) await query(`UPDATE kart.reserva_grupo_piloto SET preco_centavos = @v WHERE id = @p AND preco_centavos IS NULL`, { v: pv, p: vaga.id });
   }
-  if (await one(`SELECT 1 x FROM dbo.ReservaGrupoCobranca WHERE AsaasId = @a`, { a: asaasId })) return true;
-  await query(`UPDATE dbo.ReservaGrupoCobranca SET Status = 'cancelada' WHERE PilotoId = @p AND Status = 'aguardando'`, { p: vaga.id });
+  if (await one(`SELECT 1 x FROM kart.reserva_grupo_cobranca WHERE asaas_id = @a`, { a: asaasId })) return true;
+  await query(`UPDATE kart.reserva_grupo_cobranca SET status = 'cancelada' WHERE piloto_id = @p AND status = 'aguardando'`, { p: vaga.id });
   await query(
-    `INSERT INTO dbo.ReservaGrupoCobranca (GrupoId, PilotoId, ValorCentavos, AsaasId, Link) VALUES (@g, @p, @v, @a, @l)`,
+    `INSERT INTO kart.reserva_grupo_cobranca (grupo_id, piloto_id, valor_centavos, asaas_id, link) VALUES (@g, @p, @v, @a, @l)`,
     { g: vaga.grupoId, p: vaga.id, v: Math.round(Number(cob.valorCentavos) || 0), a: asaasId, l: String(cob.link ?? '').slice(0, 400) },
   );
   log(`grupo ${vaga.grupoId}: cobrança ${asaasId} do link ligada ao piloto ${vaga.id} (cliente ${clienteId})`);
@@ -1660,20 +1662,20 @@ export async function grupoDaReservaOnline(o: {
   codigoReserva: string; bateriaId: number; responsavelId: number; inscricoes: number[]; compradorPilota: boolean; precoCentavos: number; valorPagoCentavos: number;
 }, log: Log): Promise<{ codigo: string; link: string; painel: string }> {
   const marca = marcaDoSite(o.codigoReserva);
-  let id = Number((await one<{ id: number }>(`SELECT TOP 1 Id id FROM dbo.ReservaGrupo WHERE Origem = 'site' AND Observacao LIKE @m ORDER BY Id`, { m: `${marca}%` }))?.id ?? 0);
+  let id = Number((await one<{ id: number }>(`SELECT id id FROM kart.reserva_grupo WHERE origem = 'site' AND observacao LIKE @m ORDER BY id limit 1`, { m: `${marca}%` }))?.id ?? 0);
   if (!id) {
     const obs = o.compradorPilota
       ? `${marca} · cada um paga o seu`
       : `${marca} · cada um paga o seu · garantia de R$ ${(o.valorPagoCentavos / 100).toFixed(2).replace('.', ',')} paga online por quem organiza (abater de quem faltar ou devolver pela política)`;
     id = await tx(async (run) => {
       const [g] = await run(
-        `INSERT INTO dbo.ReservaGrupo (Codigo, BateriaId, ResponsavelId, Origem, Modo, PrecoCentavos, SinalPct, Observacao, CriadoPor)
-         OUTPUT inserted.Id id VALUES (@codigo, @b, @r, 'site', 'individual', @preco, 0, @obs, NULL)`,
+        `INSERT INTO kart.reserva_grupo (codigo, bateria_id, responsavel_id, origem, modo, preco_centavos, sinal_pct, observacao, criado_por)
+          VALUES (@codigo, @b, @r, 'site', 'individual', @preco, 0, @obs, NULL) returning id id`,
         { codigo: codigoNovo(), b: o.bateriaId, r: o.responsavelId, preco: o.precoCentavos, obs },
       );
       const gid = Number(g.id);
       const inserir = (ordem: number, responsavel: boolean, clienteId: number | null, inscricaoId: number | null) => run(
-        `INSERT INTO dbo.ReservaGrupoPiloto (GrupoId, Ordem, Nome, Telefone, Menor, Responsavel, ClienteId, InscricaoId, Token)
+        `INSERT INTO kart.reserva_grupo_piloto (grupo_id, ordem, nome, telefone, menor, responsavel, cliente_id, inscricao_id, token)
          VALUES (@g, @o, NULL, NULL, 0, @r, @c, @i, @k)`,
         { g: gid, o: ordem, r: responsavel ? 1 : 0, c: clienteId, i: inscricaoId, k: tokenNovo() },
       );
@@ -1684,7 +1686,7 @@ export async function grupoDaReservaOnline(o: {
         const ordem = k + 2;
         await inserir(ordem, false, null, insc);
         const prov = await cadastroDaVaga(run, o.responsavelId, ordem, null, null);
-        await run(`UPDATE dbo.Inscricao SET ClienteId = @c, PrecoCentavos = @preco, AtualizadoEm = SYSDATETIME() WHERE Id = @i`, { c: prov, i: insc, preco: o.precoCentavos });
+        await run(`UPDATE kart.inscricao SET cliente_id = @c, preco_centavos = @preco, atualizado_em = now() WHERE id = @i`, { c: prov, i: insc, preco: o.precoCentavos });
       }
       return gid;
     });
@@ -1693,7 +1695,7 @@ export async function grupoDaReservaOnline(o: {
     ultimoResumoSite = '';
   }
   const g = await one<{ codigo: string; token: string }>(
-    `SELECT g.Codigo codigo, p.Token token FROM dbo.ReservaGrupo g JOIN dbo.ReservaGrupoPiloto p ON p.GrupoId = g.Id AND p.Responsavel = 1 WHERE g.Id = @id`, { id });
+    `SELECT g.codigo codigo, p.token token FROM kart.reserva_grupo g JOIN kart.reserva_grupo_piloto p ON p.grupo_id = g.id AND p.responsavel = true WHERE g.id = @id`, { id });
   if (!g) throw new HttpError(500, 'Grupo do site sem responsável.');
   return { codigo: g.codigo, link: linkCadastro(g.token), painel: linkPainel(g.codigo) };
 }
@@ -1705,19 +1707,19 @@ export async function grupoDaReservaOnline(o: {
  */
 export async function soltarVagasNaoPagasDoSite(log: Log) {
   const vagas = await query<{ grupoId: number; pilotoId: number; inscricaoId: number; ordem: number; codigo: string }>(
-    `SELECT g.Id grupoId, p.Id pilotoId, p.InscricaoId inscricaoId, p.Ordem ordem, g.Codigo codigo
-       FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId
-       JOIN dbo.ReservaGrupoPiloto p ON p.GrupoId = g.Id AND p.Responsavel = 0
-       JOIN dbo.Inscricao i ON i.Id = p.InscricaoId
-      WHERE g.Origem = 'site' AND g.Modo = 'individual' AND g.Status = 'ativa'
-        AND b.Inicio > SYSDATETIME() AND b.Inicio <= DATEADD(hour, 24, SYSDATETIME())
-        AND i.Status <> 'cancelada' AND i.Pago = 0 AND i.VendaId IS NULL AND i.TermoImpressoEm IS NULL AND i.Kart IS NULL`,
+    `SELECT g.id "grupoId", p.id "pilotoId", p.inscricao_id "inscricaoId", p.ordem ordem, g.codigo codigo
+       FROM kart.reserva_grupo g JOIN kart.bateria b ON b.id = g.bateria_id
+       JOIN kart.reserva_grupo_piloto p ON p.grupo_id = g.id AND p.responsavel = false
+       JOIN kart.inscricao i ON i.id = p.inscricao_id
+      WHERE g.origem = 'site' AND g.modo = 'individual' AND g.status = 'ativa'
+        AND b.inicio > now() AND b.inicio <= (now() + make_interval(hours => (24)::int))
+        AND i.status <> 'cancelada' AND i.pago = false AND i.venda_id IS NULL AND i.termo_impresso_em IS NULL AND i.kart IS NULL`,
   );
   const soltasPorGrupo = new Map<number, number>();
   for (const v of vagas) {
     const feito = await one<{ Id: number }>(
-      `UPDATE dbo.Inscricao SET Status = 'cancelada', AtualizadoEm = SYSDATETIME() OUTPUT inserted.Id
-        WHERE Id = @i AND Pago = 0 AND Status <> 'cancelada' AND VendaId IS NULL`, { i: v.inscricaoId });
+      `UPDATE kart.inscricao SET status = 'cancelada', atualizado_em = now() 
+        WHERE id = @i AND pago = false AND status <> 'cancelada' AND venda_id IS NULL returning id`, { i: v.inscricaoId });
     if (feito) {
       log(`grupo ${v.grupoId} (${v.codigo}): vaga ${v.ordem} sem pagamento a 24h da bateria voltou para venda`);
       soltasPorGrupo.set(v.grupoId, (soltasPorGrupo.get(v.grupoId) ?? 0) + 1);
@@ -1728,8 +1730,8 @@ export async function soltarVagasNaoPagasDoSite(log: Log) {
   if (soltasPorGrupo.size && siteUrl() && siteChave()) {
     const ids = [...soltasPorGrupo.keys()].join(',');
     const orgs = await query<{ grupoId: number; codigo: string; nome: string; email: string | null; bateria: string; inicio: string }>(
-      `SELECT g.Id grupoId, g.Codigo codigo, r.Nome nome, r.Email email, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio
-         FROM dbo.ReservaGrupo g JOIN dbo.Cliente r ON r.Id = g.ResponsavelId JOIN dbo.Bateria b ON b.Id = g.BateriaId WHERE g.Id IN (${ids})`,
+      `SELECT g.id "grupoId", g.codigo codigo, r.nome nome, r.email email, b.nome bateria, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio
+         FROM kart.reserva_grupo g JOIN kart.cliente r ON r.id = g.responsavel_id JOIN kart.bateria b ON b.id = g.bateria_id WHERE g.id IN (${ids})`,
     );
     const lembretes = orgs.filter((o) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(o.email ?? ''))).map((o) => ({
       chave: `soltas-${o.grupoId}-${o.inicio.replace(/\D/g, '')}`, tipo: 'soltas', para: o.email, nome: o.nome, bateria: o.bateria, inicio: o.inicio,
@@ -1755,29 +1757,29 @@ let proximosLembretes = 0;
 export async function enviarLembretesDosGrupos(log: Log) {
   if (!siteUrl() || !siteChave() || Date.now() < proximosLembretes) return 0;
   proximosLembretes = Date.now() + 15 * 60_000;
-  const janela = `b.Inicio > DATEADD(hour, 2, SYSDATETIME()) AND b.Inicio <= DATEADD(hour, 48, SYSDATETIME())`;
+  const janela = `b.inicio > now() + interval '2 hours' AND b.inicio <= now() + interval '48 hours'`;
   const pagar = await query<{ grupoId: number; pilotoId: number; nome: string; email: string; bateria: string; inicio: string; preco: number; origem: string; responsavel: string; token: string; cobranca: string | null }>(
-    `SELECT g.Id grupoId, p.Id pilotoId, c.Nome nome, c.Email email, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio, g.PrecoCentavos preco, g.Origem origem,
-            r.Nome responsavel, rt.Token token, cob.Link cobranca
-       FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente r ON r.Id = g.ResponsavelId
-       JOIN dbo.ReservaGrupoPiloto p ON p.GrupoId = g.Id AND p.ClienteId IS NOT NULL
-       JOIN dbo.Cliente c ON c.Id = p.ClienteId
-       JOIN dbo.Inscricao i ON i.Id = p.InscricaoId
-       JOIN dbo.ReservaGrupoPiloto rt ON rt.GrupoId = g.Id AND rt.Responsavel = 1
-       OUTER APPLY (SELECT TOP 1 Link FROM dbo.ReservaGrupoCobranca WHERE PilotoId = p.Id AND Status = 'aguardando' ORDER BY Id DESC) cob
-      WHERE g.Status = 'ativa' AND g.Modo = 'individual' AND ${janela}
-        AND i.Status <> 'cancelada' AND i.Pago = 0 AND i.VendaId IS NULL AND c.Email LIKE '%_@_%._%'
+    `SELECT g.id "grupoId", p.id "pilotoId", c.nome nome, c.email email, b.nome bateria, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio, g.preco_centavos preco, g.origem origem,
+            r.nome responsavel, rt.token token, cob.link cobranca
+       FROM kart.reserva_grupo g JOIN kart.bateria b ON b.id = g.bateria_id JOIN kart.cliente r ON r.id = g.responsavel_id
+       JOIN kart.reserva_grupo_piloto p ON p.grupo_id = g.id AND p.cliente_id IS NOT NULL
+       JOIN kart.cliente c ON c.id = p.cliente_id
+       JOIN kart.inscricao i ON i.id = p.inscricao_id
+       JOIN kart.reserva_grupo_piloto rt ON rt.grupo_id = g.id AND rt.responsavel = true
+       LEFT JOIN LATERAL (SELECT link FROM kart.reserva_grupo_cobranca WHERE piloto_id = p.id AND status = 'aguardando' ORDER BY id DESC LIMIT 1) cob ON true
+      WHERE g.status = 'ativa' AND g.modo = 'individual' AND ${janela}
+        AND i.status <> 'cancelada' AND i.pago = false AND i.venda_id IS NULL AND c.email LIKE '%_@_%._%'
         -- só com a cobrança aberta: o link dela paga direto na Asaas (refazer o cadastro pelo link do grupo é ruim)
-        AND cob.Link LIKE 'https://%'`,
+        AND cob.link LIKE 'https://%'`,
   );
   const cadastros = await query<{ grupoId: number; codigo: string; nome: string; email: string; bateria: string; inicio: string; origem: string; modo: string; token: string; faltam: number }>(
-    `SELECT g.Id grupoId, g.Codigo codigo, r.Nome nome, r.Email email, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio, g.Origem origem, g.Modo modo, rt.Token token, COUNT(*) faltam
-       FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente r ON r.Id = g.ResponsavelId
-       JOIN dbo.ReservaGrupoPiloto rt ON rt.GrupoId = g.Id AND rt.Responsavel = 1
-       JOIN dbo.ReservaGrupoPiloto p ON p.GrupoId = g.Id AND p.Responsavel = 0 AND p.ClienteId IS NULL
-       JOIN dbo.Inscricao i ON i.Id = p.InscricaoId AND i.Status <> 'cancelada'
-      WHERE g.Status = 'ativa' AND ${janela} AND r.Email LIKE '%_@_%._%'
-      GROUP BY g.Id, g.Codigo, r.Nome, r.Email, b.Nome, b.Inicio, g.Origem, g.Modo, rt.Token`,
+    `SELECT g.id "grupoId", g.codigo codigo, r.nome nome, r.email email, b.nome bateria, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio, g.origem origem, g.modo modo, rt.token token, COUNT(*) faltam
+       FROM kart.reserva_grupo g JOIN kart.bateria b ON b.id = g.bateria_id JOIN kart.cliente r ON r.id = g.responsavel_id
+       JOIN kart.reserva_grupo_piloto rt ON rt.grupo_id = g.id AND rt.responsavel = true
+       JOIN kart.reserva_grupo_piloto p ON p.grupo_id = g.id AND p.responsavel = false AND p.cliente_id IS NULL
+       JOIN kart.inscricao i ON i.id = p.inscricao_id AND i.status <> 'cancelada'
+      WHERE g.status = 'ativa' AND ${janela} AND r.email LIKE '%_@_%._%'
+      GROUP BY g.id, g.codigo, r.nome, r.email, b.nome, b.inicio, g.origem, g.modo, rt.token`,
   );
   const lembretes = [
     ...pagar.map((x) => ({ chave: `pagar-${x.pilotoId}-${x.inicio.replace(/\D/g, '')}`, tipo: 'pagar', para: x.email, nome: x.nome, bateria: x.bateria, inicio: x.inicio,
