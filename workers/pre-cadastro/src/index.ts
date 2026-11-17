@@ -21,7 +21,7 @@ export { AoVivo } from './mobile/live';
 export { SinalVinculo } from './mobile/sinal-vinculo';
 import { esperarPedidoDeVinculo, pedirVinculo, type SinalVinculoEnv } from './mobile/sinal-vinculo';
 import { handleMobilePerfil, type MobilePerfilEnv } from './mobile/perfil';
-import { handleMobileRanking } from './mobile/ranking';
+import { fotoDoKartodromo, handleMobileRanking } from './mobile/ranking';
 import { handleMobileOutbox } from './mobile/outbox';
 
 export interface Env extends EnvReservas, BouncesEnv, MobileAccountAdminEnv, MobileResultsEnv, MobileLiveEnv, MobilePerfilEnv, SinalVinculoEnv {
@@ -556,6 +556,12 @@ export default {
           return json(200, { ok: true, removidos: validos.length });
         }
         if (p === '/api/sync/lembretes' && req.method === 'POST') return await lembretesSync(req, env);
+        // foto do cadastro espelhada no app (SRVKART manda quando a Recepção/CRM troca ou tira a foto do piloto)
+        {
+          const mf = /^\/api\/sync\/foto-app\/(\d{1,12})$/.exec(p);
+          if (mf && req.method === 'PUT') return await fotoDoKartodromo(env as never, mf[1], new Uint8Array(await req.arrayBuffer()));
+          if (mf && req.method === 'DELETE') return await fotoDoKartodromo(env as never, mf[1], null);
+        }
         if (p === '/api/sync/mobile/coupons' || p.startsWith('/api/sync/mobile/coupons/')) return await handleMobileCouponsSync(req, env);
         if (p === '/api/sync/pedidos' && req.method === 'GET') return await syncPedidos(env, ctx);
         if (p === '/api/sync/pedido' && req.method === 'POST') return await syncResultado(req, env, ctx);

@@ -99,4 +99,23 @@ describe('admin web: comprovantes de pagamento', () => {
     expect(tipoConfere('image/webp', new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]))).toBe(true);
     expect(tipoConfere('image/png', PDF)).toBe(false);
   });
+
+  it('anexos gerais: comprovante de patrocínio com valor e data, lista, abre, recente e remove', async () => {
+    const r = await chamar('anexos/patrocinio_cobranca/9b2f0c1e-1111-4a2b-9c3d-000000000001?nome=pix.pdf&categoria=comprovante&valor=150.5&pago_em=2026-11-17&forma=Pix&descricao=TESTE', 'POST', PDF);
+    expect(r.status).toBe(201);
+    const a = (await r.json()) as { id: number; entidade: string; valor: number; pagoEm: string; forma: string; categoria: string; enviadoPor: string };
+    expect(a).toMatchObject({ entidade: 'patrocinio_cobranca', valor: 150.5, pagoEm: '2026-11-17', forma: 'Pix', categoria: 'comprovante', enviadoPor: 'ATENDENTE TESTE' });
+    const lista = (await (await chamar('anexos/patrocinio_cobranca/9b2f0c1e-1111-4a2b-9c3d-000000000001')).json()) as { id: number }[];
+    expect(lista.map((x) => x.id)).toEqual([a.id]);
+    expect(((await (await chamar('anexos?desde=2000-01-01')).json()) as unknown[]).length).toBe(1);
+    const arq = await chamar(`anexo/${a.id}`);
+    expect(new Uint8Array(await arq.arrayBuffer())).toEqual(PDF);
+    expect((await chamar(`anexo/${a.id}`, 'DELETE')).status).toBe(200);
+    expect(await (await chamar('anexos/patrocinio_cobranca/9b2f0c1e-1111-4a2b-9c3d-000000000001')).json()).toEqual([]);
+  });
+
+  it('anexos gerais recusam tipo de registro desconhecido e arquivo que não é o que diz', async () => {
+    expect((await chamar('anexos/hackeado/1', 'POST', PDF)).status).toBe(400);
+    expect((await chamar('anexos/grupo/1', 'POST', PDF, 'image/png')).status).toBe(400);
+  });
 });

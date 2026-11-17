@@ -449,6 +449,29 @@ async function contaApp(id: number, acao: string, b: Record<string, unknown>, qu
   return { ...j, cliente } as Record<string, any>;
 }
 
+/**
+ * Foto do cadastro espelhada no app do piloto (Android/iOS): o app mostra fotos-app/<cliente>.jpg do servidor de cadastro.
+ * Não segura a resposta da Recepção: se o site não responder, só registra no log (a próxima troca de foto reenvia).
+ */
+export async function espelharFotoNoApp(clienteId: number, foto: Buffer | null, log: (...a: unknown[]) => void = console.log): Promise<boolean> {
+  const base = (process.env.PRECADASTRO_URL || '').replace(/\/+$/, '');
+  const chave = process.env.PRECADASTRO_KEY || '';
+  if (!base || !chave) return false;
+  try {
+    const r = await fetch(`${base}/api/sync/foto-app/${clienteId}`, {
+      method: foto ? 'PUT' : 'DELETE',
+      headers: { 'x-sync-key': chave, ...(foto ? { 'content-type': 'application/octet-stream' } : {}) },
+      body: foto ? new Uint8Array(foto) : undefined,
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) log(`foto do cliente ${clienteId}: o app recusou (${r.status})`);
+    return r.ok;
+  } catch (e) {
+    log(`foto do cliente ${clienteId}: o app não respondeu (${(e as Error).message})`);
+    return false;
+  }
+}
+
 export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
   const { method, url } = req;
   const path = url.pathname.replace(/^\/api\/office/, '');
@@ -617,10 +640,17 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
          on conflict (cliente_id) do update set foto = excluded.foto, miniatura = excluded.miniatura, tipo = excluded.tipo, atualizado_por = excluded.atualizado_por, atualizado_em = now()`,
         { id, foto: foto.buf, mini: mini.buf, tipo: foto.tipo, uid: req.sessao.uid },
       );
-      send(200, { ok: true });
+      // a foto veio do próprio app (CRM puxou a do app para o cadastro): não precisa voltar para lá
+      const noApp = b.origem === 'app' ? true : await espelharFotoNoApp(id, foto.buf);
+      send(200, { ok: true, noApp });
       return true;
     }
-    if (method === 'DELETE') { await query(`delete from kart.cliente_foto where cliente_id = @id`, { id }); send(200, { ok: true }); return true; }
+    if (method === 'DELETE') {
+      await query(`delete from kart.cliente_foto where cliente_id = @id`, { id });
+      const noApp = await espelharFotoNoApp(id, null);
+      send(200, { ok: true, noApp });
+      return true;
+    }
   }
 
   if (path === '/pilotos/miniaturas' && method === 'GET') {

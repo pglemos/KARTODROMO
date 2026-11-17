@@ -50,6 +50,23 @@ async function enviarFoto(request: Request, env: MobileRankingEnv, cliente: stri
   return json(200, { ok: true, versao: Date.now() });
 }
 
+/**
+ * Foto do cadastro (painel/CRM do kartódromo) espelhada no app: o SRVKART manda por /api/sync/foto-app/:cliente quando a
+ * Recepção troca ou tira a foto. `origem: kartodromo` marca que veio do cadastro (a volta app → cadastro ignora essa).
+ */
+export async function fotoDoKartodromo(env: { PRE?: R2Bucket }, cliente: string, bytes: Uint8Array | null): Promise<Response> {
+  if (!env.PRE) return json(503, { erro: 'Armazenamento indisponível.' });
+  if (!/^\d{1,12}$/.test(cliente)) return json(400, { erro: 'Cliente inválido.' });
+  if (bytes === null) {
+    await env.PRE.delete(fotoChave(cliente));
+    return json(200, { ok: true });
+  }
+  const detectado = tipoDaImagem(bytes);
+  if (bytes.length < 100 || bytes.length > FOTO_MAX || !detectado) return json(400, { erro: 'Arquivo de imagem inválido.' });
+  await env.PRE.put(fotoChave(cliente), bytes, { httpMetadata: { contentType: detectado }, customMetadata: { enviadaEm: new Date().toISOString(), origem: 'kartodromo' } });
+  return json(200, { ok: true });
+}
+
 async function lerFoto(env: MobileRankingEnv, cliente: string) {
   const obj = env.PRE ? await env.PRE.get(fotoChave(cliente)) : null;
   if (!obj) return new Response(null, { status: 404, headers: { 'cache-control': 'public, max-age=300' } });
