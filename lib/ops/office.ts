@@ -575,8 +575,19 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
 }
 export { inscreverN };
 
-/** O movimento completo do grupo usa uma única transação: nunca fica pela metade. */
-export async function moverReservas(ids: number[], destino: number, grupoId?: number) {
+export const MSG_SERVICO_DIFERENTE = 'Reserva paga só pode ser movida para bateria do mesmo serviço e tipo de kart. O produto e o valor já pagos são preservados.';
+
+/** Resultado do mover: quantas reservas pagas trocaram de serviço e quanto falta cobrar no caixa (só quando o novo é mais caro). */
+export interface ResultadoMover { trocasDeServico: number; diferencaCentavos: number }
+
+/**
+ * O movimento completo do grupo usa uma única transação: nunca fica pela metade.
+ * opcoes.trocarServico: a Recepção confirmou que a reserva PAGA vai para outro serviço (ex.: Happy Hour 15 min → Locação
+ * padrão). A reserva passa para o produto/preço da bateria nova, continua paga com o valor já pago, e a diferença fica
+ * anotada na observação para cobrar no caixa. O tipo de kart continua tendo de ser o mesmo.
+ */
+export async function moverReservas(ids: number[], destino: number, grupoId?: number, opcoes: { trocarServico?: boolean } = {}): Promise<ResultadoMover> {
+  const resultado: ResultadoMover = { trocasDeServico: 0, diferencaCentavos: 0 };
   await tx(async (run) => {
     if (grupoId) {
       const [g] = await run(`SELECT id "Id" FROM kart.reserva_grupo WHERE id = @g AND status = 'ativa' for update`, { g: grupoId });
@@ -594,7 +605,7 @@ export async function moverReservas(ids: number[], destino: number, grupoId?: nu
       }
       const [r] = await run(
         `SELECT i.cliente_id "ClienteId", i.bateria_id "BateriaId", i.pago "Pago", i.status "Status", coalesce(i.produto_id, b.produto_id) "produtoId",
-         coalesce(i.preco_centavos, po.preco_centavos) preco, i.desconto_centavos desconto, b.tipo_kart "tipoKart", po.servico_locacao "servicoLocacao", po.categoria categoria, REPLACE(REPLACE(UPPER(po.nome), 'ANTECIPADO - ', ''), 'BALCÃO - ', '') servico, po.duracao_min "duracaoMin" FROM kart.inscricao i JOIN kart.bateria b ON b.id = i.bateria_id
+         coalesce(i.preco_centavos, po.preco_centavos) preco, i.desconto_centavos desconto, i.valor_centavos "valorPago", po.nome "produtoNome", b.tipo_kart "tipoKart", po.servico_locacao "servicoLocacao", po.categoria categoria, REPLACE(REPLACE(UPPER(po.nome), 'ANTECIPADO - ', ''), 'BALCÃO - ', '') servico, po.duracao_min "duracaoMin" FROM kart.inscricao i JOIN kart.bateria b ON b.id = i.bateria_id
          LEFT JOIN kart.produto po ON po.id = coalesce(i.produto_id, b.produto_id) WHERE i.id = @id for update of i`,
         { id },
       );
@@ -602,7 +613,7 @@ export async function moverReservas(ids: number[], destino: number, grupoId?: nu
       if (r.Status === 'cancelada') throw new HttpError(409, 'Não é possível mover uma reserva cancelada.');
       if (Number(r.BateriaId) === destino) continue;
       const [d] = await run(
-        `SELECT b.status "Status", b.vagas "Vagas", b.reserva_fechada "reservaFechada", b.tipo_kart "tipoKart", p.servico_locacao "servicoLocacao", p.categoria categoria, REPLACE(REPLACE(UPPER(p.nome), 'ANTECIPADO - ', ''), 'BALCÃO - ', '') servico, p.duracao_min "duracaoMin", p.id "produtoId", p.preco_centavos preco, (SELECT COUNT(*) FROM kart.inscricao x WHERE x.bateria_id = b.id AND x.status <> 'cancelada') ocupadas
+        `SELECT b.status "Status", b.vagas "Vagas", b.reserva_fechada "reservaFechada", b.tipo_kart "tipoKart", p.servico_locacao "servicoLocacao", p.categoria categoria, REPLACE(REPLACE(UPPER(p.nome), 'ANTECIPADO - ', ''), 'BALCÃO - ', '') servico, p.duracao_min "duracaoMin", p.id "produtoId", p.nome "produtoNome", p.preco_centavos preco, (SELECT COUNT(*) FROM kart.inscricao x WHERE x.bateria_id = b.id AND x.status <> 'cancelada') ocupadas
          FROM kart.bateria b LEFT JOIN kart.produto p ON p.id = b.produto_id WHERE b.id = @destino for update of b`,
         { destino },
       );
@@ -614,13 +625,27 @@ export async function moverReservas(ids: number[], destino: number, grupoId?: nu
         && r.servico && r.servico === d.servico
         && (r.duracaoMin ?? null) === (d.duracaoMin ?? null)
       );
-      if ((r.Pago || grupoId) && (r.tipoKart !== d.tipoKart || !mesmoServico)) {
-        throw new HttpError(409, 'Reserva paga só pode ser movida para bateria do mesmo serviço e tipo de kart. O produto e o valor já pagos são preservados.');
-      }
+      if ((r.Pago || grupoId) && r.tipoKart !== d.tipoKart) throw new HttpError(409, MSG_SERVICO_DIFERENTE);
+      const trocaServico = Boolean((r.Pago || grupoId) && !mesmoServico);
+      if (trocaServico && !opcoes.trocarServico) throw new HttpError(409, MSG_SERVICO_DIFERENTE);
       if ((d.ocupadas as number) >= (d.Vagas as number)) throw new HttpError(409, 'Não há vagas disponíveis na bateria destino.');
       const [dup] = await run(`SELECT 1 x FROM kart.inscricao WHERE bateria_id = @destino AND cliente_id = @c AND status <> 'cancelada'`, { destino, c: r.ClienteId });
       if (dup) throw new HttpError(409, 'Já existe uma reserva para este cliente na bateria selecionada.');
-      if (r.Pago || grupoId) {
+      if (trocaServico) {
+        // pago: o que já entrou (valor pago, ou preço − desconto se ainda não houver valor gravado); sem pagar: nada
+        const jaPago = r.Pago ? Number(r.valorPago ?? Math.max(0, Number(r.preco ?? 0) - Number(r.desconto ?? 0))) : 0;
+        const falta = r.Pago ? Math.max(0, Number(d.preco) - jaPago) : 0;
+        const brl = (c: number) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const nota = `Troca de serviço: ${r.produtoNome ?? 'serviço anterior'} → ${d.produtoNome ?? 'serviço novo'}` +
+          (r.Pago ? ` · pago ${brl(jaPago)} · ${falta > 0 ? `diferença ${brl(falta)} a cobrar no caixa` : 'sem diferença a cobrar'}` : '');
+        await run(
+          `UPDATE kart.inscricao SET bateria_id = @destino, produto_id = @produtoDestino, preco_centavos = @precoDestino,
+           observacao = left(concat_ws(' · ', nullif(observacao, ''), @nota), 400), termo_impresso_em = NULL, atualizado_em = now() WHERE id = @id`,
+          { destino, id, produtoDestino: d.produtoId, precoDestino: d.preco, nota },
+        );
+        resultado.trocasDeServico += 1;
+        resultado.diferencaCentavos += falta;
+      } else if (r.Pago || grupoId) {
         await run(`UPDATE kart.inscricao SET bateria_id = @destino, termo_impresso_em = NULL, atualizado_em = now() WHERE id = @id`, { destino, id });
       } else {
         await run(
@@ -633,6 +658,7 @@ export async function moverReservas(ids: number[], destino: number, grupoId?: nu
     }
     if (grupoId) await run(`UPDATE kart.reserva_grupo SET bateria_id = @destino, atualizado_em = now() WHERE id = @g`, { destino, g: grupoId });
   });
+  return resultado;
 }
 
 // ---------------------------------------------------------------- venda (checkout / receita avulsa)
@@ -2024,8 +2050,9 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     return true;
   }
   if ((m = path.match(/^\/reservas\/(\d+)\/mover$/)) && method === 'POST') {
-    await moverReservas([Number(m[1])], int((await req.body()).bateriaId, 'Bateria'));
-    send(200, { mensagem: 'Cliente movido com sucesso.' });
+    const corpo = await req.body();
+    const r = await moverReservas([Number(m[1])], int(corpo.bateriaId, 'Bateria'), undefined, { trocarServico: corpo.trocarServico === true });
+    send(200, { mensagem: 'Cliente movido com sucesso.', ...r });
     return true;
   }
   if ((m = path.match(/^\/reservas\/(\d+)\/aprovar$/)) && method === 'POST') {

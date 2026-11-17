@@ -1145,8 +1145,9 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
   }
 
   if ((m = path.match(/^\/grupos\/(\d+)\/mover$/)) && method === 'POST') {
-    await moverReservas([], int((await req.body()).bateriaId, 'Bateria'), Number(m[1]));
-    send(200, await grupo(Number(m[1])));
+    const corpo = await req.body();
+    const r = await moverReservas([], int(corpo.bateriaId, 'Bateria'), Number(m[1]), { trocarServico: corpo.trocarServico === true });
+    send(200, { ...(await grupo(Number(m[1]))), ...r });
     return true;
   }
 

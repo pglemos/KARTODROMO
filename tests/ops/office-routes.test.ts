@@ -379,7 +379,11 @@ describe('Office: mover reserva preserva os dados de cobrança', () => {
       if (tem(sql, 'SELECT 1 x FROM kart.inscricao WHERE bateria_id')) return [];
       return [];
     }));
-    return { statements, executar: () => call('/reservas/42/mover', 'POST', { bateriaId: 8 }) };
+    return {
+      statements,
+      executar: () => call('/reservas/42/mover', 'POST', { bateriaId: 8 }),
+      trocando: () => call('/reservas/42/mover', 'POST', { bateriaId: 8, trocarServico: true }),
+    };
   }
 
   const reservaPendente = { ClienteId: 5, BateriaId: 7, Pago: false, Status: 'confirmada', produtoId: 10, preco: 17500, desconto: 1500 };
@@ -410,6 +414,29 @@ describe('Office: mover reserva preserva os dados de cobrança', () => {
     await expect(executar()).rejects.toMatchObject({ status: 409, message: expect.stringContaining('mesmo serviço') });
     expect(statements.some((statement) => tem(statement.sql, 'UPDATE kart.inscricao'))).toBe(false);
   });
+  it('troca de serviço confirmada: reserva paga vai para o produto novo, segue paga e anota a diferença a cobrar', async () => {
+    const { statements, trocando } = moverComReserva(
+      { ...reservaPendente, Pago: true, valorPago: 8990, produtoNome: 'HAPPY HOUR - 15 MIN' },
+      { ...bateriaDestino, produtoId: 20, preco: 17500, produtoNome: 'BALCÃO - LOCAÇÃO PADRÃO' },
+    );
+    await expect(trocando()).resolves.toMatchObject({ status: 200, body: { trocasDeServico: 1, diferencaCentavos: 8510 } });
+    const update = statements.find((s) => tem(s.sql, 'UPDATE kart.inscricao SET bateria_id'));
+    expect(update?.sql).toContain('produto_id = @produtoDestino, preco_centavos = @precoDestino');
+    expect(update?.sql).not.toContain('pago =');
+    expect(update?.sql).not.toContain('valor_centavos');
+    expect(update?.params).toMatchObject({ destino: 8, id: 42, produtoDestino: 20, precoDestino: 17500 });
+    expect(String(update?.params.nota)).toContain('HAPPY HOUR - 15 MIN → BALCÃO - LOCAÇÃO PADRÃO');
+    expect(String(update?.params.nota)).toMatch(/diferença R\$\s?85,10 a cobrar no caixa/);
+  });
+
+  it('troca para serviço mais barato não gera diferença; tipo de kart diferente continua bloqueado', async () => {
+    const barata = moverComReserva({ ...reservaPendente, Pago: true, valorPago: 17500 }, { ...bateriaDestino, produtoId: 20, preco: 8990 });
+    await expect(barata.trocando()).resolves.toMatchObject({ status: 200, body: { trocasDeServico: 1, diferencaCentavos: 0 } });
+    const kart = moverComReserva({ ...reservaPendente, Pago: true, tipoKart: 'Normal' }, { ...bateriaDestino, produtoId: 20, tipoKart: 'Super Kart' });
+    await expect(kart.trocando()).rejects.toMatchObject({ status: 409 });
+    expect(kart.statements.some((s) => tem(s.sql, 'UPDATE kart.inscricao'))).toBe(false);
+  });
+
   it('preserva tarifa paga mesmo quando a tarifa atual do mesmo produto aumentou', async () => {
     const { statements, executar } = moverComReserva({ ...reservaPendente, Pago: true }, { ...bateriaDestino, produtoId: 10, preco: 22000 });
     await expect(executar()).resolves.toMatchObject({status:200});

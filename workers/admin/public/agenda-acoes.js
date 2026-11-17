@@ -366,7 +366,7 @@ const AgendaAcoes = (() => {
       ok.textContent = alvo ? `Mover para ${horaDe(alvo.dataHora)}${alvo.dataHora.slice(0, 10) !== origem.dataHora.slice(0, 10) ? ' de ' + dataBr(alvo.dataHora) : ''}` : 'Escolha a bateria';
       const naoPagas = reservas.filter((r) => !r.pago && !grupoPorInscricao.has(r.id));
       const aviso = alvo && naoPagas.length && naoPagas.some((r) => Number(r.produtoId) !== Number(alvo.produtoId) || Number(r.preco) !== Number(alvo.preco)) ? `O valor ${naoPagas.length === 1 ? 'da reserva' : 'das reservas não pagas'} passa a ser o da bateria nova (${brl(alvo.preco)}).` : '';
-      m.querySelector('#mvAviso').textContent = [aviso, alvo && (inteiros.length || reservas.some((r) => r.pago)) ? 'O produto e o valor já pagos são preservados; o servidor confere se é o mesmo serviço.' : ''].filter(Boolean).join(' ');
+      m.querySelector('#mvAviso').textContent = [aviso, alvo && (inteiros.length || reservas.some((r) => r.pago)) ? 'O valor já pago é preservado. Se a bateria for de outro serviço, o sistema pergunta se quer trocar e mostra a diferença a cobrar no caixa.' : ''].filter(Boolean).join(' ');
     };
     const carregarDia = async () => {
       const pedido = ++consulta, dataPedido = dia;
@@ -402,19 +402,49 @@ const AgendaAcoes = (() => {
       const alvo = lista.find((b) => b.id === escolhida); if (ocupado || !alvo || motivo(alvo)) return;
       const btnOk = m.querySelector('#mvOk');
       ocupado = true; btnOk.disabled = true; btnOk.setAttribute?.('aria-busy', 'true'); btnOk.textContent = 'Movendo…'; m.querySelector('#mvErro').textContent = '';
-      const falhas = [], pendentes = [], feitosPath = []; let feitas = 0;
+      const falhas = [], pendentes = [], feitosPath = []; let feitas = 0, diferenca = 0, trocas = 0;
       const processados = new Set();
+      // Reserva paga para outro serviço (ex.: Happy Hour → Locação padrão): o servidor recusa; a Recepção confirma uma vez
+      // a troca e o resto segue com trocarServico. A reserva continua paga e a diferença fica para cobrar no caixa.
+      let trocar = null;
+      const ehServicoDiferente = (e) => /mesmo serviço/.test(String(e && e.message));
+      const moverUm = async (rota) => {
+        try { return await office(rota, { method: 'POST', body: { bateriaId: alvo.id, ...(trocar ? { trocarServico: true } : {}) } }); }
+        catch (e) {
+          if (!ehServicoDiferente(e) || trocar === false) throw e;
+          if (trocar === null) {
+            const resp = await dialogo({
+              titulo: 'Trocar de serviço?',
+              texto: `A bateria das ${horaDe(alvo.dataHora)} de ${dataBr(alvo.dataHora)} é ${alvo.produto || 'outro serviço'} (${brl(alvo.preco)} por piloto), diferente do que foi pago. A reserva passa para o serviço novo e continua paga; se o novo for mais caro, a diferença fica anotada para cobrar no caixa.`,
+              botoes: [{ rotulo: 'Trocar serviço e mover', valor: 'sim', classe: 'prim' }],
+            });
+            trocar = resp === 'sim';
+            if (!trocar) throw e;
+          }
+          return await office(rota, { method: 'POST', body: { bateriaId: alvo.id, trocarServico: true } });
+        }
+      };
       for (const r of reservas) {
         if (m.isConnected === false) break;
         const grupoId = grupoPorInscricao.get(r.id);
         if (grupoId && processados.has(grupoId)) continue;
         if (grupoId) processados.add(grupoId);
         const membros = grupoId ? reservas.filter((x) => grupoPorInscricao.get(x.id) === grupoId) : [r];
-        try { const rota = grupoId ? `/grupos/${grupoId}/mover` : `/reservas/${r.id}/mover`; await office(rota, { method: 'POST', body: { bateriaId: alvo.id } }); feitosPath.push(rota); feitas += membros.length; }
+        try {
+          const rota = grupoId ? `/grupos/${grupoId}/mover` : `/reservas/${r.id}/mover`;
+          const resp = await moverUm(rota);
+          diferenca += Number(resp && resp.diferencaCentavos) || 0; trocas += Number(resp && resp.trocasDeServico) || 0;
+          if (!(resp && resp.trocasDeServico)) feitosPath.push(rota); feitas += membros.length;
+        }
         catch (e) { pendentes.push(...membros); falhas.push(`${r.cliente}: ${e.message}`); }
       }
       ocupado = false;
       m.querySelector('#mvOk')?.removeAttribute?.('aria-busy');
+      if (!falhas.length && trocas) {
+        // troca de serviço não tem "Desfazer" automático (o preço já mudou); o aviso da diferença fica na tela
+        toast(`${feitas === 1 ? 'Cliente movido' : `${feitas} clientes movidos`} com troca de serviço.${diferenca ? ` Cobrar no caixa a diferença: ${brl(diferenca)}.` : ' Sem diferença a cobrar.'}`);
+        C.A.sel = origem.id; if (m.isConnected !== false) fecharCamada(); await C.recarregar(); return;
+      }
       if (!falhas.length) {
         toastAcao(feitas === 1 ? 'Cliente movido' : `${feitas} clientes movidos`, 'Desfazer', async () => {
           const erros = [];
