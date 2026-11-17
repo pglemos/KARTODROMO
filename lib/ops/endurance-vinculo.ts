@@ -1,13 +1,13 @@
-/** Mesmo vinculo para a recepcao e o grid: somente o evento desta bateria e o piloto ativo. */
-export const ENDURANCE_VINCULO_SQL = `OUTER APPLY (
-  SELECT TOP 1 ep.Pulseira pulseira, eq.Id equipeId,
-    STUFF((SELECT ' / ' + qs.Nome FROM dbo.EndurancePilotoInscricao ps
-      JOIN dbo.EnduranceEquipe qs ON qs.Id=ps.EquipeId AND qs.EventoId=ps.EventoId
-      WHERE ps.Id=ep.Id AND ps.Ativo=1 ORDER BY qs.Nome
-      FOR XML PATH(''),TYPE).value('.','nvarchar(max)'),1,3,'') equipe
-  FROM dbo.EnduranceEvento ev
-  JOIN dbo.EndurancePiloto ep ON ep.EventoId = ev.Id AND ep.ClienteId = i.ClienteId AND ep.Ativo = 1
-  JOIN dbo.EnduranceEquipe eq ON eq.Id = ep.EquipeId AND eq.EventoId = ev.Id
-  WHERE ev.BateriaId = i.BateriaId AND ev.Ativo = 1
-  ORDER BY ev.Id DESC, ep.Id DESC
-) endurance`;
+/** Mesmo vinculo para a recepcao e o grid: somente o evento desta bateria e o piloto ativo. Usado depois de `from kart.inscricao i ...`. */
+export const ENDURANCE_VINCULO_SQL = `left join lateral (
+  select ep.pulseira, eq.id "equipeId",
+    (select string_agg(qs.nome, ' / ' order by qs.nome) from kart.endurance_piloto_inscricao ps
+      join kart.endurance_equipe qs on qs.id = ps.equipe_id and qs.evento_id = ps.evento_id
+      where ps.id = ep.id and ps.ativo) equipe
+  from kart.endurance_evento ev
+  join kart.endurance_piloto ep on ep.evento_id = ev.id and ep.cliente_id = i.cliente_id and ep.ativo
+  join kart.endurance_equipe eq on eq.id = ep.equipe_id and eq.evento_id = ev.id
+  where ev.bateria_id = i.bateria_id and ev.ativo
+  order by ev.id desc, ep.id desc
+  limit 1
+) endurance on true`;

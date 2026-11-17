@@ -14,15 +14,15 @@ export type TotemBateriaCandidate = {
 };
 
 export const TOTEM_BATERIAS_SQL = `
-      SELECT b.Id id, b.Nome nome, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Vagas vagas, b.TipoKart tipoKart,
-             b.Status status, b.AutoAtendimento autoAtendimento, b.ReservaFechada reservaFechada, b.Campeonato campeonato,
-             CONVERT(varchar(10), SYSDATETIME(), 126) dataHoje,
-             (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') ocupadas
-      FROM dbo.Bateria b
-      WHERE b.Status = 'aberta' AND b.AutoAtendimento = 1 AND b.ReservaFechada = 0
-        AND b.Inicio >= CAST(SYSDATETIME() AS date)
-        AND b.Inicio < DATEADD(day, 1, CAST(SYSDATETIME() AS date))
-      ORDER BY b.Inicio`;
+      select b.id, b.nome, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio, b.vagas, b.tipo_kart "tipoKart",
+             b.status, b.auto_atendimento "autoAtendimento", b.reserva_fechada "reservaFechada", b.campeonato,
+             to_char(now(), 'YYYY-MM-DD') "dataHoje",
+             (select count(*) from kart.inscricao i where i.bateria_id = b.id and i.status <> 'cancelada') ocupadas
+      from kart.bateria b
+      where b.status = 'aberta' and b.auto_atendimento and not b.reserva_fechada
+        and b.inicio >= current_date
+        and b.inicio < current_date + 1
+      order by b.inicio`;
 
 function isTrue(value: boolean | number | string) {
   return value === true || value === 1 || value === '1' || value === 'true';

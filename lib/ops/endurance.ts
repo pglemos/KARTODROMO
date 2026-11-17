@@ -24,11 +24,11 @@ type Evento = { id: number; nome: string; data: string | null; bateriaId: number
 type Equipe = { id: number; eventoId: number; nome: string; numero: string; transponder: string | null; chefeNome: string | null; chefeTelefone: string | null; pago: boolean; desclassificada: boolean; obs: string | null };
 type Piloto = { id: number; eventoId: number; equipeId: number; clienteId: number | null; nome: string; pulseira: number; pesoKg: number | null; lastroKg: number | null; chefe: boolean; origem: string; ativo: boolean; pesoCadastro: number | null; documento: string | null; telefone: string | null };
 
-const EVENTO_COLS = `Id id, Nome nome, CONVERT(varchar(10), Data, 126) data, BateriaId bateriaId, SessaoCrono sessaoCrono, SessaoTomada sessaoTomada, Regras regras, Segredo segredo, Ativo ativo`;
-const EQUIPE_COLS = `Id id, EventoId eventoId, Nome nome, Numero numero, Transponder transponder, ChefeNome chefeNome, ChefeTelefone chefeTelefone, Pago pago, Desclassificada desclassificada, Obs obs`;
-const PILOTO_SQL = `SELECT p.Id id, p.EventoId eventoId, p.EquipeId equipeId, p.ClienteId clienteId, p.Nome nome, p.Pulseira pulseira, CAST(p.PesoKg AS float) pesoKg,
-  CAST(p.LastroKg AS float) lastroKg, p.Chefe chefe, p.Origem origem, p.Ativo ativo, CAST(c.Peso AS float) pesoCadastro, c.Documento documento, c.Telefone telefone
-  FROM dbo.EndurancePilotoInscricao p LEFT JOIN dbo.Cliente c ON c.Id = p.ClienteId`;
+const EVENTO_COLS = `id, nome, to_char(data, 'YYYY-MM-DD') data, bateria_id "bateriaId", sessao_crono "sessaoCrono", sessao_tomada "sessaoTomada", regras, segredo, ativo`;
+const EQUIPE_COLS = `id, evento_id "eventoId", nome, numero, transponder, chefe_nome "chefeNome", chefe_telefone "chefeTelefone", pago, desclassificada, obs`;
+const PILOTO_SQL = `select p.id, p.evento_id "eventoId", p.equipe_id "equipeId", p.cliente_id "clienteId", p.nome, p.pulseira, p.peso_kg::float8 "pesoKg",
+  p.lastro_kg::float8 "lastroKg", p.chefe, p.origem, p.ativo, c.peso::float8 "pesoCadastro", c.documento, c.telefone
+  from kart.endurance_piloto_inscricao p left join kart.cliente c on c.id = p.cliente_id`;
 
 const txt = (v: unknown, max = 120) => (v == null ? '' : String(v).trim().slice(0, max));
 const num = (v: unknown) => { const s = String(v ?? '').trim().replace(',', '.'); if (!s) return null; const n = Number(s); return Number.isFinite(n) ? n : null; };
@@ -37,12 +37,12 @@ const idDe = (v: unknown, nome: string) => { const n = Number(v); if (!Number.is
 // ------------------------------------------------------------------ leitura
 
 async function evento(id: number): Promise<Evento> {
-  const e = await one<Evento>(`SELECT ${EVENTO_COLS} FROM dbo.EnduranceEvento WHERE Id = @id`, { id });
+  const e = await one<Evento>(`select ${EVENTO_COLS} from kart.endurance_evento where id = @id`, { id });
   if (!e) throw new HttpError(404, 'Evento não encontrado.');
   return e;
 }
-const equipesDo = (eventoId: number) => query<Equipe>(`SELECT ${EQUIPE_COLS} FROM dbo.EnduranceEquipe WHERE EventoId = @e ORDER BY TRY_CONVERT(int, Numero), Numero`, { e: eventoId });
-const pilotosDo = (eventoId: number) => query<Piloto>(`${PILOTO_SQL} WHERE p.EventoId = @e AND p.Ativo = 1 ORDER BY p.Pulseira`, { e: eventoId });
+const equipesDo = (eventoId: number) => query<Equipe>(`select ${EQUIPE_COLS} from kart.endurance_equipe where evento_id = @e order by case when numero ~ '^[0-9]+$' then numero::int end, numero`, { e: eventoId });
+const pilotosDo = (eventoId: number) => query<Piloto>(`${PILOTO_SQL} where p.evento_id = @e and p.ativo order by p.pulseira`, { e: eventoId });
 
 export function tokenEquipe(ev: Pick<Evento, 'segredo'>, equipeId: number) {
   return `${equipeId}.${createHmac('sha256', ev.segredo).update(`equipe:${equipeId}`).digest('base64url').slice(0, 16)}`;
@@ -50,25 +50,25 @@ export function tokenEquipe(ev: Pick<Evento, 'segredo'>, equipeId: number) {
 
 async function filasDo(eventoId: number) {
   return query<{ kart: string; fileira: number | null; ordem: number | null; situacao: string; equipeId: number | null; obs: string | null }>(
-    `SELECT Kart kart, Fileira fileira, Ordem ordem, Situacao situacao, EquipeId equipeId, Obs obs FROM dbo.EnduranceFila WHERE EventoId = @e ORDER BY Fileira, Ordem, Kart`, { e: eventoId });
+    `select kart, fileira, ordem, situacao, equipe_id "equipeId", obs from kart.endurance_fila where evento_id = @e order by fileira nulls first, ordem nulls first, kart`, { e: eventoId });
 }
 async function trocasDo(eventoId: number) {
   return query<{ id: number; equipeId: number; pilotoId: number | null; piloto: string | null; pulseira: number | null; kart: string | null; kartDevolvido: string | null; fileira: number | null; tipo: string; usuario: string | null; obs: string | null; em: string; emMs: number }>(
-    `SELECT t.Id id, t.EquipeId equipeId, t.PilotoId pilotoId, p.Nome piloto, p.Pulseira pulseira, t.Kart kart, t.KartDevolvido kartDevolvido, t.Fileira fileira, t.Tipo tipo,
-       t.Usuario usuario, t.Obs obs, CONVERT(varchar(19), t.Em, 126) em, t.EmMs emMs
-     FROM dbo.EnduranceTroca t LEFT JOIN dbo.EndurancePiloto p ON p.Id = t.PilotoId WHERE t.EventoId = @e AND t.Cancelada = 0 ORDER BY t.EmMs, t.Id`, { e: eventoId });
+    `select t.id, t.equipe_id "equipeId", t.piloto_id "pilotoId", p.nome piloto, p.pulseira, t.kart, t.kart_devolvido "kartDevolvido", t.fileira, t.tipo,
+       t.usuario, t.obs, to_char(t.em, 'YYYY-MM-DD"T"HH24:MI:SS') em, t.em_ms "emMs"
+     from kart.endurance_troca t left join kart.endurance_piloto p on p.id = t.piloto_id where t.evento_id = @e and not t.cancelada order by t.em_ms, t.id`, { e: eventoId });
 }
 async function pesagensDo(eventoId: number) {
   return query<{ id: number; pilotoId: number; momento: string; balancaKg: number; lastroKg: number | null; totalKg: number; resultado: string; punicaoSeg: number; usuario: string | null; obs: string | null; em: string }>(
-    `SELECT Id id, PilotoId pilotoId, Momento momento, CAST(BalancaKg AS float) balancaKg, CAST(LastroKg AS float) lastroKg, CAST(TotalKg AS float) totalKg, Resultado resultado,
-       PunicaoSeg punicaoSeg, Usuario usuario, Obs obs, CONVERT(varchar(19), Em, 126) em FROM dbo.EndurancePesagem WHERE EventoId = @e ORDER BY Id DESC`, { e: eventoId });
+    `select id, piloto_id "pilotoId", momento, balanca_kg::float8 "balancaKg", lastro_kg::float8 "lastroKg", total_kg::float8 "totalKg", resultado,
+       punicao_seg "punicaoSeg", usuario, obs, to_char(em, 'YYYY-MM-DD"T"HH24:MI:SS') em from kart.endurance_pesagem where evento_id = @e order by id desc`, { e: eventoId });
 }
 async function punicoesDo(eventoId: number) {
   return query<{ id: number; equipeId: number; tipo: PunicaoIn['tipo']; valor: number; motivo: string; origem: string; usuario: string | null; em: string }>(
-    `SELECT Id id, EquipeId equipeId, Tipo tipo, Valor valor, Motivo motivo, Origem origem, Usuario usuario, CONVERT(varchar(19), Em, 126) em
-     FROM dbo.EndurancePunicao WHERE EventoId = @e AND Cancelada = 0 ORDER BY Id`, { e: eventoId });
+    `select id, equipe_id "equipeId", tipo, valor, motivo, origem, usuario, to_char(em, 'YYYY-MM-DD"T"HH24:MI:SS') em
+     from kart.endurance_punicao where evento_id = @e and not cancelada order by id`, { e: eventoId });
 }
-const ajustesDo = (eventoId: number) => query<AjusteIn>(`SELECT EquipeId equipeId, Volta volta, Acao acao FROM dbo.EnduranceParadaAjuste WHERE EventoId = @e`, { e: eventoId });
+const ajustesDo = (eventoId: number) => query<AjusteIn>(`select equipe_id "equipeId", volta, acao from kart.endurance_parada_ajuste where evento_id = @e`, { e: eventoId });
 
 // ------------------------------------------------------------------ cronometragem
 
@@ -133,32 +133,32 @@ async function vincularInscricoes(ev: Evento, selecao: number[], dados: { client
   if (!ids.length || ids.length > 7) throw new HttpError(400, 'Selecione de uma a sete inscrições da mesma família.');
   return tx(async (run) => {
     // Serializa pulseiras e vagas por evento; uma falha desfaz toda a seleção.
-    await run('SELECT Id FROM dbo.EnduranceEvento WITH(UPDLOCK,HOLDLOCK) WHERE Id=@e', {e:ev.id});
-    const equipes = await run(`SELECT Id id,Nome nome,Numero numero,GrupoId grupoId FROM dbo.EnduranceEquipe WITH(UPDLOCK,HOLDLOCK) WHERE EventoId=@e AND Desclassificada=0 AND Id IN (${ids.join(',')})`, {e:ev.id}) as {id:number;nome:string;numero:string;grupoId:number|null}[];
+    await run('select id from kart.endurance_evento where id=@e for update', {e:ev.id});
+    const equipes = await run(`select id,nome,numero,grupo_id "grupoId" from kart.endurance_equipe where evento_id=@e and not desclassificada and id in (${ids.join(',')}) for update`, {e:ev.id}) as {id:number;nome:string;numero:string;grupoId:number|null}[];
     if(equipes.length !== ids.length) throw new HttpError(404,'Inscrição não encontrada ou indisponível neste evento.');
     const validar=(qs:typeof equipes)=>{try{validarFamiliaEquipes(qs);}catch(err){throw new HttpError(409,(err as Error).message);}};
     validar(equipes);
     const saida: {pilotoId:number;pulseira:number;equipe:string;numero:string;novo:boolean;equipes:{id:number;nome:string}[]}[]=[];
     for(const d of dados){
-      let p=d.clienteId ? (await run('SELECT Id id,EquipeId equipeId,Pulseira pulseira FROM dbo.EndurancePiloto WITH(UPDLOCK,HOLDLOCK) WHERE EventoId=@e AND ClienteId=@c AND Ativo=1',{e:ev.id,c:d.clienteId}))[0] as {id:number;equipeId:number;pulseira:number}|undefined : undefined;
+      let p=d.clienteId ? (await run('select id,equipe_id "equipeId",pulseira from kart.endurance_piloto where evento_id=@e and cliente_id=@c and ativo for update',{e:ev.id,c:d.clienteId}))[0] as {id:number;equipeId:number;pulseira:number}|undefined : undefined;
       const novo=!p;
       if(p){
-        const anteriores=await run('SELECT q.Id id,q.Nome nome,q.Numero numero,q.GrupoId grupoId FROM dbo.EndurancePilotoInscricao p JOIN dbo.EnduranceEquipe q ON q.Id=p.EquipeId WHERE p.Id=@id',{id:p.id}) as typeof equipes;
+        const anteriores=await run('select q.id,q.nome,q.numero,q.grupo_id "grupoId" from kart.endurance_piloto_inscricao p join kart.endurance_equipe q on q.id=p.equipe_id where p.id=@id',{id:p.id}) as typeof equipes;
         validar([...anteriores,...equipes]);
       }
       for(const q of equipes){
-        const ja=p && (await run('SELECT Id FROM dbo.EndurancePilotoInscricao WHERE Id=@id AND EquipeId=@q',{id:p.id,q:q.id})).length>0;
-        const n=(await run('SELECT COUNT(*) n FROM dbo.EndurancePilotoInscricao WHERE EquipeId=@q AND Ativo=1',{q:q.id}))[0] as {n:number};
+        const ja=p && (await run('select id from kart.endurance_piloto_inscricao where id=@id and equipe_id=@q',{id:p.id,q:q.id})).length>0;
+        const n=(await run('select count(*) n from kart.endurance_piloto_inscricao where equipe_id=@q and ativo',{q:q.id}))[0] as {n:number};
         if(!ja && n.n>=regras.pilotosMax) throw new HttpError(409,`A inscrição ${q.nome} já tem ${regras.pilotosMax} pilotos. Escolha outra inscrição da mesma família.`);
         if(!p){
-          const prox=(await run('SELECT ISNULL(MAX(Pulseira),0)+1 n FROM dbo.EndurancePiloto WITH(UPDLOCK,HOLDLOCK) WHERE EventoId=@e',{e:ev.id}))[0] as {n:number};
-          const ins=(await run('INSERT dbo.EndurancePiloto(EventoId,EquipeId,ClienteId,Nome,Pulseira,Chefe,Origem) OUTPUT INSERTED.Id id VALUES(@e,@q,@c,@nome,@p,@chefe,@o)',{e:ev.id,q:q.id,c:d.clienteId??null,nome:d.nome.slice(0,120),p:prox.n,chefe:d.chefe?1:0,o:d.origem}))[0] as {id:number};
+          const prox=(await run('select coalesce(max(pulseira),0)+1 n from kart.endurance_piloto where evento_id=@e',{e:ev.id}))[0] as {n:number};
+          const ins=(await run('insert into kart.endurance_piloto(evento_id,equipe_id,cliente_id,nome,pulseira,chefe,origem) values(@e,@q,@c,@nome,@p,@chefe,@o) returning id',{e:ev.id,q:q.id,c:d.clienteId??null,nome:d.nome.slice(0,120),p:prox.n,chefe:!!d.chefe,o:d.origem}))[0] as {id:number};
           p={id:ins.id,equipeId:q.id,pulseira:prox.n};
         }else if(!ja){
-          await run('INSERT dbo.EndurancePilotoEquipe(PilotoId,EquipeId) VALUES(@p,@q)',{p:p.id,q:q.id});
+          await run('insert into kart.endurance_piloto_equipe(piloto_id,equipe_id) values(@p,@q)',{p:p.id,q:q.id});
         }
       }
-      const vinculadas=await run('SELECT q.Id id,q.Nome nome FROM dbo.EndurancePilotoInscricao p JOIN dbo.EnduranceEquipe q ON q.Id=p.EquipeId WHERE p.Id=@p ORDER BY q.Nome',{p:p!.id}) as {id:number;nome:string}[];
+      const vinculadas=await run('select q.id,q.nome from kart.endurance_piloto_inscricao p join kart.endurance_equipe q on q.id=p.equipe_id where p.id=@p order by q.nome',{p:p!.id}) as {id:number;nome:string}[];
       saida.push({pilotoId:p!.id,pulseira:p!.pulseira,equipe:vinculadas.map(q=>q.nome).join(' / '),numero:equipes[0].numero,novo,equipes:vinculadas});
     }
     return saida;
@@ -166,7 +166,7 @@ async function vincularInscricoes(ev: Evento, selecao: number[], dados: { client
 }
 
 async function pilotoPorPulseira(eventoId: number, pulseira: number, equipeId?: number, exigirEquipe=false) {
-  const pilotos = await query<Piloto>(`${PILOTO_SQL} WHERE p.EventoId = @e AND p.Pulseira = @n AND p.Ativo = 1`, { e: eventoId, n: pulseira });
+  const pilotos = await query<Piloto>(`${PILOTO_SQL} where p.evento_id = @e and p.pulseira = @n and p.ativo`, { e: eventoId, n: pulseira });
   if(!equipeId && exigirEquipe && pilotos.length>1) throw new HttpError(409,'Este piloto corre em várias inscrições. Escolha a inscrição da equipe para esta operação.');
   const p = equipeId ? pilotos.find(p=>p.equipeId===equipeId) : pilotos[0];
   if (!p) throw new HttpError(404, `Nenhum piloto com a pulseira ${pulseira} neste evento.`);
@@ -179,17 +179,17 @@ async function pilotoPorPulseira(eventoId: number, pulseira: number, equipeId?: 
 export async function enduranceDasBaterias(bateriaIds: number[]) {
   if (!bateriaIds.length) return new Map<number, { eventoId: number; nome: string }>();
   const lista = bateriaIds.filter((b) => Number.isInteger(b)).join(',') || '0';
-  const rows = await query<{ bateriaId: number; eventoId: number; nome: string }>(`SELECT BateriaId bateriaId, Id eventoId, Nome nome FROM dbo.EnduranceEvento WHERE Ativo = 1 AND BateriaId IN (${lista})`).catch(() => []);
+  const rows = await query<{ bateriaId: number; eventoId: number; nome: string }>(`select bateria_id "bateriaId", id "eventoId", nome from kart.endurance_evento where ativo and bateria_id in (${lista})`).catch(() => []);
   return new Map(rows.map((r) => [r.bateriaId, { eventoId: r.eventoId, nome: r.nome }] as const));
 }
 
 export async function equipesParaOTotem(bateriaId: number) {
-  const ev = await one<Evento>(`SELECT TOP 1 ${EVENTO_COLS} FROM dbo.EnduranceEvento WHERE Ativo = 1 AND BateriaId = @b ORDER BY Id DESC`, { b: bateriaId });
+  const ev = await one<Evento>(`select ${EVENTO_COLS} from kart.endurance_evento where ativo and bateria_id = @b order by id desc limit 1`, { b: bateriaId });
   if (!ev) return null;
   const regras = lerRegras(ev.regras);
   const equipes = await query<{ id: number; nome: string; numero: string; pilotos: number }>(
-    `SELECT q.Id id, q.Nome nome, q.Numero numero, q.GrupoId grupoId, (SELECT COUNT(*) FROM dbo.EndurancePilotoInscricao p WHERE p.EquipeId = q.Id AND p.Ativo = 1) pilotos
-     FROM dbo.EnduranceEquipe q WHERE q.EventoId = @e AND q.Desclassificada = 0 ORDER BY q.Nome`, { e: ev.id });
+    `select q.id, q.nome, q.numero, q.grupo_id "grupoId", (select count(*) from kart.endurance_piloto_inscricao p where p.equipe_id = q.id and p.ativo) pilotos
+     from kart.endurance_equipe q where q.evento_id = @e and not q.desclassificada order by q.nome`, { e: ev.id });
   return { eventoId: ev.id, nome: ev.nome, maxPilotos: regras.pilotosMax, equipes: equipes.map((q) => ({ ...q, vagas: Math.max(0, regras.pilotosMax - q.pilotos) })) };
 }
 
@@ -198,7 +198,7 @@ export async function vincularNoTotem(eventoId: number, equipeId: number | numbe
   const ev = await evento(eventoId);
   const dados: Array<{ clienteId: number; nome: string; origem: string }> = [];
   for (const cid of [...new Set(clienteIds.map(id=>idDe(id,'Piloto')))]) {
-    const c = await one<{ nome: string }>(`SELECT Nome nome FROM dbo.Cliente WHERE Id = @id`, { id: cid });
+    const c = await one<{ nome: string }>(`select nome from kart.cliente where id = @id`, { id: cid });
     if(!c) throw new HttpError(404,'Piloto não encontrado.');
     dados.push({clienteId:cid,nome:c.nome,origem:'totem'});
   }
@@ -211,7 +211,7 @@ export async function vincularNoTotem(eventoId: number, equipeId: number | numbe
 export async function paginaDoChefe(token: string) {
   const m = token.match(/^(\d{1,9})\.([\w-]{16})$/);
   if (!m) throw new HttpError(404, 'Link inválido.');
-  const eq = await one<Equipe>(`SELECT ${EQUIPE_COLS} FROM dbo.EnduranceEquipe WHERE Id = @id`, { id: Number(m[1]) });
+  const eq = await one<Equipe>(`select ${EQUIPE_COLS} from kart.endurance_equipe where id = @id`, { id: Number(m[1]) });
   if (!eq) throw new HttpError(404, 'Link inválido.');
   const ev = await evento(eq.eventoId);
   const esperado = Buffer.from(tokenEquipe(ev, eq.id)), recebido = Buffer.from(token);
@@ -242,8 +242,8 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
   const quem = sessao.nome.slice(0, 60);
 
   if (path === '/endurance/eventos' && method === 'GET') {
-    send(200, await query(`SELECT ${EVENTO_COLS}, (SELECT COUNT(*) FROM dbo.EnduranceEquipe q WHERE q.EventoId = e.Id) equipes,
-      (SELECT COUNT(*) FROM dbo.EndurancePiloto p WHERE p.EventoId = e.Id AND p.Ativo = 1) pilotos FROM dbo.EnduranceEvento e ORDER BY Ativo DESC, Data DESC, Id DESC`)
+    send(200, await query(`select ${EVENTO_COLS}, (select count(*) from kart.endurance_equipe q where q.evento_id = e.id) equipes,
+      (select count(*) from kart.endurance_piloto p where p.evento_id = e.id and p.ativo) pilotos from kart.endurance_evento e order by ativo desc, e.data desc nulls last, id desc`)
       .then((l) => l.map(({ segredo: _s, ...x }) => { void _s; return { ...x, regras: lerRegras(x.regras as string) }; })));
     return true;
   }
@@ -252,7 +252,7 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     const nome = txt(b.nome);
     if (!nome) throw new HttpError(400, 'Informe o nome do evento.');
     const r = await one<{ id: number }>(
-      `INSERT INTO dbo.EnduranceEvento (Nome, Data, BateriaId, SessaoCrono, Regras, Segredo) OUTPUT INSERTED.Id id VALUES (@nome, @data, @bat, @crono, @regras, @seg)`,
+      `insert into kart.endurance_evento (nome, data, bateria_id, sessao_crono, regras, segredo) values (@nome, @data, @bat, @crono, @regras, @seg) returning id`,
       { nome, data: txt(b.data, 10) || null, bat: b.bateriaId ? Number(b.bateriaId) : null, crono: txt(b.sessaoCrono, 80) || null, regras: JSON.stringify(lerRegras(JSON.stringify(b.regras ?? {}))), seg: randomBytes(18).toString('base64url') },
     );
     send(201, { id: r!.id });
@@ -276,10 +276,10 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if (!resto && method === 'PUT') {
     const b = await req.body();
-    await query(`UPDATE dbo.EnduranceEvento SET Nome = COALESCE(@nome, Nome), Data = @data, BateriaId = @bat, SessaoCrono = @crono, SessaoTomada = @tomada, Regras = @regras, Ativo = @ativo WHERE Id = @id`, {
+    await query(`update kart.endurance_evento set nome = coalesce(@nome, nome), data = @data::date, bateria_id = @bat, sessao_crono = @crono, sessao_tomada = @tomada, regras = @regras, ativo = @ativo where id = @id`, {
       id: ev.id, nome: txt(b.nome) || null, data: b.data !== undefined ? (txt(b.data, 10) || null) : ev.data, bat: b.bateriaId !== undefined ? (b.bateriaId ? Number(b.bateriaId) : null) : ev.bateriaId,
       crono: b.sessaoCrono !== undefined ? (txt(b.sessaoCrono, 80) || null) : ev.sessaoCrono, tomada: b.sessaoTomada !== undefined ? (txt(b.sessaoTomada, 80) || null) : ev.sessaoTomada,
-      regras: b.regras ? JSON.stringify(lerRegras(JSON.stringify({ ...regras, ...(b.regras as object) }))) : ev.regras, ativo: b.ativo === undefined ? (ev.ativo ? 1 : 0) : (b.ativo ? 1 : 0),
+      regras: b.regras ? JSON.stringify(lerRegras(JSON.stringify({ ...regras, ...(b.regras as object) }))) : ev.regras, ativo: b.ativo === undefined ? !!ev.ativo : !!b.ativo,
     });
     send(200, { ok: true });
     return true;
@@ -334,7 +334,7 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
       body: JSON.stringify({ competitors: equipes.map((q) => ({ kart: q.numero, name: q.nome })), semEmailPilotos: true, ...(b.tipo === 'corrida' ? { durationMin: regras.duracaoMin } : {}) }),
     });
     if (!r.ok) throw new HttpError(502, `A cronometragem recusou (${((await r.json().catch(() => ({}))) as { error?: string }).error ?? r.status}).`);
-    await query(b.tipo === 'tomada' ? `UPDATE dbo.EnduranceEvento SET SessaoTomada = @s WHERE Id = @id` : `UPDATE dbo.EnduranceEvento SET SessaoCrono = @s WHERE Id = @id`, { s: sessaoId, id: ev.id });
+    await query(b.tipo === 'tomada' ? `update kart.endurance_evento set sessao_tomada = @s where id = @id` : `update kart.endurance_evento set sessao_crono = @s where id = @id`, { s: sessaoId, id: ev.id });
     send(200, { ok: true, equipes: equipes.length, avisos });
     return true;
   }
@@ -345,8 +345,8 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     const nome = txt(b.nome, 80), numero = txt(b.numero, 10);
     if (!nome || !numero) throw new HttpError(400, 'Informe o nome e o número da placa.');
     const r = await one<{ id: number }>(
-      `INSERT INTO dbo.EnduranceEquipe (EventoId, Nome, Numero, Transponder, ChefeNome, ChefeTelefone, Pago, Obs) OUTPUT INSERTED.Id id VALUES (@e, @nome, @num, @tr, @cn, @ct, @pago, @obs)`,
-      { e: ev.id, nome, num: numero, tr: txt(b.transponder, 12).replace(/\D/g, '') || null, cn: txt(b.chefeNome) || null, ct: txt(b.chefeTelefone, 20) || null, pago: b.pago ? 1 : 0, obs: txt(b.obs, 400) || null },
+      `insert into kart.endurance_equipe (evento_id, nome, numero, transponder, chefe_nome, chefe_telefone, pago, obs) values (@e, @nome, @num, @tr, @cn, @ct, @pago, @obs) returning id`,
+      { e: ev.id, nome, num: numero, tr: txt(b.transponder, 12).replace(/\D/g, '') || null, cn: txt(b.chefeNome) || null, ct: txt(b.chefeTelefone, 20) || null, pago: !!b.pago, obs: txt(b.obs, 400) || null },
     ).catch((e) => { if (/UX_EnduranceEquipe_Numero|duplicate/i.test(String(e))) throw new HttpError(409, `Já existe equipe com a placa ${numero}.`); throw e; });
     send(201, { id: r!.id });
     return true;
@@ -355,18 +355,22 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     const id = Number(m[1]);
     if (method === 'PUT') {
       const b = await req.body();
-      await query(`UPDATE dbo.EnduranceEquipe SET Nome = COALESCE(@nome, Nome), Numero = COALESCE(@num, Numero), Transponder = @tr, ChefeNome = @cn, ChefeTelefone = @ct, Pago = @pago,
-        Desclassificada = @dq, Obs = @obs WHERE Id = @id AND EventoId = @e`, {
+      await query(`update kart.endurance_equipe set nome = coalesce(@nome, nome), numero = coalesce(@num, numero), transponder = @tr, chefe_nome = @cn, chefe_telefone = @ct, pago = @pago,
+        desclassificada = @dq, obs = @obs where id = @id and evento_id = @e`, {
         id, e: ev.id, nome: txt(b.nome, 80) || null, num: txt(b.numero, 10) || null, tr: txt(b.transponder, 12).replace(/\D/g, '') || null, cn: txt(b.chefeNome) || null,
-        ct: txt(b.chefeTelefone, 20) || null, pago: b.pago ? 1 : 0, dq: b.desclassificada ? 1 : 0, obs: txt(b.obs, 400) || null,
+        ct: txt(b.chefeTelefone, 20) || null, pago: !!b.pago, dq: !!b.desclassificada, obs: txt(b.obs, 400) || null,
       });
       send(200, { ok: true });
       return true;
     }
     if (method === 'DELETE') {
-      const usada = await one<{ n: number }>(`SELECT (SELECT COUNT(*) FROM dbo.EndurancePilotoInscricao WHERE EquipeId = @id AND Ativo = 1) + (SELECT COUNT(*) FROM dbo.EnduranceTroca WHERE EquipeId = @id) n`, { id });
+      const usada = await one<{ n: number }>(`select (select count(*) from kart.endurance_piloto_inscricao where equipe_id = @id and ativo) + (select count(*) from kart.endurance_troca where equipe_id = @id) n`, { id });
       if (usada && usada.n > 0) throw new HttpError(409, 'A equipe tem pilotos ou trocas. Tire os pilotos antes (ou marque como desclassificada).');
-      await query(`DELETE FROM dbo.EndurancePilotoEquipe WHERE EquipeId=@id OR PilotoId IN(SELECT Id FROM dbo.EndurancePiloto WHERE EquipeId=@id AND Ativo=0); DELETE FROM dbo.EndurancePiloto WHERE EquipeId = @id AND Ativo = 0; DELETE FROM dbo.EnduranceEquipe WHERE Id = @id AND EventoId = @e`, { id, e: ev.id });
+      await tx(async (run) => {
+        await run(`delete from kart.endurance_piloto_equipe where equipe_id=@id or piloto_id in (select id from kart.endurance_piloto where equipe_id=@id and not ativo)`, { id });
+        await run(`delete from kart.endurance_piloto where equipe_id = @id and not ativo`, { id });
+        await run(`delete from kart.endurance_equipe where id = @id and evento_id = @e`, { id, e: ev.id });
+      });
       send(200, { ok: true });
       return true;
     }
@@ -378,7 +382,7 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     const equipeId = idDe(b.equipeId, 'Equipe');
     const clienteId = b.clienteId ? idDe(b.clienteId, 'Cliente') : null;
     let nome = txt(b.nome);
-    if (clienteId && !nome) nome = (await one<{ nome: string }>(`SELECT Nome nome FROM dbo.Cliente WHERE Id = @id`, { id: clienteId }))?.nome ?? '';
+    if (clienteId && !nome) nome = (await one<{ nome: string }>(`select nome from kart.cliente where id = @id`, { id: clienteId }))?.nome ?? '';
     if (!nome) throw new HttpError(400, 'Informe o nome do piloto.');
     const v = await vincular(ev, equipeId, { clienteId, nome, origem: 'admin', chefe: Boolean(b.chefe) });
     send(201, v);
@@ -389,13 +393,13 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     if (method === 'PUT') {
       const b = await req.body();
       if (b.equipeId) {
-        const n = await one<{ n: number }>(`SELECT COUNT(*) n FROM dbo.EndurancePilotoInscricao WHERE EquipeId = @q AND Ativo = 1 AND Id <> @id`, { q: Number(b.equipeId), id });
+        const n = await one<{ n: number }>(`select count(*) n from kart.endurance_piloto_inscricao where equipe_id = @q and ativo and id <> @id`, { q: Number(b.equipeId), id });
         if (n && n.n >= regras.pilotosMax) throw new HttpError(409, `A equipe já tem ${regras.pilotosMax} pilotos.`);
-        await query('DELETE FROM dbo.EndurancePilotoEquipe WHERE PilotoId=@id AND EXISTS(SELECT 1 FROM dbo.EndurancePiloto WHERE Id=@id AND EquipeId<>@q)',{id,q:Number(b.equipeId)});
+        await query('delete from kart.endurance_piloto_equipe where piloto_id=@id and exists(select 1 from kart.endurance_piloto where id=@id and equipe_id<>@q)',{id,q:Number(b.equipeId)});
       }
-      await query(`UPDATE dbo.EndurancePiloto SET Nome = COALESCE(@nome, Nome), EquipeId = COALESCE(@q, EquipeId), Chefe = COALESCE(@chefe, Chefe),
-        PesoKg = CASE WHEN @temPeso = 1 THEN @peso ELSE PesoKg END, LastroKg = CASE WHEN @temLastro = 1 THEN @lastro ELSE LastroKg END WHERE Id = @id AND EventoId = @e`, {
-        id, e: ev.id, nome: txt(b.nome) || null, q: b.equipeId ? Number(b.equipeId) : null, chefe: b.chefe === undefined ? null : (b.chefe ? 1 : 0),
+      await query(`update kart.endurance_piloto set nome = coalesce(@nome, nome), equipe_id = coalesce(@q::int, equipe_id), chefe = coalesce(@chefe::boolean, chefe),
+        peso_kg = case when @temPeso::int = 1 then @peso::numeric else peso_kg end, lastro_kg = case when @temLastro::int = 1 then @lastro::numeric else lastro_kg end where id = @id and evento_id = @e`, {
+        id, e: ev.id, nome: txt(b.nome) || null, q: b.equipeId ? Number(b.equipeId) : null, chefe: b.chefe === undefined ? null : !!b.chefe,
         temPeso: b.pesoKg === undefined ? 0 : 1, peso: num(b.pesoKg), temLastro: b.lastroKg === undefined ? 0 : 1, lastro: num(b.lastroKg),
       });
       send(200, { ok: true });
@@ -403,7 +407,7 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     }
     if (method === 'DELETE') {
       // a pulseira não volta para ninguém (a pulseira física já pode estar no braço de alguém)
-      await query(`UPDATE dbo.EndurancePiloto SET Ativo = 0, Pulseira = -Id WHERE Id = @id AND EventoId = @e`, { id, e: ev.id });
+      await query(`update kart.endurance_piloto set ativo = false, pulseira = -id where id = @id and evento_id = @e`, { id, e: ev.id });
       send(200, { ok: true });
       return true;
     }
@@ -416,11 +420,11 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     const resumo = { equipes: 0, pilotos: 0, erros: [] as string[] };
     for (const [numero, nomeEq, nomePil, cpf, chefe] of linhas) {
       if (/^(placa|numero|número|n[ºo°])$/i.test(numero)) continue;
-      let eq = await one<{ id: number }>(`SELECT Id id FROM dbo.EnduranceEquipe WHERE EventoId = @e AND Numero = @n`, { e: ev.id, n: numero.slice(0, 10) });
-      if (!eq) { eq = await one<{ id: number }>(`INSERT INTO dbo.EnduranceEquipe (EventoId, Nome, Numero, Pago) OUTPUT INSERTED.Id id VALUES (@e, @nome, @n, 1)`, { e: ev.id, nome: nomeEq.slice(0, 80), n: numero.slice(0, 10) }); resumo.equipes++; }
+      let eq = await one<{ id: number }>(`select id from kart.endurance_equipe where evento_id = @e and numero = @n`, { e: ev.id, n: numero.slice(0, 10) });
+      if (!eq) { eq = await one<{ id: number }>(`insert into kart.endurance_equipe (evento_id, nome, numero, pago) values (@e, @nome, @n, true) returning id`, { e: ev.id, nome: nomeEq.slice(0, 80), n: numero.slice(0, 10) }); resumo.equipes++; }
       if (!nomePil) continue;
       const digitos = String(cpf ?? '').replace(/\D/g, '');
-      const cli = digitos.length >= 5 ? await one<{ id: number; nome: string }>(`SELECT TOP 1 Id id, Nome nome FROM dbo.Cliente WHERE DocumentoNum = @d ORDER BY CASE WHEN ResponsavelId IS NULL THEN 0 ELSE 1 END`, { d: digitos }) : null;
+      const cli = digitos.length >= 5 ? await one<{ id: number; nome: string }>(`select id, nome from kart.cliente where documento_num = @d order by case when responsavel_id is null then 0 else 1 end limit 1`, { d: digitos }) : null;
       try {
         const v = await vincular(ev, eq!.id, { clienteId: cli?.id ?? null, nome: cli?.nome ?? nomePil, origem: 'importado', chefe: /^(chefe|sim|s|x)$/i.test(chefe ?? '') });
         if (v.novo) resumo.pilotos++;
@@ -433,10 +437,10 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
   // ---- pesagem
   if ((m = resto.match(/^\/pulseira\/(\d+)$/)) && method === 'GET') {
     const p = await pilotoPorPulseira(ev.id, Number(m[1]));
-    const eq = await one<Equipe>(`SELECT ${EQUIPE_COLS} FROM dbo.EnduranceEquipe WHERE Id = @id`, { id: p.equipeId });
+    const eq = await one<Equipe>(`select ${EQUIPE_COLS} from kart.endurance_equipe where id = @id`, { id: p.equipeId });
     const pesagens = (await pesagensDo(ev.id)).filter((x) => x.pilotoId === p.id);
     const companheiros = (await pilotosDo(ev.id)).filter((x) => x.equipeId === p.equipeId && x.id !== p.id).map((x) => ({ nome: x.nome, pulseira: x.pulseira }));
-    const equipes=await query<Equipe>(`SELECT q.Id id,q.Nome nome,q.Numero numero FROM dbo.EnduranceEquipe q JOIN dbo.EndurancePilotoInscricao v ON v.EquipeId=q.Id WHERE v.Id=@p AND v.Ativo=1 ORDER BY q.Nome`,{p:p.id});
+    const equipes=await query<Equipe>(`select q.id,q.nome,q.numero from kart.endurance_equipe q join kart.endurance_piloto_inscricao v on v.equipe_id=q.id where v.id=@p and v.ativo order by q.nome`,{p:p.id});
     send(200, { piloto: p, equipe: eq, equipes, pesagens, companheiros, regras, lastroSugerido: p.pesoKg != null ? lastroNecessario(p.pesoKg, regras) : null });
     return true;
   }
@@ -454,15 +458,15 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     const av = avaliarPeso(total, regras);
     const r = await tx(async (run) => {
       const ins = (await run(
-        `INSERT INTO dbo.EndurancePesagem (EventoId, PilotoId, Momento, BalancaKg, LastroKg, TotalKg, Resultado, PunicaoSeg, Usuario, Obs, EmMs) OUTPUT INSERTED.Id id
-         VALUES (@e, @p, @mo, @b, @l, @t, @res, @pun, @u, @obs, @ms)`,
+        `insert into kart.endurance_pesagem (evento_id, piloto_id, momento, balanca_kg, lastro_kg, total_kg, resultado, punicao_seg, usuario, obs, em_ms)
+         values (@e, @p, @mo, @b, @l, @t, @res, @pun, @u, @obs, @ms) returning id`,
         { e: ev.id, p: p.id, mo: momento, b: balanca, l: lastro, t: total, res: av.resultado, pun: av.punicaoSeg, u: quem, obs: txt(b.obs, 300) || null, ms: Date.now() },
       ))[0] as { id: number };
-      if (momento === 'inicial') await run(`UPDATE dbo.EndurancePiloto SET PesoKg = @peso, LastroKg = @l WHERE Id = @id`, { peso: balanca, l: lastro, id: p.id });
-      else if (lastro != null) await run(`UPDATE dbo.EndurancePiloto SET LastroKg = @l WHERE Id = @id`, { l: lastro, id: p.id });
+      if (momento === 'inicial') await run(`update kart.endurance_piloto set peso_kg = @peso, lastro_kg = @l where id = @id`, { peso: balanca, l: lastro, id: p.id });
+      else if (lastro != null) await run(`update kart.endurance_piloto set lastro_kg = @l where id = @id`, { l: lastro, id: p.id });
       // a pesagem de antes da largada só define o lastro; punição vale para as pesagens durante e depois da prova
       if (momento !== 'inicial' && av.resultado !== 'ok') {
-        await run(`INSERT INTO dbo.EndurancePunicao (EventoId, EquipeId, Tipo, Valor, Motivo, Origem, PesagemId, Usuario) VALUES (@e, @q, @tipo, @v, @mot, 'pesagem', @pid, @u)`, {
+        await run(`insert into kart.endurance_punicao (evento_id, equipe_id, tipo, valor, motivo, origem, pesagem_id, usuario) values (@e, @q, @tipo, @v, @mot, 'pesagem', @pid, @u)`, {
           e: ev.id, q: p.equipeId, tipo: av.resultado === 'dq' ? 'dq' : 'segundos', v: av.punicaoSeg, pid: ins.id, u: quem,
           mot: `Pesagem (${momento}) de ${p.nome}, pulseira ${p.pulseira}: ${total.toFixed(2).replace('.', ',')} kg. ${av.mensagem}`.slice(0, 300),
         });
@@ -473,7 +477,11 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     return true;
   }
   if ((m = resto.match(/^\/pesagens\/(\d+)$/)) && method === 'DELETE') {
-    await query(`UPDATE dbo.EndurancePunicao SET Cancelada = 1 WHERE PesagemId = @id AND EventoId = @e; DELETE FROM dbo.EndurancePesagem WHERE Id = @id AND EventoId = @e`, { id: Number(m[1]), e: ev.id });
+    const pes = { id: Number(m[1]), e: ev.id };
+    await tx(async (run) => {
+      await run(`update kart.endurance_punicao set cancelada = true where pesagem_id = @id and evento_id = @e`, pes);
+      await run(`delete from kart.endurance_pesagem where id = @id and evento_id = @e`, pes);
+    });
     send(200, { ok: true });
     return true;
   }
@@ -484,8 +492,8 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     const b = await req.body();
     const fil = (b.fileiras ?? {}) as Record<string, unknown[]>;
     await tx(async (run) => {
-      await run(`DELETE FROM dbo.EnduranceFila WHERE EventoId = @e AND Situacao <> 'pista'`, { e: ev.id });
-      const naPista = new Set(((await run(`SELECT Kart kart FROM dbo.EnduranceFila WHERE EventoId = @e`, { e: ev.id })) as { kart: string }[]).map((x) => x.kart));
+      await run(`delete from kart.endurance_fila where evento_id = @e and situacao <> 'pista'`, { e: ev.id });
+      const naPista = new Set(((await run(`select kart from kart.endurance_fila where evento_id = @e`, { e: ev.id })) as { kart: string }[]).map((x) => x.kart));
       for (const [f, karts] of Object.entries(fil)) {
         const fileira = Number(f);
         if (!Number.isInteger(fileira) || fileira < 1 || fileira > 12) continue;
@@ -493,12 +501,12 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
         for (const k of karts.map((x) => txt(x, 10)).filter(Boolean)) {
           if (naPista.has(k)) continue;
           naPista.add(k);
-          await run(`INSERT INTO dbo.EnduranceFila (EventoId, Kart, Fileira, Ordem, Situacao) VALUES (@e, @k, @f, @o, 'fila')`, { e: ev.id, k, f: fileira, o: ++ordem });
+          await run(`insert into kart.endurance_fila (evento_id, kart, fileira, ordem, situacao) values (@e, @k, @f, @o, 'fila')`, { e: ev.id, k, f: fileira, o: ++ordem });
         }
       }
       for (const k of (Array.isArray(b.fora) ? b.fora : []).map((x: unknown) => txt(x, 10)).filter(Boolean)) {
         if (naPista.has(k)) continue;
-        await run(`INSERT INTO dbo.EnduranceFila (EventoId, Kart, Situacao) VALUES (@e, @k, 'fora')`, { e: ev.id, k });
+        await run(`insert into kart.endurance_fila (evento_id, kart, situacao) values (@e, @k, 'fora')`, { e: ev.id, k });
       }
     });
     send(200, { filas: await filasDo(ev.id) });
@@ -510,11 +518,11 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     const kart = txt(b.kart, 10);
     const sit = String(b.situacao ?? 'fila');
     const fileira = b.fileira ? Number(b.fileira) : null;
-    const k = await one<{ situacao: string }>(`SELECT Situacao situacao FROM dbo.EnduranceFila WHERE EventoId = @e AND Kart = @k`, { e: ev.id, k: kart });
+    const k = await one<{ situacao: string }>(`select situacao from kart.endurance_fila where evento_id = @e and kart = @k`, { e: ev.id, k: kart });
     if (k?.situacao === 'pista') throw new HttpError(409, `O kart ${kart} está na pista com uma equipe. Faça a troca primeiro.`);
-    const ordem = await one<{ o: number }>(`SELECT ISNULL(${b.inicio ? 'MIN(Ordem) - 1' : 'MAX(Ordem) + 1'}, 1) o FROM dbo.EnduranceFila WHERE EventoId = @e AND Fileira = @f AND Situacao = 'fila'`, { e: ev.id, f: fileira });
-    if (k) await query(`UPDATE dbo.EnduranceFila SET Situacao = @s, Fileira = @f, Ordem = @o, Obs = @obs WHERE EventoId = @e AND Kart = @k`, { e: ev.id, k: kart, s: sit === 'fora' ? 'fora' : 'fila', f: sit === 'fora' ? null : fileira, o: sit === 'fora' ? null : ordem?.o ?? 1, obs: txt(b.obs, 200) || null });
-    else await query(`INSERT INTO dbo.EnduranceFila (EventoId, Kart, Fileira, Ordem, Situacao, Obs) VALUES (@e, @k, @f, @o, @s, @obs)`, { e: ev.id, k: kart, s: sit === 'fora' ? 'fora' : 'fila', f: sit === 'fora' ? null : fileira, o: sit === 'fora' ? null : ordem?.o ?? 1, obs: txt(b.obs, 200) || null });
+    const ordem = await one<{ o: number }>(`select coalesce(${b.inicio ? 'min(ordem) - 1' : 'max(ordem) + 1'}, 1) o from kart.endurance_fila where evento_id = @e and fileira = @f::int and situacao = 'fila'`, { e: ev.id, f: fileira });
+    if (k) await query(`update kart.endurance_fila set situacao = @s, fileira = @f, ordem = @o, obs = @obs where evento_id = @e and kart = @k`, { e: ev.id, k: kart, s: sit === 'fora' ? 'fora' : 'fila', f: sit === 'fora' ? null : fileira, o: sit === 'fora' ? null : ordem?.o ?? 1, obs: txt(b.obs, 200) || null });
+    else await query(`insert into kart.endurance_fila (evento_id, kart, fileira, ordem, situacao, obs) values (@e, @k, @f, @o, @s, @obs)`, { e: ev.id, k: kart, s: sit === 'fora' ? 'fora' : 'fila', f: sit === 'fora' ? null : fileira, o: sit === 'fora' ? null : ordem?.o ?? 1, obs: txt(b.obs, 200) || null });
     send(200, { filas: await filasDo(ev.id) });
     return true;
   }
@@ -522,16 +530,16 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     // sorteio dos karts do briefing: cada equipe sem kart recebe um kart sorteado entre os das fileiras
     const b = await req.body();
     const res = await tx(async (run) => {
-      const livres = (await run(`SELECT Kart kart FROM dbo.EnduranceFila WITH (UPDLOCK) WHERE EventoId = @e AND Situacao = 'fila'`, { e: ev.id }) as { kart: string }[]).map((x) => x.kart);
-      const semKart = (await run(`SELECT q.Id id, q.Numero numero, q.Nome nome FROM dbo.EnduranceEquipe q WHERE q.EventoId = @e AND q.Desclassificada = 0
-        AND NOT EXISTS (SELECT 1 FROM dbo.EnduranceFila f WHERE f.EventoId = q.EventoId AND f.EquipeId = q.Id AND f.Situacao = 'pista')`, { e: ev.id })) as { id: number; numero: string; nome: string }[];
+      const livres = (await run(`select kart from kart.endurance_fila where evento_id = @e and situacao = 'fila' for update`, { e: ev.id }) as { kart: string }[]).map((x) => x.kart);
+      const semKart = (await run(`select q.id, q.numero, q.nome from kart.endurance_equipe q where q.evento_id = @e and not q.desclassificada
+        and not exists (select 1 from kart.endurance_fila f where f.evento_id = q.evento_id and f.equipe_id = q.id and f.situacao = 'pista')`, { e: ev.id })) as { id: number; numero: string; nome: string }[];
       if (livres.length < semKart.length) throw new HttpError(409, `Há ${semKart.length} equipes sem kart e só ${livres.length} karts nas fileiras.`);
       for (let i = livres.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [livres[i], livres[j]] = [livres[j], livres[i]]; }
       const out: { equipe: string; numero: string; kart: string }[] = [];
       for (const [i, q] of semKart.entries()) {
         const kart = livres[i];
-        await run(`UPDATE dbo.EnduranceFila SET Situacao = 'pista', EquipeId = @q, Fileira = NULL, Ordem = NULL WHERE EventoId = @e AND Kart = @k`, { e: ev.id, q: q.id, k: kart });
-        await run(`INSERT INTO dbo.EnduranceTroca (EventoId, EquipeId, Kart, Tipo, Usuario, Obs, EmMs) VALUES (@e, @q, @k, 'largada', @u, @obs, @ms)`, { e: ev.id, q: q.id, k: kart, u: quem, obs: txt(b.obs, 300) || 'Sorteio dos karts do briefing', ms: Date.now() });
+        await run(`update kart.endurance_fila set situacao = 'pista', equipe_id = @q, fileira = null, ordem = null where evento_id = @e and kart = @k`, { e: ev.id, q: q.id, k: kart });
+        await run(`insert into kart.endurance_troca (evento_id, equipe_id, kart, tipo, usuario, obs, em_ms) values (@e, @q, @k, 'largada', @u, @obs, @ms)`, { e: ev.id, q: q.id, k: kart, u: quem, obs: txt(b.obs, 300) || 'Sorteio dos karts do briefing', ms: Date.now() });
         out.push({ equipe: q.nome, numero: q.numero, kart });
       }
       return out;
@@ -546,7 +554,7 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     const p = b.pulseira ? await pilotoPorPulseira(ev.id, idDe(b.pulseira, 'Pulseira'),b.equipeId?idDe(b.equipeId,'Inscrição'):undefined,true) : null;
     const equipeId = p?.equipeId ?? idDe(b.equipeId, 'Equipe');
     const r = await tx(async (run) => {
-      const filasAgora = (await run(`SELECT Kart kart, Fileira fileira, Ordem ordem, Situacao situacao, EquipeId equipeId FROM dbo.EnduranceFila WITH (UPDLOCK) WHERE EventoId = @e ORDER BY Fileira, Ordem`, { e: ev.id })) as { kart: string; fileira: number | null; ordem: number | null; situacao: string; equipeId: number | null }[];
+      const filasAgora = (await run(`select kart, fileira, ordem, situacao, equipe_id "equipeId" from kart.endurance_fila where evento_id = @e order by fileira nulls first, ordem nulls first for update`, { e: ev.id })) as { kart: string; fileira: number | null; ordem: number | null; situacao: string; equipeId: number | null }[];
       const anterior = filasAgora.find((f) => f.situacao === 'pista' && f.equipeId === equipeId) ?? null;
       let kart: string; let fileira: number | null = null;
       const manual = txt(b.kart, 10);
@@ -568,33 +576,33 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
         for (let f = 1; f <= regras.fileiras; f++) cont.set(f, 0);
         for (const f of filasAgora) if (f.situacao === 'fila' && f.fileira && f.kart !== kart) cont.set(f.fileira, (cont.get(f.fileira) ?? 0) + 1);
         devolvidoEm = b.devolverFileira ? Number(b.devolverFileira) : [...cont.entries()].sort((x, y) => x[1] - y[1] || x[0] - y[0])[0][0];
-        if (b.kartAnteriorFora) await run(`UPDATE dbo.EnduranceFila SET Situacao = 'fora', EquipeId = NULL, Fileira = NULL, Ordem = NULL, Obs = @obs WHERE EventoId = @e AND Kart = @k`, { e: ev.id, k: anterior.kart, obs: txt(b.obs, 200) || 'Retirado na troca' });
+        if (b.kartAnteriorFora) await run(`update kart.endurance_fila set situacao = 'fora', equipe_id = null, fileira = null, ordem = null, obs = @obs where evento_id = @e and kart = @k`, { e: ev.id, k: anterior.kart, obs: txt(b.obs, 200) || 'Retirado na troca' });
         else {
-          const max = (await run(`SELECT ISNULL(MAX(Ordem), 0) + 1 o FROM dbo.EnduranceFila WHERE EventoId = @e AND Fileira = @f AND Situacao = 'fila'`, { e: ev.id, f: devolvidoEm }))[0] as { o: number };
-          await run(`UPDATE dbo.EnduranceFila SET Situacao = 'fila', EquipeId = NULL, Fileira = @f, Ordem = @o WHERE EventoId = @e AND Kart = @k`, { e: ev.id, k: anterior.kart, f: devolvidoEm, o: max.o });
+          const max = (await run(`select coalesce(max(ordem), 0) + 1 o from kart.endurance_fila where evento_id = @e and fileira = @f and situacao = 'fila'`, { e: ev.id, f: devolvidoEm }))[0] as { o: number };
+          await run(`update kart.endurance_fila set situacao = 'fila', equipe_id = null, fileira = @f, ordem = @o where evento_id = @e and kart = @k`, { e: ev.id, k: anterior.kart, f: devolvidoEm, o: max.o });
         }
       }
       const existe = filasAgora.some((f) => f.kart === kart);
-      if (existe) await run(`UPDATE dbo.EnduranceFila SET Situacao = 'pista', EquipeId = @q, Fileira = NULL, Ordem = NULL WHERE EventoId = @e AND Kart = @k`, { e: ev.id, q: equipeId, k: kart });
-      else await run(`INSERT INTO dbo.EnduranceFila (EventoId, Kart, Situacao, EquipeId) VALUES (@e, @k, 'pista', @q)`, { e: ev.id, k: kart, q: equipeId });
+      if (existe) await run(`update kart.endurance_fila set situacao = 'pista', equipe_id = @q, fileira = null, ordem = null where evento_id = @e and kart = @k`, { e: ev.id, q: equipeId, k: kart });
+      else await run(`insert into kart.endurance_fila (evento_id, kart, situacao, equipe_id) values (@e, @k, 'pista', @q)`, { e: ev.id, k: kart, q: equipeId });
       const ins = (await run(
-        `INSERT INTO dbo.EnduranceTroca (EventoId, EquipeId, PilotoId, Kart, KartDevolvido, Fileira, Tipo, Usuario, Obs, EmMs) OUTPUT INSERTED.Id id VALUES (@e, @q, @p, @k, @kd, @f, @t, @u, @obs, @ms)`,
+        `insert into kart.endurance_troca (evento_id, equipe_id, piloto_id, kart, kart_devolvido, fileira, tipo, usuario, obs, em_ms) values (@e, @q, @p, @k, @kd, @f, @t, @u, @obs, @ms) returning id`,
         { e: ev.id, q: equipeId, p: p?.id ?? null, k: kart, kd: anterior && anterior.kart !== kart ? anterior.kart : null, f: fileira, t: tipo, u: quem, obs: txt(b.obs, 300) || null, ms: Date.now() },
       ))[0] as { id: number };
       return { id: ins.id, kart, fileira, devolvido: anterior && anterior.kart !== kart ? { kart: anterior.kart, fileira: b.kartAnteriorFora ? null : devolvidoEm } : null };
     });
-    const eq = await one<{ nome: string; numero: string }>(`SELECT Nome nome, Numero numero FROM dbo.EnduranceEquipe WHERE Id = @id`, { id: equipeId });
+    const eq = await one<{ nome: string; numero: string }>(`select nome, numero from kart.endurance_equipe where id = @id`, { id: equipeId });
     send(201, { ...r, piloto: p ? { nome: p.nome, pulseira: p.pulseira } : null, equipe: eq });
     return true;
   }
   if ((m = resto.match(/^\/trocas\/(\d+)$/)) && method === 'PUT') {
     // escolher depois quem larga (sorteio do briefing) ou corrigir o piloto de uma troca
     const b = await req.body();
-    const t = await one<{ equipeId: number }>(`SELECT EquipeId equipeId FROM dbo.EnduranceTroca WHERE Id = @id AND EventoId = @e`, { id: Number(m[1]), e: ev.id });
+    const t = await one<{ equipeId: number }>(`select equipe_id "equipeId" from kart.endurance_troca where id = @id and evento_id = @e`, { id: Number(m[1]), e: ev.id });
     if (!t) throw new HttpError(404, 'Troca não encontrada.');
-    const p = b.pulseira ? await pilotoPorPulseira(ev.id, idDe(b.pulseira, 'Pulseira'),t.equipeId) : b.pilotoId ? await one<Piloto>(`${PILOTO_SQL} WHERE p.Id = @id AND p.EventoId = @e AND p.EquipeId=@q`, { id: Number(b.pilotoId), e: ev.id,q:t.equipeId }) : null;
+    const p = b.pulseira ? await pilotoPorPulseira(ev.id, idDe(b.pulseira, 'Pulseira'),t.equipeId) : b.pilotoId ? await one<Piloto>(`${PILOTO_SQL} where p.id = @id and p.evento_id = @e and p.equipe_id=@q`, { id: Number(b.pilotoId), e: ev.id,q:t.equipeId }) : null;
     if (p && p.equipeId !== t.equipeId) throw new HttpError(409, `${p.nome} é de outra equipe.`);
-    await query(`UPDATE dbo.EnduranceTroca SET PilotoId = @p WHERE Id = @id`, { p: p?.id ?? null, id: Number(m[1]) });
+    await query(`update kart.endurance_troca set piloto_id = @p where id = @id`, { p: p?.id ?? null, id: Number(m[1]) });
     send(200, { ok: true });
     return true;
   }
@@ -602,16 +610,16 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     // só a última troca da equipe: o kart volta para o começo da fileira de onde saiu e o anterior volta para a equipe
     const id = Number(m[1]);
     await tx(async (run) => {
-      const t = (await run(`SELECT Id id, EquipeId equipeId, Kart kart, KartDevolvido kartDevolvido, Fileira fileira FROM dbo.EnduranceTroca WHERE Id = @id AND EventoId = @e AND Cancelada = 0`, { id, e: ev.id }))[0] as { id: number; equipeId: number; kart: string; kartDevolvido: string | null; fileira: number | null } | undefined;
+      const t = (await run(`select id, equipe_id "equipeId", kart, kart_devolvido "kartDevolvido", fileira from kart.endurance_troca where id = @id and evento_id = @e and not cancelada`, { id, e: ev.id }))[0] as { id: number; equipeId: number; kart: string; kartDevolvido: string | null; fileira: number | null } | undefined;
       if (!t) throw new HttpError(404, 'Troca não encontrada.');
-      const ultima = (await run(`SELECT MAX(Id) id FROM dbo.EnduranceTroca WHERE EquipeId = @q AND Cancelada = 0`, { q: t.equipeId }))[0] as { id: number };
+      const ultima = (await run(`select max(id) id from kart.endurance_troca where equipe_id = @q and not cancelada`, { q: t.equipeId }))[0] as { id: number };
       if (ultima.id !== t.id) throw new HttpError(409, 'Só dá para desfazer a última troca da equipe.');
       if (t.fileira) {
-        const min = (await run(`SELECT ISNULL(MIN(Ordem), 1) - 1 o FROM dbo.EnduranceFila WHERE EventoId = @e AND Fileira = @f AND Situacao = 'fila'`, { e: ev.id, f: t.fileira }))[0] as { o: number };
-        await run(`UPDATE dbo.EnduranceFila SET Situacao = 'fila', EquipeId = NULL, Fileira = @f, Ordem = @o WHERE EventoId = @e AND Kart = @k`, { e: ev.id, k: t.kart, f: t.fileira, o: min.o });
-      } else await run(`UPDATE dbo.EnduranceFila SET Situacao = 'fila', EquipeId = NULL, Fileira = 1, Ordem = 0 WHERE EventoId = @e AND Kart = @k`, { e: ev.id, k: t.kart });
-      if (t.kartDevolvido) await run(`UPDATE dbo.EnduranceFila SET Situacao = 'pista', EquipeId = @q, Fileira = NULL, Ordem = NULL WHERE EventoId = @e AND Kart = @k`, { e: ev.id, k: t.kartDevolvido, q: t.equipeId });
-      await run(`UPDATE dbo.EnduranceTroca SET Cancelada = 1, Obs = CONCAT(ISNULL(Obs + ' · ', ''), 'desfeita por ', @u) WHERE Id = @id`, { id, u: quem });
+        const min = (await run(`select coalesce(min(ordem), 1) - 1 o from kart.endurance_fila where evento_id = @e and fileira = @f and situacao = 'fila'`, { e: ev.id, f: t.fileira }))[0] as { o: number };
+        await run(`update kart.endurance_fila set situacao = 'fila', equipe_id = null, fileira = @f, ordem = @o where evento_id = @e and kart = @k`, { e: ev.id, k: t.kart, f: t.fileira, o: min.o });
+      } else await run(`update kart.endurance_fila set situacao = 'fila', equipe_id = null, fileira = 1, ordem = 0 where evento_id = @e and kart = @k`, { e: ev.id, k: t.kart });
+      if (t.kartDevolvido) await run(`update kart.endurance_fila set situacao = 'pista', equipe_id = @q, fileira = null, ordem = null where evento_id = @e and kart = @k`, { e: ev.id, k: t.kartDevolvido, q: t.equipeId });
+      await run(`update kart.endurance_troca set cancelada = true, obs = concat(coalesce(obs || ' · ', ''), 'desfeita por ', @u::text) where id = @id`, { id, u: quem });
     });
     send(200, { ok: true });
     return true;
@@ -624,13 +632,13 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     if (!['segundos', 'voltas', 'advertencia', 'dq'].includes(tipo)) throw new HttpError(400, 'Tipo de punição inválido.');
     const motivo = txt(b.motivo, 300);
     if (!motivo) throw new HttpError(400, 'Escreva o motivo.');
-    await query(`INSERT INTO dbo.EndurancePunicao (EventoId, EquipeId, Tipo, Valor, Motivo, Usuario) VALUES (@e, @q, @t, @v, @m, @u)`,
+    await query(`insert into kart.endurance_punicao (evento_id, equipe_id, tipo, valor, motivo, usuario) values (@e, @q, @t, @v, @m, @u)`,
       { e: ev.id, q: idDe(b.equipeId, 'Equipe'), t: tipo, v: Math.max(0, Math.round(num(b.valor) ?? 0)), m: motivo, u: quem });
     send(201, { ok: true });
     return true;
   }
   if ((m = resto.match(/^\/punicoes\/(\d+)$/)) && method === 'DELETE') {
-    await query(`UPDATE dbo.EndurancePunicao SET Cancelada = 1 WHERE Id = @id AND EventoId = @e`, { id: Number(m[1]), e: ev.id });
+    await query(`update kart.endurance_punicao set cancelada = true where id = @id and evento_id = @e`, { id: Number(m[1]), e: ev.id });
     send(200, { ok: true });
     return true;
   }
@@ -638,9 +646,9 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     const b = await req.body();
     const equipeId = idDe(b.equipeId, 'Equipe'), volta = idDe(b.volta, 'Volta');
     const acao = String(b.acao ?? '');
-    await query(`DELETE FROM dbo.EnduranceParadaAjuste WHERE EventoId = @e AND EquipeId = @q AND Volta = @v`, { e: ev.id, q: equipeId, v: volta });
+    await query(`delete from kart.endurance_parada_ajuste where evento_id = @e and equipe_id = @q and volta = @v`, { e: ev.id, q: equipeId, v: volta });
     if (['quebra', 'invalidar', 'ignorar', 'validar'].includes(acao)) {
-      await query(`INSERT INTO dbo.EnduranceParadaAjuste (EventoId, EquipeId, Volta, Acao, Usuario) VALUES (@e, @q, @v, @a, @u)`, { e: ev.id, q: equipeId, v: volta, a: acao, u: quem });
+      await query(`insert into kart.endurance_parada_ajuste (evento_id, equipe_id, volta, acao, usuario) values (@e, @q, @v, @a, @u)`, { e: ev.id, q: equipeId, v: volta, a: acao, u: quem });
     }
     cacheCrono.delete(ev.sessaoCrono ?? '');
     send(200, { ok: true });

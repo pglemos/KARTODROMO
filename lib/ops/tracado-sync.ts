@@ -59,8 +59,7 @@ export async function syncTimingTracks({
   // O servidor pode estar atualizando uma instalação criada antes deste espelho.
   // Fazemos isso antes da chamada externa para que o fallback histórico continue
   // funcionando mesmo se a Cronometragem estiver temporariamente indisponível.
-  await query(`IF OBJECT_ID('dbo.Tracado', 'U') IS NOT NULL AND COL_LENGTH('dbo.Tracado', 'TimingTrackId') IS NULL
-    ALTER TABLE dbo.Tracado ADD TimingTrackId NVARCHAR(80) NULL`);
+  // kart.tracado.timing_track_id já vem das migrations do Kartódromo OS.
 
   const response = await fetcher(`${timingUrl.replace(/\/$/, '')}/api/catalog/tracks`, { signal: AbortSignal.timeout(5_000) });
   if (!response.ok) throw new Error(`A cronometragem respondeu HTTP ${response.status}.`);
@@ -68,7 +67,7 @@ export async function syncTimingTracks({
   if (!tracks.length) throw new Error('A cronometragem não devolveu nenhum traçado ativo.');
 
   const atuais = await query<{ id: number; timingId: string | null }>(
-    `SELECT Id id, TimingTrackId timingId FROM dbo.Tracado WHERE TimingTrackId IS NOT NULL`,
+    `select id, timing_track_id "timingId" from kart.tracado where timing_track_id is not null`,
   );
   const porTimingId = new Map(atuais.filter((r) => r.timingId).map((r) => [String(r.timingId), r.id]));
   const idsCanonicos = new Map(porTimingId);
@@ -79,13 +78,13 @@ export async function syncTimingTracks({
     const id = porTimingId.get(track.id);
     if (id) {
       await query(
-        `UPDATE dbo.Tracado SET Nome = @nome, Comprimento = @comprimento, Ativo = 1 WHERE Id = @id`,
+        `update kart.tracado set nome = @nome, comprimento = @comprimento, ativo = true where id = @id`,
         { id, nome: track.name, comprimento: track.lengthMeters },
       );
     } else {
       const criado = await one<{ id: number }>(
-        `INSERT INTO dbo.Tracado (Nome, Comprimento, Ativo, TimingTrackId) OUTPUT inserted.Id id
-         VALUES (@nome, @comprimento, 1, @timingId)`,
+        `insert into kart.tracado (nome, comprimento, ativo, timing_track_id)
+         values (@nome, @comprimento, true, @timingId) returning id`,
         { nome: track.name, comprimento: track.lengthMeters, timingId: track.id },
       );
       if (criado?.id) idsCanonicos.set(track.id, criado.id);
@@ -97,7 +96,7 @@ export async function syncTimingTracks({
   // apontamos somente baterias futuras e padrões ativos para a variante Normal
   // de mesmo número e comprimento. Histórico e provas já iniciadas não mudam.
   const antigos = await query<{ id: number; nome: string; comprimento: number | null }>(
-    `SELECT Id id, Nome nome, Comprimento comprimento FROM dbo.Tracado WHERE TimingTrackId IS NULL AND Ativo = 1`,
+    `select id, nome, comprimento from kart.tracado where timing_track_id is null and ativo`,
   );
   for (const antigo of antigos) {
     const match = antigo.nome.match(/^Traçado\s+(\d+)$/i);
@@ -105,14 +104,14 @@ export async function syncTimingTracks({
     const normal = tracks.find((track) => track.name === `Traçado ${match[1]} Normal` && Number(antigo.comprimento) === track.lengthMeters);
     const novoId = normal ? idsCanonicos.get(normal.id) : undefined;
     if (!novoId) continue;
-    await query(`UPDATE dbo.Bateria SET TracadoId = @novo WHERE TracadoId = @antigo AND Inicio >= SYSDATETIME()`, { novo: novoId, antigo: antigo.id });
-    await query(`UPDATE dbo.PadraoReserva SET TracadoId = @novo WHERE TracadoId = @antigo AND Ativo = 1`, { novo: novoId, antigo: antigo.id });
+    await query(`update kart.bateria set tracado_id = @novo where tracado_id = @antigo and inicio >= now()`, { novo: novoId, antigo: antigo.id });
+    await query(`update kart.padrao_reserva set tracado_id = @novo where tracado_id = @antigo and ativo`, { novo: novoId, antigo: antigo.id });
   }
 
   // Registros retirados/inativados na Cronometragem não continuam aparecendo na Recepção.
   for (const atual of atuais) {
     if (atual.timingId && !idsAtivos.has(String(atual.timingId))) {
-      await query(`UPDATE dbo.Tracado SET Ativo = 0 WHERE Id = @id`, { id: atual.id });
+      await query(`update kart.tracado set ativo = false where id = @id`, { id: atual.id });
     }
   }
   return tracks;

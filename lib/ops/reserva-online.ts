@@ -58,7 +58,7 @@ export const produtoDaBateria = (produtoBateria: number | null | undefined, c = 
 
 /**
  * Primeira vez no kartódromo: CPF sem cadastro, ou cadastro sem nenhuma inscrição (corrida, marcada ou paga) e que não veio
- * dos sistemas antigos de cronometragem (LapTime/CalXPro = já passou pela pista antes de 2026).
+ * dos sistemas antigos de cronometragem (origem 'legado' = já passou pela pista antes de 2026).
  */
 export async function primeiraVez(documentos: string[], read: ReadOne): Promise<boolean[]> {
   const out: boolean[] = [];
@@ -66,10 +66,10 @@ export async function primeiraVez(documentos: string[], read: ReadOne): Promise<
     const doc = onlyDigits(d);
     if (!isValidCpf(doc)) { out.push(false); continue; }
     const r = await read(
-      `SELECT COUNT(*) n FROM dbo.Cliente c
-        WHERE (c.DocumentoNum = @doc OR c.Documento = @doc)
-          AND (c.Origem IN ('laptime', 'calxpro') OR c.LegadoId IS NOT NULL OR c.CalxproId IS NOT NULL
-               OR EXISTS (SELECT 1 FROM dbo.Inscricao i WHERE i.ClienteId = c.Id AND i.Status <> 'cancelada'))`,
+      `select count(*) n from kart.cliente c
+        where (c.documento_num = @doc or c.documento = @doc)
+          and (c.origem = 'legado' or c.legado_id is not null
+               or exists (select 1 from kart.inscricao i where i.cliente_id = c.id and i.status <> 'cancelada'))`,
       { doc },
     );
     out.push(Number(r?.n ?? 1) === 0);
@@ -80,15 +80,15 @@ export async function primeiraVez(documentos: string[], read: ReadOne): Promise<
 /** Baterias à venda no site: abertas, que aparecem no totem, do produto de locação, com antecedência e vaga. */
 export async function agendaOnline() {
   const c = configOnline();
-  const produto = await one<{ preco: number | null; nome: string }>(`SELECT PrecoCentavos preco, Nome nome FROM dbo.Produto WHERE Id = @id`, { id: c.produtoVenda });
+  const produto = await one<{ preco: number | null; nome: string }>(`select preco_centavos preco, nome from kart.produto where id = @id`, { id: c.produtoVenda });
   const linhas = await query<{ id: number; inicio: string; nome: string; vagas: number; ocupadas: number; produto: number; preco: number | null }>(
-    `SELECT b.Id id, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Nome nome, b.Vagas vagas, b.ProdutoId produto, pb.PrecoCentavos preco,
-            (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') ocupadas
-       FROM dbo.Bateria b LEFT JOIN dbo.Produto pb ON pb.Id = b.ProdutoId
-      WHERE b.Status = 'aberta' AND b.ReservaFechada = 0
-        AND b.ProdutoId IN (${c.produtosBateria.map((n) => Number(n)).join(',') || '0'})
-        AND b.Inicio > DATEADD(minute, @antes, SYSDATETIME()) AND b.Inicio < DATEADD(day, @dias, SYSDATETIME())
-      ORDER BY b.Inicio`,
+    `select b.id, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio, b.nome, b.vagas, b.produto_id produto, pb.preco_centavos preco,
+            (select count(*) from kart.inscricao i where i.bateria_id = b.id and i.status <> 'cancelada') ocupadas
+       from kart.bateria b left join kart.produto pb on pb.id = b.produto_id
+      where b.status = 'aberta' and not coalesce(b.reserva_fechada, false)
+        and b.produto_id in (${c.produtosBateria.map((n) => Number(n)).join(',') || '0'})
+        and b.inicio > now() + make_interval(mins => @antes::int) and b.inicio < now() + make_interval(days => @dias::int)
+      order by b.inicio`,
     { antes: c.antecedenciaMin, dias: c.diasAgenda },
   );
   const horarios: HorarioOnline[] = [];
@@ -153,8 +153,9 @@ type Resultado =
   | { id: string; acao: 'pago_sem_vaga'; erro: string };
 
 type Linha = { Id: number; Status: string; InscricaoIds: string; ValorCentavos: number; expira: string; BateriaId: number; Quantidade: number; ClienteId: number; Codigo: string };
-const LINHA = `SELECT *, CONVERT(varchar(19), ExpiraEm, 126) expira FROM dbo.ReservaOnline`;
-/** O banco grava no horário de Brasília (SYSDATETIME); o site recebe com o fuso explícito. */
+const LINHA = `select id "Id", pedido_id "PedidoId", status "Status", inscricao_ids "InscricaoIds", valor_centavos "ValorCentavos", bateria_id "BateriaId",
+  quantidade "Quantidade", cliente_id "ClienteId", codigo "Codigo", to_char(expira_em, 'YYYY-MM-DD"T"HH24:MI:SS') expira from kart.reserva_online`;
+/** As horas saem no horário de Brasília (sessão em America/Sao_Paulo); o site recebe com o fuso explícito. */
 const brasilia = (local: string) => `${String(local ?? '').slice(0, 19)}-03:00`;
 
 const ids = (s: string) => s.split(',').map(Number).filter((n) => n > 0);
@@ -176,11 +177,11 @@ async function calcularPedidoOnline(input: CouponInput, read: ReadOne, lock: boo
 
   const baterias = c.produtosBateria.map(Number).filter((id) => Number.isSafeInteger(id) && id > 0).join(',') || '0';
   const bateria = await read(
-    `SELECT b.Id, b.Nome nome, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Status, b.Vagas, b.ReservaFechada, b.AutoAtendimento, b.ProdutoId,
-            (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') ocupadas,
-            CASE WHEN b.Status = 'aberta' AND b.ReservaFechada = 0
-                  AND b.ProdutoId IN (${baterias}) AND b.Inicio > DATEADD(minute, @antes, SYSDATETIME()) THEN 1 ELSE 0 END ok
-       FROM dbo.Bateria b${lock ? ' WITH (UPDLOCK, HOLDLOCK)' : ''} WHERE b.Id = @id`,
+    `select b.id "Id", b.nome, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio, b.status "Status", b.vagas "Vagas", b.reserva_fechada "ReservaFechada", b.auto_atendimento "AutoAtendimento", b.produto_id "ProdutoId",
+            (select count(*) from kart.inscricao i where i.bateria_id = b.id and i.status <> 'cancelada') ocupadas,
+            case when b.status = 'aberta' and not coalesce(b.reserva_fechada, false)
+                  and b.produto_id in (${baterias}) and b.inicio > now() + make_interval(mins => @antes::int) then 1 else 0 end ok
+       from kart.bateria b where b.id = @id${lock ? ' for update of b' : ''}`,
     { id: Number(input.bateriaId), antes: c.antecedenciaMin - 10 },
   );
   if (!bateria || Number(bateria.ok) !== 1) throw new HttpError(400, 'Esse horário não está mais disponível. Escolha outro.');
@@ -188,7 +189,7 @@ async function calcularPedidoOnline(input: CouponInput, read: ReadOne, lock: boo
   if (livres < quantidade) throw new HttpError(409, `Não há vagas o suficiente para a quantidade de participantes selecionada. Vagas disponíveis: ${Math.max(0, livres)}.`);
 
   const produtoId = produtoDaBateria(Number(bateria.ProdutoId), c);
-  const produto = await read('SELECT Id, PrecoCentavos preco FROM dbo.Produto WHERE Id = @id', { id: produtoId });
+  const produto = await read('select id "Id", preco_centavos preco from kart.produto where id = @id', { id: produtoId });
   const preco = Number(produto?.preco ?? 0);
   if (!Number.isSafeInteger(preco) || preco <= 0) throw new HttpError(503, 'Reserva online indisponível no momento. Fale com a recepção pelo WhatsApp.');
   const pv = c.primeiraVez[produtoId];
@@ -217,15 +218,15 @@ export async function avaliarVoucher(
 ): Promise<{ voucherId: number; descontoCentavos: number; clienteId: number }> {
   const { codigo, documento, produtoId, brutoCentavos } = e;
   const cliente = e.clienteId ?? Number((await read(
-    `SELECT TOP 1 Id id FROM dbo.Cliente WHERE (DocumentoNum = @doc OR Documento = @doc) AND ResponsavelId IS NULL ORDER BY AtualizadoEm DESC`,
+    `select id from kart.cliente where (documento_num = @doc or documento = @doc) and responsavel_id is null order by atualizado_em desc limit 1`,
     { doc: documento },
   ))?.id ?? 0);
   const voucher = await read(
-    `SELECT v.*, p.Ativo parceiroAtivo, fc.Ativo fidelidadeAtiva,
-            CASE WHEN CAST(SYSDATETIME() AS date) BETWEEN v.InicioEm AND v.FimEm THEN 1 ELSE 0 END vigenciaOk
-       FROM dbo.Voucher v${lock ? ' WITH (UPDLOCK, HOLDLOCK)' : ''}
-       LEFT JOIN dbo.Parceiro p ON p.Id = v.ParceiroId LEFT JOIN dbo.FidelidadeConta fc ON fc.Id = v.FidelidadeContaId
-      WHERE v.Codigo = @codigo`,
+    `select v.id "Id", v.codigo "Codigo", v.ativo "Ativo", v.parceiro_id "ParceiroId", v.fidelidade_conta_id "FidelidadeContaId", v.produto_id "ProdutoId", v.uso_unico "UsoUnico", v.uso_max_total "UsoMaxTotal", v.uso_max_cliente "UsoMaxCliente", v.restrito_clientes "RestritoClientes", v.pedido_minimo_centavos "PedidoMinimoCentavos", v.tipo "Tipo", v.valor "Valor", v.desconto_maximo_centavos "DescontoMaximoCentavos", p.ativo "parceiroAtivo", fc.ativo "fidelidadeAtiva",
+            case when current_date between v.inicio_em and v.fim_em then 1 else 0 end "vigenciaOk"
+       from kart.voucher v
+       left join kart.parceiro p on p.id = v.parceiro_id left join kart.fidelidade_conta fc on fc.id = v.fidelidade_conta_id
+      where upper(v.codigo) = @codigo${lock ? ' for update of v' : ''}`,
     { codigo },
   );
   if (!voucher || !voucher.Ativo) throw new HttpError(400, 'Voucher não encontrado.');
@@ -235,13 +236,13 @@ export async function avaliarVoucher(
   if (voucher.ProdutoId && Number(voucher.ProdutoId) !== produtoId) throw new HttpError(400, 'O produto do voucher não está na reserva.');
 
   const usos = await read(
-    `SELECT
-       (SELECT COUNT(*) FROM dbo.VoucherUso u WHERE u.VoucherId = @voucher AND u.Estornado = 0)
-       + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso o WHERE o.VoucherId = @voucher AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
-       + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso gv WHERE gv.VoucherId = @voucher AND gv.Estado IN ('reservado', 'consumido')) n,
-       (SELECT COUNT(*) FROM dbo.VoucherUso u WHERE u.VoucherId = @voucher AND u.ClienteId = @cliente AND u.Estornado = 0)
-       + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso o WHERE o.VoucherId = @voucher AND o.ClienteId = @cliente AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
-       + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso gv WHERE gv.VoucherId = @voucher AND gv.ClienteId = @cliente AND gv.Estado IN ('reservado', 'consumido')) doCliente`,
+    `select
+       (select count(*) from kart.voucher_uso u where u.voucher_id = @voucher and not u.estornado)
+       + (select count(*) from kart.reserva_online_voucher_uso o where o.voucher_id = @voucher and o.estado in ('reservado', 'consumido', 'reembolso_pendente'))
+       + (select count(*) from kart.reserva_grupo_voucher_uso gv where gv.voucher_id = @voucher and gv.estado in ('reservado', 'consumido')) n,
+       (select count(*) from kart.voucher_uso u where u.voucher_id = @voucher and u.cliente_id = @cliente and not u.estornado)
+       + (select count(*) from kart.reserva_online_voucher_uso o where o.voucher_id = @voucher and o.cliente_id = @cliente and o.estado in ('reservado', 'consumido', 'reembolso_pendente'))
+       + (select count(*) from kart.reserva_grupo_voucher_uso gv where gv.voucher_id = @voucher and gv.cliente_id = @cliente and gv.estado in ('reservado', 'consumido')) "doCliente"`,
     { voucher: voucher.Id, cliente },
   );
   const eleg = await avaliarElegibilidadeVoucher({
@@ -302,10 +303,10 @@ export function documentosDasVagas(p: Pick<PedidoSite, 'cliente' | 'acompanhante
 /** Pedido novo: grava o cliente e segura as vagas. Idempotente pelo id do pedido (o site pode mandar de novo). */
 export async function reservarPedido(p: PedidoSite, log: Log): Promise<Resultado> {
   const c = configOnline();
-  const ja = await one<Linha>(`${LINHA} WHERE PedidoId = @id`, { id: p.id });
+  const ja = await one<Linha>(`${LINHA} where pedido_id = @id`, { id: p.id });
   if (ja) {
     if (ja.Status === 'aguardando') {
-      const b = await one<{ nome: string; inicio: string }>(`SELECT Nome nome, CONVERT(varchar(16), Inicio, 126) inicio FROM dbo.Bateria WHERE Id = @id`, { id: ja.BateriaId });
+      const b = await one<{ nome: string; inicio: string }>(`select nome, to_char(inicio, 'YYYY-MM-DD"T"HH24:MI') inicio from kart.bateria where id = @id`, { id: ja.BateriaId });
       return { id: p.id, acao: 'reservado', valorCentavos: ja.ValorCentavos, expiraEm: brasilia(ja.expira), descricao: descricaoPedido(b?.nome ?? '', b?.inicio ?? 'T', ja.Quantidade), inicio: b?.inicio ?? '' };
     }
     if (ja.Status === 'pago') return { id: p.id, acao: 'confirmado', codigo: ja.Codigo };
@@ -357,18 +358,18 @@ export async function reservarPedido(p: PedidoSite, log: Log): Promise<Resultado
       }
       const inscricoes = await inscreverN(Number(p.bateriaId), clienteId, n, 'site', null, obs, false, { produtoId: quote.produtoId, precos: quote.precos, clientes: pessoas, run });
       await run(
-        `INSERT INTO dbo.ReservaOnline (PedidoId, Codigo, ClienteId, BateriaId, Quantidade, ValorCentavos, Status, Forma, InscricaoIds, Pilotos, ExpiraEm)
-         VALUES (@pedido, @codigo, @cliente, @bateria, @n, @valor, 'aguardando', @forma, @insc, @pilotos, DATEADD(minute, @prazo, SYSDATETIME()))`,
+        `insert into kart.reserva_online (pedido_id, codigo, cliente_id, bateria_id, quantidade, valor_centavos, status, forma, inscricao_ids, pilotos, expira_em)
+         values (@pedido, @codigo, @cliente, @bateria, @n, @valor, 'aguardando', @forma, @insc, @pilotos, now() + make_interval(mins => @prazo::int))`,
         { pedido: p.id, codigo: p.codigo, cliente: clienteId, bateria: Number(p.bateriaId), n, valor: quote.totalCentavos, forma: p.forma, insc: inscricoes.join(','), pilotos: (p.pilotos ?? []).join(', ').slice(0, 600) || null, prazo: c.prazoMin },
       );
       if (quote.voucherId !== null) {
         await run(
-          `INSERT INTO dbo.ReservaOnlineVoucherUso (PedidoId, VoucherId, ClienteId, DescontoCentavos, ValidadeEm, Estado)
-           VALUES (@pedido, @voucher, @cliente, @desconto, DATEADD(minute, @prazo, SYSDATETIME()), 'reservado')`,
+          `insert into kart.reserva_online_voucher_uso (pedido_id, voucher_id, cliente_id, desconto_centavos, validade_em, estado)
+           values (@pedido, @voucher, @cliente, @desconto, now() + make_interval(mins => @prazo::int), 'reservado')`,
           { pedido: p.id, voucher: quote.voucherId, cliente: clienteId, desconto: quote.descontoCentavos, prazo: c.prazoMin },
         );
       }
-      const nova = await read(`SELECT CONVERT(varchar(19), ExpiraEm, 126) expira FROM dbo.ReservaOnline WHERE PedidoId = @p`, { p: p.id });
+      const nova = await read(`select to_char(expira_em, 'YYYY-MM-DD"T"HH24:MI:SS') expira from kart.reserva_online where pedido_id = @p`, { p: p.id });
       return { quote, inscricoes, expira: String(nova?.expira ?? '') };
     });
     const expiraEm = brasilia(result.expira);
@@ -382,37 +383,37 @@ export async function reservarPedido(p: PedidoSite, log: Log): Promise<Resultado
 
 /** Pagamento confirmado no site: vagas pagas. Se o prazo já tinha vencido, tenta segurar de novo; sem vaga, fica para devolver. */
 export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resultado> {
-  const r = await one<Linha>(`${LINHA} WHERE PedidoId = @id`, { id: p.id });
+  const r = await one<Linha>(`${LINHA} where pedido_id = @id`, { id: p.id });
   if (!r) return { id: p.id, acao: 'pago_sem_vaga', erro: 'Pedido não encontrado no sistema da recepção.' };
   if (r.Status === 'pago') return { id: p.id, acao: 'confirmado', codigo: r.Codigo, ...(await grupoDoPedido(p, r, ids(r.InscricaoIds), log)) };
   // a Asaas diz se o cartão foi de débito (DEBIT_CARD); voucher 100% chega com VOUCHER
   const forma = p.pagamento?.billingType === 'VOUCHER' ? 'voucher' : p.pagamento?.billingType === 'PIX' ? 'pix' : p.pagamento?.billingType === 'DEBIT_CARD' ? 'debito' : 'credito';
   if (r.Status === 'pago_sem_vaga') return { id: p.id, acao: 'pago_sem_vaga', erro: 'O pagamento está aguardando a resolução da recepção.' };
-  const voucherUso = await one<{ Estado: string; VoucherId?: number | null; DescontoCentavos?: number | null }>(`SELECT Estado, VoucherId, DescontoCentavos FROM dbo.ReservaOnlineVoucherUso WHERE PedidoId = @id`, { id: p.id });
+  const voucherUso = await one<{ Estado: string; VoucherId?: number | null; DescontoCentavos?: number | null }>(`select estado "Estado", voucher_id "VoucherId", desconto_centavos "DescontoCentavos" from kart.reserva_online_voucher_uso where pedido_id = @id`, { id: p.id });
   const voucherIdUso = voucherUso?.VoucherId ? Number(voucherUso.VoucherId) : null;
   if (voucherUso?.Estado === 'liberado') {
     await tx(async (run) => {
-      await run(`UPDATE dbo.ReservaOnline SET Status = 'pago_sem_vaga', AsaasPagamentoId = @asaas, PagoEm = SYSDATETIME(), Forma = @forma WHERE Id = @id`, {
+      await run(`update kart.reserva_online set status = 'pago_sem_vaga', asaas_pagamento_id = @asaas, pago_em = now(), forma = @forma where id = @id`, {
         id: r.Id, asaas: p.pagamento?.asaasId ?? null, forma,
       });
-      await run(`UPDATE dbo.ReservaOnlineVoucherUso SET Estado = 'reembolso_pendente' WHERE PedidoId = @pedido AND Estado = 'liberado'`, { pedido: p.id });
+      await run(`update kart.reserva_online_voucher_uso set estado = 'reembolso_pendente' where pedido_id = @pedido and estado = 'liberado'`, { pedido: p.id });
     });
     return { id: p.id, acao: 'pago_sem_vaga', erro: 'O pagamento chegou depois do prazo da reserva. A recepção precisa conferir o pedido e o cupom.' };
   }
   let insc = ids(r.InscricaoIds);
-  const ativas = await query<{ Id: number }>(`SELECT Id FROM dbo.Inscricao WHERE Id IN (${insc.join(',') || '0'}) AND Status <> 'cancelada'`);
+  const ativas = await query<{ Id: number }>(`select id "Id" from kart.inscricao where id in (${insc.join(',') || '0'}) and status <> 'cancelada'`);
   if (ativas.length < insc.length && (await reativarVagas(r.BateriaId, insc.filter((i) => !ativas.some((a) => a.Id === i))))) {
     log(`reserva online ${r.Codigo}: paga após o prazo, as mesmas ${insc.length - ativas.length} vaga(s) voltaram`);
   } else if (ativas.length < insc.length) {
     // pagou depois do prazo e não deu para devolver as mesmas linhas: segura de novo se ainda houver, para as MESMAS pessoas
-    const canceladas = await query<{ ClienteId: number }>(`SELECT ClienteId FROM dbo.Inscricao WHERE Id IN (${insc.join(',') || '0'}) AND Status = 'cancelada' ORDER BY Id`);
+    const canceladas = await query<{ ClienteId: number }>(`select cliente_id "ClienteId" from kart.inscricao where id in (${insc.join(',') || '0'}) and status = 'cancelada' order by id`);
     try {
-      const novas = await inscreverN(r.BateriaId, r.ClienteId, r.Quantidade - ativas.length, 'site', null, `Reserva online ${r.Codigo} (paga após o prazo)`, false, { produtoId: produtoDaBateria((await one<{ p: number }>(`SELECT ProdutoId p FROM dbo.Bateria WHERE Id = @id`, { id: r.BateriaId }))?.p), clientes: canceladas.length === r.Quantidade - ativas.length ? canceladas.map((x) => x.ClienteId) : undefined });
+      const novas = await inscreverN(r.BateriaId, r.ClienteId, r.Quantidade - ativas.length, 'site', null, `Reserva online ${r.Codigo} (paga após o prazo)`, false, { produtoId: produtoDaBateria((await one<{ p: number }>(`select produto_id p from kart.bateria where id = @id`, { id: r.BateriaId }))?.p), clientes: canceladas.length === r.Quantidade - ativas.length ? canceladas.map((x) => x.ClienteId) : undefined });
       insc = [...ativas.map((a) => a.Id), ...novas];
     } catch (e) {
       await tx(async (run) => {
-        await run(`UPDATE dbo.ReservaOnline SET Status = 'pago_sem_vaga', AsaasPagamentoId = @asaas, PagoEm = SYSDATETIME(), Forma = @forma WHERE Id = @id`, { id: r.Id, asaas: p.pagamento?.asaasId ?? null, forma });
-        await run(`UPDATE dbo.ReservaOnlineVoucherUso SET Estado = 'reembolso_pendente' WHERE PedidoId = @pedido AND Estado IN ('reservado', 'liberado')`, { pedido: p.id });
+        await run(`update kart.reserva_online set status = 'pago_sem_vaga', asaas_pagamento_id = @asaas, pago_em = now(), forma = @forma where id = @id`, { id: r.Id, asaas: p.pagamento?.asaasId ?? null, forma });
+        await run(`update kart.reserva_online_voucher_uso set estado = 'reembolso_pendente' where pedido_id = @pedido and estado in ('reservado', 'liberado')`, { pedido: p.id });
       });
       log(`reserva online ${r.Codigo}: PAGO SEM VAGA (${(e as Error).message}) — devolver ou reagendar`);
       return { id: p.id, acao: 'pago_sem_vaga', erro: 'Recebemos o pagamento, mas as vagas desse horário acabaram. A recepção vai entrar em contato para trocar o horário ou devolver o valor.' };
@@ -420,16 +421,16 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
   }
   // cada vaga recebe a sua parte do valor pago, na proporção do preço dela (Happy Hour: primeira vez R$ 89,90, as outras R$ 99,90)
   if (p.modo === 'individual') return await confirmarIndividual(p, r, insc, forma, log, voucherIdUso);
-  const linhasPreco = await query<{ Id: number; PrecoCentavos: number | null }>(`SELECT Id, PrecoCentavos FROM dbo.Inscricao WHERE Id IN (${insc.join(',') || '0'}) ORDER BY Id`);
+  const linhasPreco = await query<{ Id: number; PrecoCentavos: number | null }>(`select id "Id", preco_centavos "PrecoCentavos" from kart.inscricao where id in (${insc.join(',') || '0'}) order by id`);
   const valores = dividirValor(r.ValorCentavos, linhasPreco.map((l) => Number(l.PrecoCentavos ?? 0)));
   const unit = Math.round(r.ValorCentavos / Math.max(1, r.Quantidade));
   await tx(async (run) => {
-    await run(`UPDATE dbo.Inscricao SET Pago = 1, ValorCentavos = @unit, ${voucherIdUso ? 'VoucherId = COALESCE(VoucherId, @vid), ' : ''}Status = 'confirmada', AtualizadoEm = SYSDATETIME() WHERE Id IN (${insc.join(',')})`, { unit, ...(voucherIdUso ? { vid: voucherIdUso } : {}) });
+    await run(`update kart.inscricao set pago = true, valor_centavos = @unit, ${voucherIdUso ? 'voucher_id = coalesce(voucher_id, @vid), ' : ''}status = 'confirmada' where id in (${insc.join(',')})`, { unit, ...(voucherIdUso ? { vid: voucherIdUso } : {}) });
     if (linhasPreco.length === insc.length && new Set(linhasPreco.map((l) => l.PrecoCentavos)).size > 1) {
-      for (const [k, l] of linhasPreco.entries()) await run(`UPDATE dbo.Inscricao SET ValorCentavos = @valor WHERE Id = @id`, { id: l.Id, valor: valores[k] });
+      for (const [k, l] of linhasPreco.entries()) await run(`update kart.inscricao set valor_centavos = @valor where id = @id`, { id: l.Id, valor: valores[k] });
     }
-    await run(`UPDATE dbo.ReservaOnline SET Status = 'pago', InscricaoIds = @insc, AsaasPagamentoId = @asaas, PagoEm = SYSDATETIME(), Forma = @forma WHERE Id = @id`, { id: r.Id, insc: insc.join(','), asaas: p.pagamento?.asaasId ?? null, forma });
-    await run(`UPDATE dbo.ReservaOnlineVoucherUso SET Estado = 'consumido' WHERE PedidoId = @pedido AND Estado IN ('reservado', 'reembolso_pendente')`, { pedido: p.id });
+    await run(`update kart.reserva_online set status = 'pago', inscricao_ids = @insc, asaas_pagamento_id = @asaas, pago_em = now(), forma = @forma where id = @id`, { id: r.Id, insc: insc.join(','), asaas: p.pagamento?.asaasId ?? null, forma });
+    await run(`update kart.reserva_online_voucher_uso set estado = 'consumido' where pedido_id = @pedido and estado in ('reservado', 'reembolso_pendente')`, { pedido: p.id });
   });
   log(`reserva online ${r.Codigo}: paga (${forma}), ${insc.length} vaga(s) confirmadas`);
   return { id: p.id, acao: 'confirmado', codigo: r.Codigo };
@@ -440,9 +441,9 @@ async function confirmarIndividual(p: PedidoSite, r: Linha, insc: number[], form
   const ordenadas = [...insc].sort((a, b) => a - b);
   const eu = p.compradorPilota !== false;
   await tx(async (run) => {
-    if (eu && ordenadas[0]) await run(`UPDATE dbo.Inscricao SET Pago = 1, ValorCentavos = @v, ${voucherIdUso ? 'VoucherId = COALESCE(VoucherId, @vid), ' : ''}Status = 'confirmada', AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id: ordenadas[0], v: r.ValorCentavos, ...(voucherIdUso ? { vid: voucherIdUso } : {}) });
-    await run(`UPDATE dbo.ReservaOnline SET Status = 'pago', InscricaoIds = @insc, AsaasPagamentoId = @asaas, PagoEm = SYSDATETIME(), Forma = @forma WHERE Id = @id`, { id: r.Id, insc: ordenadas.join(','), asaas: p.pagamento?.asaasId ?? null, forma });
-    await run(`UPDATE dbo.ReservaOnlineVoucherUso SET Estado = 'consumido' WHERE PedidoId = @pedido AND Estado IN ('reservado', 'reembolso_pendente')`, { pedido: p.id });
+    if (eu && ordenadas[0]) await run(`update kart.inscricao set pago = true, valor_centavos = @v, ${voucherIdUso ? 'voucher_id = coalesce(voucher_id, @vid), ' : ''}status = 'confirmada' where id = @id`, { id: ordenadas[0], v: r.ValorCentavos, ...(voucherIdUso ? { vid: voucherIdUso } : {}) });
+    await run(`update kart.reserva_online set status = 'pago', inscricao_ids = @insc, asaas_pagamento_id = @asaas, pago_em = now(), forma = @forma where id = @id`, { id: r.Id, insc: ordenadas.join(','), asaas: p.pagamento?.asaasId ?? null, forma });
+    await run(`update kart.reserva_online_voucher_uso set estado = 'consumido' where pedido_id = @pedido and estado in ('reservado', 'reembolso_pendente')`, { pedido: p.id });
   });
   log(`reserva online ${r.Codigo}: paga (${forma}), cada um paga o seu: ${eu ? 'vaga de quem organiza paga' : 'garantia paga'}, ${ordenadas.length} vaga(s) no grupo`);
   return { id: p.id, acao: 'confirmado', codigo: r.Codigo, ...(await grupoDoPedido(p, r, ordenadas, log)) };
@@ -452,9 +453,9 @@ async function confirmarIndividual(p: PedidoSite, r: Linha, insc: number[], form
 async function grupoDoPedido(p: PedidoSite, r: Linha, insc: number[], log: Log): Promise<{ grupo?: { codigo: string; link: string; painel: string } }> {
   if (p.modo !== 'individual') return {};
   try {
-    const preco = Number((await one<{ preco: number }>(`SELECT TOP 1 PrecoCentavos preco FROM dbo.Inscricao WHERE Id IN (${insc.join(',') || '0'}) AND Pago = 0 ORDER BY Id DESC`))?.preco ?? 0)
-      || Number((await one<{ preco: number }>(`SELECT p.PrecoCentavos preco FROM dbo.Bateria b JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @b`, { b: r.BateriaId }))?.preco ?? 0);
-    const ativas = (await query<{ Id: number }>(`SELECT Id FROM dbo.Inscricao WHERE Id IN (${insc.join(',') || '0'}) AND Status <> 'cancelada' ORDER BY Id`)).map((x) => x.Id);
+    const preco = Number((await one<{ preco: number }>(`select preco_centavos preco from kart.inscricao where id in (${insc.join(',') || '0'}) and not pago order by id desc limit 1`))?.preco ?? 0)
+      || Number((await one<{ preco: number }>(`select p.preco_centavos preco from kart.bateria b join kart.produto p on p.id = b.produto_id where b.id = @b`, { b: r.BateriaId }))?.preco ?? 0);
+    const ativas = (await query<{ Id: number }>(`select id "Id" from kart.inscricao where id in (${insc.join(',') || '0'}) and status <> 'cancelada' order by id`)).map((x) => x.Id);
     return { grupo: await grupoDaReservaOnline({ codigoReserva: r.Codigo, bateriaId: r.BateriaId, responsavelId: r.ClienteId, inscricoes: ativas, compradorPilota: p.compradorPilota !== false, precoCentavos: preco, valorPagoCentavos: r.ValorCentavos }, log) };
   } catch (e) {
     log(`reserva online ${r.Codigo}: grupo do "cada um paga o seu" não foi criado agora (${(e as Error).message})`);
@@ -474,7 +475,7 @@ export function dividirValor(total: number, precos: number[]): number[] {
 }
 
 /**
- * Pix pago dentro do prazo cujo aviso só chegou depois (13/10, reserva ACEXRJ: o webhook ainda ia para o MyLapTime):
+ * Pix pago dentro do prazo cujo aviso só chegou depois (13/10, reserva ACEXRJ: o webhook ainda ia para o sistema antigo):
  * as vagas já tinham sido canceladas. Devolve as MESMAS inscrições (se a bateria ainda tem lugar e não passou) em vez de
  * criar outras — senão a recepção via o piloto duas vezes na bateria (as canceladas + as novas).
  */
@@ -482,26 +483,27 @@ async function reativarVagas(bateriaId: number, canceladas: number[]) {
   if (!canceladas.length) return false;
   return tx(async (run) => {
     const [b] = await run(
-      `SELECT b.Vagas - (SELECT COUNT(*) FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') livres,
-              CASE WHEN b.Status = 'cancelada' OR b.Inicio < DATEADD(minute, -30, SYSDATETIME()) THEN 0 ELSE 1 END ok
-         FROM dbo.Bateria b WHERE b.Id = @id`,
+      // trava a linha da bateria: quem aloca vaga na mesma bateria espera (serializa a contagem de vagas)
+      `select b.vagas - (select count(*) from kart.inscricao i where i.bateria_id = b.id and i.status <> 'cancelada') livres,
+              case when b.status = 'cancelada' or b.inicio < now() - interval '30 minutes' then 0 else 1 end ok
+         from kart.bateria b where b.id = @id for update of b`,
       { id: bateriaId },
     );
     if (!b || !b.ok || (b.livres as number) < canceladas.length) return false;
-    const n = await run(`UPDATE dbo.Inscricao SET Status = 'confirmada', AtualizadoEm = SYSDATETIME() OUTPUT inserted.Id WHERE Id IN (${canceladas.join(',')}) AND Status = 'cancelada'`);
+    const n = await run(`update kart.inscricao set status = 'confirmada' where id in (${canceladas.join(',')}) and status = 'cancelada' returning id`);
     return n.length === canceladas.length;
   });
 }
 
 /** Prazo vencido sem pagamento (com 2 min de folga para o aviso da Asaas chegar): cancela as vagas. */
 export async function expirarVencidos(log: Log) {
-  const vencidos = await query<Linha & { PedidoId: string }>(`${LINHA} WHERE Status = 'aguardando' AND ExpiraEm < DATEADD(minute, -2, SYSDATETIME())`);
+  const vencidos = await query<Linha & { PedidoId: string }>(`${LINHA} where status = 'aguardando' and expira_em < now() - interval '2 minutes'`);
   const res: Resultado[] = [];
   for (const v of vencidos) {
     await tx(async (run) => {
-      await run(`UPDATE dbo.Inscricao SET Status = 'cancelada', AtualizadoEm = SYSDATETIME() WHERE Id IN (${ids(v.InscricaoIds).join(',') || '0'}) AND Pago = 0 AND Status <> 'cancelada'`);
-      await run(`UPDATE dbo.ReservaOnline SET Status = 'expirado' WHERE Id = @id AND Status = 'aguardando'`, { id: v.Id });
-      await run(`UPDATE dbo.ReservaOnlineVoucherUso SET Estado = 'liberado' WHERE PedidoId = @pedido AND Estado = 'reservado'`, { pedido: v.PedidoId });
+      await run(`update kart.inscricao set status = 'cancelada' where id in (${ids(v.InscricaoIds).join(',') || '0'}) and not pago and status <> 'cancelada'`);
+      await run(`update kart.reserva_online set status = 'expirado' where id = @id and status = 'aguardando'`, { id: v.Id });
+      await run(`update kart.reserva_online_voucher_uso set estado = 'liberado' where pedido_id = @pedido and estado = 'reservado'`, { pedido: v.PedidoId });
     });
     log(`reserva online ${v.Codigo}: sem pagamento no prazo, vagas liberadas`);
     res.push({ id: v.PedidoId, acao: 'expirado' });
@@ -549,23 +551,23 @@ export async function vagaOnlineDoGrupo(bateriaId: number, clienteId: number, pa
   const grupo = [...new Set(participantes.filter((n) => n > 0))];
   if (!grupo.length) return null;
   const lista = grupo.join(',');
-  const resp = await query<{ r: number }>(`SELECT DISTINCT ResponsavelId r FROM dbo.Cliente WHERE Id IN (${lista}) AND ResponsavelId IS NOT NULL`);
+  const resp = await query<{ r: number }>(`select distinct responsavel_id r from kart.cliente where id in (${lista}) and responsavel_id is not null`);
   // quem se identificou no totem pagou pelo grupo mesmo sem correr (não está na lista de participantes)
   const donos = [...new Set([...grupo, ...resp.map((x) => x.r), ...(quemSeIdentificou ? [quemSeIdentificou] : [])])].join(',');
   const vaga = await one<{ Id: number; dono: number; nome: string }>(
-    `SELECT TOP 1 i.Id, i.ClienteId dono, c.Nome nome FROM dbo.Inscricao i JOIN dbo.Cliente c ON c.Id = i.ClienteId
-      WHERE i.BateriaId = @b AND i.Origem = 'site' AND i.Pago = 1 AND i.Status <> 'cancelada'
-        AND i.ClienteId IN (${donos}) AND i.ClienteId <> @c
+    `select i.id "Id", i.cliente_id dono, c.nome from kart.inscricao i join kart.cliente c on c.id = i.cliente_id
+      where i.bateria_id = @b and i.origem = 'site' and i.pago and i.status <> 'cancelada'
+        and i.cliente_id in (${donos}) and i.cliente_id <> @c
         -- o comprador que também vai correr fica com uma vaga dele: só as que sobram passam para o grupo
-        AND (i.ClienteId NOT IN (${lista})
-             OR (SELECT COUNT(*) FROM dbo.Inscricao j WHERE j.BateriaId = @b AND j.ClienteId = i.ClienteId AND j.Status <> 'cancelada') > 1)
-      ORDER BY i.Id DESC`,
+        and (i.cliente_id not in (${lista})
+             or (select count(*) from kart.inscricao j where j.bateria_id = @b and j.cliente_id = i.cliente_id and j.status <> 'cancelada') > 1)
+      order by i.id desc limit 1`,
     { b: bateriaId, c: clienteId },
   );
   if (!vaga) return null;
   const r = await one<{ n: number }>(
-    `UPDATE dbo.Inscricao SET ClienteId = @c, Observacao = LEFT(ISNULL(Observacao + ' · ', '') + @obs, 400), AtualizadoEm = SYSDATETIME()
-      OUTPUT 1 n WHERE Id = @id AND ClienteId = @dono`,
+    `update kart.inscricao set cliente_id = @c, observacao = left(coalesce(observacao || ' · ', '') || @obs, 400)
+      where id = @id and cliente_id = @dono returning 1 n`,
     { c: clienteId, id: vaga.Id, dono: vaga.dono, obs: `vaga paga online por ${vaga.nome}` },
   );
   if (!r) return null;
@@ -631,15 +633,15 @@ export async function precoDaVagaPeloLink(token: string, cpf: string, cupom = ''
   if (!/^[A-Za-z0-9]{10,24}$/.test(token) || !isValidCpf(onlyDigits(cpf))) return null;
   const c = configOnline();
   const g = await one<{ preco: number; produtoId: number | null; aniversario: boolean | number; precoAniv: number | null; respDoc: string | null; respDocNum: string | null; ativos: number }>(
-    `SELECT g.PrecoCentavos preco, b.ProdutoId produtoId, g.Aniversario aniversario, g.PrecoAniversarianteCentavos precoAniv,
-            r.Documento respDoc, r.DocumentoNum respDocNum,
-            (SELECT COUNT(*) FROM dbo.ReservaGrupoPiloto vp LEFT JOIN dbo.Inscricao ip ON ip.Id = vp.InscricaoId
-              WHERE vp.GrupoId = g.Id AND (ip.Id IS NULL OR ip.Status <> 'cancelada')) ativos
-       FROM dbo.ReservaGrupoPiloto t
-       JOIN dbo.ReservaGrupo g ON g.Id = t.GrupoId AND g.Status = 'ativa'
-       JOIN dbo.Bateria b ON b.Id = g.BateriaId
-       JOIN dbo.Cliente r ON r.Id = g.ResponsavelId
-      WHERE t.Token = @token`, { token },
+    `select g.preco_centavos preco, b.produto_id "produtoId", g.aniversario, g.preco_aniversariante_centavos "precoAniv",
+            r.documento "respDoc", r.documento_num "respDocNum",
+            (select count(*) from kart.reserva_grupo_piloto vp left join kart.inscricao ip on ip.id = vp.inscricao_id
+              where vp.grupo_id = g.id and (ip.id is null or ip.status <> 'cancelada')) ativos
+       from kart.reserva_grupo_piloto t
+       join kart.reserva_grupo g on g.id = t.grupo_id and g.status = 'ativa'
+       join kart.bateria b on b.id = g.bateria_id
+       join kart.cliente r on r.id = g.responsavel_id
+      where t.token = @token`, { token },
   );
   if (!g) return null;
   const cheio = Number(g.preco) || 0;
@@ -668,9 +670,9 @@ export async function precoDaVagaPeloLink(token: string, cpf: string, cupom = ''
  * Devolve o preço que a vaga passa a valer, ou null se o cupom não vale mais (a vaga fica com o preço normal).
  */
 export async function reservarCupomDoLink(o: { asaasId: string; grupoId: number; pilotoId: number; clienteId: number; documento: string; codigo: string; valorCobrado: number; consumido?: boolean }, log: Log): Promise<number | null> {
-  const ja = await one<{ Id: number }>(`SELECT Id FROM dbo.ReservaGrupoVoucherUso WHERE AsaasId = @a`, { a: o.asaasId });
+  const ja = await one<{ Id: number }>(`select id "Id" from kart.reserva_grupo_voucher_uso where asaas_id = @a`, { a: o.asaasId });
   if (ja) return o.valorCobrado;
-  const g = await one<{ preco: number; produtoId: number | null; aniversario?: boolean | number; precoAniv?: number | null }>(`SELECT g.PrecoCentavos preco, b.ProdutoId produtoId, g.Aniversario aniversario, g.PrecoAniversarianteCentavos precoAniv FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId WHERE g.Id = @id`, { id: o.grupoId });
+  const g = await one<{ preco: number; produtoId: number | null; aniversario?: boolean | number; precoAniv?: number | null }>(`select g.preco_centavos preco, b.produto_id "produtoId", g.aniversario, g.preco_aniversariante_centavos "precoAniv" from kart.reserva_grupo g join kart.bateria b on b.id = g.bateria_id where g.id = @id`, { id: o.grupoId });
   if (!g) return null;
   const c = configOnline();
   const produto = produtoDaBateria(Number(g.produtoId), c);
@@ -681,7 +683,7 @@ export async function reservarCupomDoLink(o: { asaasId: string; grupoId: number;
       for (const base of bases) {
         const v = await avaliarVoucher({ codigo: o.codigo, documento: o.documento, clienteId: o.clienteId, produtoId: produto, brutoCentavos: base }, read, true, run);
         if (base - v.descontoCentavos !== o.valorCobrado) continue;
-        await run(`INSERT INTO dbo.ReservaGrupoVoucherUso (AsaasId, GrupoId, PilotoId, VoucherId, ClienteId, DescontoCentavos, Estado) VALUES (@a, @g, @p, @v, @c, @d, @estado)`,
+        await run(`insert into kart.reserva_grupo_voucher_uso (asaas_id, grupo_id, piloto_id, voucher_id, cliente_id, desconto_centavos, estado) values (@a, @g, @p, @v, @c, @d, @estado)`,
           { a: o.asaasId, g: o.grupoId, p: o.pilotoId, v: v.voucherId, c: o.clienteId, d: v.descontoCentavos, estado: o.consumido ? 'consumido' : 'reservado' });
         log(`grupo ${o.grupoId}: cupom ${o.codigo} ${o.consumido ? 'consumido' : 'reservado'} na cobrança ${o.asaasId} (desconto ${brl(v.descontoCentavos)})`);
         return o.valorCobrado;
@@ -697,15 +699,15 @@ export async function reservarCupomDoLink(o: { asaasId: string; grupoId: number;
 
 /** Cupom de cobrança paga vira consumido; de cobrança vencida/cancelada volta a valer (liberado). Roda a cada ciclo. */
 export async function acertarCuponsDosGrupos() {
-  await query(`UPDATE u SET Estado = 'consumido' FROM dbo.ReservaGrupoVoucherUso u
-    WHERE u.Estado = 'reservado' AND EXISTS (SELECT 1 FROM dbo.ReservaGrupoPagamento pg WHERE pg.AsaasId = u.AsaasId AND pg.Cancelado = 0)`);
-  await query(`UPDATE u SET Estado = 'liberado' FROM dbo.ReservaGrupoVoucherUso u
-    WHERE u.Estado = 'reservado' AND EXISTS (SELECT 1 FROM dbo.ReservaGrupoCobranca c WHERE c.AsaasId = u.AsaasId AND c.Status IN ('vencida', 'cancelada'))`);
+  await query(`update kart.reserva_grupo_voucher_uso u set estado = 'consumido'
+    where u.estado = 'reservado' and exists (select 1 from kart.reserva_grupo_pagamento pg where pg.asaas_id = u.asaas_id and not pg.cancelado)`);
+  await query(`update kart.reserva_grupo_voucher_uso u set estado = 'liberado'
+    where u.estado = 'reservado' and exists (select 1 from kart.reserva_grupo_cobranca c where c.asaas_id = u.asaas_id and c.status in ('vencida', 'cancelada'))`);
 }
 
 /** Valor de primeira vez configurado para o produto da bateria do grupo (para conferir o que o site cobrou). */
 export async function precoPrimeiraVezDoGrupo(grupoId: number): Promise<number | null> {
-  const b = await one<{ produtoId: number | null }>(`SELECT b.ProdutoId produtoId FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId WHERE g.Id = @id`, { id: grupoId });
+  const b = await one<{ produtoId: number | null }>(`select b.produto_id "produtoId" from kart.reserva_grupo g join kart.bateria b on b.id = g.bateria_id where g.id = @id`, { id: grupoId });
   const c = configOnline();
   return b ? c.primeiraVez[produtoDaBateria(Number(b.produtoId), c)] ?? null : null;
 }
