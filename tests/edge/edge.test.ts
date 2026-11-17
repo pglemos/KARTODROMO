@@ -138,3 +138,30 @@ describe('ASSETS', () => {
     expect((await a.fetch('https://x/nada')).status).toBe(404);
   });
 });
+
+describe('Cache API (caches.default)', async () => {
+  const { EdgeCache, EdgeCacheStorage } = await import('../../services/edge/src/cache');
+  it('guarda com max-age, expira e não guarda sem TTL — como o limite por IP do cadastro usa', async () => {
+    let t = 1_000_000;
+    const c = new EdgeCache(() => t);
+    const k = new Request('https://limite.cadastro/cadastro/1.2.3.4');
+    expect(await c.match(k)).toBeUndefined();
+    await c.put(k, new Response('1', { headers: { 'cache-control': 'max-age=600' } }));
+    expect(await (await c.match('https://limite.cadastro/cadastro/1.2.3.4'))?.text()).toBe('1');
+    await c.put(k, new Response('2', { headers: { 'cache-control': 'max-age=600' } }));
+    expect(await (await c.match(k))?.text()).toBe('2');
+    t += 601_000;
+    expect(await c.match(k)).toBeUndefined();
+    await c.put(k, new Response('x'));
+    expect(await c.match(k)).toBeUndefined();
+    await c.put(k, new Response('{"pago":true}', { headers: { 'cache-control': 'max-age=60', 'content-type': 'application/json' } }));
+    expect(await (await c.match(k))!.json()).toEqual({ pago: true });
+    expect(await c.delete(k)).toBe(true);
+    expect(await c.match(k)).toBeUndefined();
+  });
+  it('caches.default e caches.open', async () => {
+    const s = new EdgeCacheStorage();
+    expect(await s.open('a')).toBe(await s.open('a'));
+    expect(s.default).not.toBe(await s.open('a'));
+  });
+});

@@ -19,6 +19,7 @@ import { Assets } from './assets';
 import { EnvioEmail } from './email';
 import { EdgeResponse, WebSocketPair, ligar, type CfWebSocket } from './websocket';
 import { HTMLRewriter } from './html-rewriter';
+import { EdgeCacheStorage } from './cache';
 
 const NativeResponse = globalThis.Response;
 Object.defineProperty(EdgeResponse, Symbol.hasInstance, { value: (o: unknown) => o instanceof NativeResponse });
@@ -51,6 +52,9 @@ Object.assign(globalThis, {
   Response: EdgeResponse,
   WebSocketPair,
   HTMLRewriter,
+  // Cache API (`caches.default`): limites por IP do cadastro/busca de CPF e cache curto de consultas. Sem ele o
+  // POST /api/pre-cadastro e /api/cliente/identificar caíam com "caches is not defined" (500).
+  caches: new EdgeCacheStorage(),
   fetch: async (input: RequestInfo | URL, init?: RequestInit) => semCodificacao(await fetchNativo(limparSaida(input, init))),
 });
 
