@@ -85,11 +85,11 @@ it('mudança de frota com envelope é auditada uma única vez', async () => {
 it('ordem de serviço exige kart na oficina, mecânico e mantém liberação separada', async () => {
  const { api, store } = setup();
  await api.marcarKart(ger, '2', { reason: 'motor', operationId: 'bloqueio-os', expectedSessionRevision: 0, payload: { estado: 'oficina' } });
- const criar = pedido({ kart: '2', motivo: 'Falha no motor', mecanico: 'Carlos' }, 'os-1', 0);
+ const criar = pedido({ kart: '2', motivo: 'Falha no motor', mecanico: 'Johnny' }, 'os-1', 0);
  await expect(api.criarOrdemServico(op, criar)).rejects.toThrow(/permissão/i);
  expect((await api.criarOrdemServico(ger, criar)).status).toBe('APPLIED');
  expect((await api.criarOrdemServico(ger, criar)).status).toBe('APPLIED');
- expect(api.ordensServico().ordens).toEqual([expect.objectContaining({ id: 'os-1', kart: '2', mecanico: 'Carlos', status: 'aberta' })]);
+ expect(api.ordensServico().ordens).toEqual([expect.objectContaining({ id: 'os-1', kart: '2', mecanico: 'Johnny', status: 'aberta' })]);
  const iniciar = pedido({ status: 'em_execucao' }, 'os-2', 1);
  expect((await api.atualizarOrdemServico(ger, 'os-1', iniciar)).status).toBe('APPLIED');
  const concluir = pedido({ status: 'concluida' }, 'os-3', 2);
@@ -101,17 +101,17 @@ it('ordem de serviço exige kart na oficina, mecânico e mantém liberação sep
 it('ordem de serviço recusa kart livre, mecânico vazio e transição inválida', async () => {
  const { api } = setup();
  await expect(api.criarOrdemServico(ger, pedido({ kart: '2', motivo: 'motor', mecanico: '' }, 'os-sem-mecanico'))).rejects.toThrow(/mecânico/i);
- expect(await api.criarOrdemServico(ger, pedido({ kart: '2', motivo: 'motor', mecanico: 'Carlos' }, 'os-kart-livre'))).toMatchObject({ status: 'REJECTED', erro: expect.stringMatching(/oficina/i) });
+ expect(await api.criarOrdemServico(ger, pedido({ kart: '2', motivo: 'motor', mecanico: 'Johnny' }, 'os-kart-livre'))).toMatchObject({ status: 'REJECTED', erro: expect.stringMatching(/oficina/i) });
  await api.marcarKart(ger, '2', { fora: true, reason: 'motor' });
- await api.criarOrdemServico(ger, pedido({ kart: '2', motivo: 'motor', mecanico: 'Carlos' }, 'os-transicao'));
+ await api.criarOrdemServico(ger, pedido({ kart: '2', motivo: 'motor', mecanico: 'Johnny' }, 'os-transicao'));
  expect(await api.atualizarOrdemServico(ger, 'os-transicao', pedido({ status: 'concluida' }, 'os-pular', 1))).toMatchObject({ status: 'REJECTED', erro: expect.stringMatching(/transição/i) });
 });
 
 it('ordem de serviço com encaminharOficina coloca kart na oficina automaticamente e cria a O.S.', async () => {
  const { api, store } = setup();
- const criar = pedido({ kart: '7', motivo: 'Embreagem', mecanico: 'Carlos', encaminharOficina: true }, 'os-encaminhar', 0);
+ const criar = pedido({ kart: '7', motivo: 'Embreagem', mecanico: 'Johnny', encaminharOficina: true }, 'os-encaminhar', 0);
  const r = await api.criarOrdemServico(ger, criar);
  expect(r.status).toBe('APPLIED');
  expect(store.db.prepare('SELECT estado, motivo FROM karts_fora WHERE kart = ?').get('7')).toMatchObject({ estado: 'oficina', motivo: 'Embreagem' });
- expect(api.ordensServico().ordens).toEqual([expect.objectContaining({ id: 'os-encaminhar', kart: '7', motivo: 'Embreagem', mecanico: 'Carlos', status: 'aberta' })]);
+ expect(api.ordensServico().ordens).toEqual([expect.objectContaining({ id: 'os-encaminhar', kart: '7', motivo: 'Embreagem', mecanico: 'Johnny', status: 'aberta' })]);
 });

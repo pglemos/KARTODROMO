@@ -12,6 +12,17 @@ import type { AppStore } from './store';
 
 /** Chama a mesma rota que o programa Windows usa: as regras de prova continuam num lugar só. */
 export type Legado = (metodo: string, caminho: string, corpo?: unknown) => Promise<unknown>;
+/** Mecânicos do Kartódromo Internacional de Betim: só estes três. Grafias antigas ("Jhonny") viram o nome certo. */
+export const MECANICOS = ['Anderson', 'Johnny', 'Doidim'] as const;
+export function mecanicoDaCasa(nome: string): string | null {
+  const n = nome.normalize('NFD').replace(/\p{M}/gu, '').trim().toLowerCase();
+  if (!n) return null;
+  if (/^(jhonny|johnny|jhony|johny|joni|jonny)$/.test(n)) return 'Johnny';
+  if (/^doid(im|inho)$/.test(n)) return 'Doidim';
+  if (n === 'anderson') return 'Anderson';
+  return null;
+}
+
 export class ErroLegado extends Error {}
 export type DepsOperacao = {
   store: AppStore;
@@ -421,8 +432,8 @@ export function criarOperacao(d: DepsOperacao) {
     },
     async criarOrdemServico(q: Identidade, b: Record<string, unknown>) {
       const p = (b.payload ?? {}) as Record<string, unknown>;
-      const kart = texto(p.kart, 4); const motivo = texto(p.motivo, 200); const mecanico = texto(p.mecanico, 80);
-      if (!/^[0-9]{1,4}$/.test(kart) || !motivo || !mecanico) throw new ErroApp(400, 'INVALID_REQUEST', 'Informe kart, defeito e mecânico responsável.');
+      const kart = texto(p.kart, 4); const motivo = texto(p.motivo, 200); const mecanico = mecanicoDaCasa(texto(p.mecanico, 80));
+      if (!/^[0-9]{1,4}$/.test(kart) || !motivo || !mecanico) throw new ErroApp(400, 'INVALID_REQUEST', `Informe kart, defeito e mecânico responsável (${MECANICOS.join(', ')}).`);
       return roda(q, 'manutencao.gerir', b, 'manutencao', 'work-order-create', async () => {
         const chassiRow = d.store.db.prepare('SELECT chassi FROM karts_chassi WHERE kart = ?').get(kart) as { chassi: string } | undefined;
         const chassiInformado = texto(p.chassi, 80);
@@ -471,8 +482,8 @@ export function criarOperacao(d: DepsOperacao) {
         if (!atual) throw new ErroApp(404, 'NOT_FOUND', 'Ordem de serviço não encontrada.');
         const permitida = atual.status === 'aberta' ? ['em_execucao', 'cancelada'] : atual.status === 'em_execucao' ? ['concluida', 'cancelada'] : [];
         if (!permitida.includes(status)) throw new Error('Transição inválida para esta ordem de serviço.');
-        const mecanico = texto(p.mecanico, 80);
-        if (p.mecanico !== undefined && !mecanico) throw new ErroApp(400, 'INVALID_REQUEST', 'Informe o mecânico responsável.');
+        const mecanico = mecanicoDaCasa(texto(p.mecanico, 80));
+        if (p.mecanico !== undefined && !mecanico) throw new ErroApp(400, 'INVALID_REQUEST', `Informe o mecânico responsável (${MECANICOS.join(', ')}).`);
         const servicoRealizado = texto(p.servicoRealizado, 1000) || texto(p.observacao, 1000) || null;
         const agora = new Date().toISOString();
         d.store.transacao(() => {

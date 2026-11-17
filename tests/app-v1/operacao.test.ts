@@ -230,7 +230,7 @@ describe('operação', () => {
 
   it('equalização finalizada não aceita alteração, só reabrir', async () => {
     legado.mockResolvedValueOnce({ finalizadaEm: 123 });
-    const r = await op.comandoEqualizacao({ ...OP, perfil: 'EQUALIZACAO' }, 'eq', envio({ acao: 'config', mecanico: 'Zé' }));
+    const r = await op.comandoEqualizacao({ ...OP, perfil: 'EQUALIZACAO' }, 'eq', envio({ acao: 'config', mecanico: 'Doidim' }));
     expect(r.status).toBe('REJECTED');
     expect(legado.mock.calls.some(([m]) => m === 'PATCH')).toBe(false);
   });

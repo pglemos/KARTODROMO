@@ -79,8 +79,8 @@ it('servidor real integra punição, grid, bloqueio nativo, equalização mista 
  expect((await req('/api/app/v1/lessons/aula-teste/accept', rec, { operationId: 'aceitar-teste', expectedSessionRevision: lista.sessionRevision, payload: {}, reason: 'TESTE CODEX' })).body.status).toBe('APPLIED');
  expect((await req('/api/app/v1/fleet/3', ger, { estado: 'oficina', reason: 'TESTE CODEX' })).http).toBe(200);
  expect((await req('/api/app/v1/maintenance/orders', op)).http).toBe(403);
- const os = await req('/api/app/v1/maintenance/orders/create', ger, { operationId: 'os-teste', expectedSessionRevision: 0, payload: { kart: '3', motivo: 'Falha no motor', mecanico: 'TESTE CODEX Carlos' }, reason: 'TESTE CODEX' });
- expect(os.body.status).toBe('APPLIED'); expect((await req('/api/app/v1/maintenance/orders', ger)).body.ordens[0]).toMatchObject({ kart: '3', mecanico: 'TESTE CODEX Carlos', status: 'aberta' });
+ const os = await req('/api/app/v1/maintenance/orders/create', ger, { operationId: 'os-teste', expectedSessionRevision: 0, payload: { kart: '3', motivo: 'Falha no motor', mecanico: 'Anderson' }, reason: 'TESTE CODEX' });
+ expect(os.body.status).toBe('APPLIED'); expect((await req('/api/app/v1/maintenance/orders', ger)).body.ordens[0]).toMatchObject({ kart: '3', mecanico: 'Anderson', status: 'aberta' });
  expect((await req('/api/app/v1/maintenance/orders/os-teste/status', ger, { operationId: 'os-iniciar', expectedSessionRevision: 1, payload: { status: 'em_execucao' }, reason: 'TESTE CODEX' })).body.status).toBe('APPLIED');
  expect((await req('/api/app/v1/maintenance/orders/os-teste/status', ger, { operationId: 'os-concluir', expectedSessionRevision: 2, payload: { status: 'concluida' }, reason: 'TESTE CODEX' })).body.status).toBe('APPLIED');
  expect((await req('/api/app/v1/fleet', ger)).body.fora).toEqual(expect.arrayContaining([expect.objectContaining({ kart: '3', estado: 'oficina' })]));
