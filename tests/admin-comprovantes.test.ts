@@ -118,4 +118,16 @@ describe('admin web: comprovantes de pagamento', () => {
     expect((await chamar('anexos/hackeado/1', 'POST', PDF)).status).toBe(400);
     expect((await chamar('anexos/grupo/1', 'POST', PDF, 'image/png')).status).toBe(400);
   });
+
+  it('CORS só para o CRM: preflight e cabeçalho na resposta', async () => {
+    const u = 'https://admin.example.test/api/comprovantes/anexos/grupo/1';
+    const pre = await tratarComprovantes(new Request(u, { method: 'OPTIONS', headers: { origin: 'https://crm.kartodromodebetim.com.br' } }), { OPS_URL: OPS, KARTODROMO_ADMIN_DB: db, COMPROVANTES: bucket }, new URL(u));
+    expect(pre.status).toBe(204);
+    expect(pre.headers.get('access-control-allow-origin')).toBe('https://crm.kartodromodebetim.com.br');
+    const fora = await tratarComprovantes(new Request(u, { method: 'OPTIONS', headers: { origin: 'https://evil.example' } }), { OPS_URL: OPS, KARTODROMO_ADMIN_DB: db, COMPROVANTES: bucket }, new URL(u));
+    expect(fora.status).toBe(403);
+    const r = await tratarComprovantes(new Request(u, { headers: { origin: 'https://crm.kartodromodebetim.com.br', authorization: `Bearer ${tk}` } }), { OPS_URL: OPS, KARTODROMO_ADMIN_DB: db, COMPROVANTES: bucket }, new URL(u));
+    expect(r.status).toBe(200);
+    expect(r.headers.get('access-control-allow-origin')).toBe('https://crm.kartodromodebetim.com.br');
+  });
 });

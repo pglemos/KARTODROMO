@@ -102,10 +102,10 @@ const anexoPublico = (l: LinhaAnexo) => ({
   forma: l.forma, nome: l.nome_arquivo, tipo: l.tipo, tamanho: l.tamanho, enviadoPor: l.enviado_por, criadoEm: l.criado_em,
 });
 
-let tabelaAnexosPronta = false;
+const tabelaAnexosPronta = new WeakSet<object>();
 /** A tabela nasce sozinha (mesmo SQL da migration 0014): o painel na VPS não tem passo de migração do D1. */
 async function garantirAnexos(db: D1Db) {
-  if (tabelaAnexosPronta) return;
+  if (tabelaAnexosPronta.has(db)) return;
   await db.prepare(`CREATE TABLE IF NOT EXISTS anexos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entidade TEXT NOT NULL CHECK (entidade IN ('reserva','reserva_online','grupo','bateria','campeonato','patrocinio_contrato','patrocinio_cobranca','cliente')),
@@ -116,7 +116,7 @@ async function garantirAnexos(db: D1Db) {
     criado_em TEXT NOT NULL DEFAULT (datetime('now')))`).run();
   await db.prepare('CREATE INDEX IF NOT EXISTS idx_anexos_entidade ON anexos (entidade, entidade_id)').run();
   await db.prepare('CREATE INDEX IF NOT EXISTS idx_anexos_criado ON anexos (criado_em)').run();
-  tabelaAnexosPronta = true;
+  tabelaAnexosPronta.add(db);
 }
 
 const entidadeDe = (texto: string) => {
@@ -199,7 +199,37 @@ async function tratarAnexos(req: Request, env: ComprovanteEnv, url: URL, partes:
   throw new ErroHttp(404, 'Rota não encontrada.');
 }
 
+/** O CRM (Kartódromo OS) envia e abre anexos direto do navegador, com o token curto do ops-server. */
+const ORIGENS_LIBERADAS = new Set(['https://crm.kartodromodebetim.com.br']);
+function comCors(req: Request, r: Response): Response {
+  const origem = req.headers.get('origin') ?? '';
+  if (!ORIGENS_LIBERADAS.has(origem)) return r;
+  const h = new Headers(r.headers);
+  h.set('access-control-allow-origin', origem);
+  h.set('vary', 'origin');
+  h.set('access-control-expose-headers', 'content-disposition, content-type');
+  return new Response(r.body, { status: r.status, statusText: r.statusText, headers: h });
+}
+
 export async function tratarComprovantes(req: Request, env: ComprovanteEnv, url: URL): Promise<Response> {
+  const origem = req.headers.get('origin') ?? '';
+  if (req.method === 'OPTIONS') {
+    if (!ORIGENS_LIBERADAS.has(origem)) return new Response(null, { status: 403 });
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'access-control-allow-origin': origem,
+        'access-control-allow-methods': 'GET, POST, DELETE',
+        'access-control-allow-headers': 'authorization, content-type',
+        'access-control-max-age': '600',
+        vary: 'origin',
+      },
+    });
+  }
+  return comCors(req, await tratarComprovantesInterno(req, env, url));
+}
+
+async function tratarComprovantesInterno(req: Request, env: ComprovanteEnv, url: URL): Promise<Response> {
   try {
     const quem = await autenticar(req, env);
     const db = env.KARTODROMO_ADMIN_DB;
