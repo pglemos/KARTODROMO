@@ -1454,10 +1454,8 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
 export async function tipoDaBateria(bateriaId: number, tipo: string, anterior?: { status: string; reservaFechada: boolean; autoAtendimento: boolean }) {
   if (!['fechada', 'bloqueada', 'aberta'].includes(tipo)) throw new HttpError(400, 'Tipo inválido.');
   const estado = anterior ?? { status: 'aberta', reservaFechada: tipo === 'fechada', autoAtendimento: tipo === 'aberta' };
-  const rows = await query(`DECLARE @alteradas TABLE (id int);
-    UPDATE kart.bateria SET status = @status, reserva_fechada = @rf, auto_atendimento = @aa
-     WHERE id = @id AND status <> 'cancelada';
-    SELECT id id FROM @alteradas returning id INTO @alteradas`,
+  const rows = await query(`UPDATE kart.bateria SET status = @status, reserva_fechada = @rf, auto_atendimento = @aa
+     WHERE id = @id AND status <> 'cancelada' RETURNING id`,
     { id: bateriaId, status: estado.status, rf: estado.reservaFechada ? 1 : 0, aa: estado.autoAtendimento ? 1 : 0 });
   if (!rows.length) throw new HttpError(404, 'Bateria não encontrada ou cancelada.');
 }

@@ -199,7 +199,7 @@ def fora_de_aspas(s: str, fn) -> str:
     return "".join(p if i % 2 else fn(p) for i, p in enumerate(partes))
 
 
-def converter_sql(s: str, revisar: list) -> str:
+def converter_sql(s: str, revisar: list, ultimo: bool = True) -> str:
     s = re.sub(r"\bN'", "'", s)
     s = re.sub(r"\b(SYSDATETIME|GETDATE|SYSUTCDATETIME)\s*\(\s*\)", "now()", s, flags=re.I)
     s = re.sub(r"\bISNULL\s*\(", "coalesce(", s, flags=re.I)
@@ -233,13 +233,15 @@ def converter_sql(s: str, revisar: list) -> str:
         return m.group(0)
     s = re.sub(r"((?:\b\w+\.)?)(\w+)\s*(=|<>)\s*([01])\b(?!\.)", bit, s)
     # concatenação com literal
-    s = re.sub(r"'\s*\+\s*", "' || ", s)
-    s = re.sub(r"\s*\+\s*'", " || '", s)
+    s = re.sub(r"('(?:[^']|'')*')\s*\+\s*", r"\1 || ", s)
+    s = re.sub(r"\s*\+\s*('(?:[^']|'')*')", r" || \1", s)
     # TOP n no nível de topo
     mt = re.search(r"\bSELECT\s+(DISTINCT\s+)?TOP\s*\(?\s*(\d+|@\w+)\s*\)?\s+", s, re.I)
     if mt:
         prof = s[:mt.start()].count("(") - s[:mt.start()].count(")")
-        if prof == 0:
+        if prof == 0 and not ultimo:
+            revisar.append("TOP antes de ${...}: pôr o limit no fim da consulta montada")
+        elif prof == 0:
             s = s[:mt.start()] + "SELECT " + (mt.group(1) or "") + s[mt.end():]
             s = s.rstrip()
             fim = s[len(s.rstrip(";")):]
@@ -248,6 +250,9 @@ def converter_sql(s: str, revisar: list) -> str:
             revisar.append("TOP em subconsulta")
     # OUTPUT inserted.X -> returning
     mo = re.search(r"\bOUTPUT\s+(.*?)(?=\s+(?:WHERE|VALUES|SELECT|FROM)\b|\s*$)", s, re.I | re.S)
+    if mo and not ultimo:
+        revisar.append("OUTPUT antes de ${...}: pôr o returning no fim")
+        mo = None
     if mo:
         ret = re.sub(r"\b(inserted|deleted)\.", "", mo.group(1), flags=re.I)
         s = (s[:mo.start()] + s[mo.end():]).rstrip()
@@ -273,10 +278,17 @@ def processar(caminho: Path, aplicar: bool):
     for m in padrao.finditer(src):
         lit = m.group(0)
         corpo = lit[1:-1]
-        if not SQL_DICA.search(corpo) or (lit[0] == "'" and not re.search(r"\b(SELECT|UPDATE|INSERT|DELETE)\b.*\b(FROM|SET|INTO|WHERE)\b|dbo\.", corpo, re.I)):
+        fragmento = re.search(r"\b[a-z]{1,4}\.[A-Z][a-z]+\w*\b", corpo) and not re.search(r"https?://|\.(ts|js|json|png|html)\b", corpo)
+        if not (SQL_DICA.search(corpo) or fragmento) or (lit[0] == "'" and not fragmento and not re.search(r"\b(SELECT|UPDATE|INSERT|DELETE)\b.*\b(FROM|SET|INTO|WHERE)\b|dbo\.", corpo, re.I)):
             continue
         revisar: list = []
-        novo = "".join(converter_sql(t, revisar) if k == "sql" else t for k, t in separar(corpo)) if lit[0] == "`" else converter_sql(corpo, revisar)
+        if lit[0] == "`":
+            partes = separar(corpo)
+            ult = max(i for i, (k, _) in enumerate(partes) if k == "sql")
+            tem_js_depois = any(k == "js" for k, _ in partes[ult + 1:])
+            novo = "".join(converter_sql(t, revisar, i == ult and not tem_js_depois or (i == ult and partes[ult][1].strip() != "")) if k == "sql" else t for i, (k, t) in enumerate(partes))
+        else:
+            novo = converter_sql(corpo, revisar)
         if novo != corpo or revisar:
             n_lits += 1
             linha = src.count("\n", 0, m.start()) + 1

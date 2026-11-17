@@ -36,7 +36,7 @@ async function main() {
     ok('pendências', pend.status === 200, Array.isArray(pend.body) ? `${pend.body.length}` : Object.keys(pend.body ?? {}));
     const tot = await gruposDoDiaNoTotem();
     ok('grupos do dia no totem', Array.isArray(tot), `${tot.length}`);
-    ok('resumo do painel', typeof resumoPainel(um!).pilotos !== 'undefined' || !!resumoPainel(um!));
+    ok('resumo do painel', !!resumoPainel(um!));
     ok('preço do piloto (aniversário)', precoDoPiloto({ preco: 14500, aniversario: true, precoAniversariante: 9000 }, true, 11) === 9000 && precoDoPiloto({ preco: 14500, aniversario: true, precoAniversariante: 9000 }, true, 10) === 14500);
     const pagos = await aplicarPagos(g!.id);
     ok('aplicar pagos no grupo (idempotente)', pagos === undefined || typeof pagos === 'number' || typeof pagos === 'object', pagos as unknown as string);

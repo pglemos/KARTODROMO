@@ -198,14 +198,14 @@ async function sessoesDaCronometragem(de?: string, ate?: string): Promise<Recept
 
 
 async function parametros() {
-  return Object.fromEntries((await query<{ k: string; v: string }>(`SELECT Chave k, Valor v FROM dbo.Parametro`)).map((p) => [p.k, p.v]));
+  return Object.fromEntries((await query<{ k: string; v: string }>(`SELECT chave k, valor v FROM kart.parametro`)).map((p) => [p.k, p.v]));
 }
 
 // ---------------------------------------------------------------- termo
 
 async function termoHtml(ids: number[], branco = false) {
   const empresa = await one<{ nome: string; razaoSocial: string | null; cidade: string | null }>(
-    'SELECT Nome nome, RazaoSocial razaoSocial, Cidade cidade FROM dbo.Empresa WHERE Id = 1',
+    'SELECT nome nome, razao_social "razaoSocial", cidade cidade FROM kart.empresa WHERE id = 1',
   );
   const participantes: TermoParticipante[] = branco
     ? [{
@@ -218,21 +218,22 @@ async function termoHtml(ids: number[], branco = false) {
     const placeholders = ids.map((_, n) => '@i' + n).join(',');
     const params = Object.fromEntries(ids.map((id, n) => ['i' + n, id]));
     participantes.push(...await query<TermoParticipante>(
-      'SELECT c.Nome nome, c.Documento documento, CONVERT(varchar(10), c.Nascimento, 126) nascimento, ' +
-        'c.Email email, c.Telefone telefone, c.Cep cep, c.Endereco endereco, c.Numero numero, c.Complemento complemento, ' +
-        'c.Bairro bairro, c.Cidade cidade, r.Nome responsavelNome, r.Documento responsavelDocumento, ' +
-        'r.Telefone responsavelTelefone, r.Email responsavelEmail, i.BateriaId bateriaId, b.Nome bateriaNome, ' +
-        'CONVERT(varchar(19), b.Inicio, 126) bateriaInicio, grupo.responsavel grupoResponsavel ' +
-        'FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId JOIN dbo.Cliente c ON c.Id = i.ClienteId ' +
-        'LEFT JOIN dbo.Cliente r ON r.Id = c.ResponsavelId ' +
-        "OUTER APPLY (SELECT TOP 1 LEFT(LTRIM(rc.Nome), CHARINDEX(' ', LTRIM(rc.Nome) + ' ') - 1) responsavel FROM dbo.ReservaGrupo g JOIN dbo.Cliente rc ON rc.Id = g.ResponsavelId " +
-        "WHERE g.BateriaId = i.BateriaId AND g.Status <> 'cancelada' AND (g.ResponsavelId = i.ClienteId OR EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto gp WHERE gp.GrupoId = g.Id AND (gp.InscricaoId = i.Id OR gp.ClienteId = i.ClienteId))) ORDER BY g.Id DESC) grupo " +
-        'WHERE i.Id IN (' + placeholders + ')',
+      `SELECT c.nome nome, c.documento documento, to_char(c.nascimento, 'YYYY-MM-DD') nascimento,
+        c.email email, c.telefone telefone, c.cep cep, c.endereco endereco, c.numero numero, c.complemento complemento,
+        c.bairro bairro, c.cidade cidade, r.nome "responsavelNome", r.documento "responsavelDocumento",
+        r.telefone "responsavelTelefone", r.email "responsavelEmail", i.bateria_id "bateriaId", b.nome "bateriaNome",
+        to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI:SS') "bateriaInicio", grupo.responsavel "grupoResponsavel"
+        FROM kart.inscricao i JOIN kart.bateria b ON b.id = i.bateria_id JOIN kart.cliente c ON c.id = i.cliente_id
+        LEFT JOIN kart.cliente r ON r.id = c.responsavel_id
+        LEFT JOIN LATERAL (SELECT split_part(ltrim(rc.nome), ' ', 1) responsavel FROM kart.reserva_grupo g JOIN kart.cliente rc ON rc.id = g.responsavel_id
+          WHERE g.bateria_id = i.bateria_id AND g.status <> 'cancelada' AND (g.responsavel_id = i.cliente_id OR EXISTS (SELECT 1 FROM kart.reserva_grupo_piloto gp WHERE gp.grupo_id = g.id AND (gp.inscricao_id = i.id OR gp.cliente_id = i.cliente_id)))
+          ORDER BY g.id DESC LIMIT 1) grupo ON true
+        WHERE i.id IN (${placeholders})`,
       params,
     ));
     if (participantes.length) {
       await query(
-        'UPDATE dbo.Inscricao SET TermoImpressoEm = SYSDATETIME() WHERE Id IN (' + placeholders + ')',
+        'UPDATE kart.inscricao SET termo_impresso_em = now() WHERE id IN (' + placeholders + ')',
         params,
       );
     }
@@ -364,7 +365,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
 
   if (path === '/api/totem/config' && method === 'GET') {
     const p = await parametros();
-    const emp = await one<{ nome: string }>(`SELECT Nome nome FROM dbo.Empresa WHERE Id = 1`);
+    const emp = await one<{ nome: string }>(`SELECT nome nome FROM kart.empresa WHERE id = 1`);
     send(res, 200, {
       empresa: emp?.nome ?? 'Kartódromo',
       mensagem: p['totem.mensagemBoasVindas'] ?? `Seja bem-vindo(a) ao ${emp?.nome ?? ''}!`,
@@ -396,36 +397,36 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     const procurar = () => {
       if (isEmail) {
         return one<Record<string, unknown>>(
-          `SELECT TOP 1 ${CLIENTE_COLS} FROM dbo.Cliente c WHERE c.Email IN (@v, @v2) ORDER BY CASE WHEN c.ResponsavelId IS NULL THEN 0 ELSE 1 END, c.AtualizadoEm DESC`,
+          `SELECT ${CLIENTE_COLS} FROM kart.cliente c WHERE lower(c.email) IN (lower(@v), lower(@v2)) ORDER BY CASE WHEN c.responsavel_id IS NULL THEN 0 ELSE 1 END, c.atualizado_em DESC LIMIT 1`,
           { v, v2 },
         );
       }
       if (dig && dig.length >= 10) {
         return one<Record<string, unknown>>(
-          `SELECT TOP 1 ${CLIENTE_COLS} FROM dbo.Cliente c
-            WHERE (c.DocumentoNum = @dig OR c.Documento = @raw OR c.Documento = @dig
-               OR c.TelefoneNum = @dig OR c.Telefone LIKE @phoneLike)
-            ORDER BY CASE WHEN c.DocumentoNum = @dig OR c.Documento = @raw THEN 0 ELSE 1 END,
-                     CASE WHEN c.ResponsavelId IS NULL THEN 0 ELSE 1 END,
-                     c.AtualizadoEm DESC`,
+          `SELECT ${CLIENTE_COLS} FROM kart.cliente c
+            WHERE (c.documento_num = @dig OR c.documento = @raw OR c.documento = @dig
+               OR c.telefone_num = @dig OR c.telefone LIKE @phoneLike)
+            ORDER BY CASE WHEN c.documento_num = @dig OR c.documento = @raw THEN 0 ELSE 1 END,
+                     CASE WHEN c.responsavel_id IS NULL THEN 0 ELSE 1 END,
+                     c.atualizado_em DESC LIMIT 1`,
           { dig, raw, phoneLike: '%' + dig.slice(-8) },
         );
       }
       if (dig && dig.length >= 4) {
         return one<Record<string, unknown>>(
-          `SELECT TOP 1 ${CLIENTE_COLS} FROM dbo.Cliente c
-            WHERE (c.DocumentoNum = @dig OR c.Documento = @raw OR c.Documento = @dig)
-            ORDER BY CASE WHEN c.ResponsavelId IS NULL THEN 0 ELSE 1 END, c.AtualizadoEm DESC`,
+          `SELECT ${CLIENTE_COLS} FROM kart.cliente c
+            WHERE (c.documento_num = @dig OR c.documento = @raw OR c.documento = @dig)
+            ORDER BY CASE WHEN c.responsavel_id IS NULL THEN 0 ELSE 1 END, c.atualizado_em DESC LIMIT 1`,
           { dig, raw },
         );
       }
       const nomeLike = '%' + raw.replace(/\s+/g, '%') + '%';
       return one<Record<string, unknown>>(
-        `SELECT TOP 1 ${CLIENTE_COLS} FROM dbo.Cliente c
-          WHERE (c.Documento = @raw OR c.Nome COLLATE Latin1_General_CI_AI LIKE @nomeLike)
-          ORDER BY CASE WHEN c.Documento = @raw THEN 0 ELSE 1 END,
-                   CASE WHEN c.ResponsavelId IS NULL THEN 0 ELSE 1 END,
-                   c.AtualizadoEm DESC`,
+        `SELECT ${CLIENTE_COLS} FROM kart.cliente c
+          WHERE (c.documento = @raw OR unaccent(c.nome) ILIKE unaccent(@nomeLike))
+          ORDER BY CASE WHEN c.documento = @raw THEN 0 ELSE 1 END,
+                   CASE WHEN c.responsavel_id IS NULL THEN 0 ELSE 1 END,
+                   c.atualizado_em DESC LIMIT 1`,
         { raw, nomeLike },
       );
     };
@@ -436,7 +437,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     if (!c) return identificadoNoTotem.delete(ipDe(req)), send(res, 200, { cliente: null }), true;
     identificadoNoTotem.set(ipDe(req), { id: Number(c.id), em: Date.now() });
     const dependentes = await query<{ id: number; nome: string; nascimento: string }>(
-      `SELECT c.Id id, c.Nome nome, CONVERT(varchar(10), c.Nascimento, 126) nascimento FROM dbo.Cliente c WHERE c.ResponsavelId = @id AND c.Bloqueado = 0 ORDER BY c.Nome`,
+      `SELECT c.id id, c.nome nome, to_char(c.nascimento, 'YYYY-MM-DD') nascimento FROM kart.cliente c WHERE c.responsavel_id = @id AND c.bloqueado = false ORDER BY c.nome`,
       { id: c.id },
     );
     // cadastro completo (pedido do dono em 26/09): o cliente confere e corrige todos os dados no totem
@@ -490,7 +491,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     if (!responsavelId && !body.lgpd) throw new HttpError(400, 'É necessário aceitar o Termo de Consentimento para Tratamento de Dados Pessoais.');
     // Menores podem usar o contato do responsável, inclusive em versões antigas do totem.
     if (responsavelId && !String(dados.email ?? '').trim()) {
-      const responsavel = await one<{ email: string | null }>(`SELECT Email email FROM dbo.Cliente WHERE Id = @id`, { id: responsavelId });
+      const responsavel = await one<{ email: string | null }>(`SELECT email email FROM kart.cliente WHERE id = @id`, { id: responsavelId });
       dados.email = responsavel?.email ?? '';
     }
     const erroCadastro = erroCadastroObrigatorio(dados);
@@ -502,7 +503,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
       let limparNumero = false;
       if (dados.endereco !== undefined) {
         const atual = await one<{ endereco: string | null; numero: string | null; complemento: string | null }>(
-          `SELECT Endereco endereco, Numero numero, Complemento complemento FROM dbo.Cliente WHERE Id = @id`,
+          `SELECT endereco endereco, numero numero, complemento complemento FROM kart.cliente WHERE id = @id`,
           { id },
         );
         const digitado = String(dados.endereco ?? '').trim();
@@ -510,7 +511,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
         else limparNumero = Boolean(atual?.numero || atual?.complemento);
       }
       await updateCliente(id, { ...dados, lgpd: true }, true);
-      if (limparNumero) await query(`UPDATE dbo.Cliente SET Numero = NULL, Complemento = NULL WHERE Id = @id`, { id });
+      if (limparNumero) await query(`UPDATE kart.cliente SET numero = NULL, complemento = NULL WHERE id = @id`, { id });
       log(`totem: cadastro atualizado ${id}`);
       return send(res, 200, { id, token: sign(`cli:${id}`) }), true;
     }
@@ -520,7 +521,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     if (dados.documento && (dados.tipoDocumento ?? 'CPF') === 'CPF' && !isValidCpf(String(dados.documento))) throw new HttpError(400, 'CPF inválido.');
     if (!responsavelId) {
       if (!dados.telefone || onlyDigits(dados.telefone).length < 10) throw new HttpError(400, 'O número de telefone é obrigatório.');
-      const dup = await one<{ id: number }>(`SELECT TOP 1 Id id FROM dbo.Cliente WHERE DocumentoNum = @d`, { d: onlyDigits(dados.documento) });
+      const dup = await one<{ id: number }>(`SELECT id id FROM kart.cliente WHERE documento_num = @d limit 1`, { d: onlyDigits(dados.documento) });
       if (dup) throw new HttpError(409, 'Já existe cadastro com esse documento. Volte e informe o documento para continuar.');
     }
     if (!dados.nascimento) throw new HttpError(400, 'A data de nascimento é obrigatória.');
@@ -582,11 +583,11 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
       const bIn = rows.map((r, n) => { bmap[`b${n}`] = Number(r.id); return `@b${n}`; }).join(',');
       const gIn = grupo.map((gId, n) => { bmap[`g${n}`] = gId; return `@g${n}`; }).join(',');
       for (const g of await query<{ b: number; n: number }>(
-        `SELECT i.BateriaId b, COUNT(*) n FROM dbo.Inscricao i
-          WHERE i.BateriaId IN (${bIn}) AND i.Status <> 'cancelada'
-            AND (i.ClienteId IN (${gIn})
-                 OR (i.Origem = 'site' AND i.Pago = 1 AND i.ClienteId IN (SELECT ResponsavelId FROM dbo.Cliente WHERE Id IN (${gIn}) AND ResponsavelId IS NOT NULL)))
-          GROUP BY i.BateriaId`,
+        `SELECT i.bateria_id b, COUNT(*) n FROM kart.inscricao i
+          WHERE i.bateria_id IN (${bIn}) AND i.status <> 'cancelada'
+            AND (i.cliente_id IN (${gIn})
+                 OR (i.origem = 'site' AND i.pago = true AND i.cliente_id IN (SELECT responsavel_id "ResponsavelId" FROM kart.cliente WHERE id IN (${gIn}) AND responsavel_id IS NOT NULL)))
+          GROUP BY i.bateria_id`,
         bmap,
       )) doGrupo.set(g.b, g.n);
     }
@@ -638,7 +639,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     const end = body.endurance as { eventoId?: unknown; equipeId?: unknown; equipeIds?: unknown[] } | undefined;
     if (end && end.eventoId && (end.equipeId || Array.isArray(end.equipeIds))) {
       const eventoId=int(end.eventoId,'Evento');
-      const vinculo=await one<{bateriaId:number}>('SELECT BateriaId bateriaId FROM dbo.EnduranceEvento WHERE Id=@id AND Ativo=1',{id:eventoId});
+      const vinculo=await one<{bateriaId:number}>('SELECT bateria_id "bateriaId" FROM kart.endurance_evento WHERE id=@id AND ativo = true',{id:eventoId});
       if(!vinculo || !baterias.includes(vinculo.bateriaId)) throw new HttpError(409,'O campeonato não pertence à bateria selecionada.');
       const equipeIds=Array.isArray(end.equipeIds)?end.equipeIds.map(id=>int(id,'Inscrição')):[int(end.equipeId,'Equipe')];
       pulseiras = await vincularNoTotem(eventoId,equipeIds,grupo);
@@ -648,7 +649,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
       // quem já tem vaga na bateria primeiro (o comprador da reserva online fica com a dele; as outras vão para o grupo)
       const existentes = new Map<number, number>();
       for (const cid of grupo) {
-        const dup = await one<{ Id: number }>(`SELECT TOP 1 Id FROM dbo.Inscricao WHERE BateriaId = @b AND ClienteId = @c AND Status <> 'cancelada' ORDER BY Id`, { b: bateriaId, c: cid });
+        const dup = await one<{ Id: number }>(`SELECT id "Id" FROM kart.inscricao WHERE bateria_id = @b AND cliente_id = @c AND status <> 'cancelada' ORDER BY id limit 1`, { b: bateriaId, c: cid });
         if (dup) existentes.set(cid, dup.Id);
       }
       for (const cid of [...grupo].sort((a, b) => Number(existentes.has(b)) - Number(existentes.has(a)))) {
@@ -675,12 +676,12 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
         const novas = await inscreverN(bateriaId, cid, 1, 'totem', null, null, false);
         ids.push(...novas);
         if (novas.length) {
-          const batProd = await one<{ produtoId: number | null }>(`SELECT ProdutoId produtoId FROM dbo.Bateria WHERE Id = @id`, { id: bateriaId }).catch(() => null);
+          const batProd = await one<{ produtoId: number | null }>(`SELECT produto_id "produtoId" FROM kart.bateria WHERE id = @id`, { id: bateriaId }).catch(() => null);
           const vchs = await vouchersDisponiveisParaCliente({ clienteId: cid, produtoId: batProd?.produtoId ?? null }).catch(() => []);
           if (vchs.length) {
             const v0 = vchs[0];
             for (const insId of novas) {
-              await query(`UPDATE dbo.Inscricao SET VoucherId = @vid WHERE Id = @id`, { vid: v0.id, id: insId }).catch(() => undefined);
+              await query(`UPDATE kart.inscricao SET voucher_id = @vid WHERE id = @id`, { vid: v0.id, id: insId }).catch(() => undefined);
             }
             vouchersReconhecidos.push({ clienteId: cid, codigo: v0.codigo, tipo: v0.tipo, valor: v0.valor });
           }
@@ -688,7 +689,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
         if (!termoDoPiloto.has(cid) && novas.length) termoDoPiloto.set(cid, novas[0]);
       }
     }
-    const primeira = await one<{ inicio: string }>(`SELECT TOP 1 CONVERT(varchar(16), Inicio, 126) inicio FROM dbo.Bateria WHERE Id IN (${baterias.map((_, n) => '@b' + n).join(',')}) ORDER BY Inicio`, Object.fromEntries(baterias.map((b, n) => ['b' + n, b])));
+    const primeira = await one<{ inicio: string }>(`SELECT to_char(inicio, 'YYYY-MM-DD"T"HH24:MI') inicio FROM kart.bateria WHERE id IN (${baterias.map((_, n) => '@b' + n).join(',')}) ORDER BY bateria.inicio LIMIT 1`, Object.fromEntries(baterias.map((b, n) => ['b' + n, b])));
     const p = await parametros();
     log(`totem: ${ids.length} pre-reserva(s) em ${baterias.length} bateria(s)`);
     const imprimir = p['totem.imprimirTermo'] !== 'false';
@@ -702,7 +703,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     if (naRecepcao) for (const idInscricao of termoDoPiloto.values()) enfileirarImpressao(termoLink([idInscricao]), 'Termo de responsabilidade', origem);
     if (ids.length) {
       const pmap = Object.fromEntries(ids.map((id, n) => ['id' + n, id]));
-      await query(`UPDATE dbo.Inscricao SET TermoImpressoEm = COALESCE(TermoImpressoEm, SYSDATETIME()), AtualizadoEm = SYSDATETIME() WHERE Id IN (${ids.map((_, n) => '@id' + n).join(',')})`, pmap).catch(() => undefined);
+      await query(`UPDATE kart.inscricao SET termo_impresso_em = COALESCE(termo_impresso_em, now()), atualizado_em = now() WHERE id IN (${ids.map((_, n) => '@id' + n).join(',')})`, pmap).catch(() => undefined);
     }
     send(res, 201, { inscricoes: ids, inicio: primeira?.inicio, termoUrl: imprimir ? termoLink(ids) : null, termoUrls: imprimir ? [...termoDoPiloto.values()].map((id) => termoLink([id])) : [], termoNaRecepcao: naRecepcao, pulseiras, vouchersReconhecidos });
     return true;
@@ -725,7 +726,7 @@ async function loginRoute(req: http.IncomingMessage, res: http.ServerResponse) {
   const login = String(b.login ?? '').trim().toLowerCase();
   const senha = String(b.senha ?? '');
   if (!b.termos) throw new HttpError(400, 'É necessário concordar com os termos de uso.');
-  const u = await one<{ id: number; nome: string; hash: string; admin: boolean; ativo: boolean }>(`SELECT Id id, Nome nome, SenhaHash hash, Admin admin, Ativo ativo FROM dbo.Usuario WHERE Login = @login`, { login });
+  const u = await one<{ id: number; nome: string; hash: string; admin: boolean; ativo: boolean }>(`SELECT id id, nome nome, senha_hash hash, admin admin, ativo ativo FROM kart.usuario WHERE login = @login`, { login });
   if (!u || !u.ativo || !confereSenha(senha, u.hash)) {
     const reg = tentativasLogin.get(ip) ?? { n: 0, ate: 0 };
     if (reg.ate && agora >= reg.ate) { reg.n = 0; reg.ate = 0; }
@@ -737,7 +738,7 @@ async function loginRoute(req: http.IncomingMessage, res: http.ServerResponse) {
   }
   tentativasLogin.delete(ip);
   log(`login: ${login}`);
-  await query(`UPDATE dbo.Usuario SET UltimoAcesso = SYSDATETIME() WHERE Id = @id`, { id: u.id }).catch(() => undefined);
+  await query(`UPDATE kart.usuario SET ultimo_acesso = now() WHERE id = @id`, { id: u.id }).catch(() => undefined);
   send(res, 200, { token: emiteToken({ uid: u.id, nome: u.nome, admin: Boolean(u.admin) }), usuario: { id: u.id, nome: u.nome, admin: Boolean(u.admin) } });
 }
 
@@ -769,7 +770,7 @@ async function atender(req: http.IncomingMessage, res: http.ServerResponse) {
     if (path === '/totem') return sendStatic(res, 'totem.html');
     if (path.startsWith('/ui/')) return sendStatic(res, path.slice(4));
     if (path === '/healthz') {
-      const r = await one<{ agora: string }>(`SELECT CONVERT(varchar(19), SYSDATETIME(), 126) agora`);
+      const r = await one<{ agora: string }>(`SELECT to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS') agora`);
       return send(res, 200, { ok: true, sqlAgora: r?.agora });
     }
     if (path === '/termo') {
@@ -813,7 +814,7 @@ async function atender(req: http.IncomingMessage, res: http.ServerResponse) {
         if (ids.length > 1000) throw new HttpError(502, 'Quantidade de pilotos inválida.');
         const params = Object.fromEntries(ids.map((id, i) => ['id' + i, id]));
         const clientes = ids.length ? await query<{ id: number; instagram: string | null }>(
-          `SELECT Id id, Instagram instagram FROM dbo.Cliente WHERE Id IN (${ids.map((_, i) => '@id' + i).join(',')})`, params,
+          `SELECT id id, instagram instagram FROM kart.cliente WHERE id IN (${ids.map((_, i) => '@id' + i).join(',')})`, params,
         ) : [];
         return send(res, 200, acrescentarInstagramRelatorio(data as SessaoRelatorio, clientes));
       }
@@ -874,9 +875,9 @@ async function atender(req: http.IncomingMessage, res: http.ServerResponse) {
       let m = path.match(/^\/api\/crono\/baterias\/(\d+)\/grid$/);
       if (m) {
         const rows = await query(
-          `SELECT i.Id inscricaoId, c.Nome nome, endurance.equipe, endurance.equipeId, endurance.pulseira, i.Kart kart, i.Pago pago, i.Aprovada aprovada, c.Id clienteId FROM dbo.Inscricao i JOIN dbo.Cliente c ON c.Id = i.ClienteId
+          `SELECT i.id "inscricaoId", c.nome nome, endurance.equipe, endurance.equipeId, endurance.pulseira, i.kart kart, i.pago pago, i.aprovada aprovada, c.id "clienteId" FROM kart.inscricao i JOIN kart.cliente c ON c.id = i.cliente_id
            ${ENDURANCE_VINCULO_SQL}
-           WHERE i.BateriaId = @id AND i.Status <> 'cancelada' ORDER BY i.Id`,
+           WHERE i.bateria_id = @id AND i.status <> 'cancelada' ORDER BY i.id`,
           { id: Number(m[1]) },
         );
         return send(res, 200, rows);
@@ -887,7 +888,7 @@ async function atender(req: http.IncomingMessage, res: http.ServerResponse) {
         const b = (await readBody(req)) as { agendaId?: unknown; karts?: { kart?: unknown; minutos?: unknown }[] };
         const agendaId = Number(b.agendaId);
         const cat = agendaId > 0
-          ? (await one<{ c: string | null }>(`SELECT p.Categoria c FROM dbo.Bateria b JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @id`, { id: agendaId }))?.c ?? null
+          ? (await one<{ c: string | null }>(`SELECT p.categoria c FROM kart.bateria b JOIN kart.produto p ON p.id = b.produto_id WHERE b.id = @id`, { id: agendaId }))?.c ?? null
           : null;
         let somados = 0, criados = 0, ignorados = 0;
         for (const k of Array.isArray(b.karts) ? b.karts : []) {
@@ -895,26 +896,26 @@ async function atender(req: http.IncomingMessage, res: http.ServerResponse) {
           const minutos = Math.round(Number(k.minutos));
           if (!Number.isSafeInteger(numero) || numero <= 0 || !(minutos > 0) || minutos > 600) { ignorados++; continue; }
           const linhas = await query<{ id: number; categoria: string | null; item: number | null; minutos: number; ultima: string | null }>(
-            `SELECT Id id, Categoria categoria, ItemId item, MinutosUso minutos, CONVERT(varchar(19), UltimaManutencao, 126) ultima
-             FROM dbo.Manutencao WHERE TRY_CAST(LTRIM(RTRIM(Kart)) AS int) = @n`, { n: numero });
+            `SELECT id id, categoria categoria, item_id item, minutos_uso minutos, to_char(ultima_manutencao, 'YYYY-MM-DD"T"HH24:MI:SS') ultima
+             FROM kart.manutencao WHERE trim(kart) ~ '^[0-9]+$' AND trim(kart)::int = @n`, { n: numero });
           const cats = [...new Set(linhas.map((l) => l.categoria ?? ''))];
           const daCategoria = cat ? linhas.filter((l) => (l.categoria ?? '') === cat) : cats.length === 1 ? linhas : [];
-          // o LapTime deixou controles repetidos do mesmo kart ("01" e "1", "12" e "12 "): soma só em UM por item —
+          // o sistema antigo deixou controles repetidos do mesmo kart ("01" e "1", "12" e "12 "): soma só em UM por item —
           // o que já teve manutenção registrada mais recente, senão o de mais horas (antes somava em todos)
           const porItem = new Map<string, typeof daCategoria>();
           for (const l of daCategoria) porItem.set(String(l.item ?? ''), [...(porItem.get(String(l.item ?? '')) ?? []), l]);
           const alvo = [...porItem.values()].map((g) => g.sort((a, x) => (x.ultima ?? '').localeCompare(a.ultima ?? '') || x.minutos - a.minutos || a.id - x.id)[0]);
           if (!alvo.length && cat) {
             // kart novo nessa categoria: abre o controle com os itens que contam por hora
-            const r = await query(`INSERT dbo.Manutencao (Kart, Categoria, ItemId, MinutosUso, Realizada, Data)
-              SELECT @k, @c, Id, @m, 0, SYSDATETIME() FROM dbo.ItemManutencao WHERE Ativo = 1 AND ControlaPorTempo = 1`, { k: String(numero), c: cat, m: minutos });
+            const r = await query(`INSERT INTO kart.manutencao (kart, categoria, item_id, minutos_uso, realizada, data)
+              SELECT @k, @c, id "Id", @m, 0, now() FROM kart.item_manutencao WHERE ativo = true AND controla_por_tempo = true`, { k: String(numero), c: cat, m: minutos });
             void r; criados++;
             continue;
           }
           if (!alvo.length) { ignorados++; continue; }
           for (const l of alvo) {
             // somar uso depois de uma manutenção feita abre um ciclo novo (volta para "A realizar" contando do zero)
-            await query(`UPDATE dbo.Manutencao SET MinutosUso = MinutosUso + @m, Realizada = 0, Data = SYSDATETIME() WHERE Id = @id`, { m: minutos, id: l.id });
+            await query(`UPDATE kart.manutencao SET minutos_uso = minutos_uso + @m, realizada = false, data = now() WHERE id = @id`, { m: minutos, id: l.id });
             somados++;
           }
         }
@@ -922,8 +923,8 @@ async function atender(req: http.IncomingMessage, res: http.ServerResponse) {
       }
       if (path === '/api/crono/empresa' && method === 'GET') {
         // dados da empresa (Cadastros › Empresa da recepção) para o cabeçalho da cronometragem, só leitura
-        return send(res, 200, await one(`SELECT Nome nome, Cnpj cnpj, Telefone telefone, Email email, Endereco endereco, Numero numero, Bairro bairro, Cidade cidade, Estado estado
-          FROM dbo.Empresa WHERE Id = 1`) ?? {});
+        return send(res, 200, await one(`SELECT nome nome, cnpj cnpj, telefone telefone, email email, endereco endereco, numero numero, bairro bairro, cidade cidade, estado estado
+          FROM kart.empresa WHERE id = 1`) ?? {});
       }
       if (path === '/api/crono/clientes' && method === 'GET') {
         // dados dos pilotos para a lista de competidores da cronometragem (só leitura)
@@ -931,28 +932,28 @@ async function atender(req: http.IncomingMessage, res: http.ServerResponse) {
         if (!ids.length) return send(res, 200, []);
         const pmap = Object.fromEntries(ids.map((id, n) => [`id${n}`, id]));
         const inClause = ids.map((_, n) => `@id${n}`).join(',');
-        const clientes = await query<Record<string, unknown>>(`SELECT Id id, Email email, Cidade cidade, Estado uf, Peso peso, Sexo sexo, Telefone telefone FROM dbo.Cliente WHERE Id IN (${inClause})`, pmap);
+        const clientes = await query<Record<string, unknown>>(`SELECT id id, email email, cidade cidade, estado uf, peso peso, sexo sexo, telefone telefone FROM kart.cliente WHERE id IN (${inClause})`, pmap);
         const vinculos = await query<{ clienteId: number; bateriaId: number; equipeId: number; equipe: string; pulseira: number }>(
-          `SELECT p.ClienteId clienteId, ev.BateriaId bateriaId, q.Id equipeId, q.Nome equipe, p.Pulseira pulseira
-           FROM dbo.EndurancePilotoInscricao p JOIN dbo.EnduranceEvento ev ON ev.Id = p.EventoId
-           JOIN dbo.EnduranceEquipe q ON q.Id = p.EquipeId AND q.EventoId = ev.Id
-           WHERE p.ClienteId IN (${inClause}) AND p.Ativo = 1 AND ev.Ativo = 1`, pmap);
+          `SELECT p.cliente_id "clienteId", ev.bateria_id "bateriaId", q.id "equipeId", q.nome equipe, p.pulseira pulseira
+           FROM kart.endurance_piloto_inscricao p JOIN kart.endurance_evento ev ON ev.id = p.evento_id
+           JOIN kart.endurance_equipe q ON q.id = p.equipe_id AND q.evento_id = ev.id
+           WHERE p.cliente_id IN (${inClause}) AND p.ativo = true AND ev.ativo = true`, pmap);
         return send(res, 200, clientes.map((c) => ({ ...c, enduranceVinculos: vinculos.filter((v) => v.clienteId === c.id) })));
       }
       m = path.match(/^\/api\/crono\/baterias\/(\d+)\/programa$/);
       if (m) {
-        return send(res, 200, await query(`SELECT pp.Ordem ordem, pp.Nome nome, pp.Tipo tipo, pp.Finalizacao finalizacao, pp.TempoMin tempoMin, pp.VoltasMax voltasMax, b.VoltaMinimaSeg voltaMinimaSeg, t.TimingTrackId trackId
-          FROM dbo.Bateria b JOIN dbo.ProdutoProva pp ON pp.ProdutoId = b.ProdutoId LEFT JOIN dbo.Tracado t ON t.Id = b.TracadoId
-          WHERE b.Id = @id ORDER BY pp.Ordem`, { id: Number(m[1]) }));
+        return send(res, 200, await query(`SELECT pp.ordem ordem, pp.nome nome, pp.tipo tipo, pp.finalizacao finalizacao, pp.tempo_min "tempoMin", pp.voltas_max "voltasMax", b.volta_minima_seg "voltaMinimaSeg", t.timing_track_id "trackId"
+          FROM kart.bateria b JOIN kart.produto_prova pp ON pp.produto_id = b.produto_id LEFT JOIN kart.tracado t ON t.id = b.tracado_id
+          WHERE b.id = @id ORDER BY pp.ordem`, { id: Number(m[1]) }));
       }
       if (path === '/api/crono/baterias' && method === 'GET') {
         const data = String(url.searchParams.get('data') ?? '');
         return send(res, 200, await query(
-          `SELECT b.Id id, b.Nome nome, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Vagas vagas, b.TipoKart tipoKart, t.TimingTrackId trackId,
-                  (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') inscritos,
-                  (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada' AND i.Pago = 1) pagos
-           FROM dbo.Bateria b LEFT JOIN dbo.Tracado t ON t.Id = b.TracadoId
-           WHERE b.Status <> 'cancelada' AND b.Inicio >= @d AND b.Inicio < DATEADD(day, 1, @d) ORDER BY b.Inicio`,
+          `SELECT b.id id, b.nome nome, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio, b.vagas vagas, b.tipo_kart "tipoKart", t.timing_track_id "trackId",
+                  (SELECT COUNT(*) FROM kart.inscricao i WHERE i.bateria_id = b.id AND i.status <> 'cancelada') inscritos,
+                  (SELECT COUNT(*) FROM kart.inscricao i WHERE i.bateria_id = b.id AND i.status <> 'cancelada' AND i.pago = true) pagos
+           FROM kart.bateria b LEFT JOIN kart.tracado t ON t.id = b.tracado_id
+           WHERE b.status <> 'cancelada' AND b.inicio >= @d AND b.inicio < (@d + make_interval(days => (1)::int)) ORDER BY b.inicio`,
           { d: /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) },
         ));
       }
@@ -963,11 +964,11 @@ async function atender(req: http.IncomingMessage, res: http.ServerResponse) {
       await sincronizarTracadosDaCronometragem();
       const data = String(url.searchParams.get('data') ?? '');
       return send(res, 200, await query(
-        `SELECT b.Id id, b.Nome nome, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Vagas vagas, b.TipoKart tipoKart, t.TimingTrackId trackId,
-                (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') inscritos,
-                (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada' AND i.Pago = 1) pagos
-         FROM dbo.Bateria b LEFT JOIN dbo.Tracado t ON t.Id = b.TracadoId
-         WHERE b.Status <> 'cancelada' AND b.Inicio >= @d AND b.Inicio < DATEADD(day, 1, @d) ORDER BY b.Inicio`,
+        `SELECT b.id id, b.nome nome, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') inicio, b.vagas vagas, b.tipo_kart "tipoKart", t.timing_track_id "trackId",
+                (SELECT COUNT(*) FROM kart.inscricao i WHERE i.bateria_id = b.id AND i.status <> 'cancelada') inscritos,
+                (SELECT COUNT(*) FROM kart.inscricao i WHERE i.bateria_id = b.id AND i.status <> 'cancelada' AND i.pago = true) pagos
+         FROM kart.bateria b LEFT JOIN kart.tracado t ON t.id = b.tracado_id
+         WHERE b.status <> 'cancelada' AND b.inicio >= @d AND b.inicio < (@d + make_interval(days => (1)::int)) ORDER BY b.inicio`,
         { d: /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) },
       ));
     }

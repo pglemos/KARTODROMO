@@ -17,6 +17,15 @@ type Params = Record<string, unknown>;
 export const DATA_HORA = `'YYYY-MM-DD"T"HH24:MI:SS'`;
 export const DATA = `'YYYY-MM-DD'`;
 
+/** Nome de coluna/tabela do banco anterior (PascalCase) -> nome no Postgres (snake_case): 'PrecoCentavos' -> 'preco_centavos'. */
+export function colPg(nome: string): string {
+  return nome.replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2').replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+}
+/** Troca os identificadores PascalCase de um trecho SQL montado no código (ORDER BY 'LEN(Nome), Nome' etc.). */
+export function sqlPg(trecho: string): string {
+  return trecho.replace(/\bLEN\(/g, 'length(').replace(/\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)*\b/g, (m) => colPg(m));
+}
+
 export function getPool() {
   return getPgPool();
 }

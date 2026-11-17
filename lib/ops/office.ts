@@ -1,10 +1,10 @@
 /**
- * API do app da recepcao (replica funcional do LapTime Office).
+ * API do app da recepcao.
  * Todas as rotas daqui exigem sessao de usuario (lib/ops/auth.ts).
  */
 import { saldosDasBaterias } from './agenda-financeiro';
 import { pedirVinculoAgora } from './app-mobile';
-import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, tx, updateCliente, type ClienteInput } from './db';
+import { CLIENTE_COLS, colPg, insertCliente, isValidCpf, one, onlyDigits, query, sqlPg, tx, updateCliente, type ClienteInput } from './db';
 import { confereSenha, hashSenha, type Sessao } from './auth';
 import { erroCadastroObrigatorio, erroPesoCliente } from './cadastro-obrigatorio';
 import { mobileApiEndpoint } from '../mobile-api-url';
@@ -23,8 +23,8 @@ import {
 /** Libera a vaga preservando pagamento, venda e vínculos para consulta e estorno separado. */
 export async function cancelarReserva(id: number) {
   const r = await one<{ Id: number }>(
-    `UPDATE dbo.Inscricao SET Status = 'cancelada', AtualizadoEm = SYSDATETIME()
-       OUTPUT inserted.Id WHERE Id = @id`, { id });
+    `UPDATE kart.inscricao SET status = 'cancelada', atualizado_em = now()
+        WHERE id = @id returning id`, { id });
   if (!r) throw new HttpError(404, 'Reserva não encontrada.');
 }
 
@@ -55,8 +55,7 @@ const isoDate = (v: unknown) => {
   if (s.startsWith('0000') || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== s) throw new HttpError(400, 'Data inválida.');
   return s;
 };
-// SQL Server exige segundos no formato ISO de DATETIME2. Preserva a hora local,
-// sem converter o horário de Brasília para UTC.
+// Data/hora local de Brasília com segundos (a sessão do banco roda em America/Sao_Paulo).
 const localDateTime = (v: unknown) => {
   const s = String(v ?? '');
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s) || Number(s.slice(11, 13)) > 23 || Number(s.slice(14, 16)) > 59) {
@@ -87,10 +86,10 @@ const mobilePermissions = new Set(['resultados_publicar_mobile', 'identidade_mob
 
 async function mobilePermission(sessao: Sessao, funcao: string) {
   const row = await one<{ allowed: boolean | number | string }>(
-    `SELECT CAST(CASE WHEN COALESCE(p.AcessoTotal, 0) = 1 OR COALESCE(pp.Incluir, 0) = 1 THEN 1 ELSE 0 END AS bit) allowed
-     FROM dbo.Usuario u LEFT JOIN dbo.Perfil p ON p.Id = u.PerfilId
-     LEFT JOIN dbo.PerfilPermissao pp ON pp.PerfilId = p.Id AND pp.Modulo = @modulo AND pp.Funcao = @funcao
-     WHERE u.Id = @uid AND u.Ativo = 1`,
+    `SELECT (coalesce(p.acesso_total, false) OR coalesce(pp.incluir, false)) allowed
+     FROM kart.usuario u LEFT JOIN kart.perfil p ON p.id = u.perfil_id
+     LEFT JOIN kart.perfil_permissao pp ON pp.perfil_id = p.id AND pp.modulo = @modulo AND pp.funcao = @funcao
+     WHERE u.id = @uid AND u.ativo = true`,
     { uid: sessao.uid, modulo: 'App Mobile', funcao },
   );
   return row?.allowed === true || row?.allowed === 1 || row?.allowed === '1';
@@ -103,7 +102,7 @@ async function mobilePermission(sessao: Sessao, funcao: string) {
 let semFecharCache: { em: number; logins: Set<string> } | null = null;
 async function loginsSemFechar() {
   if (semFecharCache && Date.now() - semFecharCache.em < 15_000) return semFecharCache.logins;
-  const r = await one<{ v: string | null }>(`SELECT Valor v FROM dbo.Parametro WHERE Chave = 'office.usuariosSemFecharBateria'`).catch(() => null);
+  const r = await one<{ v: string | null }>(`SELECT valor v FROM kart.parametro WHERE chave = 'office.usuariosSemFecharBateria'`).catch(() => null);
   const logins = new Set(String(r?.v ?? '').split(/[,;\s]+/).map((x) => x.trim().toLowerCase()).filter(Boolean));
   semFecharCache = { em: Date.now(), logins };
   return logins;
@@ -111,7 +110,7 @@ async function loginsSemFechar() {
 export async function podeFecharBateria(sessao: Sessao) {
   const lista = await loginsSemFechar();
   if (!lista.size) return true;
-  const u = await one<{ l: string }>(`SELECT LOWER(Login) l FROM dbo.Usuario WHERE Id = @id`, { id: sessao.uid });
+  const u = await one<{ l: string }>(`SELECT LOWER(login) l FROM kart.usuario WHERE id = @id`, { id: sessao.uid });
   return !(u && lista.has(u.l));
 }
 export async function exigePodeFecharBateria(sessao: Sessao) {
@@ -125,12 +124,12 @@ export async function exigePermissaoOffice(sessao: Sessao, path: string, method:
     : /^\/reservas/.test(path) ? ['agenda', 'recepcao', 'reservas'] : [];
   if (!telas.length) return;
   const u = await one<{ ativo: boolean; admin: boolean; perfilId: number | null; acessoTotal: boolean }>(
-    `SELECT u.Ativo ativo, u.Admin admin, u.PerfilId perfilId, p.AcessoTotal acessoTotal
-     FROM dbo.Usuario u LEFT JOIN dbo.Perfil p ON p.Id = u.PerfilId WHERE u.Id = @uid`, { uid: sessao.uid });
+    `SELECT u.ativo ativo, u.admin admin, u.perfil_id "perfilId", p.acesso_total "acessoTotal"
+     FROM kart.usuario u LEFT JOIN kart.perfil p ON p.id = u.perfil_id WHERE u.id = @uid`, { uid: sessao.uid });
   if (!u?.ativo) throw new HttpError(401, 'Sessão expirada. Entre novamente.');
   if (u.admin || u.acessoTotal || !u.perfilId) return;
   const permissoes = await query<{ funcao: string; acessar: boolean; alterar: boolean }>(
-    `SELECT Funcao funcao, Acessar acessar, Alterar alterar FROM dbo.PerfilPermissao WHERE PerfilId = @p AND Modulo = 'Admin Web'`, { p: u.perfilId });
+    `SELECT funcao funcao, acessar acessar, alterar alterar FROM kart.perfil_permissao WHERE perfil_id = @p AND modulo = 'Admin Web'`, { p: u.perfilId });
   // Perfis antigos sem configuração continuam com o acesso contratado; configuração explícita é restritiva.
   if (!permissoes.length) return;
   if (!permissoes.some((p) => telas.includes(p.funcao) && p.acessar && (method === 'GET' || p.alterar)))
@@ -144,7 +143,7 @@ async function servicosOnline() {
   let bancoOnline = false;
   let bancoVerificado: string | null = null;
   try {
-    const db = await one<{ agora: string }>(`SELECT CONVERT(varchar(19), SYSDATETIME(), 126) agora`);
+    const db = await one<{ agora: string }>(`SELECT to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS') agora`);
     bancoOnline = Boolean(db);
     bancoVerificado = db?.agora ?? null;
     servicos.push({ id: 'ops-sql', nome: 'Banco operacional', online: bancoOnline, status: bancoOnline ? 'online' : 'offline', verificadoEm: bancoVerificado });
@@ -203,25 +202,25 @@ async function voucherLinks(origem: string, body: Record<string, unknown>, keep?
   if (origem === 'parceiro') {
     fidelidadeContaId = null;
     if (!parceiroId && referencia) {
-      const p = await one<{ id: number }>(`SELECT TOP 1 Id id FROM dbo.Parceiro WHERE Nome COLLATE Latin1_General_CI_AI = @nome AND Ativo = 1 ORDER BY Id`, { nome: referencia });
+      const p = await one<{ id: number }>(`SELECT id id FROM kart.parceiro WHERE lower(unaccent(nome)) = lower(unaccent(@nome)) AND ativo = true ORDER BY id limit 1`, { nome: referencia });
       parceiroId = p?.id ?? null;
     }
     if (!parceiroId) throw new HttpError(400, 'Selecione um parceiro ativo para vincular o voucher.');
-    const p = await one<{ nome: string; ativo: boolean }>(`SELECT Nome nome, Ativo ativo FROM dbo.Parceiro WHERE Id = @id`, { id: parceiroId });
+    const p = await one<{ nome: string; ativo: boolean }>(`SELECT nome nome, ativo ativo FROM kart.parceiro WHERE id = @id`, { id: parceiroId });
     if (!p || !p.ativo) throw new HttpError(400, 'Parceiro não encontrado ou inativo.');
     referencia = referencia ?? p.nome;
   } else if (origem === 'fidelidade') {
     parceiroId = null;
     if (!fidelidadeContaId && referencia) {
       const a = await one<{ id: number }>(
-        `SELECT TOP 1 f.Id id FROM dbo.FidelidadeConta f JOIN dbo.Cliente c ON c.Id = f.ClienteId
-         WHERE c.Nome COLLATE Latin1_General_CI_AI = @nome AND f.Ativo = 1 ORDER BY f.Id`, { nome: referencia },
+        `SELECT f.id id FROM kart.fidelidade_conta f JOIN kart.cliente c ON c.id = f.cliente_id
+         WHERE lower(unaccent(c.nome)) = lower(unaccent(@nome)) AND f.ativo = true ORDER BY f.id limit 1`, { nome: referencia },
       );
       fidelidadeContaId = a?.id ?? null;
     }
     if (!fidelidadeContaId) throw new HttpError(400, 'Selecione uma conta de fidelidade ativa para vincular o voucher.');
     const a = await one<{ nome: string; ativo: boolean }>(
-      `SELECT c.Nome nome, f.Ativo ativo FROM dbo.FidelidadeConta f JOIN dbo.Cliente c ON c.Id = f.ClienteId WHERE f.Id = @id`, { id: fidelidadeContaId },
+      `SELECT c.nome nome, f.ativo ativo FROM kart.fidelidade_conta f JOIN kart.cliente c ON c.id = f.cliente_id WHERE f.id = @id`, { id: fidelidadeContaId },
     );
     if (!a || !a.ativo) throw new HttpError(400, 'Conta de fidelidade não encontrada ou inativa.');
     referencia = referencia ?? a.nome;
@@ -232,7 +231,7 @@ async function voucherLinks(origem: string, body: Record<string, unknown>, keep?
   return { parceiroId, fidelidadeContaId, referencia };
 }
 
-/** Filtro "Exibir dados:" do LapTime aplicado a uma coluna de data. */
+/** Filtro "Exibir dados:" da recepção aplicado a uma coluna de data. */
 function periodo(url: URL, col: string) {
   const filtro = url.searchParams.get('filtro') || 'dia';
   const data = url.searchParams.get('data') || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
@@ -240,53 +239,54 @@ function periodo(url: URL, col: string) {
   const ate = url.searchParams.get('ate');
   switch (filtro) {
     case 'semana':
-      return { where: `${col} >= DATEADD(day, 1 - DATEPART(weekday, @d), @d) AND ${col} < DATEADD(day, 8 - DATEPART(weekday, @d), @d)`, p: { d: data } };
+      // semana de domingo a sábado (como o DATEFIRST padrão do banco anterior)
+      return { where: `${col} >= @d::date - extract(dow from @d::date)::int AND ${col} < @d::date - extract(dow from @d::date)::int + 7`, p: { d: data } };
     case 'mes':
-      return { where: `${col} >= DATEFROMPARTS(YEAR(@d), MONTH(@d), 1) AND ${col} < DATEADD(month, 1, DATEFROMPARTS(YEAR(@d), MONTH(@d), 1))`, p: { d: data } };
+      return { where: `${col} >= date_trunc('month', @d::date) AND ${col} < date_trunc('month', @d::date) + interval '1 month'`, p: { d: data } };
     case 'apartir':
-      return { where: `${col} >= @d`, p: { d: data } };
+      return { where: `${col} >= @d::date`, p: { d: data } };
     case 'entre':
-      return { where: `${col} >= @d AND ${col} < DATEADD(day, 1, @a)`, p: { d: data, a: isoDate(ate) } };
+      return { where: `${col} >= @d::date AND ${col} < @a::date + 1`, p: { d: data, a: isoDate(ate) } };
     case 'todas':
       return { where: '1=1', p: {} };
     default:
-      return { where: `${col} >= @d AND ${col} < DATEADD(day, 1, @d)`, p: { d: data } };
+      return { where: `${col} >= @d::date AND ${col} < @d::date + 1`, p: { d: data } };
   }
 }
 
 // ---------------------------------------------------------------- consultas de lista (arvore)
 
-const RESERVA_SELECT = `SELECT TOP 5000 i.Id id, i.Pago pago, CONVERT(varchar(16), b.Inicio, 126) dataHora, b.Nome reserva, b.Id bateriaId,
-  c.Id clienteId, c.Nome cliente, endurance.equipe, endurance.equipeId, endurance.pulseira, c.Documento documento, c.Email email, c.Telefone telefone, c.Peso peso, CONVERT(varchar(10), c.Nascimento, 126) nascimento,
-  CASE WHEN c.Nascimento IS NULL THEN NULL ELSE DATEDIFF(YEAR, c.Nascimento, GETDATE()) - CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, c.Nascimento, GETDATE()), c.Nascimento) > GETDATE() THEN 1 ELSE 0 END END idade,
-  r.Nome responsavel, p.Id produtoId, p.Nome produto, p.Categoria categoria, ISNULL(i.PrecoCentavos, p.PrecoCentavos) preco, i.DescontoCentavos desconto,
-  CASE WHEN i.Pago = 1 THEN i.ValorCentavos ELSE ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos END total,
-  i.Observacao observacao, i.Aprovada aprovada, CASE WHEN i.TermoImpressoEm IS NULL THEN 0 ELSE 1 END termo, i.Status status, i.Origem origem, i.Kart kart, i.VendaId vendaId,
-  i.VoucherId voucherId, vSug.Codigo voucherCodigo,
-  CONVERT(varchar(16), i.TermoImpressoEm, 126) termoImpressoEm, CONVERT(varchar(16), i.CriadoEm, 126) criadoEm, CONVERT(varchar(16), i.CheckinEm, 126) checkinEm, i.CheckinOrigem checkinOrigem,
-  CASE WHEN i.Pago = 1 THEN ISNULL(onl.forma, cx.formas) END formaPagamento
-  FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId JOIN dbo.Cliente c ON c.Id = i.ClienteId
-  ${ENDURANCE_VINCULO_SQL}
-  LEFT JOIN dbo.Cliente r ON r.Id = ISNULL(i.ResponsavelId, c.ResponsavelId) LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
-  LEFT JOIN dbo.Voucher vSug ON vSug.Id = i.VoucherId
-  OUTER APPLY (SELECT TOP 1 CASE ro.Forma WHEN 'pix' THEN 'Pix' WHEN 'debito' THEN 'Débito' WHEN 'credito' THEN 'Crédito' ELSE 'Cartão' END + ' (site)' forma
-    FROM dbo.ReservaOnline ro WHERE i.Origem = 'site' AND ro.Status = 'pago' AND ',' + ro.InscricaoIds + ',' LIKE '%,' + CAST(i.Id AS varchar(12)) + ',%') onl
-  OUTER APPLY (SELECT STUFF((SELECT DISTINCT ' + ' + fp.Nome FROM dbo.VendaPagamento vp JOIN dbo.FormaPagamento fp ON fp.Id = vp.FormaPagamentoId
-    WHERE vp.VendaId = i.VendaId AND vp.Cancelado = 0 FOR XML PATH(''), TYPE).value('.', 'nvarchar(200)'), 1, 3, '') formas) cx`;
+// as listas abaixo são completadas pelo chamador com "WHERE ... ORDER BY ..." e "limit 5000" (era o TOP 5000)
+const RESERVA_SELECT = `SELECT i.id id, i.pago pago, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') "dataHora", b.nome reserva, b.id "bateriaId",
+  c.id "clienteId", c.nome cliente, endurance.equipe, endurance."equipeId", endurance.pulseira, c.documento documento, c.email email, c.telefone telefone, c.peso peso, to_char(c.nascimento, 'YYYY-MM-DD') nascimento,
+  CASE WHEN c.nascimento IS NULL THEN NULL ELSE extract(year from age(current_date, c.nascimento))::int END idade,
+  r.nome responsavel, p.id "produtoId", p.nome produto, p.categoria categoria, coalesce(i.preco_centavos, p.preco_centavos) preco, i.desconto_centavos desconto,
+  CASE WHEN i.pago = true THEN i.valor_centavos ELSE coalesce(i.preco_centavos, p.preco_centavos) - i.desconto_centavos END total,
+  i.observacao observacao, i.aprovada aprovada, CASE WHEN i.termo_impresso_em IS NULL THEN 0 ELSE 1 END termo, i.status status, i.origem origem, i.kart kart, i.venda_id "vendaId",
+  i.voucher_id "voucherId", vsug.codigo "voucherCodigo",
+  to_char(i.termo_impresso_em, 'YYYY-MM-DD"T"HH24:MI') "termoImpressoEm", to_char(i.criado_em, 'YYYY-MM-DD"T"HH24:MI') "criadoEm", to_char(i.checkin_em, 'YYYY-MM-DD"T"HH24:MI') "checkinEm", i.checkin_origem "checkinOrigem",
+  CASE WHEN i.pago = true THEN coalesce(onl.forma, cx.formas) END "formaPagamento"
+  FROM kart.inscricao i JOIN kart.bateria b ON b.id = i.bateria_id JOIN kart.cliente c ON c.id = i.cliente_id ${ENDURANCE_VINCULO_SQL}
+  LEFT JOIN kart.cliente r ON r.id = coalesce(i.responsavel_id, c.responsavel_id) LEFT JOIN kart.produto p ON p.id = coalesce(i.produto_id, b.produto_id)
+  LEFT JOIN kart.voucher vsug ON vsug.id = i.voucher_id
+  LEFT JOIN LATERAL (SELECT CASE ro.forma WHEN 'pix' THEN 'Pix' WHEN 'debito' THEN 'Débito' WHEN 'credito' THEN 'Crédito' ELSE 'Cartão' END || ' (site)' forma
+    FROM kart.reserva_online ro WHERE i.origem = 'site' AND ro.status = 'pago' AND ',' || ro.inscricao_ids || ',' LIKE '%,' || (i.id)::text || ',%' LIMIT 1) onl ON true
+  LEFT JOIN LATERAL (SELECT string_agg(DISTINCT fp.nome, ' + ') formas FROM kart.venda_pagamento vp JOIN kart.forma_pagamento fp ON fp.id = vp.forma_pagamento_id
+    WHERE vp.venda_id = i.venda_id AND vp.cancelado = false) cx ON true`;
 
-const BATERIA_SELECT = `SELECT TOP 5000 b.Id id, CONVERT(varchar(16), b.Inicio, 126) dataHora, b.Nome nome, p.Id produtoId, p.Nome produto, p.Categoria categoria,
-  p.PrecoCentavos preco, b.Vagas vagas, b.Vagas - (SELECT COUNT(*) FROM dbo.Inscricao x WHERE x.BateriaId = b.Id AND x.Status <> 'cancelada') disponiveis,
-  (SELECT COUNT(*) FROM dbo.Inscricao x WHERE x.BateriaId = b.Id AND x.Status <> 'cancelada') inscritos,
-  (SELECT COUNT(*) FROM dbo.Inscricao x WHERE x.BateriaId = b.Id AND x.Status <> 'cancelada' AND x.Pago = 1) pagos,
-  (SELECT COUNT(*) FROM dbo.Inscricao x WHERE x.BateriaId = b.Id AND x.Status <> 'cancelada' AND x.Aprovada = 0) preReservas,
-  rc.Nome responsavel, b.ResponsavelId responsavelId, b.Status status, b.AutoAtendimento autoAtendimento, t.Id tracadoId, t.Nome tracado,
-  b.VoltaMinimaSeg voltaMinimaSeg, b.CodigoReserva codigoReserva, b.ReservaFechada reservaFechada, b.Observacao observacao, b.TipoKart tipoKart, b.Campeonato campeonato
-  FROM dbo.Bateria b LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId LEFT JOIN dbo.Tracado t ON t.Id = b.TracadoId LEFT JOIN dbo.Cliente rc ON rc.Id = b.ResponsavelId`;
+const BATERIA_SELECT = `SELECT b.id id, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') "dataHora", b.nome nome, p.id "produtoId", p.nome produto, p.categoria categoria,
+  p.preco_centavos preco, b.vagas vagas, b.vagas - (SELECT COUNT(*) FROM kart.inscricao x WHERE x.bateria_id = b.id AND x.status <> 'cancelada') disponiveis,
+  (SELECT COUNT(*) FROM kart.inscricao x WHERE x.bateria_id = b.id AND x.status <> 'cancelada') inscritos,
+  (SELECT COUNT(*) FROM kart.inscricao x WHERE x.bateria_id = b.id AND x.status <> 'cancelada' AND x.pago = true) pagos,
+  (SELECT COUNT(*) FROM kart.inscricao x WHERE x.bateria_id = b.id AND x.status <> 'cancelada' AND x.aprovada = false) "preReservas",
+  rc.nome responsavel, b.responsavel_id "responsavelId", b.status status, b.auto_atendimento "autoAtendimento", t.id "tracadoId", t.nome tracado,
+  b.volta_minima_seg "voltaMinimaSeg", b.codigo_reserva "codigoReserva", b.reserva_fechada "reservaFechada", b.observacao observacao, b.tipo_kart "tipoKart", b.campeonato campeonato
+  FROM kart.bateria b LEFT JOIN kart.produto p ON p.id = b.produto_id LEFT JOIN kart.tracado t ON t.id = b.tracado_id LEFT JOIN kart.cliente rc ON rc.id = b.responsavel_id`;
 
-const VENDA_SELECT = `SELECT TOP 5000 v.Id id, CONVERT(varchar(16), v.CriadoEm, 126) dataHora, ISNULL(v.Codigo, CAST(v.Id AS varchar(20))) codigo, c.Nome cliente, c.Documento documento,
-  u.Nome usuario, t.Nome terminal, v.BrutoCentavos bruto, v.DescontoCentavos desconto, v.AcrescimoCentavos acrescimo, v.RecebidoCentavos recebido,
-  v.TrocoCentavos troco, v.EstornoCentavos estorno, v.FinalCentavos final, v.Cancelada cancelada, v.MotivoCancelamento motivo, v.Observacao observacao, v.MovimentoId movimentoId
-  FROM dbo.Venda v LEFT JOIN dbo.Cliente c ON c.Id = v.ClienteId LEFT JOIN dbo.Usuario u ON u.Id = v.UsuarioId LEFT JOIN dbo.Terminal t ON t.Id = v.TerminalId`;
+const VENDA_SELECT = `SELECT v.id id, to_char(v.criado_em, 'YYYY-MM-DD"T"HH24:MI') "dataHora", coalesce(v.codigo, (v.id)::text) codigo, c.nome cliente, c.documento documento,
+  u.nome usuario, t.nome terminal, v.bruto_centavos bruto, v.desconto_centavos desconto, v.acrescimo_centavos acrescimo, v.recebido_centavos recebido,
+  v.troco_centavos troco, v.estorno_centavos estorno, v.final_centavos final, v.cancelada cancelada, v.motivo_cancelamento motivo, v.observacao observacao, v.movimento_id "movimentoId"
+  FROM kart.venda v LEFT JOIN kart.cliente c ON c.id = v.cliente_id LEFT JOIN kart.usuario u ON u.id = v.usuario_id LEFT JOIN kart.terminal t ON t.id = v.terminal_id`;
 
 // ---------------------------------------------------------------- cadastros genericos
 
@@ -313,7 +313,7 @@ const CAD: Record<string, CadDef> = {
   turnos: { table: 'Turno', cols: { descricao: ['Descricao', 'text', 60], inicio: ['Inicio', 'time'], fim: ['Fim', 'time'], ativo: ['Ativo', 'bool'] }, order: 'Descricao', required: ['descricao'] },
   terminais: {
     table: 'Terminal', cols: { codigo: ['Codigo', 'text', 10], nome: ['Nome', 'text', 60], ativo: ['Ativo', 'bool'] }, order: 'Nome', required: ['nome'],
-    extra: `(SELECT TOP 1 'Aberto · ' + u.Nome FROM dbo.Movimento m JOIN dbo.Usuario u ON u.Id = m.UsuarioId WHERE m.TerminalId = dbo.Terminal.Id AND m.FechadoEm IS NULL ORDER BY m.Id DESC) situacao`,
+    extra: `(SELECT 'Aberto · ' || u.nome FROM kart.movimento m JOIN kart.usuario u ON u.id = m.usuario_id WHERE m.terminal_id = terminal.id AND m.fechado_em IS NULL ORDER BY m.id DESC LIMIT 1) situacao`,
   },
   formas: { table: 'FormaPagamento', cols: { codigo: ['Codigo', 'text', 10], nome: ['Nome', 'text', 60], tipo: ['Tipo', 'text', 12], ativo: ['Ativo', 'bool'] }, order: 'Codigo', required: ['nome'] },
   padroes: {
@@ -331,7 +331,7 @@ const CAD: Record<string, CadDef> = {
   },
   usuarios: {
     table: 'Usuario', cols: { login: ['Login', 'text', 40], nome: ['Nome', 'text', 100], admin: ['Admin', 'bool'], ativo: ['Ativo', 'bool'], perfilId: ['PerfilId', 'int'] }, order: 'Nome', required: ['login', 'nome'], adminOnly: true,
-    extra: `CONVERT(varchar(16), UltimoAcesso, 126) ultimoAcesso, (SELECT p.Descricao FROM dbo.Perfil p WHERE p.Id = PerfilId) perfil`,
+    extra: `to_char(ultimo_acesso, 'YYYY-MM-DD"T"HH24:MI') "ultimoAcesso", (SELECT p.descricao "Descricao" FROM kart.perfil p WHERE p.id = perfil_id) perfil`,
   },
   // perfis de acesso (SegPerfil do canvas)
   perfis: {
@@ -339,9 +339,12 @@ const CAD: Record<string, CadDef> = {
   },
 };
 
+/** Os cadastros guardam os nomes do banco anterior (PascalCase); aqui viram os nomes do Postgres. */
 function cadSelect(def: CadDef) {
-  const cols = Object.entries(def.cols).map(([k, [c, t]]) => (t === 'date' ? `CONVERT(varchar(10), ${c}, 126) ${k}` : `${c} ${k}`));
-  return `SELECT Id id, ${cols.join(', ')}${def.extra ? ', ' + def.extra : ''} FROM dbo.${def.table}`;
+  const cols = Object.entries(def.cols).map(([k, [c, t]]) => (t === 'date' ? `to_char(${colPg(c)}, 'YYYY-MM-DD') "${k}"`
+    // hora: o mesmo JSON que o driver anterior devolvia para colunas time ("1970-01-01T08:00:00.000Z")
+      : `${colPg(c)} "${k}"`));
+  return `SELECT id id, ${cols.join(', ')}${def.extra ? ', ' + def.extra : ''} FROM kart.${colPg(def.table)}`;
 }
 
 function cadValues(def: CadDef, body: Record<string, unknown>, partial: boolean) {
@@ -373,11 +376,11 @@ function cadValues(def: CadDef, body: Record<string, unknown>, partial: boolean)
 async function guardaUsuario(req: Req, id: number | null, body: Record<string, unknown> | null) {
   const login = body && 'login' in body ? String(body.login ?? '').trim().toLowerCase() : '';
   if (login) {
-    const igual = await one<{ id: number }>(`SELECT Id id FROM dbo.Usuario WHERE Login = @login AND (@id IS NULL OR Id <> @id)`, { login, id });
+    const igual = await one<{ id: number }>(`SELECT id id FROM kart.usuario WHERE lower(login) = @login AND (@id::int IS NULL OR id <> @id::int)`, { login, id });
     if (igual) throw new HttpError(409, 'Já existe um usuário com esse login.');
   }
   if (!id) return;
-  const alvo = await one<{ admin: boolean; ativo: boolean }>(`SELECT Admin admin, Ativo ativo FROM dbo.Usuario WHERE Id = @id`, { id });
+  const alvo = await one<{ admin: boolean; ativo: boolean }>(`SELECT admin admin, ativo ativo FROM kart.usuario WHERE id = @id`, { id });
   if (!alvo) throw new HttpError(404, 'Usuário não encontrado.');
   const excluir = body === null;
   const tiraAtivo = excluir || (body && 'ativo' in body && !bit(body.ativo));
@@ -386,7 +389,7 @@ async function guardaUsuario(req: Req, id: number | null, body: Record<string, u
   if (id === req.sessao.uid && tiraAtivo) throw new HttpError(400, 'Você não pode desativar o próprio usuário.');
   if (id === req.sessao.uid && tiraAdmin) throw new HttpError(400, 'Você não pode tirar o próprio acesso de administrador.');
   if (alvo.admin && alvo.ativo && (tiraAtivo || tiraAdmin)) {
-    const outros = await one<{ n: number }>(`SELECT COUNT(*) n FROM dbo.Usuario WHERE Admin = 1 AND Ativo = 1 AND Id <> @id`, { id });
+    const outros = await one<{ n: number }>(`SELECT COUNT(*) n FROM kart.usuario WHERE admin = true AND ativo = true AND id <> @id`, { id });
     if (!outros || outros.n < 1) throw new HttpError(400, 'Precisa sobrar pelo menos um administrador ativo.');
   }
 }
@@ -396,14 +399,14 @@ async function cadRoutes(req: Req, send: Res, ent: string, id: number | null): P
   if (!def) throw new HttpError(404, 'Cadastro desconhecido.');
   if (def.adminOnly && !req.sessao.admin) throw new HttpError(403, 'Disponível apenas para administradores.');
   if (req.method === 'GET') {
-    if (id) return send(200, await one(`${cadSelect(def)} WHERE Id = @id`, { id }));
+    if (id) return send(200, await one(`${cadSelect(def)} WHERE id = @id`, { id }));
     const f = def.filter && req.url.searchParams.get(def.filter);
     const filtros = [
-      ent === 'tracados' ? `(TimingTrackId IS NOT NULL OR NOT EXISTS (SELECT 1 FROM dbo.Tracado WHERE Ativo = 1 AND TimingTrackId IS NOT NULL))` : '',
-      f ? `${def.cols[def.filter!][0]} = @f` : '',
+      ent === 'tracados' ? `(timing_track_id IS NOT NULL OR NOT EXISTS (SELECT 1 FROM kart.tracado WHERE ativo = true AND timing_track_id IS NOT NULL))` : '',
+      f ? `${colPg(def.cols[def.filter!][0])} = @f` : '',
     ].filter(Boolean);
     const where = filtros.length ? `WHERE ${filtros.join(' AND ')}` : '';
-    return send(200, await query(`${cadSelect(def)} ${where} ORDER BY ${def.order}`, f ? { f } : {}));
+    return send(200, await query(`${cadSelect(def)} ${where} ORDER BY ${sqlPg(def.order)}`, f ? { f } : {}));
   }
   if (req.method === 'POST' || req.method === 'PUT') {
     const body = await req.body();
@@ -421,11 +424,11 @@ async function cadRoutes(req: Req, send: Res, ent: string, id: number | null): P
     const names = Object.keys(vals);
     try {
       if (req.method === 'POST') {
-        const r = await one<{ id: number }>(`INSERT INTO dbo.${def.table} (${names.join(', ')}) OUTPUT inserted.Id id VALUES (${names.map((n) => '@' + n).join(', ')})`, vals);
+        const r = await one<{ id: number }>(`INSERT INTO kart.${colPg(def.table)} (${names.map(colPg).join(', ')}) VALUES (${names.map((n) => '@' + n).join(', ')}) returning id`, vals);
         return send(201, { id: r!.id });
       }
       if (!id) throw new HttpError(400, 'Registro não informado.');
-      if (names.length) await query(`UPDATE dbo.${def.table} SET ${names.map((n) => `${n} = @${n}`).join(', ')} WHERE Id = @id`, { ...vals, id });
+      if (names.length) await query(`UPDATE kart.${colPg(def.table)} SET ${names.map((n) => `${colPg(n)} = @${n}`).join(', ')} WHERE id = @id`, { ...vals, id });
       return send(200, { id });
     } catch (e) {
       if (!(e instanceof HttpError) && (ent === 'usuarios' || ent === 'perfis') && duplicateSql(e)) {
@@ -437,16 +440,16 @@ async function cadRoutes(req: Req, send: Res, ent: string, id: number | null): P
   if (req.method === 'DELETE' && id) {
     if (ent === 'usuarios') await guardaUsuario(req, id, null);
     if (ent === 'perfis') {
-      const emUso = await one<{ n: number }>(`SELECT COUNT(*) n FROM dbo.Usuario WHERE PerfilId = @id`, { id });
+      const emUso = await one<{ n: number }>(`SELECT COUNT(*) n FROM kart.usuario WHERE perfil_id = @id`, { id });
       if (emUso && emUso.n > 0) throw new HttpError(409, `Este perfil tem ${emUso.n} usuário(s). Troque o perfil deles antes de excluir.`);
-      await query(`DELETE FROM dbo.PerfilPermissao WHERE PerfilId = @id`, { id });
+      await query(`DELETE FROM kart.perfil_permissao WHERE perfil_id = @id`, { id });
     }
     try {
-      await query(`DELETE FROM dbo.${def.table} WHERE Id = @id`, { id });
+      await query(`DELETE FROM kart.${colPg(def.table)} WHERE id = @id`, { id });
       return send(200, { ok: true });
     } catch {
       if ('ativo' in def.cols) {
-        await query(`UPDATE dbo.${def.table} SET Ativo = 0 WHERE Id = @id`, { id });
+        await query(`UPDATE kart.${colPg(def.table)} SET ativo = false WHERE id = @id`, { id });
         return send(200, { ok: true, desativado: true });
       }
       throw new HttpError(409, 'Registro em uso, não pode ser excluído.');
@@ -459,9 +462,9 @@ async function cadRoutes(req: Req, send: Res, ent: string, id: number | null): P
 
 async function movimentoAberto(uid: number) {
   return one<{ id: number; terminalId: number; terminal: string; turno: string; abertoEm: string; inicial: number }>(
-    `SELECT TOP 1 m.Id id, m.TerminalId terminalId, t.Nome terminal, tu.Descricao turno, CONVERT(varchar(16), m.AbertoEm, 126) abertoEm, m.InicialCentavos inicial
-     FROM dbo.Movimento m JOIN dbo.Terminal t ON t.Id = m.TerminalId LEFT JOIN dbo.Turno tu ON tu.Id = m.TurnoId
-     WHERE m.UsuarioId = @uid AND m.FechadoEm IS NULL ORDER BY m.Id DESC`,
+    `SELECT m.id id, m.terminal_id "terminalId", t.nome terminal, tu.descricao turno, to_char(m.aberto_em, 'YYYY-MM-DD"T"HH24:MI') "abertoEm", m.inicial_centavos inicial
+     FROM kart.movimento m JOIN kart.terminal t ON t.id = m.terminal_id LEFT JOIN kart.turno tu ON tu.id = m.turno_id
+     WHERE m.usuario_id = @uid AND m.fechado_em IS NULL ORDER BY m.id DESC limit 1`,
     { uid },
   );
 }
@@ -481,25 +484,25 @@ export async function sumarioMovimento(movId: number) {
     recebidoDinheiro: number;
   };
   const r = await one<MovimentoResumo>(
-    `SELECT m.InicialCentavos inicial,
-       ISNULL((SELECT SUM(ValorCentavos) FROM dbo.MovimentoTransacao WHERE MovimentoId = m.Id AND Tipo = 'suprimento'), 0) suprimento,
-       ISNULL((SELECT SUM(ValorCentavos) FROM dbo.MovimentoTransacao WHERE MovimentoId = m.Id AND Tipo = 'sangria'), 0) sangria,
-       ISNULL((SELECT SUM(vi.UnitarioCentavos * vi.Quantidade) FROM dbo.VendaItem vi JOIN dbo.Venda v ON v.Id = vi.VendaId WHERE v.MovimentoId = m.Id AND vi.InscricaoId IS NULL), 0) vendasProdutos,
-       ISNULL((SELECT SUM(BrutoCentavos) FROM dbo.Venda WHERE MovimentoId = m.Id), 0) vendas,
-       ISNULL((SELECT SUM(DescontoCentavos) FROM dbo.Venda WHERE MovimentoId = m.Id), 0) desconto,
-       ISNULL((SELECT SUM(AcrescimoCentavos) FROM dbo.Venda WHERE MovimentoId = m.Id), 0) acrescimos,
-       ISNULL((SELECT SUM(vp.ValorCentavos) FROM dbo.VendaPagamento vp JOIN dbo.Venda v ON v.Id = vp.VendaId WHERE v.MovimentoId = m.Id AND vp.Cancelado = 0), 0) recebido,
-       ISNULL((SELECT SUM(TrocoCentavos) FROM dbo.Venda WHERE MovimentoId = m.Id), 0) troco,
-       ISNULL((SELECT SUM(EstornoCentavos) FROM dbo.Venda WHERE MovimentoId = m.Id), 0) cancelado,
-       ISNULL((SELECT SUM(vp.ValorCentavos) FROM dbo.VendaPagamento vp JOIN dbo.Venda v ON v.Id = vp.VendaId JOIN dbo.FormaPagamento f ON f.Id = vp.FormaPagamentoId
-               WHERE v.MovimentoId = m.Id AND vp.Cancelado = 0 AND f.Tipo = 'dinheiro'), 0) recebidoDinheiro
-     FROM dbo.Movimento m WHERE m.Id = @movId`,
+    `SELECT m.inicial_centavos inicial,
+       coalesce((SELECT SUM(valor_centavos) FROM kart.movimento_transacao WHERE movimento_id = m.id AND tipo = 'suprimento'), 0) suprimento,
+       coalesce((SELECT SUM(valor_centavos) FROM kart.movimento_transacao WHERE movimento_id = m.id AND tipo = 'sangria'), 0) sangria,
+       coalesce((SELECT SUM(vi.unitario_centavos * vi.quantidade) FROM kart.venda_item vi JOIN kart.venda v ON v.id = vi.venda_id WHERE v.movimento_id = m.id AND vi.inscricao_id IS NULL), 0) "vendasProdutos",
+       coalesce((SELECT SUM(bruto_centavos) FROM kart.venda WHERE movimento_id = m.id), 0) vendas,
+       coalesce((SELECT SUM(desconto_centavos) FROM kart.venda WHERE movimento_id = m.id), 0) desconto,
+       coalesce((SELECT SUM(acrescimo_centavos) FROM kart.venda WHERE movimento_id = m.id), 0) acrescimos,
+       coalesce((SELECT SUM(vp.valor_centavos) FROM kart.venda_pagamento vp JOIN kart.venda v ON v.id = vp.venda_id WHERE v.movimento_id = m.id AND vp.cancelado = false), 0) recebido,
+       coalesce((SELECT SUM(troco_centavos) FROM kart.venda WHERE movimento_id = m.id), 0) troco,
+       coalesce((SELECT SUM(estorno_centavos) FROM kart.venda WHERE movimento_id = m.id), 0) cancelado,
+       coalesce((SELECT SUM(vp.valor_centavos) FROM kart.venda_pagamento vp JOIN kart.venda v ON v.id = vp.venda_id JOIN kart.forma_pagamento f ON f.id = vp.forma_pagamento_id
+               WHERE v.movimento_id = m.id AND vp.cancelado = false AND f.tipo = 'dinheiro'), 0) "recebidoDinheiro"
+     FROM kart.movimento m WHERE m.id = @movId`,
     { movId },
   );
   if (!r) throw new HttpError(404, 'Movimento não encontrado.');
   const porForma = await query<{ forma: string; valor: number }>(
-    `SELECT ISNULL(f.Nome, 'Outros') forma, SUM(vp.ValorCentavos) valor FROM dbo.VendaPagamento vp JOIN dbo.Venda v ON v.Id = vp.VendaId
-     LEFT JOIN dbo.FormaPagamento f ON f.Id = vp.FormaPagamentoId WHERE v.MovimentoId = @movId AND vp.Cancelado = 0 GROUP BY f.Nome ORDER BY f.Nome`,
+    `SELECT coalesce(f.nome, 'Outros') forma, SUM(vp.valor_centavos) valor FROM kart.venda_pagamento vp JOIN kart.venda v ON v.id = vp.venda_id
+     LEFT JOIN kart.forma_pagamento f ON f.id = vp.forma_pagamento_id WHERE v.movimento_id = @movId AND vp.cancelado = false GROUP BY f.nome ORDER BY f.nome`,
     { movId },
   );
   const final = r.inicial + r.suprimento - r.sangria + r.recebido - r.troco - r.cancelado;
@@ -522,10 +525,10 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
   if (pessoas) n = pessoas.length;
   const inscrever = async (run: OpsRun) => {
     const [b] = await run(
-      `SELECT b.Id, b.Status, b.Vagas, b.Inicio, b.ProdutoId, p.PrecoCentavos preco,
-        (SELECT COUNT(*) FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') ocupadas,
-        CASE WHEN b.Inicio < DATEADD(minute, -30, SYSDATETIME()) THEN 1 ELSE 0 END passada
-       FROM dbo.Bateria b WITH (UPDLOCK, HOLDLOCK) LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @bateriaId`,
+      `SELECT b.id "Id", b.status "Status", b.vagas "Vagas", b.inicio "Inicio", b.produto_id "ProdutoId", p.preco_centavos preco,
+        (SELECT COUNT(*) FROM kart.inscricao i WHERE i.bateria_id = b.id AND i.status <> 'cancelada') ocupadas,
+        CASE WHEN b.inicio < (now() + make_interval(mins => (-30)::int)) THEN 1 ELSE 0 END passada
+       FROM kart.bateria b LEFT JOIN kart.produto p ON p.id = b.produto_id WHERE b.id = @bateriaId for update of b`,
       { bateriaId },
     );
     if (!b) throw new HttpError(404, 'Selecione uma bateria.');
@@ -537,18 +540,18 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
     // no site quem compra nem sempre pilota: pode reservar de novo para mais alguém na mesma bateria
     // no grupo cada vaga nasce no nome do responsável e depois passa para o piloto: não é reserva duplicada
     if (n === 1 && origem !== 'site' && !opcoes.vagaDoGrupo) {
-      const [dup] = await run(`SELECT Id FROM dbo.Inscricao WHERE BateriaId = @bateriaId AND ClienteId = @clienteId AND Status <> 'cancelada'`, { bateriaId, clienteId });
+      const [dup] = await run(`SELECT id "Id" FROM kart.inscricao WHERE bateria_id = @bateriaId AND cliente_id = @clienteId AND status <> 'cancelada'`, { bateriaId, clienteId });
       if (dup) throw new HttpError(409, 'Já existe uma reserva em nome deste cliente.');
     }
     for (const id of pessoas ?? [clienteId]) {
-      const [c] = await run(`SELECT Bloqueado, Nome FROM dbo.Cliente WHERE Id = @id`, { id });
+      const [c] = await run(`SELECT bloqueado "Bloqueado", nome "Nome" FROM kart.cliente WHERE id = @id`, { id });
       if (!c) throw new HttpError(404, 'Cliente não localizado.');
-      if (c.Bloqueado) throw new HttpError(409, pessoas ? `Cliente bloqueado: ${c.Nome}.` : 'Cliente bloqueado.');
+      if (c.Bloqueado) throw new HttpError(409, pessoas ? `cliente bloqueado: ${c.Nome}.` : 'Cliente bloqueado.');
     }
     let produtoId = (b.ProdutoId as number | null) ?? null;
     let preco = (b.preco as number | null) ?? null;
     if (opcoes.produtoId) {
-      const [p] = await run(`SELECT Id, PrecoCentavos preco FROM dbo.Produto WHERE Id = @id`, { id: opcoes.produtoId });
+      const [p] = await run(`SELECT id "Id", preco_centavos preco FROM kart.produto WHERE id = @id`, { id: opcoes.produtoId });
       if (!p) throw new HttpError(404, 'Produto não encontrado.');
       produtoId = p.Id as number; preco = (p.preco as number | null) ?? null;
     }
@@ -556,8 +559,8 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
     const ids: number[] = [];
     for (let k = 0; k < n; k++) {
       const [row] = await run(
-        `INSERT INTO dbo.Inscricao (BateriaId, ClienteId, Origem, Observacao, ProdutoId, PrecoCentavos, Aprovada, ResponsavelId, Pago, ValorCentavos, Status)
-         OUTPUT inserted.Id id VALUES (@bateriaId, @clienteId, @origem, @obs, @produtoId, @preco, @aprovada, @resp, @pago, @valor, @status)`,
+        `INSERT INTO kart.inscricao (bateria_id, cliente_id, origem, observacao, produto_id, preco_centavos, aprovada, responsavel_id, pago, valor_centavos, status)
+          VALUES (@bateriaId, @clienteId, @origem, @obs, @produtoId, @preco, @aprovada, @resp, @pago, @valor, @status) returning id id`,
         {
           bateriaId, clienteId: pessoas ? pessoas[k] : clienteId, origem, obs: observacao, produtoId, preco: opcoes.precos?.[k] ?? preco, aprovada: (origem === 'site' || origem === 'totem' || origem === 'agendamento') ? 0 : (aprovada ? 1 : 0), resp: n > 1 ? clienteId : null,
           pago: pago ? 1 : 0, valor: pago ? preco : null, status: pago ? 'confirmada' : 'reservada',
@@ -576,31 +579,31 @@ export { inscreverN };
 export async function moverReservas(ids: number[], destino: number, grupoId?: number) {
   await tx(async (run) => {
     if (grupoId) {
-      const [g] = await run(`SELECT Id FROM dbo.ReservaGrupo WITH (UPDLOCK, HOLDLOCK) WHERE Id = @g AND Status = 'ativa'`, { g: grupoId });
+      const [g] = await run(`SELECT id "Id" FROM kart.reserva_grupo WHERE id = @g AND status = 'ativa' for update`, { g: grupoId });
       if (!g) throw new HttpError(404, 'Reserva em grupo não encontrada.');
-      const membros = await run(`SELECT i.Id id FROM dbo.ReservaGrupoPiloto p JOIN dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) ON i.Id = p.InscricaoId WHERE p.GrupoId = @g AND i.Status <> 'cancelada' ORDER BY i.Id`, { g: grupoId });
+      const membros = await run(`SELECT i.id id FROM kart.reserva_grupo_piloto p JOIN kart.inscricao i ON i.id = p.inscricao_id WHERE p.grupo_id = @g AND i.status <> 'cancelada' ORDER BY i.id for update of p, i`, { g: grupoId });
       ids = membros.map((p) => Number(p.id));
       if (!ids.length) throw new HttpError(409, 'O grupo não tem reservas ativas.');
     }
     for (const id of ids) {
       if (!grupoId) {
-        const [vinculo] = await run(`SELECT g.Id grupoId FROM dbo.ReservaGrupoPiloto p JOIN dbo.ReservaGrupo g ON g.Id = p.GrupoId WHERE p.InscricaoId = @id AND g.Status = 'ativa'`, { id });
+        const [vinculo] = await run(`SELECT g.id "grupoId" FROM kart.reserva_grupo_piloto p JOIN kart.reserva_grupo g ON g.id = p.grupo_id WHERE p.inscricao_id = @id AND g.status = 'ativa'`, { id });
         if (vinculo) {
-          await run(`UPDATE dbo.ReservaGrupoPiloto SET InscricaoId = NULL WHERE InscricaoId = @id`, { id });
+          await run(`UPDATE kart.reserva_grupo_piloto SET inscricao_id = NULL WHERE inscricao_id = @id`, { id });
         }
       }
       const [r] = await run(
-        `SELECT i.ClienteId, i.BateriaId, i.Pago, i.Status, ISNULL(i.ProdutoId, b.ProdutoId) produtoId,
-         ISNULL(i.PrecoCentavos, po.PrecoCentavos) preco, i.DescontoCentavos desconto, b.TipoKart tipoKart, po.ServicoLocacao servicoLocacao, po.Categoria categoria, REPLACE(REPLACE(UPPER(po.Nome), N'ANTECIPADO - ', N''), N'BALCÃO - ', N'') servico, po.DuracaoMin duracaoMin FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) JOIN dbo.Bateria b ON b.Id = i.BateriaId
-         LEFT JOIN dbo.Produto po ON po.Id = ISNULL(i.ProdutoId, b.ProdutoId) WHERE i.Id = @id`,
+        `SELECT i.cliente_id "ClienteId", i.bateria_id "BateriaId", i.pago "Pago", i.status "Status", coalesce(i.produto_id, b.produto_id) "produtoId",
+         coalesce(i.preco_centavos, po.preco_centavos) preco, i.desconto_centavos desconto, b.tipo_kart "tipoKart", po.servico_locacao "servicoLocacao", po.categoria categoria, REPLACE(REPLACE(UPPER(po.nome), 'ANTECIPADO - ', ''), 'BALCÃO - ', '') servico, po.duracao_min "duracaoMin" FROM kart.inscricao i JOIN kart.bateria b ON b.id = i.bateria_id
+         LEFT JOIN kart.produto po ON po.id = coalesce(i.produto_id, b.produto_id) WHERE i.id = @id for update of i`,
         { id },
       );
       if (!r) throw new HttpError(404, 'Reserva não encontrada.');
       if (r.Status === 'cancelada') throw new HttpError(409, 'Não é possível mover uma reserva cancelada.');
       if (Number(r.BateriaId) === destino) continue;
       const [d] = await run(
-        `SELECT b.Status, b.Vagas, b.ReservaFechada reservaFechada, b.TipoKart tipoKart, p.ServicoLocacao servicoLocacao, p.Categoria categoria, REPLACE(REPLACE(UPPER(p.Nome), N'ANTECIPADO - ', N''), N'BALCÃO - ', N'') servico, p.DuracaoMin duracaoMin, p.Id produtoId, p.PrecoCentavos preco, (SELECT COUNT(*) FROM dbo.Inscricao x WITH (UPDLOCK, HOLDLOCK) WHERE x.BateriaId = b.Id AND x.Status <> 'cancelada') ocupadas
-         FROM dbo.Bateria b WITH (UPDLOCK, HOLDLOCK) LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @destino`,
+        `SELECT b.status "Status", b.vagas "Vagas", b.reserva_fechada "reservaFechada", b.tipo_kart "tipoKart", p.servico_locacao "servicoLocacao", p.categoria categoria, REPLACE(REPLACE(UPPER(p.nome), 'ANTECIPADO - ', ''), 'BALCÃO - ', '') servico, p.duracao_min "duracaoMin", p.id "produtoId", p.preco_centavos preco, (SELECT COUNT(*) FROM kart.inscricao x WHERE x.bateria_id = b.id AND x.status <> 'cancelada') ocupadas
+         FROM kart.bateria b LEFT JOIN kart.produto p ON p.id = b.produto_id WHERE b.id = @destino for update of b`,
         { destino },
       );
       if (!d || d.Status === 'cancelada') throw new HttpError(404, 'Bateria destino não encontrada ou cancelada.');
@@ -615,20 +618,20 @@ export async function moverReservas(ids: number[], destino: number, grupoId?: nu
         throw new HttpError(409, 'Reserva paga só pode ser movida para bateria do mesmo serviço e tipo de kart. O produto e o valor já pagos são preservados.');
       }
       if ((d.ocupadas as number) >= (d.Vagas as number)) throw new HttpError(409, 'Não há vagas disponíveis na bateria destino.');
-      const [dup] = await run(`SELECT 1 x FROM dbo.Inscricao WHERE BateriaId = @destino AND ClienteId = @c AND Status <> 'cancelada'`, { destino, c: r.ClienteId });
+      const [dup] = await run(`SELECT 1 x FROM kart.inscricao WHERE bateria_id = @destino AND cliente_id = @c AND status <> 'cancelada'`, { destino, c: r.ClienteId });
       if (dup) throw new HttpError(409, 'Já existe uma reserva para este cliente na bateria selecionada.');
       if (r.Pago || grupoId) {
-        await run(`UPDATE dbo.Inscricao SET BateriaId = @destino, TermoImpressoEm = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { destino, id });
+        await run(`UPDATE kart.inscricao SET bateria_id = @destino, termo_impresso_em = NULL, atualizado_em = now() WHERE id = @id`, { destino, id });
       } else {
         await run(
-          `UPDATE dbo.Inscricao SET BateriaId = @destino, ProdutoId = @produtoDestino, PrecoCentavos = @precoDestino,
-           DescontoCentavos = CASE WHEN @produtoOrigem = @produtoDestino THEN CASE WHEN DescontoCentavos > @precoDestino THEN @precoDestino ELSE DescontoCentavos END ELSE 0 END,
-           TermoImpressoEm = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @id`,
+          `UPDATE kart.inscricao SET bateria_id = @destino, produto_id = @produtoDestino, preco_centavos = @precoDestino,
+           desconto_centavos = CASE WHEN @produtoOrigem = @produtoDestino THEN CASE WHEN desconto_centavos > @precoDestino THEN @precoDestino ELSE desconto_centavos END ELSE 0 END,
+           termo_impresso_em = NULL, atualizado_em = now() WHERE id = @id`,
           { destino, id, produtoOrigem: r.produtoId, produtoDestino: d.produtoId, precoDestino: d.preco },
         );
       }
     }
-    if (grupoId) await run(`UPDATE dbo.ReservaGrupo SET BateriaId = @destino, AtualizadoEm = SYSDATETIME() WHERE Id = @g`, { destino, g: grupoId });
+    if (grupoId) await run(`UPDATE kart.reserva_grupo SET bateria_id = @destino, atualizado_em = now() WHERE id = @g`, { destino, g: grupoId });
   });
 }
 
@@ -644,7 +647,7 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
   const pagamentosIn = (Array.isArray(body.pagamentos) ? body.pagamentos : []) as { formaPagamentoId: number; valorCentavos: number }[];
   const clienteId = body.clienteId ? int(body.clienteId, 'Cliente') : null;
   const voucherCodigo = str(body.voucherCodigo, 40);
-  const validar = (await one<{ v: string }>(`SELECT Valor v FROM dbo.Parametro WHERE Chave = 'office.validarTotalPago'`))?.v !== 'false';
+  const validar = (await one<{ v: string }>(`SELECT valor v FROM kart.parametro WHERE chave = 'office.validarTotalPago'`))?.v !== 'false';
 
   return tx(async (run) => {
     // itens: confere reserva e produto no servidor
@@ -660,7 +663,7 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
       let itemClienteId: number | null = it.clienteId ? int(it.clienteId, 'Cliente') : null;
       if (inscricaoId) {
         const [ins] = await run(
-          `SELECT i.Pago, i.Status, i.ProdutoId, i.ClienteId, c.Nome, b.Nome bateria FROM dbo.Inscricao i WITH (UPDLOCK) JOIN dbo.Cliente c ON c.Id = i.ClienteId JOIN dbo.Bateria b ON b.Id = i.BateriaId WHERE i.Id = @inscricaoId`,
+          `SELECT i.pago "Pago", i.status "Status", i.produto_id "ProdutoId", i.cliente_id "ClienteId", c.nome "Nome", b.nome bateria FROM kart.inscricao i JOIN kart.cliente c ON c.id = i.cliente_id JOIN kart.bateria b ON b.id = i.bateria_id WHERE i.id = @inscricaoId for update of i`,
           { inscricaoId },
         );
         if (!ins) throw new HttpError(404, 'Reserva não encontrada.');
@@ -670,7 +673,7 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
         itemClienteId = (ins.ClienteId as number | null) ?? itemClienteId;
         descricao = `${ins.bateria} - ${ins.Nome}`.slice(0, 200);
       } else if (produtoId) {
-        const [p] = await run(`SELECT Nome FROM dbo.Produto WHERE Id = @produtoId`, { produtoId });
+        const [p] = await run(`SELECT nome "Nome" FROM kart.produto WHERE id = @produtoId`, { produtoId });
         if (!p) throw new HttpError(404, 'Produto não encontrado.');
         descricao = String(p.Nome).slice(0, 200);
       }
@@ -690,17 +693,17 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
     const voucherUsos: Array<{ clienteId: number | null; desconto: number; autoLink: { vcId: number; clienteId: number } | null }> = [];
     if (voucherCodigo) {
       const [v] = await run(
-        `SELECT v.*, p.Ativo parceiroAtivo, fc.Ativo fidelidadeAtiva FROM dbo.Voucher v WITH (UPDLOCK, HOLDLOCK)
-         LEFT JOIN dbo.Parceiro p ON p.Id = v.ParceiroId LEFT JOIN dbo.FidelidadeConta fc ON fc.Id = v.FidelidadeContaId WHERE v.Codigo = @c`,
+        `SELECT v.id "Id", v.codigo "Codigo", v.ativo "Ativo", v.parceiro_id "ParceiroId", v.fidelidade_conta_id "FidelidadeContaId", v.produto_id "ProdutoId", v.tipo "Tipo", v.valor "Valor", v.inicio_em "InicioEm", v.fim_em "FimEm", v.desconto_maximo_centavos "DescontoMaximoCentavos", v.pedido_minimo_centavos "PedidoMinimoCentavos", v.uso_unico "UsoUnico", v.uso_max_total "UsoMaxTotal", v.uso_max_cliente "UsoMaxCliente", v.restrito_clientes "RestritoClientes", v.origem "Origem", v.referencia "Referencia", p.ativo "parceiroAtivo", fc.ativo "fidelidadeAtiva" FROM kart.voucher v
+         LEFT JOIN kart.parceiro p ON p.id = v.parceiro_id LEFT JOIN kart.fidelidade_conta fc ON fc.id = v.fidelidade_conta_id WHERE upper(v.codigo) = upper(@c) for update of v`,
         { c: voucherCodigo },
       );
       if (!v || !v.Ativo) throw new HttpError(400, 'Voucher não encontrado.');
       if (v.ParceiroId && !v.parceiroAtivo) throw new HttpError(400, 'O parceiro vinculado ao voucher está inativo.');
       if (v.FidelidadeContaId && !v.fidelidadeAtiva) throw new HttpError(400, 'A conta de fidelidade vinculada ao voucher está inativa.');
-      const [hoje] = await run(`SELECT CAST(SYSDATETIME() AS date) d`);
+      const [hoje] = await run(`SELECT (now())::date d`);
       if ((hoje.d as Date) < (v.InicioEm as Date) || (hoje.d as Date) > (v.FimEm as Date)) throw new HttpError(400, 'Voucher expirado.');
       const totalPedido = itens.reduce((s, i) => s + i.liquido, 0);
-      if (v.PedidoMinimoCentavos && totalPedido < (v.PedidoMinimoCentavos as number)) throw new HttpError(400, `Valor do pedido insuficiente. Mínimo exigido: ${brl(v.PedidoMinimoCentavos as number)}.`);
+      if (v.PedidoMinimoCentavos && totalPedido < (v.PedidoMinimoCentavos as number)) throw new HttpError(400, `valor do pedido insuficiente. Mínimo exigido: ${brl(v.PedidoMinimoCentavos as number)}.`);
 
       const marcados = itens.filter((i) => i.voucherAplicado);
       const alvos = marcados.length
@@ -715,17 +718,17 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
         let cliAlvoId: number | null = alvo.itemClienteId ?? clienteId;
         let cliAlvoDoc: string | null = null;
         if (v.RestritoClientes && cliAlvoId) {
-          const [cli] = await run(`SELECT Documento, DocumentoNum FROM dbo.Cliente WHERE Id = @cid`, { cid: cliAlvoId });
+          const [cli] = await run(`SELECT documento "Documento", documento_num "DocumentoNum" FROM kart.cliente WHERE id = @cid`, { cid: cliAlvoId });
           cliAlvoDoc = normalizarDocVoucher(cli?.DocumentoNum ?? cli?.Documento);
         }
         const [usos] = await run(
           `SELECT
-             (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @id AND Estornado = 0)
-             + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @id AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
-             + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @id AND Estado IN ('reservado', 'consumido')) n,
-             (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estornado = 0)
-             + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
-             + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estado IN ('reservado', 'consumido')) doCliente`,
+             (SELECT COUNT(*) FROM kart.voucher_uso WHERE voucher_id = @id AND estornado = false)
+             + (SELECT COUNT(*) FROM kart.reserva_online_voucher_uso WHERE voucher_id = @id AND estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+             + (SELECT COUNT(*) FROM kart.reserva_grupo_voucher_uso WHERE voucher_id = @id AND estado IN ('reservado', 'consumido')) n,
+             (SELECT COUNT(*) FROM kart.voucher_uso WHERE voucher_id = @id AND cliente_id = @cli AND estornado = false)
+             + (SELECT COUNT(*) FROM kart.reserva_online_voucher_uso WHERE voucher_id = @id AND cliente_id = @cli AND estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+             + (SELECT COUNT(*) FROM kart.reserva_grupo_voucher_uso WHERE voucher_id = @id AND cliente_id = @cli AND estado IN ('reservado', 'consumido')) "doCliente"`,
           { id: v.Id, cli: cliAlvoId },
         );
         const extraCli = cliAlvoId ? (usosPorClienteExtra.get(cliAlvoId) ?? 0) : 0;
@@ -771,7 +774,7 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
       const formaPagamentoId = int(pg.formaPagamentoId, 'Forma de pagamento');
       const valor = cents(pg.valorCentavos);
       if (!valor) continue;
-      const [f] = await run(`SELECT Tipo FROM dbo.FormaPagamento WHERE Id = @formaPagamentoId AND Ativo = 1`, { formaPagamentoId });
+      const [f] = await run(`SELECT tipo "Tipo" FROM kart.forma_pagamento WHERE id = @formaPagamentoId AND ativo = true`, { formaPagamentoId });
       if (!f) throw new HttpError(400, 'Forma de pagamento inválida.');
       if (f.Tipo === 'dinheiro') dinheiro += valor;
       recebido += valor;
@@ -782,51 +785,51 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
     if (troco > dinheiro) throw new HttpError(400, 'Troco só pode ser dado sobre pagamento em dinheiro. Ajuste os valores.');
 
     const [venda] = await run(
-      `INSERT INTO dbo.Venda (MovimentoId, UsuarioId, TerminalId, ClienteId, BrutoCentavos, DescontoCentavos, AcrescimoCentavos, RecebidoCentavos, TrocoCentavos, FinalCentavos, Observacao)
-       OUTPUT inserted.Id id VALUES (@mov, @uid, @term, @cli, @bruto, @desc, @acr, @rec, @troco, @final, @obs)`,
+      `INSERT INTO kart.venda (movimento_id, usuario_id, terminal_id, cliente_id, bruto_centavos, desconto_centavos, acrescimo_centavos, recebido_centavos, troco_centavos, final_centavos, observacao)
+        VALUES (@mov, @uid, @term, @cli, @bruto, @desc, @acr, @rec, @troco, @final, @obs) returning id id`,
       { mov: mov.id, uid: sessao.uid, term: mov.terminalId, cli: clienteId, bruto, desc: desconto, acr: acrescimo, rec: recebido, troco, final: total, obs: str(body.observacao, 1000) },
     );
     const vendaId = venda.id as number;
-    await run(`UPDATE dbo.Venda SET Codigo = CAST(Id AS varchar(20)) WHERE Id = @vendaId`, { vendaId });
+    await run(`UPDATE kart.venda SET codigo = (id)::text WHERE id = @vendaId`, { vendaId });
     let n = 1;
     for (const i of itens) {
       await run(
-        `INSERT INTO dbo.VendaItem (VendaId, Item, ProdutoId, Descricao, Quantidade, UnitarioCentavos, DescontoCentavos, AcrescimoCentavos, LiquidoCentavos, InscricaoId, VoucherId)
+        `INSERT INTO kart.venda_item (venda_id, item, produto_id, descricao, quantidade, unitario_centavos, desconto_centavos, acrescimo_centavos, liquido_centavos, inscricao_id, voucher_id)
          VALUES (@vendaId, @n, @produtoId, @descricao, @qtd, @unit, @desc, @acr, @liq, @ins, @voucherId)`,
         { vendaId, n: n++, produtoId: i.produtoId, descricao: i.descricao, qtd: i.quantidade, unit: i.unitarioCentavos, desc: i.descontoCentavos, acr: i.acrescimoCentavos, liq: i.liquido, ins: i.inscricaoId, voucherId: i.voucherId ?? null },
       );
       if (i.inscricaoId) {
         await run(
-          `UPDATE dbo.Inscricao SET Pago = 1, Aprovada = 1, Status = 'confirmada', ValorCentavos = @liq, DescontoCentavos = @desc, VendaId = @vendaId${i.voucherId ? ', VoucherId = @vid' : ''}, AtualizadoEm = SYSDATETIME() WHERE Id = @ins`,
+          `UPDATE kart.inscricao SET pago = true, aprovada = true, status = 'confirmada', valor_centavos = @liq, desconto_centavos = @desc, venda_id = @vendaId${i.voucherId ? ', voucher_id = @vid' : ''} WHERE id = @ins`,
           { liq: i.liquido, desc: i.descontoCentavos, vendaId, ins: i.inscricaoId, ...(i.voucherId ? { vid: i.voucherId } : {}) },
         );
       }
     }
     for (const pg of pagamentos) {
-      await run(`INSERT INTO dbo.VendaPagamento (VendaId, FormaPagamentoId, ValorCentavos) VALUES (@vendaId, @f, @v)`, { vendaId, f: pg.formaPagamentoId, v: pg.valor });
+      await run(`INSERT INTO kart.venda_pagamento (venda_id, forma_pagamento_id, valor_centavos) VALUES (@vendaId, @f, @v)`, { vendaId, f: pg.formaPagamentoId, v: pg.valor });
     }
     if (voucher) {
       for (const vu of voucherUsos) {
-        await run(`INSERT INTO dbo.VoucherUso (VoucherId, VendaId, ClienteId, DescontoCentavos) VALUES (@v, @vendaId, @cli, @d)`, { v: voucher.Id, vendaId, cli: vu.clienteId ?? clienteId, d: vu.desconto });
+        await run(`INSERT INTO kart.voucher_uso (voucher_id, venda_id, cliente_id, desconto_centavos) VALUES (@v, @vendaId, @cli, @d)`, { v: voucher.Id, vendaId, cli: vu.clienteId ?? clienteId, d: vu.desconto });
         if (vu.autoLink) {
-          await run(`UPDATE dbo.VoucherCliente SET ClienteId = @cid WHERE Id = @vcId AND ClienteId IS NULL`, { cid: vu.autoLink.clienteId, vcId: vu.autoLink.vcId });
+          await run(`UPDATE kart.voucher_cliente SET cliente_id = @cid WHERE id = @vcId AND cliente_id IS NULL`, { cid: vu.autoLink.clienteId, vcId: vu.autoLink.vcId });
         }
       }
       if (voucher.Origem === 'parceiro' && voucher.ParceiroId) {
         const base = itens.filter((i) => i.voucherId === Number(voucher!.Id)).reduce((total, i) => total + i.liquido, 0);
         if (base > 0) {
-          const [partner] = await run(`SELECT ComissaoPercentual percentual FROM dbo.Parceiro WITH (UPDLOCK, HOLDLOCK) WHERE Id = @id AND Ativo = 1`, { id: voucher.ParceiroId });
+          const [partner] = await run(`SELECT comissao_percentual percentual FROM kart.parceiro WHERE id = @id AND ativo = true for update`, { id: voucher.ParceiroId });
           if (partner) {
             const rate = Number(partner.percentual);
             const commission = Math.round(base * rate / 100);
             if (commission > 0) {
             const [created] = await run(
-              `INSERT INTO dbo.ParceiroComissao (ParceiroId, VendaId, BaseCentavos, Percentual, ValorCentavos)
-               OUTPUT inserted.Id id VALUES (@parceiroId, @vendaId, @base, @rate, @valor)`,
+              `INSERT INTO kart.parceiro_comissao (parceiro_id, venda_id, base_centavos, percentual, valor_centavos)
+                VALUES (@parceiroId, @vendaId, @base, @rate, @valor) returning id id`,
               { parceiroId: voucher.ParceiroId, vendaId, base, rate, valor: commission },
             );
             await run(
-              `INSERT INTO dbo.ParceiroComissaoTransacao (ComissaoId, Tipo, ValorCentavos, Motivo, UsuarioId)
+              `INSERT INTO kart.parceiro_comissao_transacao (comissao_id, tipo, valor_centavos, motivo, usuario_id)
                VALUES (@id, 'acumulada', @valor, 'Comissão gerada pela venda', @uid)`,
               { id: created.id, valor: commission, uid: sessao.uid },
             );
@@ -839,7 +842,7 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
     const insIds = itens.filter((i) => i.inscricaoId).map((i) => i.inscricaoId as number);
     const semTermo = insIds.length
       ? ((await run(
-          `SELECT Id id FROM dbo.Inscricao WHERE Id IN (${insIds.map((_, n) => '@t' + n).join(',')}) AND TermoImpressoEm IS NULL AND Origem <> 'totem'`,
+          `SELECT id id FROM kart.inscricao WHERE id IN (${insIds.map((_, n) => '@t' + n).join(',')}) AND termo_impresso_em IS NULL AND origem <> 'totem'`,
           Object.fromEntries(insIds.map((id, n) => ['t' + n, id])),
         )) as { id: number }[]).map((r) => r.id)
       : [];
@@ -852,37 +855,37 @@ async function estornar(sessao: Sessao, vendaId: number, body: Record<string, un
   if (!itemIds.length) throw new HttpError(400, 'Selecione os itens a estornar.');
   const motivo = str(body.motivo, 400) ?? 'Estorno';
   return tx(async (run) => {
-    const [v] = await run(`SELECT v.Id, v.MovimentoId, m.FechadoEm FROM dbo.Venda v LEFT JOIN dbo.Movimento m ON m.Id = v.MovimentoId WHERE v.Id = @vendaId`, { vendaId });
+    const [v] = await run(`SELECT v.id "Id", v.movimento_id "MovimentoId", m.fechado_em "FechadoEm" FROM kart.venda v LEFT JOIN kart.movimento m ON m.id = v.movimento_id WHERE v.id = @vendaId`, { vendaId });
     if (!v) throw new HttpError(404, 'Venda não encontrada.');
     if (!v.MovimentoId || v.FechadoEm) throw new HttpError(409, 'Não é possível realizar o estorno. Movimento fechado.');
     let soma = 0;
     let estornouVoucherParceiro = false;
     for (const itemId of itemIds) {
-      const [it] = await run(`SELECT Id, LiquidoCentavos, InscricaoId, VoucherId, Estornado FROM dbo.VendaItem WHERE Id = @itemId AND VendaId = @vendaId`, { itemId, vendaId });
+      const [it] = await run(`SELECT id "Id", liquido_centavos "LiquidoCentavos", inscricao_id "InscricaoId", voucher_id "VoucherId", estornado "Estornado" FROM kart.venda_item WHERE id = @itemId AND venda_id = @vendaId`, { itemId, vendaId });
       if (!it || it.Estornado) continue;
       soma += it.LiquidoCentavos as number;
       estornouVoucherParceiro ||= Boolean(it.VoucherId);
-      await run(`UPDATE dbo.VendaItem SET Estornado = 1, EstornadoEm = SYSDATETIME(), MotivoEstorno = @motivo WHERE Id = @itemId`, { itemId, motivo });
+      await run(`UPDATE kart.venda_item SET estornado = true, estornado_em = now(), motivo_estorno = @motivo WHERE id = @itemId`, { itemId, motivo });
       if (it.InscricaoId) {
-        await run(`UPDATE dbo.Inscricao SET Pago = 0, Status = CASE WHEN Status = 'cancelada' THEN 'cancelada' ELSE 'reservada' END, ValorCentavos = NULL, VendaId = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @i`, { i: it.InscricaoId });
+        await run(`UPDATE kart.inscricao SET pago = false, status = CASE WHEN status = 'cancelada' THEN 'cancelada' ELSE 'reservada' END, valor_centavos = NULL, venda_id = NULL, atualizado_em = now() WHERE id = @i`, { i: it.InscricaoId });
       }
     }
-    await run(`UPDATE dbo.VoucherUso SET Estornado = 1 WHERE VendaId = @vendaId AND EXISTS (SELECT 1 FROM dbo.VendaItem vi WHERE vi.VendaId = @vendaId AND vi.VoucherId IS NOT NULL AND vi.Estornado = 1)`, { vendaId });
-    const [rest] = await run(`SELECT COUNT(*) n FROM dbo.VendaItem WHERE VendaId = @vendaId AND Estornado = 0`, { vendaId });
+    await run(`UPDATE kart.voucher_uso SET estornado = true WHERE venda_id = @vendaId AND EXISTS (SELECT 1 FROM kart.venda_item vi WHERE vi.venda_id = @vendaId AND vi.voucher_id IS NOT NULL AND vi.estornado = true)`, { vendaId });
+    const [rest] = await run(`SELECT COUNT(*) n FROM kart.venda_item WHERE venda_id = @vendaId AND estornado = false`, { vendaId });
     await run(
-      `UPDATE dbo.Venda SET EstornoCentavos = EstornoCentavos + @soma, FinalCentavos = FinalCentavos - @soma,
-         Cancelada = CASE WHEN @rest = 0 THEN 1 ELSE Cancelada END, MotivoCancelamento = CASE WHEN @rest = 0 THEN @motivo ELSE MotivoCancelamento END WHERE Id = @vendaId`,
+      `UPDATE kart.venda SET estorno_centavos = estorno_centavos + @soma, final_centavos = final_centavos - @soma,
+         cancelada = CASE WHEN @rest::int = 0 THEN true ELSE cancelada END, motivo_cancelamento = CASE WHEN @rest::int = 0 THEN @motivo ELSE motivo_cancelamento END WHERE id = @vendaId`,
       { soma, rest: rest.n, motivo: `${motivo} (${sessao.nome})`, vendaId },
     );
     if (estornouVoucherParceiro) {
-      const [commission] = await run(`SELECT Id, ValorCentavos, Estado FROM dbo.ParceiroComissao WITH (UPDLOCK, HOLDLOCK) WHERE VendaId = @vendaId`, { vendaId });
+      const [commission] = await run(`SELECT id "Id", valor_centavos "ValorCentavos", estado "Estado" FROM kart.parceiro_comissao WHERE venda_id = @vendaId for update`, { vendaId });
       if (commission && commission.Estado !== 'estornada') {
         await run(
-          `INSERT INTO dbo.ParceiroComissaoTransacao (ComissaoId, Tipo, ValorCentavos, Motivo, UsuarioId)
+          `INSERT INTO kart.parceiro_comissao_transacao (comissao_id, tipo, valor_centavos, motivo, usuario_id)
            VALUES (@id, 'cancelamento_venda', -@valor, @motivo, @uid)`,
           { id: commission.Id, valor: commission.ValorCentavos, motivo: `Estorno da venda ${vendaId}: ${motivo}`.slice(0, 400), uid: sessao.uid },
         );
-        await run(`UPDATE dbo.ParceiroComissao SET Estado = 'estornada', AtualizadaEm = SYSDATETIME() WHERE Id = @id`, { id: commission.Id });
+        await run(`UPDATE kart.parceiro_comissao SET estado = 'estornada', atualizada_em = now() WHERE id = @id`, { id: commission.Id });
       }
     }
     return { estornado: soma };
@@ -923,7 +926,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if ((body.cpf !== undefined && !isValidCpf(cpf)) || email.length > 254 || (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) || (!cpf && !email)) {
       throw new HttpError(400, 'Informe um CPF válido ou o e-mail verificado da conta do app.');
     }
-    if (!await one(`SELECT Id id FROM dbo.Cliente WHERE Id = @id`, { id: customerId })) throw new HttpError(404, 'Cliente não encontrado.');
+    if (!await one(`SELECT id id FROM kart.cliente WHERE id = @id`, { id: customerId })) throw new HttpError(404, 'Cliente não encontrado.');
 
     const destination = process.env.MOBILE_IDENTITY_LINK_URL;
     const adminToken = process.env.MOBILE_ADMIN_TOKEN;
@@ -958,13 +961,13 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   if (path === '/fidelidade/contas' && method === 'GET') {
     const q = str(url.searchParams.get('q'), 100);
     const rows = await query(
-      `SELECT TOP 2000 a.Id id, a.ClienteId clienteId, c.Nome nome, c.Documento documento, c.Email email, c.Telefone telefone,
-              a.SaldoPontos saldo, a.SaldoPontos saldoCentavos, a.Ativo ativo, CONVERT(varchar(16), a.CriadoEm, 126) criadaEm,
-              (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.ClienteId = a.ClienteId AND i.Pago = 1 AND i.Status <> 'cancelada') baterias,
-              (SELECT COUNT(*) FROM dbo.FidelidadeTransacao ft WHERE ft.ContaId = a.Id) transacoes
-       FROM dbo.FidelidadeConta a JOIN dbo.Cliente c ON c.Id = a.ClienteId
-       ${q ? 'WHERE c.Nome COLLATE Latin1_General_CI_AI LIKE @q OR c.Documento LIKE @q' : ''}
-       ORDER BY c.Nome, a.Id`, q ? { q: `%${q}%` } : {},
+      `SELECT a.id id, a.cliente_id "clienteId", c.nome nome, c.documento documento, c.email email, c.telefone telefone,
+              a.saldo_pontos saldo, a.saldo_pontos "saldoCentavos", a.ativo ativo, to_char(a.criado_em, 'YYYY-MM-DD"T"HH24:MI') "criadaEm",
+              (SELECT COUNT(*) FROM kart.inscricao i WHERE i.cliente_id = a.cliente_id AND i.pago = true AND i.status <> 'cancelada') baterias,
+              (SELECT COUNT(*) FROM kart.fidelidade_transacao ft WHERE ft.conta_id = a.id) transacoes
+       FROM kart.fidelidade_conta a JOIN kart.cliente c ON c.id = a.cliente_id
+       ${q ? 'WHERE unaccent(c.nome) ILIKE unaccent(@q) OR c.documento ILIKE @q' : ''}
+       ORDER BY c.nome, a.id limit 2000`, q ? { q: `%${q}%` } : {},
     );
     send(200, rows);
     return true;
@@ -975,17 +978,17 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     let criada = false;
     try {
       contaId = await tx(async (run) => {
-        const [cliente] = await run(`SELECT Id FROM dbo.Cliente WITH (UPDLOCK, HOLDLOCK) WHERE Id = @clienteId`, { clienteId });
+        const [cliente] = await run(`SELECT id "Id" FROM kart.cliente WHERE id = @clienteId for update`, { clienteId });
         if (!cliente) throw new HttpError(404, 'Cliente não encontrado.');
-        const [existente] = await run(`SELECT Id id FROM dbo.FidelidadeConta WITH (UPDLOCK, HOLDLOCK) WHERE ClienteId = @clienteId`, { clienteId });
+        const [existente] = await run(`SELECT id id FROM kart.fidelidade_conta WHERE cliente_id = @clienteId for update`, { clienteId });
         if (existente) return Number(existente.id);
-        const [novo] = await run(`INSERT INTO dbo.FidelidadeConta (ClienteId) OUTPUT inserted.Id id VALUES (@clienteId)`, { clienteId });
+        const [novo] = await run(`INSERT INTO kart.fidelidade_conta (cliente_id)  VALUES (@clienteId) returning id id`, { clienteId });
         criada = true;
         return Number(novo.id);
       });
     } catch (e) {
       if (!duplicateSql(e)) throw e;
-      const existente = await one<{ id: number }>(`SELECT Id id FROM dbo.FidelidadeConta WHERE ClienteId = @clienteId`, { clienteId });
+      const existente = await one<{ id: number }>(`SELECT id id FROM kart.fidelidade_conta WHERE cliente_id = @clienteId`, { clienteId });
       if (!existente) throw e;
       contaId = existente.id;
       criada = false;
@@ -996,11 +999,11 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   if ((m = path.match(/^\/fidelidade\/contas\/(\d+)$/)) && method === 'GET') {
     const id = int(m[1], 'Conta');
     const account = await one(
-      `SELECT a.Id id, a.ClienteId clienteId, c.Nome nome, c.Documento documento, c.Email email, c.Telefone telefone,
-              a.SaldoPontos saldo, a.SaldoPontos saldoCentavos, a.Ativo ativo, CONVERT(varchar(16), a.CriadoEm, 126) criadaEm,
-              (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.ClienteId = a.ClienteId AND i.Pago = 1 AND i.Status <> 'cancelada') baterias,
-              (SELECT COUNT(*) FROM dbo.FidelidadeTransacao ft WHERE ft.ContaId = a.Id) transacoes
-       FROM dbo.FidelidadeConta a JOIN dbo.Cliente c ON c.Id = a.ClienteId WHERE a.Id = @id`, { id },
+      `SELECT a.id id, a.cliente_id "clienteId", c.nome nome, c.documento documento, c.email email, c.telefone telefone,
+              a.saldo_pontos saldo, a.saldo_pontos "saldoCentavos", a.ativo ativo, to_char(a.criado_em, 'YYYY-MM-DD"T"HH24:MI') "criadaEm",
+              (SELECT COUNT(*) FROM kart.inscricao i WHERE i.cliente_id = a.cliente_id AND i.pago = true AND i.status <> 'cancelada') baterias,
+              (SELECT COUNT(*) FROM kart.fidelidade_transacao ft WHERE ft.conta_id = a.id) transacoes
+       FROM kart.fidelidade_conta a JOIN kart.cliente c ON c.id = a.cliente_id WHERE a.id = @id`, { id },
     );
     if (!account) throw new HttpError(404, 'Conta de fidelidade não encontrada.');
     send(200, account);
@@ -1011,35 +1014,35 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const id = int(m[1], 'Conta');
     const b = await req.body();
     if (!('ativo' in b)) throw new HttpError(400, 'Informe o estado ativo da conta.');
-    const exists = await one<{ id: number }>(`SELECT Id id FROM dbo.FidelidadeConta WHERE Id = @id`, { id });
+    const exists = await one<{ id: number }>(`SELECT id id FROM kart.fidelidade_conta WHERE id = @id`, { id });
     if (!exists) throw new HttpError(404, 'Conta de fidelidade não encontrada.');
     const ativo = bit(b.ativo);
-    await query(`UPDATE dbo.FidelidadeConta SET Ativo = @ativo, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id, ativo });
-    if (!ativo) await query(`UPDATE dbo.Voucher SET Ativo = 0 WHERE FidelidadeContaId = @id`, { id });
+    await query(`UPDATE kart.fidelidade_conta SET ativo = @ativo, atualizado_em = now() WHERE id = @id`, { id, ativo });
+    if (!ativo) await query(`UPDATE kart.voucher SET ativo = false WHERE fidelidade_conta_id = @id`, { id });
     send(200, { id, ativo: Boolean(ativo) });
     return true;
   }
   if ((m = path.match(/^\/fidelidade\/contas\/(\d+)\/transacoes$/)) && method === 'GET') {
     const id = int(m[1], 'Conta');
-    const filtro = periodo(url, 'ft.CriadoEm');
-    const conta = await one(`SELECT Id id FROM dbo.FidelidadeConta WHERE Id = @id`, { id });
+    const filtro = periodo(url, 'ft.criado_em');
+    const conta = await one(`SELECT id id FROM kart.fidelidade_conta WHERE id = @id`, { id });
     if (!conta) throw new HttpError(404, 'Conta de fidelidade não encontrada.');
     send(200, await query(
-      `SELECT ft.Id id, CONVERT(varchar(16), ft.CriadoEm, 126) dataHora, c.Nome conta, ft.Tipo tipo, ft.Pontos pontos,
-              ft.SaldoApos saldoApos, ft.Motivo motivo, u.Nome usuario
-       FROM dbo.FidelidadeTransacao ft JOIN dbo.FidelidadeConta a ON a.Id = ft.ContaId JOIN dbo.Cliente c ON c.Id = a.ClienteId
-       JOIN dbo.Usuario u ON u.Id = ft.UsuarioId WHERE ft.ContaId = @id AND ${filtro.where} ORDER BY ft.CriadoEm DESC, ft.Id DESC`,
+      `SELECT ft.id id, to_char(ft.criado_em, 'YYYY-MM-DD"T"HH24:MI') "dataHora", c.nome conta, ft.tipo tipo, ft.pontos pontos,
+              ft.saldo_apos "saldoApos", ft.motivo motivo, u.nome usuario
+       FROM kart.fidelidade_transacao ft JOIN kart.fidelidade_conta a ON a.id = ft.conta_id JOIN kart.cliente c ON c.id = a.cliente_id
+       JOIN kart.usuario u ON u.id = ft.usuario_id WHERE ft.conta_id = @id AND ${filtro.where} ORDER BY ft.criado_em DESC, ft.id DESC`,
       { ...filtro.p, id },
     ));
     return true;
   }
   if (path === '/fidelidade/transacoes' && method === 'GET') {
-    const filtro = periodo(url, 'ft.CriadoEm');
+    const filtro = periodo(url, 'ft.criado_em');
     send(200, await query(
-      `SELECT TOP 5000 ft.Id id, CONVERT(varchar(16), ft.CriadoEm, 126) dataHora, c.Nome conta, ft.Tipo tipo, ft.Pontos pontos,
-              ft.SaldoApos saldoApos, ft.Motivo motivo, u.Nome usuario
-       FROM dbo.FidelidadeTransacao ft JOIN dbo.FidelidadeConta a ON a.Id = ft.ContaId JOIN dbo.Cliente c ON c.Id = a.ClienteId
-       JOIN dbo.Usuario u ON u.Id = ft.UsuarioId WHERE ${filtro.where} ORDER BY ft.CriadoEm DESC, ft.Id DESC`, filtro.p,
+      `SELECT ft.id id, to_char(ft.criado_em, 'YYYY-MM-DD"T"HH24:MI') "dataHora", c.nome conta, ft.tipo tipo, ft.pontos pontos,
+              ft.saldo_apos "saldoApos", ft.motivo motivo, u.nome usuario
+       FROM kart.fidelidade_transacao ft JOIN kart.fidelidade_conta a ON a.id = ft.conta_id JOIN kart.cliente c ON c.id = a.cliente_id
+       JOIN kart.usuario u ON u.id = ft.usuario_id WHERE ${filtro.where} ORDER BY ft.criado_em DESC, ft.id DESC limit 5000`, filtro.p,
     ));
     return true;
   }
@@ -1052,21 +1055,21 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (!motivo) throw new HttpError(400, 'Informe o motivo do ajuste de pontos.');
     const key = chaveIdempotencia(b.idempotencyKey);
     const result = await tx(async (run) => {
-      const [account] = await run(`SELECT Id, SaldoPontos FROM dbo.FidelidadeConta WITH (UPDLOCK, HOLDLOCK) WHERE Id = @id AND Ativo = 1`, { id });
+      const [account] = await run(`SELECT id "Id", saldo_pontos "SaldoPontos" FROM kart.fidelidade_conta WHERE id = @id AND ativo = true for update`, { id });
       if (!account) throw new HttpError(404, 'Conta de fidelidade não encontrada ou inativa.');
-      const [previous] = await run(`SELECT Id id, Pontos pontos, SaldoApos saldoApos, Motivo motivo FROM dbo.FidelidadeTransacao WHERE ContaId = @id AND IdempotencyKey = @key`, { id, key });
+      const [previous] = await run(`SELECT id id, pontos pontos, saldo_apos "saldoApos", motivo motivo FROM kart.fidelidade_transacao WHERE conta_id = @id AND idempotency_key = @key`, { id, key });
       if (previous) {
         if (Number(previous.pontos) !== delta || previous.motivo !== motivo) throw new HttpError(409, 'A chave de idempotência já foi usada para outro ajuste.');
         return { ...previous, repetido: true };
       }
       const [updated] = await run(
-        `UPDATE dbo.FidelidadeConta SET SaldoPontos = SaldoPontos + @delta, AtualizadoEm = SYSDATETIME()
-         OUTPUT inserted.SaldoPontos saldoApos WHERE Id = @id AND SaldoPontos + @delta >= 0`, { id, delta },
+        `UPDATE kart.fidelidade_conta SET saldo_pontos = saldo_pontos + @delta, atualizado_em = now()
+          WHERE id = @id AND saldo_pontos + @delta >= 0 returning saldo_pontos "saldoApos"`, { id, delta },
       );
       if (!updated) throw new HttpError(409, 'O ajuste deixaria o saldo de pontos abaixo de zero.');
       const [created] = await run(
-        `INSERT INTO dbo.FidelidadeTransacao (ContaId, Tipo, Pontos, SaldoApos, Motivo, IdempotencyKey, UsuarioId)
-         OUTPUT inserted.Id id VALUES (@id, 'ajuste', @delta, @saldo, @motivo, @key, @uid)`,
+        `INSERT INTO kart.fidelidade_transacao (conta_id, tipo, pontos, saldo_apos, motivo, idempotency_key, usuario_id)
+          VALUES (@id, 'ajuste', @delta, @saldo, @motivo, @key, @uid) returning id id`,
         { id, delta, saldo: updated.saldoApos, motivo, key, uid: sessao.uid },
       );
       return { id: created.id, pontos: delta, saldoApos: updated.saldoApos, repetido: false };
@@ -1079,14 +1082,14 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   if (path === '/parceiros' && method === 'GET') {
     const q = str(url.searchParams.get('q'), 100);
     send(200, await query(
-      `SELECT TOP 2000 p.Id id, p.Nome nome, p.Documento documento, p.Contato contato, p.Telefone telefone, p.Email email,
-              p.ComissaoPercentual comissaoPercentual, p.Ativo ativo, CONVERT(varchar(16), p.CriadoEm, 126) criadoEm,
-              (SELECT COUNT(*) FROM dbo.ParceiroComissao pc WHERE pc.ParceiroId = p.Id) vendasIndicadas,
-              (SELECT TOP 1 v.Codigo FROM dbo.Voucher v WHERE v.ParceiroId = p.Id AND v.Ativo = 1 ORDER BY v.CriadoEm DESC, v.Id DESC) voucher,
-              ISNULL((SELECT SUM(CASE WHEN pc.Estado = 'pendente' THEN pc.ValorCentavos ELSE 0 END) FROM dbo.ParceiroComissao pc WHERE pc.ParceiroId = p.Id), 0) comissaoPendenteCentavos,
-              ISNULL((SELECT SUM(-pt.ValorCentavos) FROM dbo.ParceiroComissaoTransacao pt JOIN dbo.ParceiroComissao pc ON pc.Id = pt.ComissaoId WHERE pc.ParceiroId = p.Id AND pt.Tipo = 'pagamento'), 0) comissaoPagaCentavos,
-              ISNULL((SELECT SUM(pt.ValorCentavos) FROM dbo.ParceiroComissaoTransacao pt JOIN dbo.ParceiroComissao pc ON pc.Id = pt.ComissaoId WHERE pc.ParceiroId = p.Id), 0) comissaoSaldoCentavos
-       FROM dbo.Parceiro p ${q ? 'WHERE p.Nome COLLATE Latin1_General_CI_AI LIKE @q OR p.Documento LIKE @q' : ''} ORDER BY p.Nome`,
+      `SELECT p.id id, p.nome nome, p.documento documento, p.contato contato, p.telefone telefone, p.email email,
+              p.comissao_percentual "comissaoPercentual", p.ativo ativo, to_char(p.criado_em, 'YYYY-MM-DD"T"HH24:MI') "criadoEm",
+              (SELECT COUNT(*) FROM kart.parceiro_comissao pc WHERE pc.parceiro_id = p.id) "vendasIndicadas",
+              (SELECT v.codigo FROM kart.voucher v WHERE v.parceiro_id = p.id AND v.ativo = true ORDER BY v.criado_em DESC, v.id DESC LIMIT 1) voucher,
+              coalesce((SELECT SUM(CASE WHEN pc.estado = 'pendente' THEN pc.valor_centavos ELSE 0 END) FROM kart.parceiro_comissao pc WHERE pc.parceiro_id = p.id), 0) "comissaoPendenteCentavos",
+              coalesce((SELECT SUM(-pt.valor_centavos) FROM kart.parceiro_comissao_transacao pt JOIN kart.parceiro_comissao pc ON pc.id = pt.comissao_id WHERE pc.parceiro_id = p.id AND pt.tipo = 'pagamento'), 0) "comissaoPagaCentavos",
+              coalesce((SELECT SUM(pt.valor_centavos) FROM kart.parceiro_comissao_transacao pt JOIN kart.parceiro_comissao pc ON pc.id = pt.comissao_id WHERE pc.parceiro_id = p.id), 0) "comissaoSaldoCentavos"
+       FROM kart.parceiro p ${q ? 'WHERE unaccent(p.nome) ILIKE unaccent(@q) OR p.documento ILIKE @q' : ''} ORDER BY p.nome limit 2000`,
       q ? { q: `%${q}%` } : {},
     ));
     return true;
@@ -1101,8 +1104,8 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const fields = { nome, documento: documento ? (onlyDigits(documento) || documento).slice(0, 30) : null, contato: str(b.contato, 120), telefone: str(b.telefone, 40), email: str(b.email, 200), rate };
     try {
       const created = await one<{ id: number }>(
-        `INSERT INTO dbo.Parceiro (Nome, Documento, Contato, Telefone, Email, ComissaoPercentual)
-         OUTPUT inserted.Id id VALUES (@nome, @documento, @contato, @telefone, @email, @rate)`, fields,
+        `INSERT INTO kart.parceiro (nome, documento, contato, telefone, email, comissao_percentual)
+          VALUES (@nome, @documento, @contato, @telefone, @email, @rate) returning id id`, fields,
       );
       send(201, { id: created!.id });
     } catch (e) {
@@ -1113,7 +1116,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if ((m = path.match(/^\/parceiros\/(\d+)$/)) && method === 'GET') {
     const id = int(m[1], 'Parceiro');
-    const p = await one(`SELECT Id id, Nome nome, Documento documento, Contato contato, Telefone telefone, Email email, ComissaoPercentual comissaoPercentual, Ativo ativo FROM dbo.Parceiro WHERE Id = @id`, { id });
+    const p = await one(`SELECT id id, nome nome, documento documento, contato contato, telefone telefone, email email, comissao_percentual "comissaoPercentual", ativo ativo FROM kart.parceiro WHERE id = @id`, { id });
     if (!p) throw new HttpError(404, 'Parceiro não encontrado.');
     send(200, p);
     return true;
@@ -1135,10 +1138,10 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if ('ativo' in b) vals.Ativo = bit(b.ativo);
     if (!Object.keys(vals).length) throw new HttpError(400, 'Nenhum campo informado para alteração.');
     try {
-      const changed = await query(`UPDATE dbo.Parceiro SET ${Object.keys(vals).map((c) => `${c} = @${c}`).join(', ')}, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { ...vals, id });
-      const found = await one<{ id: number }>(`SELECT Id id FROM dbo.Parceiro WHERE Id = @id`, { id });
+      const changed = await query(`UPDATE kart.parceiro SET ${Object.keys(vals).map((c) => `${colPg(c)} = @${c}`).join(', ')} WHERE id = @id`, { ...vals, id });
+      const found = await one<{ id: number }>(`SELECT id id FROM kart.parceiro WHERE id = @id`, { id });
       if (!found) throw new HttpError(404, 'Parceiro não encontrado.');
-      if ('Ativo' in vals && vals.Ativo === 0) await query(`UPDATE dbo.Voucher SET Ativo = 0 WHERE ParceiroId = @id`, { id });
+      if ('Ativo' in vals && vals.Ativo === 0) await query(`UPDATE kart.voucher SET ativo = false WHERE parceiro_id = @id`, { id });
       void changed;
     } catch (e) {
       if (e instanceof HttpError) throw e;
@@ -1151,10 +1154,10 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   if ((m = path.match(/^\/parceiros\/(\d+)$/)) && method === 'DELETE') {
     if (!sessao.admin) throw new HttpError(403, 'Disponível apenas para administradores.');
     const id = int(m[1], 'Parceiro');
-    const changed = await query(`UPDATE dbo.Parceiro SET Ativo = 0, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id });
-    const found = await one<{ id: number }>(`SELECT Id id FROM dbo.Parceiro WHERE Id = @id`, { id });
+    const changed = await query(`UPDATE kart.parceiro SET ativo = false, atualizado_em = now() WHERE id = @id`, { id });
+    const found = await one<{ id: number }>(`SELECT id id FROM kart.parceiro WHERE id = @id`, { id });
     if (!found) throw new HttpError(404, 'Parceiro não encontrado.');
-    await query(`UPDATE dbo.Voucher SET Ativo = 0 WHERE ParceiroId = @id`, { id });
+    await query(`UPDATE kart.voucher SET ativo = false WHERE parceiro_id = @id`, { id });
     void changed;
     send(200, { ok: true, desativado: true });
     return true;
@@ -1162,37 +1165,37 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   if (path === '/parceiros/comissoes' && method === 'GET') {
     const status = url.searchParams.get('status') || 'todas';
     if (!['todas', 'pendentes', 'pagas', 'estornadas'].includes(status)) throw new HttpError(400, 'Filtro de situação inválido.');
-    const where = status === 'todas' ? '' : `WHERE pc.Estado = @estado`;
-    const filtro = periodo(url, status === 'pagas' ? 'COALESCE(ultima.CriadaEm, pc.CriadaEm)' : 'pc.CriadaEm');
+    const where = status === 'todas' ? '' : `WHERE pc.estado = @estado`;
+    const filtro = periodo(url, status === 'pagas' ? 'coalesce(ultima.criada_em, pc.criada_em)' : 'pc.criada_em');
     const whereSql = [where.replace(/^WHERE\s*/, ''), filtro.where].filter(Boolean).join(' AND ');
     const partnerId = url.searchParams.get('parceiroId');
     const params = { ...filtro.p, ...(status === 'todas' ? {} : { estado: status === 'pagas' ? 'paga' : status === 'estornadas' ? 'estornada' : 'pendente' }), ...(partnerId ? { parceiroId: int(partnerId, 'Parceiro') } : {}) };
     send(200, await query(
-      `SELECT TOP 5000 pc.Id id, pc.ParceiroId parceiroId, p.Nome parceiro, pc.VendaId vendaId,
-              CONVERT(varchar(16), pc.CriadaEm, 126) data, c.Nome cliente, pc.BaseCentavos valorVendaCentavos,
-              pc.Percentual percentual, pc.ValorCentavos comissaoCentavos, pc.Estado situacao,
-              ISNULL((SELECT SUM(CASE WHEN t.Tipo = 'acumulada' THEN t.ValorCentavos ELSE 0 END) FROM dbo.ParceiroComissaoTransacao t WHERE t.ComissaoId = pc.Id), 0) acumuladoCentavos,
-              ISNULL((SELECT -SUM(CASE WHEN t.Tipo IN ('pagamento', 'estorno_pagamento') THEN t.ValorCentavos ELSE 0 END) FROM dbo.ParceiroComissaoTransacao t WHERE t.ComissaoId = pc.Id), 0) pagoCentavos,
-              ISNULL((SELECT SUM(t.ValorCentavos) FROM dbo.ParceiroComissaoTransacao t WHERE t.ComissaoId = pc.Id), 0) saldoCentavos,
-              ultima.FormaPagamentoId formaPagamentoId, ultima.formaPagamento metodoPagamento, ultima.dataHora pagoEm
-       FROM dbo.ParceiroComissao pc JOIN dbo.Parceiro p ON p.Id = pc.ParceiroId JOIN dbo.Venda v ON v.Id = pc.VendaId
-       LEFT JOIN dbo.Cliente c ON c.Id = v.ClienteId
-       OUTER APPLY (SELECT TOP 1 t.FormaPagamentoId, f.Nome formaPagamento, t.CriadaEm, CONVERT(varchar(16), t.CriadaEm, 126) dataHora
-                    FROM dbo.ParceiroComissaoTransacao t LEFT JOIN dbo.FormaPagamento f ON f.Id = t.FormaPagamentoId
-                    WHERE t.ComissaoId = pc.Id AND t.Tipo IN ('pagamento', 'estorno_pagamento') ORDER BY t.CriadaEm DESC, t.Id DESC) ultima
-       WHERE ${whereSql}${partnerId ? ' AND pc.ParceiroId = @parceiroId' : ''} ORDER BY pc.CriadaEm DESC, pc.Id DESC`, params,
+      `SELECT pc.id id, pc.parceiro_id "parceiroId", p.nome parceiro, pc.venda_id "vendaId",
+              to_char(pc.criada_em, 'YYYY-MM-DD"T"HH24:MI') data, c.nome cliente, pc.base_centavos "valorVendaCentavos",
+              pc.percentual percentual, pc.valor_centavos "comissaoCentavos", pc.estado situacao,
+              coalesce((SELECT SUM(CASE WHEN t.tipo = 'acumulada' THEN t.valor_centavos ELSE 0 END) FROM kart.parceiro_comissao_transacao t WHERE t.comissao_id = pc.id), 0) "acumuladoCentavos",
+              coalesce((SELECT -SUM(CASE WHEN t.tipo IN ('pagamento', 'estorno_pagamento') THEN t.valor_centavos ELSE 0 END) FROM kart.parceiro_comissao_transacao t WHERE t.comissao_id = pc.id), 0) "pagoCentavos",
+              coalesce((SELECT SUM(t.valor_centavos) FROM kart.parceiro_comissao_transacao t WHERE t.comissao_id = pc.id), 0) "saldoCentavos",
+              ultima.forma_pagamento_id "formaPagamentoId", ultima."formaPagamento" "metodoPagamento", ultima."dataHora" "pagoEm"
+       FROM kart.parceiro_comissao pc JOIN kart.parceiro p ON p.id = pc.parceiro_id JOIN kart.venda v ON v.id = pc.venda_id
+       LEFT JOIN kart.cliente c ON c.id = v.cliente_id
+       LEFT JOIN LATERAL (SELECT t.forma_pagamento_id, f.nome "formaPagamento", t.criada_em, to_char(t.criada_em, 'YYYY-MM-DD"T"HH24:MI') "dataHora"
+                    FROM kart.parceiro_comissao_transacao t LEFT JOIN kart.forma_pagamento f ON f.id = t.forma_pagamento_id
+                    WHERE t.comissao_id = pc.id AND t.tipo IN ('pagamento', 'estorno_pagamento') ORDER BY t.criada_em DESC, t.id DESC LIMIT 1) ultima ON true
+       WHERE ${whereSql}${partnerId ? ' AND pc.parceiro_id = @parceiroId' : ''} ORDER BY pc.criada_em DESC, pc.id DESC limit 5000`, params,
     ));
     return true;
   }
   if ((m = path.match(/^\/parceiros\/comissoes\/(\d+)\/transacoes$/)) && method === 'GET') {
     const id = int(m[1], 'Comissão');
-    const found = await one<{ id: number }>(`SELECT Id id FROM dbo.ParceiroComissao WHERE Id = @id`, { id });
+    const found = await one<{ id: number }>(`SELECT id id FROM kart.parceiro_comissao WHERE id = @id`, { id });
     if (!found) throw new HttpError(404, 'Comissão não encontrada.');
     send(200, await query(
-      `SELECT t.Id id, CONVERT(varchar(16), t.CriadaEm, 126) dataHora, t.Tipo tipo, t.ValorCentavos valorCentavos,
-              t.Motivo motivo, f.Nome formaPagamento, u.Nome usuario
-       FROM dbo.ParceiroComissaoTransacao t LEFT JOIN dbo.FormaPagamento f ON f.Id = t.FormaPagamentoId
-       LEFT JOIN dbo.Usuario u ON u.Id = t.UsuarioId WHERE t.ComissaoId = @id ORDER BY t.CriadaEm DESC, t.Id DESC`, { id },
+      `SELECT t.id id, to_char(t.criada_em, 'YYYY-MM-DD"T"HH24:MI') "dataHora", t.tipo tipo, t.valor_centavos "valorCentavos",
+              t.motivo motivo, f.nome "formaPagamento", u.nome usuario
+       FROM kart.parceiro_comissao_transacao t LEFT JOIN kart.forma_pagamento f ON f.id = t.forma_pagamento_id
+       LEFT JOIN kart.usuario u ON u.id = t.usuario_id WHERE t.comissao_id = @id ORDER BY t.criada_em DESC, t.id DESC`, { id },
     ));
     return true;
   }
@@ -1203,15 +1206,15 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const b = await req.body();
     const key = chaveIdempotencia(b.idempotencyKey);
     const formaPagamentoId = int(b.formaPagamentoId, 'Forma de pagamento');
-    const forma = await one<{ id: number }>(`SELECT Id id FROM dbo.FormaPagamento WHERE Id = @id AND Ativo = 1`, { id: formaPagamentoId });
+    const forma = await one<{ id: number }>(`SELECT id id FROM kart.forma_pagamento WHERE id = @id AND ativo = true`, { id: formaPagamentoId });
     if (!forma) throw new HttpError(400, 'Forma de pagamento inválida.');
     const motivo = action === 'estornar' ? str(b.motivo, 400) : 'Pagamento de comissão';
     if (!motivo) throw new HttpError(400, 'Informe o motivo do estorno da comissão.');
     const result = await tx(async (run) => {
-      const [comissao] = await run(`SELECT Id, ValorCentavos, Estado FROM dbo.ParceiroComissao WITH (UPDLOCK, HOLDLOCK) WHERE Id = @id`, { id });
+      const [comissao] = await run(`SELECT id "Id", valor_centavos "ValorCentavos", estado "Estado" FROM kart.parceiro_comissao WHERE id = @id for update`, { id });
       if (!comissao) throw new HttpError(404, 'Comissão não encontrada.');
       const expectedType = action === 'pagar' ? 'pagamento' : 'estorno_pagamento';
-      const [previous] = await run(`SELECT Id id, Tipo tipo, Motivo motivo, FormaPagamentoId formaPagamentoId FROM dbo.ParceiroComissaoTransacao WHERE ComissaoId = @id AND IdempotencyKey = @key`, { id, key });
+      const [previous] = await run(`SELECT id id, tipo tipo, motivo motivo, forma_pagamento_id "formaPagamentoId" FROM kart.parceiro_comissao_transacao WHERE comissao_id = @id AND idempotency_key = @key`, { id, key });
       if (previous) {
         if (previous.tipo !== expectedType || previous.motivo !== motivo || Number(previous.formaPagamentoId) !== formaPagamentoId) throw new HttpError(409, 'A chave de idempotência já foi usada para outra ação.');
         return { id, estado: comissao.Estado, repetido: true };
@@ -1221,11 +1224,11 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       const tipo = expectedType;
       const valor = action === 'pagar' ? -Number(comissao.ValorCentavos) : Number(comissao.ValorCentavos);
       await run(
-        `INSERT INTO dbo.ParceiroComissaoTransacao (ComissaoId, Tipo, ValorCentavos, Motivo, IdempotencyKey, FormaPagamentoId, UsuarioId)
+        `INSERT INTO kart.parceiro_comissao_transacao (comissao_id, tipo, valor_centavos, motivo, idempotency_key, forma_pagamento_id, usuario_id)
          VALUES (@id, @tipo, @valor, @motivo, @key, @formaPagamentoId, @uid)`, { id, tipo, valor, motivo, key, formaPagamentoId, uid: sessao.uid },
       );
       const estado = action === 'pagar' ? 'paga' : 'pendente';
-      await run(`UPDATE dbo.ParceiroComissao SET Estado = @estado, AtualizadaEm = SYSDATETIME() WHERE Id = @id`, { id, estado });
+      await run(`UPDATE kart.parceiro_comissao SET estado = @estado, atualizada_em = now() WHERE id = @id`, { id, estado });
       return { id, estado, repetido: false };
     });
     send(result.repetido ? 200 : 201, result);
@@ -1239,18 +1242,18 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const st = url.searchParams.get('status') || 'todas';
     const where: string[] = [];
     let p: Record<string, unknown> = {};
-    if (st === 'atencao') where.push("r.Status = 'pago_sem_vaga'");
+    if (st === 'atencao') where.push("r.status = 'pago_sem_vaga'");
     else {
-      const per = periodo(url, 'r.CriadoEm');
+      const per = periodo(url, 'r.criado_em');
       where.push(per.where); p = per.p;
-      if (st === 'pagas') where.push("r.Status IN ('pago', 'resolvido')");
+      if (st === 'pagas') where.push("r.status IN ('pago', 'resolvido')");
     }
     send(200, await query(
-      `SELECT r.Id id, r.Codigo codigo, CONVERT(varchar(19), r.CriadoEm, 126) dataHora, r.ClienteId clienteId, c.Nome cliente, c.Telefone telefone,
-              b.Id bateriaId, b.Nome bateria, CONVERT(varchar(19), b.Inicio, 126) inicio, r.Quantidade quantidade, r.ValorCentavos valor,
-              r.Forma forma, r.Status status, r.Pilotos pilotos, CONVERT(varchar(19), r.PagoEm, 126) pagoEm, r.AsaasPagamentoId asaas
-         FROM dbo.ReservaOnline r JOIN dbo.Cliente c ON c.Id = r.ClienteId JOIN dbo.Bateria b ON b.Id = r.BateriaId
-        WHERE ${where.join(' AND ')} ORDER BY r.CriadoEm DESC`,
+      `SELECT r.id id, r.codigo codigo, to_char(r.criado_em, 'YYYY-MM-DD"T"HH24:MI:SS') "dataHora", r.cliente_id "clienteId", c.nome cliente, c.telefone telefone,
+              b.id "bateriaId", b.nome bateria, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI:SS') inicio, r.quantidade quantidade, r.valor_centavos valor,
+              r.forma forma, r.status status, r.pilotos pilotos, to_char(r.pago_em, 'YYYY-MM-DD"T"HH24:MI:SS') "pagoEm", r.asaas_pagamento_id asaas
+         FROM kart.reserva_online r JOIN kart.cliente c ON c.id = r.cliente_id JOIN kart.bateria b ON b.id = r.bateria_id
+        WHERE ${where.join(' AND ')} ORDER BY r.criado_em DESC`,
       p,
     ));
     return true;
@@ -1261,18 +1264,18 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const legado = resolucao === undefined || resolucao === null || resolucao === '';
     if (!legado && resolucao !== 'reembolso_confirmado' && resolucao !== 'remarcado') throw new HttpError(400, 'Confirme o reembolso ou a remarcação antes de resolver.');
     if (legado && await one(
-      `SELECT TOP 1 1 x FROM dbo.ReservaOnlineVoucherUso u JOIN dbo.ReservaOnline r ON r.PedidoId = u.PedidoId WHERE r.Id = @id AND u.Estado = 'reembolso_pendente'`,
+      `SELECT 1 x FROM kart.reserva_online_voucher_uso u JOIN kart.reserva_online r ON r.pedido_id = u.pedido_id WHERE r.id = @id AND u.estado = 'reembolso_pendente' limit 1`,
       { id: Number(m![1]) },
     )) throw new HttpError(400, 'Este pedido usou cupom: atualize a Recepção para dizer se o valor foi devolvido ou se o cliente foi remarcado.');
     const estadoUso = resolucao === 'reembolso_confirmado' ? 'liberado' : 'consumido';
     const r = await tx(async (run) => {
       const [pedido] = await run(
-        `UPDATE dbo.ReservaOnline SET Status = 'resolvido' OUTPUT inserted.Codigo WHERE Id = @id AND Status = 'pago_sem_vaga'`,
+        `UPDATE kart.reserva_online SET status = 'resolvido'  WHERE id = @id AND status = 'pago_sem_vaga' returning codigo`,
         { id: Number(m![1]) },
       );
       if (!pedido) return null;
       await run(
-        `UPDATE dbo.ReservaOnlineVoucherUso SET Estado = @estado WHERE PedidoId = (SELECT PedidoId FROM dbo.ReservaOnline WHERE Id = @id) AND Estado = 'reembolso_pendente'`,
+        `UPDATE kart.reserva_online_voucher_uso SET estado = @estado WHERE pedido_id = (SELECT pedido_id "PedidoId" FROM kart.reserva_online WHERE id = @id) AND estado = 'reembolso_pendente'`,
         { id: Number(m![1]), estado: estadoUso },
       );
       return pedido;
@@ -1283,68 +1286,68 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if (path === '/reservas' && method === 'GET') {
     const st = url.searchParams.get('status') || 'todas';
-    const where = ["b.Status <> 'cancelada'"];
-    if (st === 'aprovar') where.push("i.Aprovada = 0 AND i.Status <> 'cancelada'");
+    const where = ["b.status <> 'cancelada'"];
+    if (st === 'aprovar') where.push("NOT i.aprovada AND i.status <> 'cancelada'");
     // equipes de Endurance são da organização do evento: não entram em Aprovadas nem em Pagamento pendente
-    else if (st === 'aprovadas') where.push("i.Aprovada = 1 AND i.Status <> 'cancelada' AND NOT EXISTS (SELECT 1 FROM dbo.EnduranceEvento ev WHERE ev.BateriaId = i.BateriaId AND ev.Ativo = 1)");
-    else if (st === 'pendentes') where.push("i.Aprovada = 1 AND i.Pago = 0 AND i.Status <> 'cancelada' AND ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos > 0 AND NOT EXISTS (SELECT 1 FROM dbo.EnduranceEvento ev WHERE ev.BateriaId = i.BateriaId AND ev.Ativo = 1)");
-    else if (st === 'canceladas') where.push("i.Status = 'cancelada'");
+    else if (st === 'aprovadas') where.push("i.aprovada AND i.status <> 'cancelada' AND NOT EXISTS (SELECT 1 FROM kart.endurance_evento ev WHERE ev.bateria_id = i.bateria_id AND ev.ativo)");
+    else if (st === 'pendentes') where.push("i.aprovada AND NOT i.pago AND i.status <> 'cancelada' AND coalesce(i.preco_centavos, p.preco_centavos) - i.desconto_centavos > 0 AND NOT EXISTS (SELECT 1 FROM kart.endurance_evento ev WHERE ev.bateria_id = i.bateria_id AND ev.ativo)");
+    else if (st === 'canceladas') where.push("i.status = 'cancelada'");
     const bat = url.searchParams.get('bateriaId');
     let p: Record<string, unknown> = {};
     if (bat) {
-      where.push('i.BateriaId = @bat');
+      where.push('i.bateria_id = @bat');
       p.bat = int(bat, 'Bateria');
     } else {
-      const per = periodo(url, 'b.Inicio');
+      const per = periodo(url, 'b.inicio');
       where.push(per.where);
       p = per.p;
     }
-    send(200, await query(`${RESERVA_SELECT} WHERE ${where.join(' AND ')} ORDER BY b.Inicio, i.Id`, p));
+    send(200, await query(`${RESERVA_SELECT} WHERE ${where.join(' AND ')} ORDER BY b.inicio, i.id limit 5000`, p));
     return true;
   }
   if (path === '/baterias' && method === 'GET') {
     const st = url.searchParams.get('status') || 'abertas';
-    const where = ["b.Status <> 'cancelada'"];
-    if (st === 'abertas') where.push("b.Status = 'aberta'");
-    else if (st === 'fechadas') where.push("b.Status = 'fechada'");
-    const per = periodo(url, 'b.Inicio');
+    const where = ["b.status <> 'cancelada'"];
+    if (st === 'abertas') where.push("b.status = 'aberta'");
+    else if (st === 'fechadas') where.push("b.status = 'fechada'");
+    const per = periodo(url, 'b.inicio');
     where.push(per.where);
-    const baterias = await query<{ id: number; [key: string]: unknown }>(`${BATERIA_SELECT} WHERE ${where.join(' AND ')} ORDER BY b.Inicio`, per.p);
+    const baterias = await query<{ id: number; [key: string]: unknown }>(`${BATERIA_SELECT} WHERE ${where.join(' AND ')} ORDER BY b.inicio limit 5000`, per.p);
     if (!baterias.length) { send(200, []); return true; }
     const ids = baterias.map((b) => Number(b.id)).join(',');
     const inscricoes = await query<{ id: number; bateriaId: number; pago: boolean; total: number }>(
-      `SELECT i.Id id, i.BateriaId bateriaId, i.Pago pago,
-        CASE WHEN ISNULL(i.PrecoCentavos, p.PrecoCentavos) - ISNULL(i.DescontoCentavos, 0) < 0 THEN 0
-             ELSE ISNULL(i.PrecoCentavos, p.PrecoCentavos) - ISNULL(i.DescontoCentavos, 0) END total
-       FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId
-       LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
-       WHERE i.Status <> 'cancelada' AND i.BateriaId IN (${ids})`);
+      `SELECT i.id id, i.bateria_id "bateriaId", i.pago pago,
+        CASE WHEN coalesce(i.preco_centavos, p.preco_centavos) - coalesce(i.desconto_centavos, 0) < 0 THEN 0
+             ELSE coalesce(i.preco_centavos, p.preco_centavos) - coalesce(i.desconto_centavos, 0) END total
+       FROM kart.inscricao i JOIN kart.bateria b ON b.id = i.bateria_id
+       LEFT JOIN kart.produto p ON p.id = coalesce(i.produto_id, b.produto_id)
+       WHERE i.status <> 'cancelada' AND i.bateria_id IN (${ids})`);
     const { carregarGrupos } = await import('./grupos');
-    const grupos = await carregarGrupos(`g.Status = 'ativa' AND g.BateriaId IN (${ids})`, {});
+    const grupos = await carregarGrupos(`g.status = 'ativa' AND g.bateria_id IN (${ids})`, {});
     send(200, saldosDasBaterias(baterias, inscricoes, grupos));
     return true;
   }
   if (path === '/vendas' && method === 'GET') {
     const st = url.searchParams.get('status') || 'liquidadas';
     const where: string[] = [];
-    if (st === 'liquidadas') where.push('v.Cancelada = 0');
-    else if (st === 'canceladas') where.push('(v.Cancelada = 1 OR v.EstornoCentavos > 0)');
-    const per = periodo(url, 'v.CriadoEm');
+    if (st === 'liquidadas') where.push('v.cancelada = false');
+    else if (st === 'canceladas') where.push('(v.cancelada = true OR v.estorno_centavos > 0)');
+    const per = periodo(url, 'v.criado_em');
     where.push(per.where);
-    send(200, await query(`${VENDA_SELECT} WHERE ${where.join(' AND ')} ORDER BY v.CriadoEm DESC`, per.p));
+    send(200, await query(`${VENDA_SELECT} WHERE ${where.join(' AND ')} ORDER BY v.criado_em DESC limit 5000`, per.p));
     return true;
   }
   if ((m = path.match(/^\/vendas\/(\d+)$/)) && method === 'GET') {
     const id = Number(m[1]);
-    const venda = await one(`${VENDA_SELECT} WHERE v.Id = @id`, { id });
+    const venda = await one(`${VENDA_SELECT} WHERE v.id = @id`, { id });
     if (!venda) throw new HttpError(404, 'Venda não encontrada.');
     const itens = await query(
-      `SELECT Id id, Item item, Descricao descricao, Quantidade quantidade, UnitarioCentavos unitario, DescontoCentavos desconto, AcrescimoCentavos acrescimo,
-              LiquidoCentavos liquido, Estornado estornado, InscricaoId inscricaoId, MotivoEstorno motivo FROM dbo.VendaItem WHERE VendaId = @id ORDER BY Item`,
+      `SELECT id id, item item, descricao descricao, quantidade quantidade, unitario_centavos unitario, desconto_centavos desconto, acrescimo_centavos acrescimo,
+              liquido_centavos liquido, estornado estornado, inscricao_id "inscricaoId", motivo_estorno motivo FROM kart.venda_item WHERE venda_id = @id ORDER BY item`,
       { id },
     );
     const pagamentos = await query(
-      `SELECT ISNULL(f.Nome, 'Outros') forma, vp.ValorCentavos valor, vp.Cancelado cancelado FROM dbo.VendaPagamento vp LEFT JOIN dbo.FormaPagamento f ON f.Id = vp.FormaPagamentoId WHERE vp.VendaId = @id`,
+      `SELECT coalesce(f.nome, 'Outros') forma, vp.valor_centavos valor, vp.cancelado cancelado FROM kart.venda_pagamento vp LEFT JOIN kart.forma_pagamento f ON f.id = vp.forma_pagamento_id WHERE vp.venda_id = @id`,
       { id },
     );
     send(200, { ...venda, itens, pagamentos });
@@ -1355,14 +1358,14 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     // "A realizar" = o que precisa de atenção: vencido ou com 80% do limite. Antes listava os 294 controles
     // (até kart com 5 min de uso) e o selo laranja ficava sempre aceso; "Todas" continua mostrando tudo.
     const where = st === 'arealizar'
-      ? 'WHERE m.Realizada = 0 AND (ISNULL(it.TempoHoras, 0) = 0 OR m.MinutosUso >= it.TempoHoras * 48)'
-      : st === 'realizadas' ? 'WHERE m.Realizada = 1' : '';
+      ? 'WHERE m.realizada = false AND (coalesce(it.tempo_horas, 0) = 0 OR m.minutos_uso >= it.tempo_horas * 48)'
+      : st === 'realizadas' ? 'WHERE m.realizada = true' : '';
     send(
       200,
       await query(
-        `SELECT m.Id id, LTRIM(RTRIM(m.Kart)) kart, m.Categoria categoria, it.Nome item, m.MinutosUso minutosUso, it.TempoHoras limiteHoras,
-                CONVERT(varchar(16), m.UltimaManutencao, 126) ultimaManutencao, m.Realizada realizada, CONVERT(varchar(16), m.Data, 126) data
-         FROM dbo.Manutencao m LEFT JOIN dbo.ItemManutencao it ON it.Id = m.ItemId ${where} ORDER BY TRY_CAST(LTRIM(RTRIM(m.Kart)) AS int), m.Kart`,
+        `SELECT m.id id, trim(m.kart) kart, m.categoria categoria, it.nome item, m.minutos_uso "minutosUso", it.tempo_horas "limiteHoras",
+                to_char(m.ultima_manutencao, 'YYYY-MM-DD"T"HH24:MI') "ultimaManutencao", m.realizada realizada, to_char(m.data, 'YYYY-MM-DD"T"HH24:MI') data
+         FROM kart.manutencao m LEFT JOIN kart.item_manutencao it ON it.id = m.item_id ${where} ORDER BY CASE WHEN trim(m.kart) ~ '^[0-9]+$' THEN trim(m.kart)::int END NULLS FIRST, m.kart`,
       ),
     );
     return true;
@@ -1373,8 +1376,8 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const realizada = b.realizada ? 1 : 0;
     for (const id of ids) {
       await query(
-        `UPDATE dbo.Manutencao SET Realizada = @r, UltimaManutencao = CASE WHEN @r = 1 THEN SYSDATETIME() ELSE UltimaManutencao END,
-           MinutosUso = CASE WHEN @r = 1 THEN 0 ELSE MinutosUso END, Data = SYSDATETIME() WHERE Id = @id`,
+        `UPDATE kart.manutencao SET realizada = @r::int = 1, ultima_manutencao = CASE WHEN @r::int = 1 THEN now() ELSE ultima_manutencao END,
+           minutos_uso = CASE WHEN @r::int = 1 THEN 0 ELSE minutos_uso END, data = now() WHERE id = @id`,
         { r: realizada, id },
       );
     }
@@ -1385,35 +1388,35 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     await garantirSchemaVouchers();
     const [vouchers, todosBens, todosUsos] = await Promise.all([
       query<Record<string, unknown>>(
-        `SELECT v.Id id, v.Codigo codigo, v.Origem origem, v.Referencia referencia, v.ParceiroId parceiroId, ppar.Nome parceiro,
-                v.FidelidadeContaId fidelidadeContaId, c.Nome conta, v.Tipo tipo, v.Valor valor, CONVERT(varchar(10), v.InicioEm, 126) inicio,
-                CONVERT(varchar(10), v.FimEm, 126) fim, v.ProdutoId produtoId, p.Nome produto, v.UsoMaxCliente usoMaxCliente,
-                v.UsoMaxTotal usoMaxTotal, v.UsoUnico usoUnico, v.RestritoClientes restritoClientes,
-                v.PedidoMinimoCentavos pedidoMinimo, v.DescontoMaximoCentavos descontoMaximo, v.Ativo ativo,
-                CONVERT(varchar(10), SYSDATETIME(), 126) hoje,
-                (SELECT COUNT(*) FROM dbo.VoucherUso u WHERE u.VoucherId = v.Id AND u.Estornado = 0) usosRecepcao,
-                (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso o WHERE o.VoucherId = v.Id AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente')) usosOnline,
-                (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso gv WHERE gv.VoucherId = v.Id AND gv.Estado IN ('reservado', 'consumido')) usosGrupo
-         FROM dbo.Voucher v LEFT JOIN dbo.Produto p ON p.Id = v.ProdutoId LEFT JOIN dbo.Parceiro ppar ON ppar.Id = v.ParceiroId
-         LEFT JOIN dbo.FidelidadeConta fc ON fc.Id = v.FidelidadeContaId LEFT JOIN dbo.Cliente c ON c.Id = fc.ClienteId ORDER BY v.Id DESC`,
+        `SELECT v.id id, v.codigo codigo, v.origem origem, v.referencia referencia, v.parceiro_id "parceiroId", ppar.nome parceiro,
+                v.fidelidade_conta_id "fidelidadeContaId", c.nome conta, v.tipo tipo, v.valor valor, to_char(v.inicio_em, 'YYYY-MM-DD') inicio,
+                to_char(v.fim_em, 'YYYY-MM-DD') fim, v.produto_id "produtoId", p.nome produto, v.uso_max_cliente "usoMaxCliente",
+                v.uso_max_total "usoMaxTotal", v.uso_unico "usoUnico", v.restrito_clientes "restritoClientes",
+                v.pedido_minimo_centavos "pedidoMinimo", v.desconto_maximo_centavos "descontoMaximo", v.ativo ativo,
+                to_char(now(), 'YYYY-MM-DD') hoje,
+                (SELECT COUNT(*) FROM kart.voucher_uso u WHERE u.voucher_id = v.id AND u.estornado = false) "usosRecepcao",
+                (SELECT COUNT(*) FROM kart.reserva_online_voucher_uso o WHERE o.voucher_id = v.id AND o.estado IN ('reservado', 'consumido', 'reembolso_pendente')) "usosOnline",
+                (SELECT COUNT(*) FROM kart.reserva_grupo_voucher_uso gv WHERE gv.voucher_id = v.id AND gv.estado IN ('reservado', 'consumido')) "usosGrupo"
+         FROM kart.voucher v LEFT JOIN kart.produto p ON p.id = v.produto_id LEFT JOIN kart.parceiro ppar ON ppar.id = v.parceiro_id
+         LEFT JOIN kart.fidelidade_conta fc ON fc.id = v.fidelidade_conta_id LEFT JOIN kart.cliente c ON c.id = fc.cliente_id ORDER BY v.id DESC`,
       ),
       query<{ voucherId: number; clienteId: number | null; nome: string; documento: string | null; usosMax: number }>(
-        `SELECT vc.VoucherId voucherId, vc.ClienteId clienteId,
-                COALESCE(NULLIF(LTRIM(RTRIM(c.Nome)), N''), vc.Nome) nome,
-                COALESCE(NULLIF(vc.Documento, ''), NULLIF(c.DocumentoNum, ''), REPLACE(REPLACE(REPLACE(c.Documento, '.', ''), '-', ''), '/', '')) documento,
-                vc.UsosMax usosMax
-         FROM dbo.VoucherCliente vc LEFT JOIN dbo.Cliente c ON c.Id = vc.ClienteId`,
+        `SELECT vc.voucher_id "voucherId", vc.cliente_id "clienteId",
+                COALESCE(NULLIF(trim(c.nome), ''), vc.nome) nome,
+                COALESCE(NULLIF(vc.documento, ''), NULLIF(c.documento_num, ''), REPLACE(REPLACE(REPLACE(c.documento, '.', ''), '-', ''), '/', '')) documento,
+                vc.usos_max "usosMax"
+         FROM kart.voucher_cliente vc LEFT JOIN kart.cliente c ON c.id = vc.cliente_id`,
       ),
       query<{ voucherId: number; clienteId: number | null; documento: string | null }>(
-        `SELECT u.VoucherId voucherId, u.ClienteId clienteId,
-                COALESCE(NULLIF(c.DocumentoNum, ''), REPLACE(REPLACE(REPLACE(c.Documento, '.', ''), '-', ''), '/', '')) documento
+        `SELECT u.voucher_id "voucherId", u.cliente_id "clienteId",
+                COALESCE(NULLIF(c.documento_num, ''), REPLACE(REPLACE(REPLACE(c.documento, '.', ''), '-', ''), '/', '')) documento
          FROM (
-           SELECT VoucherId, ClienteId FROM dbo.VoucherUso WHERE Estornado = 0
+           SELECT voucher_id, cliente_id FROM kart.voucher_uso WHERE estornado = false
            UNION ALL
-           SELECT VoucherId, ClienteId FROM dbo.ReservaOnlineVoucherUso WHERE Estado IN ('reservado', 'consumido', 'reembolso_pendente')
+           SELECT voucher_id, cliente_id FROM kart.reserva_online_voucher_uso WHERE estado IN ('reservado', 'consumido', 'reembolso_pendente')
            UNION ALL
-           SELECT VoucherId, ClienteId FROM dbo.ReservaGrupoVoucherUso WHERE Estado IN ('reservado', 'consumido')
-         ) u LEFT JOIN dbo.Cliente c ON c.Id = u.ClienteId`,
+           SELECT voucher_id, cliente_id FROM kart.reserva_grupo_voucher_uso WHERE estado IN ('reservado', 'consumido')
+         ) u LEFT JOIN kart.cliente c ON c.id = u.cliente_id`,
       ),
     ]);
     const bensPorVoucher = new Map<number, typeof todosBens>();
@@ -1480,23 +1483,23 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       200,
       await query(
         `SELECT * FROM (
-           SELECT u.Id id, v.Id voucherId, v.Codigo voucher, c.Id clienteId, COALESCE(c.Nome, N'Cliente balcão') cliente,
-                  c.Documento documento, u.DescontoCentavos desconto, u.VendaId vendaId, CONVERT(varchar(16), u.CriadoEm, 126) dataHora,
-                  u.Estornado estornado, 'recepcao' canal, 'Recepção' canalLabel
-           FROM dbo.VoucherUso u JOIN dbo.Voucher v ON v.Id = u.VoucherId LEFT JOIN dbo.Cliente c ON c.Id = u.ClienteId
+           SELECT u.id id, v.id "voucherId", v.codigo voucher, c.id "clienteId", COALESCE(c.nome, 'Cliente balcão') cliente,
+                  c.documento documento, u.desconto_centavos desconto, u.venda_id "vendaId", to_char(u.criado_em, 'YYYY-MM-DD"T"HH24:MI') "dataHora",
+                  u.estornado estornado, 'recepcao' canal, 'Recepção' "canalLabel"
+           FROM kart.voucher_uso u JOIN kart.voucher v ON v.id = u.voucher_id LEFT JOIN kart.cliente c ON c.id = u.cliente_id
            UNION ALL
-           SELECT o.Id + 1000000 id, v.Id voucherId, v.Codigo voucher, c.Id clienteId, COALESCE(c.Nome, N'Site') cliente,
-                  c.Documento documento, o.DescontoCentavos desconto, NULL vendaId, CONVERT(varchar(16), o.CriadoEm, 126) dataHora,
-                  CASE WHEN o.Estado = 'liberado' THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END estornado, 'site' canal, 'Reserva online' canalLabel
-           FROM dbo.ReservaOnlineVoucherUso o JOIN dbo.Voucher v ON v.Id = o.VoucherId LEFT JOIN dbo.Cliente c ON c.Id = o.ClienteId
+           SELECT o.id + 1000000 id, v.id "voucherId", v.codigo voucher, c.id "clienteId", COALESCE(c.nome, 'Site') cliente,
+                  c.documento documento, o.desconto_centavos desconto, NULL "vendaId", to_char(o.criado_em, 'YYYY-MM-DD"T"HH24:MI') "dataHora",
+                  o.estado = 'liberado' estornado, 'site' canal, 'Reserva online' "canalLabel"
+           FROM kart.reserva_online_voucher_uso o JOIN kart.voucher v ON v.id = o.voucher_id LEFT JOIN kart.cliente c ON c.id = o.cliente_id
            UNION ALL
-           SELECT gv.Id + 2000000 id, v.Id voucherId, v.Codigo voucher, c.Id clienteId, COALESCE(c.Nome, N'Grupo') cliente,
-                  c.Documento documento, gv.DescontoCentavos desconto, NULL vendaId, CONVERT(varchar(16), gv.CriadoEm, 126) dataHora,
-                  CASE WHEN gv.Estado = 'liberado' THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END estornado, 'grupo' canal, 'Link de grupo' canalLabel
-           FROM dbo.ReservaGrupoVoucherUso gv JOIN dbo.Voucher v ON v.Id = gv.VoucherId LEFT JOIN dbo.Cliente c ON c.Id = gv.ClienteId
+           SELECT gv.id + 2000000 id, v.id "voucherId", v.codigo voucher, c.id "clienteId", COALESCE(c.nome, 'Grupo') cliente,
+                  c.documento documento, gv.desconto_centavos desconto, NULL "vendaId", to_char(gv.criado_em, 'YYYY-MM-DD"T"HH24:MI') "dataHora",
+                  gv.estado = 'liberado' estornado, 'grupo' canal, 'Link de grupo' "canalLabel"
+           FROM kart.reserva_grupo_voucher_uso gv JOIN kart.voucher v ON v.id = gv.voucher_id LEFT JOIN kart.cliente c ON c.id = gv.cliente_id
          ) t
-         ${vid ? 'WHERE t.voucherId = @vid' : ''}
-         ORDER BY t.dataHora DESC, t.id DESC`,
+         ${vid ? 'WHERE t."voucherId" = @vid' : ''}
+         ORDER BY t."dataHora" DESC, t.id DESC`,
         vid ? { vid } : {},
       ),
     );
@@ -1513,15 +1516,15 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     await garantirSchemaVouchers();
     const id = int(m[1], 'Voucher');
     const v = await one<Record<string, unknown>>(
-      `SELECT v.Id id, v.Codigo codigo, v.Origem origem, v.Referencia referencia, v.ParceiroId parceiroId, v.FidelidadeContaId fidelidadeContaId,
-              v.Tipo tipo, v.Valor valor, CONVERT(varchar(10), v.InicioEm, 126) inicio, CONVERT(varchar(10), v.FimEm, 126) fim,
-              v.ProdutoId produtoId, v.UsoMaxCliente usoMaxCliente, v.UsoMaxTotal usoMaxTotal, v.UsoUnico usoUnico,
-              v.RestritoClientes restritoClientes, v.PedidoMinimoCentavos pedidoMinimo, v.DescontoMaximoCentavos descontoMaximo, v.Ativo ativo,
-              CONVERT(varchar(10), SYSDATETIME(), 126) hoje,
-              (SELECT COUNT(*) FROM dbo.VoucherUso u WHERE u.VoucherId = v.Id AND u.Estornado = 0) usosRecepcao,
-              (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso o WHERE o.VoucherId = v.Id AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente')) usosOnline,
-              (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso gv WHERE gv.VoucherId = v.Id AND gv.Estado IN ('reservado', 'consumido')) usosGrupo
-       FROM dbo.Voucher v WHERE v.Id = @id`, { id },
+      `SELECT v.id id, v.codigo codigo, v.origem origem, v.referencia referencia, v.parceiro_id "parceiroId", v.fidelidade_conta_id "fidelidadeContaId",
+              v.tipo tipo, v.valor valor, to_char(v.inicio_em, 'YYYY-MM-DD') inicio, to_char(v.fim_em, 'YYYY-MM-DD') fim,
+              v.produto_id "produtoId", v.uso_max_cliente "usoMaxCliente", v.uso_max_total "usoMaxTotal", v.uso_unico "usoUnico",
+              v.restrito_clientes "restritoClientes", v.pedido_minimo_centavos "pedidoMinimo", v.desconto_maximo_centavos "descontoMaximo", v.ativo ativo,
+              to_char(now(), 'YYYY-MM-DD') hoje,
+              (SELECT COUNT(*) FROM kart.voucher_uso u WHERE u.voucher_id = v.id AND u.estornado = false) "usosRecepcao",
+              (SELECT COUNT(*) FROM kart.reserva_online_voucher_uso o WHERE o.voucher_id = v.id AND o.estado IN ('reservado', 'consumido', 'reembolso_pendente')) "usosOnline",
+              (SELECT COUNT(*) FROM kart.reserva_grupo_voucher_uso gv WHERE gv.voucher_id = v.id AND gv.estado IN ('reservado', 'consumido')) "usosGrupo"
+       FROM kart.voucher v WHERE v.id = @id`, { id },
     );
     if (!v) throw new HttpError(404, 'Voucher não encontrado.');
     const clientes = await listarBeneficiariosVoucher(id);
@@ -1567,8 +1570,8 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const unico = Boolean(b.usoUnico) && !(usoMaxTotal != null && usoMaxTotal > 1) && clientes.length <= 1 ? 1 : 0;
     const r = await tx(async (run) => {
       const [criado] = await run(
-        `INSERT INTO dbo.Voucher (Codigo, Origem, Referencia, ParceiroId, FidelidadeContaId, Tipo, Valor, InicioEm, FimEm, ProdutoId, UsoMaxCliente, UsoMaxTotal, UsoUnico, RestritoClientes, PedidoMinimoCentavos, DescontoMaximoCentavos)
-         OUTPUT inserted.Id id VALUES (@codigo, @origem, @ref, @parceiroId, @fidelidadeContaId, @tipo, @valor, @ini, @fim, @prod, @usoMax, @usoMaxTotal, @unico, @restrito, @min, @max)`,
+        `INSERT INTO kart.voucher (codigo, origem, referencia, parceiro_id, fidelidade_conta_id, tipo, valor, inicio_em, fim_em, produto_id, uso_max_cliente, uso_max_total, uso_unico, restrito_clientes, pedido_minimo_centavos, desconto_maximo_centavos)
+          VALUES (@codigo, @origem, @ref, @parceiroId, @fidelidadeContaId, @tipo, @valor, @ini, @fim, @prod, @usoMax, @usoMaxTotal, @unico, @restrito, @min, @max) returning id id`,
         {
           codigo, origem, ref: links.referencia, parceiroId: links.parceiroId, fidelidadeContaId: links.fidelidadeContaId, tipo, valor,
           ini: inicio, fim, prod: b.produtoId ? int(b.produtoId, 'Produto') : null, usoMax: int(b.usoMaxCliente ?? 1, 'Uso máx/cliente'),
@@ -1591,9 +1594,9 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const temNovosCampos = 'usoMaxTotal' in b || 'restritoClientes' in b || 'clientes' in b;
     if (temNovosCampos) await garantirSchemaVouchers();
     const current = await one<Record<string, unknown>>(
-      `SELECT Id, Origem, Referencia, ParceiroId, FidelidadeContaId, Tipo, Valor,
-              CONVERT(varchar(10), InicioEm, 126) InicioEm, CONVERT(varchar(10), FimEm, 126) FimEm
-       FROM dbo.Voucher WHERE Id = @id`, { id },
+      `SELECT id "Id", origem "Origem", referencia "Referencia", parceiro_id "ParceiroId", fidelidade_conta_id "FidelidadeContaId", tipo "Tipo", valor "Valor",
+              to_char(inicio_em, 'YYYY-MM-DD') "InicioEm", to_char(fim_em, 'YYYY-MM-DD') "FimEm"
+       FROM kart.voucher WHERE id = @id`, { id },
     );
     if (!current) throw new HttpError(404, 'Voucher não encontrado.');
     const origem = 'origem' in b ? (['fidelidade', 'parceiro'].includes(String(b.origem)) ? String(b.origem) : 'manual') : String(current.Origem);
@@ -1630,7 +1633,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const fim = String(vals.FimEm ?? current.FimEm);
     if (inicio > fim) throw new HttpError(400, 'A data final deve ser igual ou posterior à data inicial.');
     try {
-      await query(`UPDATE dbo.Voucher SET ${Object.keys(vals).map((c) => `${c} = @${c}`).join(', ')} WHERE Id = @id`, { ...vals, id });
+      await query(`UPDATE kart.voucher SET ${Object.keys(vals).map((c) => `${colPg(c)} = @${c}`).join(', ')} WHERE id = @id`, { ...vals, id });
       if ('clientes' in b) {
         const lista = normalizarBeneficiariosInput(b.clientes);
         await sincronizarBeneficiariosVoucher(id, lista, 'replace');
@@ -1645,7 +1648,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   if ((m = path.match(/^\/vouchers\/(\d+)\/clientes$/)) && method === 'POST') {
     await garantirSchemaVouchers();
     const id = int(m[1], 'Voucher');
-    const exists = await one<{ id: number; restrito: boolean; usoMaxTotal: number | null }>(`SELECT Id id, RestritoClientes restrito, UsoMaxTotal usoMaxTotal FROM dbo.Voucher WHERE Id = @id`, { id });
+    const exists = await one<{ id: number; restrito: boolean; usoMaxTotal: number | null }>(`SELECT id id, restrito_clientes restrito, uso_max_total "usoMaxTotal" FROM kart.voucher WHERE id = @id`, { id });
     if (!exists) throw new HttpError(404, 'Voucher não encontrado.');
     const b = await req.body();
     const rawLista = Array.isArray(b.clientes) ? b.clientes : [b];
@@ -1653,12 +1656,12 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (!lista.length) throw new HttpError(400, 'Informe pelo menos uma pessoa com nome ou CPF.');
     const mode = b.substituir === true ? 'replace' : 'merge';
     const { total } = await sincronizarBeneficiariosVoucher(id, lista, mode);
-    const sets = ['RestritoClientes = 1', 'UsoUnico = CASE WHEN @total > 1 THEN 0 ELSE UsoUnico END'];
+    const sets = ['restrito_clientes = true', 'uso_unico = CASE WHEN @total::int > 1 THEN false ELSE uso_unico END'];
     const p: Record<string, unknown> = { id, total };
     if (b.ajustarLimiteTotal === true && total > 0) {
-      sets.push('UsoMaxTotal = @total');
+      sets.push('uso_max_total = @total');
     }
-    await query(`UPDATE dbo.Voucher SET ${sets.join(', ')} WHERE Id = @id`, p);
+    await query(`UPDATE kart.voucher SET ${sets.join(', ')} WHERE id = @id`, p);
     send(200, { ok: true, id, total, clientes: await listarBeneficiariosVoucher(id) });
     return true;
   }
@@ -1666,15 +1669,15 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     await garantirSchemaVouchers();
     const id = int(m[1], 'Voucher');
     const cid = int(m[2], 'Beneficiário');
-    await query(`DELETE FROM dbo.VoucherCliente WHERE Id = @cid AND VoucherId = @id`, { cid, id });
+    await query(`DELETE FROM kart.voucher_cliente WHERE id = @cid AND voucher_id = @id`, { cid, id });
     send(200, { ok: true, clientes: await listarBeneficiariosVoucher(id) });
     return true;
   }
   if ((m = path.match(/^\/vouchers\/(\d+)$/)) && method === 'DELETE') {
     const id = int(m[1], 'Voucher');
-    const exists = await one<{ id: number }>(`SELECT Id id FROM dbo.Voucher WHERE Id = @id`, { id });
+    const exists = await one<{ id: number }>(`SELECT id id FROM kart.voucher WHERE id = @id`, { id });
     if (!exists) throw new HttpError(404, 'Voucher não encontrado.');
-    await query(`UPDATE dbo.Voucher SET Ativo = 0 WHERE Id = @id`, { id });
+    await query(`UPDATE kart.voucher SET ativo = false WHERE id = @id`, { id });
     send(200, { id, ok: true, desativado: true });
     return true;
   }
@@ -1684,11 +1687,11 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const clienteId = url.searchParams.get('clienteId') ? int(url.searchParams.get('clienteId'), 'Cliente') : null;
     const documentoParam = normalizarDocVoucher(url.searchParams.get('documento'));
     const v = await one<Record<string, unknown>>(
-      `SELECT v.*, p.Nome produto, pr.Ativo parceiroAtivo, fc.Ativo fidelidadeAtiva,
-              CASE WHEN CAST(SYSDATETIME() AS date) BETWEEN v.InicioEm AND v.FimEm THEN 1 ELSE 0 END vigenciaOk
-       FROM dbo.Voucher v LEFT JOIN dbo.Produto p ON p.Id = v.ProdutoId
-       LEFT JOIN dbo.Parceiro pr ON pr.Id = v.ParceiroId LEFT JOIN dbo.FidelidadeConta fc ON fc.Id = v.FidelidadeContaId
-       WHERE v.Codigo = @c`,
+      `SELECT v.id "Id", v.codigo "Codigo", v.ativo "Ativo", v.parceiro_id "ParceiroId", v.fidelidade_conta_id "FidelidadeContaId", v.produto_id "ProdutoId", v.tipo "Tipo", v.valor "Valor", v.inicio_em "InicioEm", v.fim_em "FimEm", v.desconto_maximo_centavos "DescontoMaximoCentavos", v.pedido_minimo_centavos "PedidoMinimoCentavos", v.uso_unico "UsoUnico", v.uso_max_total "UsoMaxTotal", v.uso_max_cliente "UsoMaxCliente", v.restrito_clientes "RestritoClientes", v.origem "Origem", v.referencia "Referencia", p.nome produto, pr.ativo "parceiroAtivo", fc.ativo "fidelidadeAtiva",
+              CASE WHEN current_date BETWEEN v.inicio_em AND v.fim_em THEN 1 ELSE 0 END "vigenciaOk"
+       FROM kart.voucher v LEFT JOIN kart.produto p ON p.id = v.produto_id
+       LEFT JOIN kart.parceiro pr ON pr.id = v.parceiro_id LEFT JOIN kart.fidelidade_conta fc ON fc.id = v.fidelidade_conta_id
+       WHERE upper(v.codigo) = @c`,
       { c: codigo },
     );
     if (!v || !v.Ativo) throw new HttpError(404, 'Voucher não encontrado ou inativo.');
@@ -1697,17 +1700,17 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (!v.vigenciaOk) throw new HttpError(400, 'Voucher expirado.');
     let docEfetivo = documentoParam;
     if (!docEfetivo && clienteId) {
-      const cli = await one<{ doc: string | null; docNum: string | null }>(`SELECT Documento doc, DocumentoNum docNum FROM dbo.Cliente WHERE Id = @id`, { id: clienteId });
+      const cli = await one<{ doc: string | null; docNum: string | null }>(`SELECT documento doc, documento_num "docNum" FROM kart.cliente WHERE id = @id`, { id: clienteId });
       docEfetivo = normalizarDocVoucher(cli?.docNum ?? cli?.doc);
     }
     const usos = await one<{ n: number; doCliente: number }>(
       `SELECT
-         (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @vid AND Estornado = 0)
-         + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @vid AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
-         + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @vid AND Estado IN ('reservado', 'consumido')) n,
-         (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @vid AND ClienteId = @cli AND Estornado = 0)
-         + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @vid AND ClienteId = @cli AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
-         + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @vid AND ClienteId = @cli AND Estado IN ('reservado', 'consumido')) doCliente`,
+         (SELECT COUNT(*) FROM kart.voucher_uso WHERE voucher_id = @vid AND estornado = false)
+         + (SELECT COUNT(*) FROM kart.reserva_online_voucher_uso WHERE voucher_id = @vid AND estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+         + (SELECT COUNT(*) FROM kart.reserva_grupo_voucher_uso WHERE voucher_id = @vid AND estado IN ('reservado', 'consumido')) n,
+         (SELECT COUNT(*) FROM kart.voucher_uso WHERE voucher_id = @vid AND cliente_id = @cli AND estornado = false)
+         + (SELECT COUNT(*) FROM kart.reserva_online_voucher_uso WHERE voucher_id = @vid AND cliente_id = @cli AND estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+         + (SELECT COUNT(*) FROM kart.reserva_grupo_voucher_uso WHERE voucher_id = @vid AND cliente_id = @cli AND estado IN ('reservado', 'consumido')) "doCliente"`,
       { vid: v.Id, cli: clienteId ?? 0 },
     );
     const usosTotais = Number(usos?.n ?? 0);
@@ -1752,12 +1755,12 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const inicio = localDateTime(b.inicio);
     const vagas = int(b.vagas, 'Quantidade máxima de competidores');
     const produtoId = int(b.produtoId, 'Produto');
-    const exists = await one(`SELECT 1 x FROM dbo.Bateria WHERE Inicio = @inicio AND Status <> 'cancelada' AND ProdutoId = @produtoId`, { inicio, produtoId });
+    const exists = await one(`SELECT 1 x FROM kart.bateria WHERE inicio = @inicio AND status <> 'cancelada' AND produto_id = @produtoId`, { inicio, produtoId });
     if (exists) throw new HttpError(409, 'Já há uma reserva agendada para a data selecionada.');
-    const cat = await one<{ c: string }>(`SELECT Categoria c FROM dbo.Produto WHERE Id = @produtoId`, { produtoId });
+    const cat = await one<{ c: string }>(`SELECT categoria c FROM kart.produto WHERE id = @produtoId`, { produtoId });
     const r = await one<{ id: number }>(
-      `INSERT INTO dbo.Bateria (Inicio, Nome, TipoKart, Vagas, ProdutoId, TracadoId, VoltaMinimaSeg, ResponsavelId, CodigoReserva, ReservaFechada, AutoAtendimento, Observacao, Campeonato)
-       OUTPUT inserted.Id id VALUES (@inicio, @nome, @tipo, @vagas, @produtoId, @tracadoId, @volta, @resp, @codigo, @fechada, @aa, @obs, @camp)`,
+      `INSERT INTO kart.bateria (inicio, nome, tipo_kart, vagas, produto_id, tracado_id, volta_minima_seg, responsavel_id, codigo_reserva, reserva_fechada, auto_atendimento, observacao, campeonato)
+        VALUES (@inicio, @nome, @tipo, @vagas, @produtoId, @tracadoId, @volta, @resp, @codigo, @fechada, @aa, @obs, @camp) returning id id`,
       {
         inicio, nome, tipo: cat?.c === 'Super Kart' ? 'super' : 'light', vagas, produtoId, tracadoId: b.tracadoId ? int(b.tracadoId, 'Traçado') : null,
         volta: Number(b.voltaMinimaSeg ?? 5) || 0, resp: b.responsavelId ? int(b.responsavelId, 'Responsável') : null, codigo: str(b.codigoReserva, 20),
@@ -1770,7 +1773,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   if (path === '/baterias/gerar' && method === 'POST') {
     // "Gerar Reservas do Mes": aplica um padrao de reserva nos dias da semana escolhidos, pulando feriados
     const b = await req.body();
-    const padrao = await one<Record<string, unknown>>(`SELECT pr.*, p.Categoria cat FROM dbo.PadraoReserva pr LEFT JOIN dbo.Produto p ON p.Id = pr.ProdutoId WHERE pr.Id = @id`, { id: int(b.padraoId, 'Padrão') });
+    const padrao = await one<Record<string, unknown>>(`SELECT pr.id "Id", pr.nome "Nome", pr.produto_id "ProdutoId", pr.tracado_id "TracadoId", pr.categoria "Categoria", pr.quantidade "Quantidade", pr.primeira_hora "PrimeiraHora", pr.vagas "Vagas", pr.intervalo_min "IntervaloMin", pr.volta_minima_seg "VoltaMinimaSeg", pr.numerar_nome "NumerarNome", pr.online "Online", pr.ativo "Ativo", p.categoria cat FROM kart.padrao_reserva pr LEFT JOIN kart.produto p ON p.id = pr.produto_id WHERE pr.id = @id`, { id: int(b.padraoId, 'Padrão') });
     if (!padrao) throw new HttpError(400, 'Selecione uma configuração padrão antes de criar as reservas.');
     const de = new Date(isoDate(b.de) + 'T12:00:00');
     const ate = new Date(isoDate(b.ate) + 'T12:00:00');
@@ -1779,7 +1782,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const soFeriados = b.soFeriados === true;
     const dias = (Array.isArray(b.diasSemana) ? b.diasSemana : []).map(Number);
     if (!dias.length) throw new HttpError(400, 'Selecione pelo menos um dia da semana antes de criar as reservas.');
-    const cad = await query<{ d: string; r: boolean; a: boolean }>(`SELECT CONVERT(varchar(10), Data, 126) d, Recorrente r, Abre a FROM dbo.Feriado`);
+    const cad = await query<{ d: string; r: boolean; a: boolean }>(`SELECT to_char(data, 'YYYY-MM-DD') d, recorrente r, abre a FROM kart.feriado`);
     const chaves = (f: { d: string; r: boolean }) => (f.r ? [f.d, f.d.slice(5)] : [f.d]);
     const feriados = new Set(cad.flatMap(chaves));
     const abertos = new Set(cad.filter((f) => f.a).flatMap(chaves));
@@ -1799,10 +1802,10 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
         if (t >= 24 * 60) break;
         const hhmm = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
         const inicio = `${data}T${hhmm}:00`;
-        const exists = await one(`SELECT 1 x FROM dbo.Bateria WHERE Inicio = @inicio AND ProdutoId = @p AND Status <> 'cancelada'`, { inicio, p: padrao.ProdutoId });
+        const exists = await one(`SELECT 1 x FROM kart.bateria WHERE inicio = @inicio AND produto_id = @p AND status <> 'cancelada'`, { inicio, p: padrao.ProdutoId });
         if (exists && pularExistentes) continue;
         await query(
-          `INSERT INTO dbo.Bateria (Inicio, Nome, TipoKart, Vagas, ProdutoId, TracadoId, VoltaMinimaSeg, AutoAtendimento, ReservaFechada) VALUES (@inicio, @nome, @tipo, @vagas, @p, @t, @volta, @aa, @fechada)`,
+          `INSERT INTO kart.bateria (inicio, nome, tipo_kart, vagas, produto_id, tracado_id, volta_minima_seg, auto_atendimento, reserva_fechada) VALUES (@inicio, @nome, @tipo, @vagas, @p, @t, @volta, @aa, @fechada)`,
           {
             inicio, nome: padrao.NumerarNome ? `${padrao.Nome} ${k + 1}` : `BATERIA ${hhmm}`, tipo: padrao.cat === 'Super Kart' ? 'super' : 'light', vagas: padrao.Vagas,
             p: padrao.ProdutoId, t: padrao.TracadoId, volta: padrao.VoltaMinimaSeg, aa: padrao.Online ? 1 : 0, fechada,
@@ -1818,8 +1821,8 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const id = Number(m[1]);
     const b = await req.body();
     const atual = await one<Record<string, unknown>>(
-      `SELECT CONVERT(varchar(10), Inicio, 126) data, Vagas vagasAtual, ReservaFechada rfAtual, AutoAtendimento aaAtual, Campeonato campAtual, (SELECT COUNT(*) FROM dbo.Inscricao WHERE BateriaId = @id AND Status <> 'cancelada') n,
-              (SELECT COUNT(*) FROM dbo.Inscricao WHERE BateriaId = @id AND Pago = 1 AND Status <> 'cancelada') pagas FROM dbo.Bateria WHERE Id = @id`,
+      `SELECT to_char(inicio, 'YYYY-MM-DD') data, vagas "vagasAtual", reserva_fechada "rfAtual", auto_atendimento "aaAtual", campeonato "campAtual", (SELECT COUNT(*) FROM kart.inscricao WHERE bateria_id = @id AND status <> 'cancelada') n,
+              (SELECT COUNT(*) FROM kart.inscricao WHERE bateria_id = @id AND pago = true AND status <> 'cancelada') pagas FROM kart.bateria WHERE id = @id`,
       { id },
     );
     if (!atual) throw new HttpError(404, 'Bateria não encontrada.');
@@ -1831,10 +1834,10 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const produtoId = int(b.produtoId, 'Produto');
     // a Recepção antiga não manda o campo: sem ele, a bateria continua como estava
     const campPut = b.campeonato === undefined ? Boolean(atual.campAtual) : campeonatoDe(b, str(b.nome, 100));
-    const cat = await one<{ c: string }>(`SELECT Categoria c FROM dbo.Produto WHERE Id = @produtoId`, { produtoId });
+    const cat = await one<{ c: string }>(`SELECT categoria c FROM kart.produto WHERE id = @produtoId`, { produtoId });
     await query(
-      `UPDATE dbo.Bateria SET Inicio = @inicio, Nome = @nome, Vagas = @vagas, ProdutoId = @produtoId, TipoKart = @tipo, TracadoId = @tracadoId, VoltaMinimaSeg = @volta,
-         ResponsavelId = @resp, CodigoReserva = @codigo, ReservaFechada = @fechada, AutoAtendimento = @aa, Observacao = @obs, Campeonato = @camp WHERE Id = @id`,
+      `UPDATE kart.bateria SET inicio = @inicio, nome = @nome, vagas = @vagas, produto_id = @produtoId, tipo_kart = @tipo, tracado_id = @tracadoId, volta_minima_seg = @volta,
+         responsavel_id = @resp, codigo_reserva = @codigo, reserva_fechada = @fechada, auto_atendimento = @aa, observacao = @obs, campeonato = @camp WHERE id = @id`,
       {
         id, inicio, nome: str(b.nome, 100) ?? 'BATERIA', vagas, produtoId, tipo: cat?.c === 'Super Kart' ? 'super' : 'light', tracadoId: b.tracadoId ? int(b.tracadoId, 'Traçado') : null,
         volta: Number(b.voltaMinimaSeg ?? 5) || 0, resp: b.responsavelId ? int(b.responsavelId, 'Responsável') : null, codigo: str(b.codigoReserva, 20),
@@ -1850,10 +1853,10 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const id = Number(m[1]);
     const b = await req.body();
     const status = b.status === 'fechada' ? 'fechada' : 'aberta';
-    const ativas = await one<{ n: number }>(`SELECT COUNT(*) n FROM dbo.Inscricao WHERE BateriaId = @id AND Status <> 'cancelada'`, { id });
+    const ativas = await one<{ n: number }>(`SELECT COUNT(*) n FROM kart.inscricao WHERE bateria_id = @id AND status <> 'cancelada'`, { id });
     if ((ativas?.n ?? 0) > 0) throw new HttpError(409, 'Esta bateria já tem reservas: não dá para restaurar.');
     const r = await one<{ n: number }>(
-      `UPDATE dbo.Bateria SET Status = @status OUTPUT 1 n WHERE Id = @id AND Status = 'cancelada'`, { status, id },
+      `UPDATE kart.bateria SET status = @status  WHERE id = @id AND status = 'cancelada' returning 1 n`, { status, id },
     );
     if (!r) throw new HttpError(409, 'A bateria não está cancelada.');
     send(200, { ok: true });
@@ -1863,25 +1866,25 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const b = await req.body();
     const status = b.status === 'fechada' ? 'fechada' : 'aberta';
     if (status === 'fechada') await exigePodeFecharBateria(sessao);
-    await query(`UPDATE dbo.Bateria SET Status = @status WHERE Id = @id AND Status <> 'cancelada'`, { status, id: Number(m[1]) });
+    await query(`UPDATE kart.bateria SET status = @status WHERE id = @id AND status <> 'cancelada'`, { status, id: Number(m[1]) });
     send(200, { ok: true });
     return true;
   }
   if ((m = path.match(/^\/baterias\/(\d+)\/totem$/)) && method === 'POST') {
     const b = await req.body();
     const aa = b.autoAtendimento ? 1 : 0;
-    await query(`UPDATE dbo.Bateria SET AutoAtendimento = @aa WHERE Id = @id AND Status <> 'cancelada'`, { aa, id: Number(m[1]) });
+    await query(`UPDATE kart.bateria SET auto_atendimento = @aa WHERE id = @id AND status <> 'cancelada'`, { aa, id: Number(m[1]) });
     send(200, { ok: true });
     return true;
   }
   if ((m = path.match(/^\/baterias\/(\d+)$/)) && method === 'DELETE') {
     await exigePodeFecharBateria(sessao);
     const id = Number(m[1]);
-    const pagas = await one<{ n: number }>(`SELECT COUNT(*) n FROM dbo.Inscricao WHERE BateriaId = @id AND Pago = 1 AND Status <> 'cancelada'`, { id });
+    const pagas = await one<{ n: number }>(`SELECT COUNT(*) n FROM kart.inscricao WHERE bateria_id = @id AND pago = true AND status <> 'cancelada'`, { id });
     if (pagas!.n > 0) throw new HttpError(409, 'Não é permitido excluir reservas pagas!');
     await tx(async (run) => {
-      await run(`UPDATE dbo.Inscricao SET Status = 'cancelada', AtualizadoEm = SYSDATETIME() WHERE BateriaId = @id AND Status <> 'cancelada'`, { id });
-      await run(`UPDATE dbo.Bateria SET Status = 'cancelada' WHERE Id = @id`, { id });
+      await run(`UPDATE kart.inscricao SET status = 'cancelada', atualizado_em = now() WHERE bateria_id = @id AND status <> 'cancelada'`, { id });
+      await run(`UPDATE kart.bateria SET status = 'cancelada' WHERE id = @id`, { id });
     });
     send(200, { ok: true });
     return true;
@@ -1892,13 +1895,13 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const b = await req.body();
     const data = isoDate(b.data);
     const r = await one<{ canceladas: number; mantidas: number }>(
-      `DECLARE @c TABLE (Id int);
-       UPDATE b SET Status = 'cancelada' OUTPUT inserted.Id INTO @c
-         FROM dbo.Bateria b
-        WHERE b.Inicio >= @d AND b.Inicio < DATEADD(day, 1, @d) AND b.Status <> 'cancelada'
-          AND NOT EXISTS (SELECT 1 FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada');
-       SELECT (SELECT COUNT(*) FROM @c) canceladas,
-              (SELECT COUNT(*) FROM dbo.Bateria WHERE Inicio >= @d AND Inicio < DATEADD(day, 1, @d) AND Status <> 'cancelada') mantidas`,
+      `WITH c AS (
+         UPDATE kart.bateria b SET status = 'cancelada'
+          WHERE b.inicio >= @d::date AND b.inicio < @d::date + 1 AND b.status <> 'cancelada'
+            AND NOT EXISTS (SELECT 1 FROM kart.inscricao i WHERE i.bateria_id = b.id AND i.status <> 'cancelada')
+         RETURNING b.id)
+       SELECT (SELECT COUNT(*) FROM c) canceladas,
+              (SELECT COUNT(*) FROM kart.bateria WHERE inicio >= @d::date AND inicio < @d::date + 1 AND status <> 'cancelada') - (SELECT COUNT(*) FROM c) mantidas`,
       { d: data },
     );
     send(200, r ?? { canceladas: 0, mantidas: 0 });
@@ -1915,8 +1918,8 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     return true;
   }
   if ((m = path.match(/^\/baterias\/(\d+)\/programa$/)) && method === 'GET') {
-    send(200, await query(`SELECT pp.Ordem ordem, pp.Nome nome, pp.Tipo tipo, pp.Finalizacao finalizacao, pp.TempoMin tempoMin, pp.VoltasMax voltasMax
-      FROM dbo.ProdutoProva pp JOIN dbo.Bateria b ON b.ProdutoId = pp.ProdutoId WHERE b.Id = @id ORDER BY pp.Ordem`, { id: Number(m[1]) }));
+    send(200, await query(`SELECT pp.ordem ordem, pp.nome nome, pp.tipo tipo, pp.finalizacao finalizacao, pp.tempo_min "tempoMin", pp.voltas_max "voltasMax"
+      FROM kart.produto_prova pp JOIN kart.bateria b ON b.produto_id = pp.produto_id WHERE b.id = @id ORDER BY pp.ordem`, { id: Number(m[1]) }));
     return true;
   }
   if (path === '/agenda' && method === 'GET') {
@@ -1925,10 +1928,10 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     send(
       200,
       await query(
-        `SELECT CONVERT(varchar(10), b.Inicio, 126) dia, COUNT(*) baterias, SUM(b.Vagas) vagas, SUM(ISNULL(r.n, 0)) reservas
-         FROM dbo.Bateria b
-         LEFT JOIN (SELECT BateriaId, COUNT(*) n FROM dbo.Inscricao WHERE Status <> 'cancelada' GROUP BY BateriaId) r ON r.BateriaId = b.Id
-         WHERE b.Status <> 'cancelada' AND b.Inicio >= @d AND b.Inicio < DATEADD(month, 1, @d) GROUP BY CONVERT(varchar(10), b.Inicio, 126) ORDER BY 1`,
+        `SELECT to_char(b.inicio, 'YYYY-MM-DD') dia, COUNT(*) baterias, SUM(b.vagas) vagas, SUM(coalesce(r.n, 0)) reservas
+         FROM kart.bateria b
+         LEFT JOIN (SELECT bateria_id, COUNT(*) n FROM kart.inscricao WHERE status <> 'cancelada' GROUP BY bateria_id) r ON r.bateria_id = b.id
+         WHERE b.status <> 'cancelada' AND b.inicio >= @d::date AND b.inicio < @d::date + interval '1 month' GROUP BY to_char(b.inicio, 'YYYY-MM-DD') ORDER BY 1`,
         { d: `${mes}-01` },
       ),
     );
@@ -1946,11 +1949,11 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       p.pid = produtoDesejado;
     }
     if (b.observacao !== undefined) {
-      sets.push('Observacao = @obs');
+      sets.push('observacao = @obs');
       p.obs = str(b.observacao, 400);
     }
     if (b.kart !== undefined) {
-      sets.push('Kart = @kart');
+      sets.push('kart = @kart');
       p.kart = str(b.kart, 10);
     }
     let atualizarPeso = false;
@@ -1973,8 +1976,8 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       let produtoOrigem: number | null = null;
       if (produtoDesejado !== null || atualizarTermo) {
         const [reserva] = await run(
-          `SELECT i.Pago AS Pago, i.Status AS Status, ISNULL(i.ProdutoId, b.ProdutoId) produtoId
-           FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) JOIN dbo.Bateria b ON b.Id = i.BateriaId WHERE i.Id = @id`,
+          `SELECT i.pago AS "Pago", i.status AS "Status", coalesce(i.produto_id, b.produto_id) "produtoId"
+           FROM kart.inscricao i JOIN kart.bateria b ON b.id = i.bateria_id WHERE i.id = @id for update of i`,
           { id },
         );
         if (!reserva) throw new HttpError(404, 'Reserva não encontrada.');
@@ -1982,26 +1985,26 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
         produtoOrigem = reserva.produtoId == null ? null : Number(reserva.produtoId);
         if (produtoDesejado !== null && produtoOrigem !== produtoDesejado) {
           if (reserva.Pago) throw new HttpError(409, 'Não é permitido trocar o produto de uma reserva paga.');
-          const [prod] = await run(`SELECT PrecoCentavos preco FROM dbo.Produto WITH (UPDLOCK, HOLDLOCK) WHERE Id = @pid`, { pid: produtoDesejado });
+          const [prod] = await run(`SELECT preco_centavos preco FROM kart.produto WHERE id = @pid for update`, { pid: produtoDesejado });
           if (!prod) throw new HttpError(404, 'Produto não encontrado.');
           sets.push(
-            'ProdutoId = @pid',
-            'PrecoCentavos = @preco',
-            'DescontoCentavos = CASE WHEN @produtoOrigem = @pid THEN CASE WHEN DescontoCentavos > @preco THEN @preco ELSE DescontoCentavos END ELSE 0 END',
+            'produto_id = @pid',
+            'preco_centavos = @preco',
+            'desconto_centavos = CASE WHEN @produtoOrigem::int = @pid::int THEN CASE WHEN desconto_centavos > @preco::int THEN @preco::int ELSE desconto_centavos END ELSE 0 END',
             // o termo não depende do produto: trocar o produto (ex.: 2 baterias) apagava o "impresso" e a recepção reimprimia tudo
           );
           p.preco = prod.preco;
           p.produtoOrigem = produtoOrigem;
         }
       }
-      if (sets.length) await run(`UPDATE dbo.Inscricao SET ${sets.join(', ')}, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, p);
+      if (sets.length) await run(`UPDATE kart.inscricao SET ${sets.join(', ')} WHERE id = @id`, p);
       if (atualizarPeso) await run(
-        `UPDATE c SET Peso = @peso, AtualizadoEm = SYSDATETIME()
-         FROM dbo.Cliente c JOIN dbo.Inscricao i ON i.ClienteId = c.Id WHERE i.Id = @id`,
+        `UPDATE kart.cliente c SET peso = @peso
+         FROM kart.inscricao i WHERE i.cliente_id = c.id AND i.id = @id`,
         { id, peso },
       );
       if (atualizarTermo) await run(
-        `UPDATE dbo.Inscricao SET TermoImpressoEm = CASE WHEN @termo = 1 THEN COALESCE(TermoImpressoEm, SYSDATETIME()) ELSE NULL END, AtualizadoEm = SYSDATETIME() WHERE Id = @id`,
+        `UPDATE kart.inscricao SET termo_impresso_em = CASE WHEN @termo::boolean THEN COALESCE(termo_impresso_em, now()) ELSE NULL END WHERE id = @id`,
         { id, termo: b.termo },
       );
     });
@@ -2012,11 +2015,11 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const id = Number(m[1]);
     const b = await req.body();
     const clienteId = int(b.clienteId, 'Cliente');
-    const r = await one<{ BateriaId: number }>(`SELECT BateriaId FROM dbo.Inscricao WHERE Id = @id`, { id });
+    const r = await one<{ BateriaId: number }>(`SELECT bateria_id "BateriaId" FROM kart.inscricao WHERE id = @id`, { id });
     if (!r) throw new HttpError(404, 'Reserva não encontrada.');
-    const dup = await one(`SELECT 1 x FROM dbo.Inscricao WHERE BateriaId = @b AND ClienteId = @c AND Status <> 'cancelada' AND Id <> @id`, { b: r.BateriaId, c: clienteId, id });
+    const dup = await one(`SELECT 1 x FROM kart.inscricao WHERE bateria_id = @b AND cliente_id = @c AND status <> 'cancelada' AND id <> @id`, { b: r.BateriaId, c: clienteId, id });
     if (dup) throw new HttpError(409, 'Já existe uma reserva em nome deste cliente.');
-    await query(`UPDATE dbo.Inscricao SET ClienteId = @c, TermoImpressoEm = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { c: clienteId, id });
+    await query(`UPDATE kart.inscricao SET cliente_id = @c, termo_impresso_em = NULL, atualizado_em = now() WHERE id = @id`, { c: clienteId, id });
     send(200, { mensagem: 'Cliente alterado com sucesso!' });
     return true;
   }
@@ -2028,14 +2031,14 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   if ((m = path.match(/^\/reservas\/(\d+)\/aprovar$/)) && method === 'POST') {
     // evento já acertado fora da recepção (preço final R$ 0): aprovar já confirma, sem caixa nem planilha
     await query(
-      `UPDATE i SET Aprovada = 1,
-         Pago = CASE WHEN x.total = 0 THEN 1 ELSE i.Pago END,
-         ValorCentavos = CASE WHEN x.total = 0 THEN 0 ELSE i.ValorCentavos END,
-         Status = CASE WHEN x.total = 0 THEN 'confirmada' ELSE i.Status END,
-         AtualizadoEm = SYSDATETIME()
-       FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
-       CROSS APPLY (SELECT ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos total) x
-       WHERE i.Id = @id AND i.Status <> 'cancelada'`,
+      `UPDATE kart.inscricao i SET aprovada = true,
+         pago = CASE WHEN x.total = 0 THEN true ELSE i.pago END,
+         valor_centavos = CASE WHEN x.total = 0 THEN 0 ELSE i.valor_centavos END,
+         status = CASE WHEN x.total = 0 THEN 'confirmada' ELSE i.status END
+       FROM (SELECT i2.id, coalesce(i2.preco_centavos, p.preco_centavos) - i2.desconto_centavos total
+               FROM kart.inscricao i2 JOIN kart.bateria b ON b.id = i2.bateria_id LEFT JOIN kart.produto p ON p.id = coalesce(i2.produto_id, b.produto_id)
+              WHERE i2.id = @id) x
+       WHERE i.id = x.id AND i.status <> 'cancelada'`,
       { id: Number(m[1]) },
     );
     send(200, { ok: true });
@@ -2057,29 +2060,29 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     let where: string;
     let p: Record<string, unknown>;
     if (campo === 'email' || (campo === 'auto' && q.includes('@'))) {
-      where = 'c.Email LIKE @q';
+      where = 'lower(c.email) LIKE @q';
       p = { q: q.toLowerCase() + '%' };
     } else if (campo === 'telefone') {
-      where = '(c.TelefoneNum LIKE @t OR c.Telefone LIKE @raw)';
+      where = '(c.telefone_num LIKE @t OR c.telefone LIKE @raw)';
       p = { t: '%' + d, raw: '%' + q + '%' };
     } else if (campo === 'documento' || (campo === 'auto' && d.length >= 4 && d.length === q.replace(/[\s.\-()/]/g, '').length)) {
-      where = '(c.DocumentoNum LIKE @d OR c.Documento LIKE @raw OR c.TelefoneNum LIKE @t)';
+      where = '(c.documento_num LIKE @d OR c.documento LIKE @raw OR c.telefone_num LIKE @t)';
       p = { d: d + '%', raw: '%' + q + '%', t: '%' + d };
     } else {
-      where = 'c.Nome COLLATE Latin1_General_CI_AI LIKE @q';
+      where = 'unaccent(c.nome) ILIKE unaccent(@q)';
       p = { q: '%' + q.replace(/\s+/g, '%') + '%' };
     }
-    send(200, await query(`SELECT TOP 100 ${CLIENTE_COLS}, r.Nome responsavelNome FROM dbo.Cliente c LEFT JOIN dbo.Cliente r ON r.Id = c.ResponsavelId WHERE ${where} ORDER BY c.Nome`, p));
+    send(200, await query(`SELECT ${CLIENTE_COLS}, r.nome "responsavelNome" FROM kart.cliente c LEFT JOIN kart.cliente r ON r.id = c.responsavel_id WHERE ${where} ORDER BY c.nome limit 100`, p));
     return true;
   }
   if (path === '/clientes/nav' && method === 'GET') {
     const id = Number(url.searchParams.get('id') || 0);
     const dir = url.searchParams.get('dir');
     const sqlDir: Record<string, string> = {
-      first: 'SELECT TOP 1 Id id FROM dbo.Cliente ORDER BY Id',
-      last: 'SELECT TOP 1 Id id FROM dbo.Cliente ORDER BY Id DESC',
-      prev: 'SELECT TOP 1 Id id FROM dbo.Cliente WHERE Id < @id ORDER BY Id DESC',
-      next: 'SELECT TOP 1 Id id FROM dbo.Cliente WHERE Id > @id ORDER BY Id',
+      first: 'SELECT id id FROM kart.cliente ORDER BY id limit 1',
+      last: 'SELECT id id FROM kart.cliente ORDER BY id DESC limit 1',
+      prev: 'SELECT id id FROM kart.cliente WHERE id < @id ORDER BY id DESC limit 1',
+      next: 'SELECT id id FROM kart.cliente WHERE id > @id ORDER BY id limit 1',
     };
     if (!sqlDir[dir ?? '']) throw new HttpError(400, 'Direção inválida.');
     send(200, await one(sqlDir[dir!], { id }));
@@ -2087,18 +2090,18 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if ((m = path.match(/^\/clientes\/(\d+)$/)) && method === 'GET') {
     const id = Number(m[1]);
-    const c = await one(`SELECT ${CLIENTE_COLS}, r.Nome responsavelNome, (SELECT COUNT(*) FROM dbo.Cliente) totalRegistros,
-      (SELECT COUNT(*) FROM dbo.Cliente x WHERE x.Id <= c.Id) posicao FROM dbo.Cliente c LEFT JOIN dbo.Cliente r ON r.Id = c.ResponsavelId WHERE c.Id = @id`, { id });
+    const c = await one(`SELECT ${CLIENTE_COLS}, r.nome "responsavelNome", (SELECT COUNT(*) FROM kart.cliente) "totalRegistros",
+      (SELECT COUNT(*) FROM kart.cliente x WHERE x.id <= c.id) posicao FROM kart.cliente c LEFT JOIN kart.cliente r ON r.id = c.responsavel_id WHERE c.id = @id`, { id });
     if (!c) throw new HttpError(404, 'Cliente não localizado.');
-    const dependentes = await query(`SELECT Id id, Nome nome, CONVERT(varchar(10), Nascimento, 126) nascimento FROM dbo.Cliente WHERE ResponsavelId = @id ORDER BY Nome`, { id });
+    const dependentes = await query(`SELECT id id, nome nome, to_char(nascimento, 'YYYY-MM-DD') nascimento FROM kart.cliente WHERE responsavel_id = @id ORDER BY nome`, { id });
     const historico = await query(
-      `SELECT TOP 50 i.Id id, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) dataHora, p.Nome produto, i.Pago pago, i.Status status,
-              CASE WHEN i.Pago = 1 THEN i.ValorCentavos ELSE ISNULL(i.PrecoCentavos, p.PrecoCentavos) END valor
-       FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId) WHERE i.ClienteId = @id ORDER BY b.Inicio DESC`,
+      `SELECT i.id id, b.nome bateria, to_char(b.inicio, 'YYYY-MM-DD"T"HH24:MI') "dataHora", p.nome produto, i.pago pago, i.status status,
+              CASE WHEN i.pago = true THEN i.valor_centavos ELSE coalesce(i.preco_centavos, p.preco_centavos) END valor
+       FROM kart.inscricao i JOIN kart.bateria b ON b.id = i.bateria_id LEFT JOIN kart.produto p ON p.id = coalesce(i.produto_id, b.produto_id) WHERE i.cliente_id = @id ORDER BY b.inicio DESC limit 50`,
       { id },
     );
     const financeiro = await one(
-      `SELECT COUNT(*) vendas, ISNULL(SUM(FinalCentavos), 0) total, CONVERT(varchar(16), MAX(CriadoEm), 126) ultima FROM dbo.Venda WHERE ClienteId = @id AND Cancelada = 0`,
+      `SELECT COUNT(*) vendas, coalesce(SUM(final_centavos), 0) total, to_char(MAX(criado_em), 'YYYY-MM-DD"T"HH24:MI') ultima FROM kart.venda WHERE cliente_id = @id AND cancelada = false`,
       { id },
     );
     send(200, { ...c, dependentes, historico, financeiro });
@@ -2110,7 +2113,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (erroCadastro) throw new HttpError(400, erroCadastro);
     if ((b.tipoDocumento ?? 'CPF') === 'CPF' && b.documento && !isValidCpf(b.documento)) throw new HttpError(400, 'CPF inválido.');
     if (b.documento && !b.responsavelId) {
-      const dup = await one<{ id: number; nome: string }>(`SELECT TOP 1 Id id, Nome nome FROM dbo.Cliente WHERE DocumentoNum = @d`, { d: onlyDigits(b.documento) });
+      const dup = await one<{ id: number; nome: string }>(`SELECT id id, nome nome FROM kart.cliente WHERE documento_num = @d limit 1`, { d: onlyDigits(b.documento) });
       if (dup) throw new HttpError(409, `Documento já cadastrado para ${dup.nome} (cliente ${dup.id}).`);
     }
     send(201, { id: await insertCliente(b, 'recepcao') }); pedirVinculoAgora();
@@ -2127,9 +2130,9 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if ((m = path.match(/^\/clientes\/(\d+)$/)) && method === 'DELETE') {
     const id = Number(m[1]);
-    const uso = await one<{ n: number }>(`SELECT (SELECT COUNT(*) FROM dbo.Inscricao WHERE ClienteId = @id) + (SELECT COUNT(*) FROM dbo.Venda WHERE ClienteId = @id) + (SELECT COUNT(*) FROM dbo.Cliente WHERE ResponsavelId = @id) n`, { id });
+    const uso = await one<{ n: number }>(`SELECT (SELECT COUNT(*) FROM kart.inscricao WHERE cliente_id = @id) + (SELECT COUNT(*) FROM kart.venda WHERE cliente_id = @id) + (SELECT COUNT(*) FROM kart.cliente WHERE responsavel_id = @id) n`, { id });
     if (uso!.n > 0) throw new HttpError(409, 'Cliente com reservas, vendas ou dependentes. Use "Bloqueado" em vez de excluir.');
-    await query(`DELETE FROM dbo.Cliente WHERE Id = @id`, { id });
+    await query(`DELETE FROM kart.cliente WHERE id = @id`, { id });
     send(200, { ok: true });
     return true;
   }
@@ -2137,9 +2140,9 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   // ---------- caixa
   if (path === '/caixa' && method === 'GET') {
     const aberto = await movimentoAberto(sessao.uid);
-    const turnos = await query(`SELECT Id id, Descricao descricao, Inicio inicio, Fim fim FROM dbo.Turno WHERE Ativo = 1 ORDER BY Inicio`);
+    const turnos = await query(`SELECT id id, descricao descricao, inicio inicio, fim fim FROM kart.turno WHERE ativo = true ORDER BY inicio`);
     const terminais = await query(
-      `SELECT t.Id id, t.Nome nome FROM dbo.Terminal t WHERE t.Ativo = 1 AND NOT EXISTS (SELECT 1 FROM dbo.Movimento m WHERE m.TerminalId = t.Id AND m.FechadoEm IS NULL) ORDER BY t.Nome`,
+      `SELECT t.id id, t.nome nome FROM kart.terminal t WHERE t.ativo = true AND NOT EXISTS (SELECT 1 FROM kart.movimento m WHERE m.terminal_id = t.id AND m.fechado_em IS NULL) ORDER BY t.nome`,
     );
     send(200, { aberto, turnos, terminais, sumario: aberto ? await sumarioMovimento(aberto.id) : null });
     return true;
@@ -2148,10 +2151,10 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     send(
       200,
       await query(
-        `SELECT TOP 120 m.Id id, t.Nome terminal, tu.Descricao turno, u.Nome usuario, CONVERT(varchar(16), m.AbertoEm, 126) abertoEm, CONVERT(varchar(16), m.FechadoEm, 126) fechadoEm,
-                ISNULL((SELECT SUM(vp.ValorCentavos) FROM dbo.VendaPagamento vp JOIN dbo.Venda v ON v.Id = vp.VendaId WHERE v.MovimentoId = m.Id AND vp.Cancelado = 0), 0) recebido
-         FROM dbo.Movimento m JOIN dbo.Terminal t ON t.Id = m.TerminalId LEFT JOIN dbo.Turno tu ON tu.Id = m.TurnoId LEFT JOIN dbo.Usuario u ON u.Id = m.UsuarioId
-         ORDER BY m.AbertoEm DESC`,
+        `SELECT m.id id, t.nome terminal, tu.descricao turno, u.nome usuario, to_char(m.aberto_em, 'YYYY-MM-DD"T"HH24:MI') "abertoEm", to_char(m.fechado_em, 'YYYY-MM-DD"T"HH24:MI') "fechadoEm",
+                coalesce((SELECT SUM(vp.valor_centavos) FROM kart.venda_pagamento vp JOIN kart.venda v ON v.id = vp.venda_id WHERE v.movimento_id = m.id AND vp.cancelado = false), 0) recebido
+         FROM kart.movimento m JOIN kart.terminal t ON t.id = m.terminal_id LEFT JOIN kart.turno tu ON tu.id = m.turno_id LEFT JOIN kart.usuario u ON u.id = m.usuario_id
+         ORDER BY m.aberto_em DESC limit 120`,
       ),
     );
     return true;
@@ -2162,11 +2165,11 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (!b.turnoId) throw new HttpError(400, 'Selecione o turno que será aberto o terminal.');
     if (!b.terminalId) throw new HttpError(400, 'Selecione um terminal para abrir.');
     const terminalId = int(b.terminalId, 'Terminal');
-    const ocupado = await one(`SELECT 1 x FROM dbo.Movimento WHERE TerminalId = @terminalId AND FechadoEm IS NULL`, { terminalId });
+    const ocupado = await one(`SELECT 1 x FROM kart.movimento WHERE terminal_id = @terminalId AND fechado_em IS NULL`, { terminalId });
     if (ocupado) throw new HttpError(409, 'Esse terminal já está aberto por outro usuário.');
     const inicial = cents(b.inicialCentavos ?? 0, 'Suprimento inicial');
     const r = await one<{ id: number }>(
-      `INSERT INTO dbo.Movimento (UsuarioId, TerminalId, TurnoId, InicialCentavos) OUTPUT inserted.Id id VALUES (@uid, @terminalId, @turnoId, @inicial)`,
+      `INSERT INTO kart.movimento (usuario_id, terminal_id, turno_id, inicial_centavos)  VALUES (@uid, @terminalId, @turnoId, @inicial) returning id id`,
       { uid: sessao.uid, terminalId, turnoId: int(b.turnoId, 'Turno'), inicial },
     );
     send(201, { id: r!.id, mensagem: 'Terminal aberto com sucesso.' });
@@ -2179,7 +2182,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const prox = cents(b.proximoTurnoCentavos ?? 0, 'Valor para o próximo turno');
     const s = await sumarioMovimento(aberto.id);
     if (prox > s.dinheiroEmCaixa) throw new HttpError(400, `Valor para o próximo turno inválido. Não há ${brl(prox)} em dinheiro no caixa.`);
-    await query(`UPDATE dbo.Movimento SET FechadoEm = SYSDATETIME(), ProximoTurnoCentavos = @prox WHERE Id = @id`, { prox, id: aberto.id });
+    await query(`UPDATE kart.movimento SET fechado_em = now(), proximo_turno_centavos = @prox WHERE id = @id`, { prox, id: aberto.id });
     send(200, { id: aberto.id, mensagem: 'Terminal fechado com sucesso.' });
     return true;
   }
@@ -2196,7 +2199,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       const s = await sumarioMovimento(aberto.id);
       if (valor > s.dinheiroEmCaixa) throw new HttpError(400, 'Valor de sangria maior que o valor em caixa.');
     }
-    await query(`INSERT INTO dbo.MovimentoTransacao (MovimentoId, UsuarioId, Tipo, ValorCentavos, Observacao) VALUES (@mov, @uid, @tipo, @valor, @obs)`, {
+    await query(`INSERT INTO kart.movimento_transacao (movimento_id, usuario_id, tipo, valor_centavos, observacao) VALUES (@mov, @uid, @tipo, @valor, @obs)`, {
       mov: aberto.id, uid: sessao.uid, tipo, valor, obs,
     });
     send(201, { mensagem: tipo === 'sangria' ? 'Sangria registrada com sucesso.' : 'Suprimento registrado com sucesso.' });
@@ -2216,24 +2219,24 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   // ---------- apoio / cadastros
   if (path === '/apoio' && method === 'GET') {
     const [produtos, tracados, formas, padroes, empresa, parametros] = await Promise.all([
-      query(`SELECT Id id, Codigo codigo, Nome nome, PrecoCentavos preco, Categoria categoria, Ativo ativo FROM dbo.Produto ORDER BY Nome`),
-      query(`SELECT Id id, Nome nome FROM dbo.Tracado
-             WHERE Ativo = 1 AND (TimingTrackId IS NOT NULL OR NOT EXISTS (SELECT 1 FROM dbo.Tracado WHERE Ativo = 1 AND TimingTrackId IS NOT NULL))
-             ORDER BY LEN(Nome), Nome`),
-      query(`SELECT Id id, Nome nome, Tipo tipo FROM dbo.FormaPagamento WHERE Ativo = 1 ORDER BY Codigo`),
+      query(`SELECT id id, codigo codigo, nome nome, preco_centavos preco, categoria categoria, ativo ativo FROM kart.produto ORDER BY nome`),
+      query(`SELECT id id, nome nome FROM kart.tracado
+             WHERE ativo = true AND (timing_track_id IS NOT NULL OR NOT EXISTS (SELECT 1 FROM kart.tracado WHERE ativo = true AND timing_track_id IS NOT NULL))
+             ORDER BY length(nome), nome`),
+      query(`SELECT id id, nome nome, tipo tipo FROM kart.forma_pagamento WHERE ativo = true ORDER BY codigo`),
       // campos do padrão para a prévia de "Criar reservas" (hora como texto hh:mm)
-      query(`SELECT Id id, Nome nome, Quantidade quantidade, CONVERT(varchar(5), PrimeiraHora, 108) primeiraHora, IntervaloMin intervaloMin, Vagas vagas, Ativo ativo
-             FROM dbo.PadraoReserva WHERE Ativo = 1 ORDER BY Nome`),
-      one(`SELECT Nome nome, RazaoSocial razaoSocial FROM dbo.Empresa WHERE Id = 1`),
-      query(`SELECT Chave chave, Valor valor FROM dbo.Parametro`),
+      query(`SELECT id id, nome nome, quantidade quantidade, primeira_hora "primeiraHora", intervalo_min "intervaloMin", vagas vagas, ativo ativo
+             FROM kart.padrao_reserva WHERE ativo = true ORDER BY nome`),
+      one(`SELECT nome nome, razao_social "razaoSocial" FROM kart.empresa WHERE id = 1`),
+      query(`SELECT chave chave, valor valor FROM kart.parametro`),
     ]);
     send(200, { produtos, tracados, formas, padroes, empresa, parametros: Object.fromEntries(parametros.filter((p) => p.chave !== 'office.usuariosSemFecharBateria').map((p) => [p.chave, p.valor])), usuario: sessao, podeFecharBateria: await podeFecharBateria(sessao) });
     return true;
   }
   if (path === '/empresa' && method === 'GET') {
-    send(200, await one(`SELECT Nome nome, RazaoSocial razaoSocial, Cnpj cnpj, Cep cep, Endereco endereco, Numero numero, Complemento complemento, Bairro bairro,
-      Cidade cidade, Estado estado, Telefone telefone, Email email, PoliticaReembolso politicaReembolso,
-      Ibge ibge, Pais pais, Site site, Horarios horarios, LogoNome logoNome FROM dbo.Empresa WHERE Id = 1`));
+    send(200, await one(`SELECT nome nome, razao_social "razaoSocial", cnpj cnpj, cep cep, endereco endereco, numero numero, complemento complemento, bairro bairro,
+      cidade cidade, estado estado, telefone telefone, email email, politica_reembolso "politicaReembolso",
+      ibge ibge, pais pais, site site, horarios horarios, logo_nome "logoNome" FROM kart.empresa WHERE id = 1`));
     return true;
   }
   if (path === '/empresa' && method === 'PUT') {
@@ -2247,7 +2250,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const vals: Record<string, unknown> = {};
     for (const [k, [c, max]] of Object.entries(campos)) if (k in b) vals[c] = str(b[k], max);
     if (!vals.Nome && 'nome' in b) throw new HttpError(400, 'Informe o nome.');
-    await query(`UPDATE dbo.Empresa SET ${Object.keys(vals).map((c) => `${c} = @${c}`).join(', ')} WHERE Id = 1`, vals);
+    await query(`UPDATE kart.empresa SET ${Object.keys(vals).map((c) => `${colPg(c)} = @${c}`).join(', ')} WHERE id = 1`, vals);
     send(200, { ok: true });
     return true;
   }
@@ -2256,18 +2259,18 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const b = await req.body();
     const bytes = Buffer.from(String(b.base64 ?? ''), 'base64');
     if (!bytes.length || bytes.length > 1_500_000) throw new HttpError(400, 'Envie uma imagem de até 1,5 MB.');
-    await query(`UPDATE dbo.Empresa SET Logo = @logo, LogoNome = @nome WHERE Id = 1`, { logo: bytes, nome: str(b.nome, 200) });
+    await query(`UPDATE kart.empresa SET logo = @logo, logo_nome = @nome WHERE id = 1`, { logo: bytes, nome: str(b.nome, 200) });
     send(200, { ok: true });
     return true;
   }
   if (path === '/parametros' && method === 'GET') {
-    send(200, await query(`SELECT Chave chave, Valor valor, Descricao descricao FROM dbo.Parametro ORDER BY Chave`));
+    send(200, await query(`SELECT chave chave, valor valor, descricao descricao FROM kart.parametro ORDER BY chave`));
     return true;
   }
   if (path === '/parametros' && method === 'PUT') {
     if (!sessao.admin) throw new HttpError(403, 'Disponível apenas para administradores.');
     const b = await req.body();
-    for (const [k, v] of Object.entries(b)) await query(`UPDATE dbo.Parametro SET Valor = @v WHERE Chave = @k`, { k, v: v === null ? null : String(v).slice(0, 1000) });
+    for (const [k, v] of Object.entries(b)) await query(`UPDATE kart.parametro SET valor = @v WHERE chave = @k`, { k, v: v === null ? null : String(v).slice(0, 1000) });
     send(200, { ok: true });
     return true;
   }
@@ -2277,23 +2280,23 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const nova = String(b.nova ?? '');
     if (nova.length < 8) throw new HttpError(400, 'A senha precisa ter pelo menos 8 caracteres.');
     if (!atual) throw new HttpError(400, 'Informe sua senha atual.');
-    const u = await one<{ hash: string; ativo: boolean }>(`SELECT SenhaHash hash, Ativo ativo FROM dbo.Usuario WHERE Id = @id`, { id: sessao.uid });
+    const u = await one<{ hash: string; ativo: boolean }>(`SELECT senha_hash hash, ativo ativo FROM kart.usuario WHERE id = @id`, { id: sessao.uid });
     if (!u || !u.ativo) throw new HttpError(401, 'Usuário não encontrado ou inativo.');
     if (!confereSenha(atual, u.hash)) throw new HttpError(403, 'A senha atual está incorreta.');
-    await query(`UPDATE dbo.Usuario SET SenhaHash = @h WHERE Id = @id`, { h: hashSenha(nova), id: sessao.uid });
+    await query(`UPDATE kart.usuario SET senha_hash = @h WHERE id = @id`, { h: hashSenha(nova), id: sessao.uid });
     send(200, { mensagem: 'Senha alterada.' });
     return true;
   }
   // ---------- permissões por perfil (Permissoes do canvas): matriz funcionalidade × acessar/incluir/alterar/excluir/exportar/importar
   if (path === '/minhas-permissoes' && method === 'GET') {
     const u = await one<{ id: number; nome: string; login: string; admin: boolean; ativo: boolean; perfilId: number | null; perfil: string | null; acessoTotal: boolean | null }>(
-      `SELECT u.Id id, u.Nome nome, u.Login login, u.Admin admin, u.Ativo ativo, u.PerfilId perfilId, p.Descricao perfil, p.AcessoTotal acessoTotal
-       FROM dbo.Usuario u LEFT JOIN dbo.Perfil p ON p.Id = u.PerfilId WHERE u.Id = @uid`, { uid: sessao.uid });
+      `SELECT u.id id, u.nome nome, u.login login, u.admin admin, u.ativo ativo, u.perfil_id "perfilId", p.descricao perfil, p.acesso_total "acessoTotal"
+       FROM kart.usuario u LEFT JOIN kart.perfil p ON p.id = u.perfil_id WHERE u.id = @uid`, { uid: sessao.uid });
     if (!u || !u.ativo) throw new HttpError(401, 'Sessão expirada. Entre novamente.');
     const total = Boolean(u.admin) || Boolean(u.acessoTotal);
     const itens = u.perfilId
       ? await query<{ funcao: string; acessar: boolean; incluir: boolean; alterar: boolean; excluir: boolean }>(
-        `SELECT Funcao funcao, Acessar acessar, Incluir incluir, Alterar alterar, Excluir excluir FROM dbo.PerfilPermissao WHERE PerfilId = @p AND Modulo = 'Admin Web'`, { p: u.perfilId })
+        `SELECT funcao funcao, acessar acessar, incluir incluir, alterar alterar, excluir excluir FROM kart.perfil_permissao WHERE perfil_id = @p AND modulo = 'Admin Web'`, { p: u.perfilId })
       : [];
     send(200, { id: u.id, nome: u.nome, login: u.login, admin: Boolean(u.admin), perfilId: u.perfilId, perfil: u.perfil, acessoTotal: total, configurado: itens.length > 0, telas: itens, fecharBateria: await podeFecharBateria(sessao) });
     return true;
@@ -2302,9 +2305,9 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (!sessao.admin) throw new HttpError(403, 'Disponível apenas para administradores.');
     const perfilId = Number(url.searchParams.get('perfilId'));
     if (!perfilId) throw new HttpError(400, 'Informe o perfil.');
-    const perfil = await one<{ id: number; descricao: string; acessoTotal: boolean }>(`SELECT Id id, Descricao descricao, AcessoTotal acessoTotal FROM dbo.Perfil WHERE Id = @perfilId`, { perfilId });
+    const perfil = await one<{ id: number; descricao: string; acessoTotal: boolean }>(`SELECT id id, descricao descricao, acesso_total "acessoTotal" FROM kart.perfil WHERE id = @perfilId`, { perfilId });
     if (!perfil) throw new HttpError(404, 'Perfil não encontrado.');
-    const itens = await query(`SELECT Modulo modulo, Funcao funcao, Acessar acessar, Incluir incluir, Alterar alterar, Excluir excluir, Exportar exportar, Importar importar FROM dbo.PerfilPermissao WHERE PerfilId = @perfilId`, { perfilId });
+    const itens = await query(`SELECT modulo modulo, funcao funcao, acessar acessar, incluir incluir, alterar alterar, excluir excluir, exportar exportar, importar importar FROM kart.perfil_permissao WHERE perfil_id = @perfilId`, { perfilId });
     send(200, { perfil, itens });
     return true;
   }
@@ -2314,15 +2317,16 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const perfilId = Number(b.perfilId);
     if (!perfilId) throw new HttpError(400, 'Informe o perfil.');
     const itens = Array.isArray(b.itens) ? (b.itens as Record<string, unknown>[]) : [];
-    await query(`UPDATE dbo.Perfil SET AcessoTotal = @t WHERE Id = @perfilId`, { t: b.acessoTotal ? 1 : 0, perfilId });
+    await query(`UPDATE kart.perfil SET acesso_total = @t WHERE id = @perfilId`, { t: b.acessoTotal ? 1 : 0, perfilId });
     for (const it of itens) {
       const modulo = str(it.modulo, 30); const funcao = str(it.funcao, 60);
       if (!modulo || !funcao) continue;
       const v = (k: string) => (it[k] ? 1 : 0);
       await query(
-        `MERGE dbo.PerfilPermissao AS t USING (SELECT @perfilId PerfilId, @modulo Modulo, @funcao Funcao) AS s ON t.PerfilId = s.PerfilId AND t.Modulo = s.Modulo AND t.Funcao = s.Funcao
-         WHEN MATCHED THEN UPDATE SET Acessar = @a, Incluir = @i, Alterar = @al, Excluir = @e, Exportar = @ex, Importar = @im
-         WHEN NOT MATCHED THEN INSERT (PerfilId, Modulo, Funcao, Acessar, Incluir, Alterar, Excluir, Exportar, Importar) VALUES (@perfilId, @modulo, @funcao, @a, @i, @al, @e, @ex, @im);`,
+        `INSERT INTO kart.perfil_permissao (perfil_id, modulo, funcao, acessar, incluir, alterar, excluir, exportar, importar)
+         VALUES (@perfilId, @modulo, @funcao, @a, @i, @al, @e, @ex, @im)
+         ON CONFLICT (perfil_id, modulo, funcao) DO UPDATE SET acessar = excluded.acessar, incluir = excluded.incluir, alterar = excluded.alterar,
+           excluir = excluded.excluir, exportar = excluded.exportar, importar = excluded.importar`,
         { perfilId, modulo, funcao, a: v('acessar'), i: v('incluir'), al: v('alterar'), e: v('excluir'), ex: v('exportar'), im: v('importar') },
       );
     }
