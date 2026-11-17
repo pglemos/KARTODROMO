@@ -403,6 +403,7 @@ const AgendaAcoes = (() => {
       const btnOk = m.querySelector('#mvOk');
       ocupado = true; btnOk.disabled = true; btnOk.setAttribute?.('aria-busy', 'true'); btnOk.textContent = 'Movendo…'; m.querySelector('#mvErro').textContent = '';
       const falhas = [], pendentes = [], feitosPath = []; let feitas = 0, diferenca = 0, trocas = 0;
+      const trocadas = [];
       const processados = new Set();
       // Reserva paga para outro serviço (ex.: Happy Hour → Locação padrão): o servidor recusa; a Recepção confirma uma vez
       // a troca e o resto segue com trocarServico. A reserva continua paga e a diferença fica para cobrar no caixa.
@@ -434,6 +435,7 @@ const AgendaAcoes = (() => {
           const rota = grupoId ? `/grupos/${grupoId}/mover` : `/reservas/${r.id}/mover`;
           const resp = await moverUm(rota);
           diferenca += Number(resp && resp.diferencaCentavos) || 0; trocas += Number(resp && resp.trocasDeServico) || 0;
+          if (!grupoId && resp && resp.trocasDeServico && resp.diferencaCentavos > 0) trocadas.push(r.id);
           if (!(resp && resp.trocasDeServico)) feitosPath.push(rota); feitas += membros.length;
         }
         catch (e) { pendentes.push(...membros); falhas.push(`${r.cliente}: ${e.message}`); }
@@ -442,7 +444,19 @@ const AgendaAcoes = (() => {
       m.querySelector('#mvOk')?.removeAttribute?.('aria-busy');
       if (!falhas.length && trocas) {
         // troca de serviço não tem "Desfazer" automático (o preço já mudou); o aviso da diferença fica na tela
-        toast(`${feitas === 1 ? 'Cliente movido' : `${feitas} clientes movidos`} com troca de serviço.${diferenca ? ` Cobrar no caixa a diferença: ${brl(diferenca)}.` : ' Sem diferença a cobrar.'}`);
+        const msg = `${feitas === 1 ? 'Cliente movido' : `${feitas} clientes movidos`} com troca de serviço.${diferenca ? ` Diferença: ${brl(diferenca)}.` : ' Sem diferença a cobrar.'}`;
+        if (trocadas.length) {
+          // um link Asaas por pessoa só com a diferença (grupo "cada um paga o seu"; o pagamento dá baixa sozinho)
+          toastAcao(msg, 'Gerar links da diferença', async () => {
+            try {
+              const r = await office('/grupos/diferenca', { method: 'POST', body: { inscricoes: trocadas } });
+              const linhas = (r.links || []).map((l) => `${l.nome}: ${brl(l.valor)} · ${l.link || l.erro}`);
+              try { await navigator.clipboard.writeText(linhas.join('\n')); } catch { /* sem permissão de copiar */ }
+              await dialogo({ titulo: 'Links da diferença (copiados)', texto: linhas.join(' | '), botoes: [{ rotulo: 'Ok', valor: 'ok', classe: 'prim' }] });
+              await C.recarregar();
+            } catch (e) { toast(`Não deu para gerar os links: ${e.message}`, true); }
+          }, 20000);
+        } else toast(msg);
         C.A.sel = origem.id; if (m.isConnected !== false) fecharCamada(); await C.recarregar(); return;
       }
       if (!falhas.length) {
