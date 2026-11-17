@@ -65,6 +65,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  // Na Cloudflare os assets completavam ".html" sozinhos (/design/home.dc -> home.dc.html); no Node é explícito.
+  async rewrites() {
+    return [{ source: '/design/:pagina.dc', destination: '/design/:pagina.dc.html' }];
+  },
   async redirects() {
     return [
       { source: '/valores', destination: '/kart-locacao', permanent: true },
