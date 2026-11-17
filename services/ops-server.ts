@@ -929,7 +929,12 @@ async function atender(req: http.IncomingMessage, res: http.ServerResponse) {
       let m = path.match(/^\/api\/crono\/baterias\/(\d+)\/grid$/);
       if (m) {
         const rows = await query(
-          `SELECT i.id "inscricaoId", c.nome nome, endurance.equipe, endurance."equipeId", endurance.pulseira, i.kart kart, i.pago pago, i.aprovada aprovada, c.id "clienteId" FROM kart.inscricao i JOIN kart.cliente c ON c.id = i.cliente_id
+          `SELECT i.id "inscricaoId", c.nome nome, endurance.equipe, endurance."equipeId", endurance.pulseira, i.kart kart, i.pago pago, i.aprovada aprovada, c.id "clienteId",
+             (i.termo_impresso_em IS NOT NULL) termo,
+             (COALESCE(i.preco_centavos, pg.preco_centavos, 0) - COALESCE(i.desconto_centavos, 0))::int "totalCentavos",
+             EXISTS (SELECT 1 FROM kart.endurance_evento ev WHERE ev.bateria_id = i.bateria_id AND ev.ativo) "enduranceAtivo"
+           FROM kart.inscricao i JOIN kart.cliente c ON c.id = i.cliente_id
+           JOIN kart.bateria bg ON bg.id = i.bateria_id LEFT JOIN kart.produto pg ON pg.id = COALESCE(i.produto_id, bg.produto_id)
            ${ENDURANCE_VINCULO_SQL}
            WHERE i.bateria_id = @id AND i.status <> 'cancelada' ORDER BY i.id`,
           { id: Number(m[1]) },

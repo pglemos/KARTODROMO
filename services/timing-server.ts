@@ -3979,17 +3979,14 @@ async function chamarLegadoLocal(metodo: string, caminho: string, corpo?: unknow
 }
 
 async function inscricoesDaRecepcao(agendaId: number): Promise<Inscricao[]> {
-  if (!process.env.OPS_SQL_PASSWORD) {
-    if (SIMULATE && process.env.TIMING_SIM_INSCRICOES_JSON) return JSON.parse(process.env.TIMING_SIM_INSCRICOES_JSON) as Inscricao[];
-    throw new Error('Banco da recepção não configurado.');
-  }
-  const { query } = await import('../lib/ops/db');
-  return await query(`SELECT c.Id clienteId, c.Nome nome, i.Aprovada aprovada, i.Pago pago,
-      CAST(CASE WHEN i.TermoImpressoEm IS NULL THEN 0 ELSE 1 END AS bit) termo,
-      ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos totalCentavos,
-      CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.EnduranceEvento ev WHERE ev.BateriaId = i.BateriaId AND ev.Ativo = 1) THEN 1 ELSE 0 END AS bit) endurance
-    FROM dbo.Inscricao i JOIN dbo.Cliente c ON c.Id = i.ClienteId JOIN dbo.Bateria b ON b.Id = i.BateriaId LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
-    WHERE i.BateriaId = @id AND i.Status <> 'cancelada'`, { id: agendaId }) as Inscricao[];
+  if (SIMULATE && process.env.TIMING_SIM_INSCRICOES_JSON) return JSON.parse(process.env.TIMING_SIM_INSCRICOES_JSON) as Inscricao[];
+  // Banco da recepção = Postgres no SRVKART desde 17/11/2026; lê pelo ops-server (o SQL Server antigo ficou congelado).
+  const linhas = await opsGet<Record<string, unknown>[]>(`/api/crono/baterias/${agendaId}/grid`);
+  if (!Array.isArray(linhas)) throw new Error('Grade da recepção inválida.');
+  return linhas.map((l) => ({
+    clienteId: l.clienteId, nome: String(l.nome ?? ''), aprovada: l.aprovada, pago: l.pago, termo: l.termo,
+    totalCentavos: l.totalCentavos === undefined || l.totalCentavos === null ? undefined : Number(l.totalCentavos), endurance: l.enduranceAtivo,
+  }));
 }
 
 /** Horários da agenda de hoje para o app; falha na consulta mantém o último resultado. */
