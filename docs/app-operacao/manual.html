@@ -1,0 +1,259 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Kart no app da operação</title>
+<style>
+@page { size: A4; margin: 12mm 12mm 14mm; }
+:root { --verde:#14804a; --verm:#e51e2d; --tinta:#16181c; --cinza:#5b616b; --linha:#dfe2e6; --fundo:#f5f6f8; --amarelo:#fff6d6; --borda-am:#e0a800; }
+* { box-sizing: border-box; }
+body { font-family: "Segoe UI", -apple-system, Helvetica, Arial, sans-serif; color:var(--tinta); font-size:10.5pt; line-height:1.42; margin:0; }
+img { max-width:100%; display:block; border:1px solid var(--linha); border-radius:6px; }
+.capa { height: 265mm; display:flex; flex-direction:column; justify-content:center; padding: 0 8mm; }
+.capa .tag { color:var(--verde); font-weight:700; letter-spacing:.12em; font-size:10pt; }
+.capa h1 { font-size:34pt; line-height:1.05; margin:8px 0 10px; }
+.capa p { font-size:13pt; color:var(--cinza); margin:0 0 22px; max-width:150mm; }
+.regras { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:12px; }
+.regra { background:var(--fundo); border-radius:10px; padding:12px 14px; }
+.regra .big { display:block; font-size:15pt; margin-bottom:3px; }
+.regra span { color:var(--cinza); font-size:10pt; }
+.sumario { margin-top:26px; columns:2; font-size:11pt; }
+.sumario div { margin:2px 0; }
+h2.secao { margin-top:18px !important; break-after: avoid; } h2.secao.pg { break-before: page; } h2.secao { font-size:18pt; margin:0 0 4px; padding-bottom:6px; border-bottom:3px solid var(--tinta); }
+.sub { color:var(--cinza); margin:0 0 12px; }
+.passo { break-inside: avoid; border:1px solid var(--linha); border-radius:12px; padding:12px 14px 14px; margin:0 0 12px; }
+.passo h3 { margin:0 0 8px; font-size:13pt; display:flex; align-items:center; gap:10px; }
+.num { flex:none; width:30px; height:30px; border-radius:50%; background:var(--verde); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:13pt; }
+.quadro { display:grid; grid-template-columns: 1fr 1fr; gap:6px 14px; margin:8px 0 0; font-size:10pt; }
+.quadro div { background:var(--fundo); border-radius:8px; padding:6px 10px; }
+.quadro .rot { display:block; font-size:8.5pt; letter-spacing:.06em; color:var(--cinza); text-transform:uppercase; }
+.lado { display:grid; grid-template-columns: 1.15fr 1fr; gap:12px; align-items:start; }
+.zooms { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.zooms img { height:92px; width:auto; }
+.digite { font-family: Consolas, Menlo, monospace; background:#111; color:#fff; padding:1px 7px; border-radius:4px; font-size:10pt; }
+.aviso { background:var(--amarelo); border:1.5px solid var(--borda-am); border-radius:8px; padding:8px 11px; margin:8px 0 0; }
+.ok { background:#eaf8ee; border-color:#1fae4b; }
+.vm { color:var(--verm); font-weight:700; }
+table { border-collapse:collapse; width:100%; font-size:10pt; }
+td, th { border:1px solid var(--linha); padding:6px 8px; text-align:left; vertical-align:top; }
+th { background:var(--fundo); }
+.pe { color:var(--cinza); font-size:8.5pt; margin-top:10px; }
+.lado { grid-template-columns: 0.95fr 1fr; } .tela { max-height: 112mm; width:auto; margin:0 auto; } .quadro.um { grid-template-columns: 1fr; margin-top:0; } .capa h1 { font-size:30pt; }
+.passo > img:not(.tela) { max-width: 120mm; }
+</style></head><body>
+</head><body>
+<section class="capa">
+  <div class="tag">KARTÓDROMO INTERNACIONAL DE BETIM · APP DA OPERAÇÃO</div>
+  <h1>Kart no app<br>da operação</h1>
+  <p>Passo a passo com as telas reais do app <b>Operação</b> no tablet: achar o kart que chegou da cronometragem, conferir o chassi, mandar para a oficina, abrir e fechar a ordem de serviço com o mecânico e liberar o kart para o sorteio.</p>
+  <div class="regras">
+    <div class="regra"><span class="big">Anderson · Johnny · Doidim</span><span>Os três mecânicos da casa. O app e o servidor só aceitam esses nomes.</span></div>
+    <div class="regra"><span class="big">1 a 99 / 100+</span><span>Número do kart: 1 a 99 é <b>Light</b>, 100 em diante é <b>Super</b>.</span></div>
+    <div class="regra"><span class="big">Chassi livre</span><span>Vem da cronometragem e pode ser trocado no app. Não define a frota.</span></div>
+  </div>
+  <div class="sumario">
+    <div><b>A.</b> Entrar e abrir a Frota</div>
+    <div><b>B.</b> Card de teste: o kart subiu?</div>
+    <div><b>C.</b> Ficha do kart e chassi</div>
+    <div><b>D.</b> Tirar o kart de operação</div>
+    <div><b>E.</b> Ordem de serviço (mecânico)</div>
+    <div><b>F.</b> Concluir a oficina</div>
+    <div><b>G.</b> Abertura do dia: liberar o kart</div>
+    <div><b>H.</b> Problemas comuns</div>
+  </div>
+  <p class="pe">Telas tiradas do app ligado ao servidor de produção do kartódromo em 17/11/2026, durante um teste real com o kart de teste 98 (chassi CARD-TESTE). Versão do app: 1.3.2.</p>
+</section>
+
+<h2 class="secao pg">A. Entrar e abrir a Frota</h2>
+<div class="passo">
+  <h3><span class="num">1</span>Entrar com seu usuário</h3>
+  <div class="lado">
+    <img class="tela" src="marcadas/01-login-marcada.png">
+    <div class="quadro um">
+      <div><span class="rot">1 · Operador</span>Seu usuário (o mesmo de sempre).</div>
+      <div><span class="rot">2 · Credencial</span>Sua senha.</div>
+      <div><span class="rot">3 · Entrar</span>Toque em <b>ENTRAR ›</b>.</div>
+      <div><span class="rot">Sair</span>Botão <b>Sair</b> no canto de cima da tela inicial. Sai na hora, mesmo com a internet ruim.</div>
+    </div>
+  </div>
+</div>
+<div class="passo">
+  <h3><span class="num">2</span>Na tela inicial, tocar em <span class="vm">Frota</span></h3>
+  <div class="lado">
+    <img class="tela" src="marcadas/02-inicio-marcada.png">
+    <div class="quadro um">
+      <div><span class="rot">Onde tocar</span>Card <b>GALPÃO · Frota</b>, à direita, no alto.</div>
+      <div><span class="rot">O que abre</span>A tela <b>Frota</b> do galpão, com todos os karts.</div>
+      <div><span class="rot">Conectado</span>O selo verde <b>Conectado</b> no alto mostra que o app está falando com o servidor.</div>
+    </div>
+  </div>
+</div>
+
+<h2 class="secao">B. Card de teste: o kart subiu?</h2>
+<div class="passo">
+  <h3><span class="num">3</span>Conferir se o kart cadastrado na cronometragem apareceu</h3>
+  <div class="lado">
+    <img class="tela" src="marcadas/03-frota-marcada.png">
+    <div class="quadro um">
+      <div><span class="rot">1 · Aba Pendentes</span>Kart que acabou de chegar aparece aqui (ainda não liberado hoje).</div>
+      <div><span class="rot">2 · Card do kart</span>No teste, o kart <b>98</b> foi cadastrado no programa da cronometragem e o card apareceu no app <b>na mesma hora</b>.</div>
+      <div><span class="rot">Card de teste fixo</span>O kart <b>98 (chassi CARD-TESTE)</b> ficou na aba <b>Oficina</b> para vocês conferirem no tablet. Ele não entra em sorteio. Para tirar, exclua o transponder 9990001 no programa da cronometragem.</div>
+    </div>
+  </div>
+  <div class="aviso">Se o kart não aparecer: confira o cadastro na cronometragem (Cadastros › Kart: transponder e chassi) e veja se o selo <b>Conectado</b> está verde.</div>
+</div>
+
+<h2 class="secao">C. Ficha do kart e chassi</h2>
+<div class="passo">
+  <h3><span class="num">4</span>Tocar no kart para abrir a ficha</h3>
+  <div class="lado">
+    <img class="tela" src="marcadas/25-ficha-livre-marcada.png">
+    <div class="quadro um">
+      <div><span class="rot">1 · Card do kart</span>Toque no número. A <b>Ficha de inspeção do kart</b> abre à direita.</div>
+      <div><span class="rot">2 · Chassi</span>Já vem preenchido com o chassi da cronometragem.</div>
+      <div><span class="rot">3 · Trocar chassi</span>Digite o chassi novo e toque em <b>Atualizar identificação do chassi</b>. A troca vai também para a cronometragem.</div>
+    </div>
+  </div>
+</div>
+<div class="passo">
+  <h3><span class="num">5</span>Confirmação</h3>
+  <img src="marcadas/26-chassi-app-salvar-zoom1.png">
+  <div class="aviso ok">Aparece <b>“Identificação do chassi salva.”</b> Se esse chassi estava em outro kart, ele sai de lá (troca de placa e sensor).</div>
+</div>
+
+<h2 class="secao">D. Tirar o kart de operação</h2>
+<div class="passo">
+  <h3><span class="num">6</span>Escolher o defeito e tocar em <span class="vm">Tirar kart de operação</span></h3>
+  <div class="lado">
+    <img class="tela" src="marcadas/05-tirar-de-operacao-marcada.png">
+    <div class="quadro um">
+      <div><span class="rot">1 · Motivo</span>Toque no defeito: Motor, Freio, Direção, Pneu, Corrente, Acelerador, Embreagem ou Revisar.</div>
+      <div><span class="rot">2 · Detalhe</span>Se quiser, escreva mais (ex.: “pastilha gasta”).</div>
+      <div><span class="rot">3 · Tirar</span>Botão vermelho <b>Tirar kart X de operação</b>.</div>
+    </div>
+  </div>
+</div>
+<div class="passo">
+  <h3><span class="num">7</span>O kart vai para a aba Oficina</h3>
+  <div class="lado">
+    <img class="tela" src="marcadas/07-aba-oficina-marcada.png">
+    <div class="quadro um">
+      <div><span class="rot">1 · Aba Oficina</span>Mostra os karts fora de operação (vermelhos).</div>
+      <div><span class="rot">2 · Kart</span>O kart aparece aqui e <b>não entra no sorteio</b> até ser liberado.</div>
+      <div><span class="rot">Contador</span>“Manutenção” sobe 1 e aparece “Frota atualizada e auditada.”</div>
+    </div>
+  </div>
+</div>
+
+<h2 class="secao">E. Ordem de serviço (mecânico)</h2>
+<div class="passo">
+  <h3><span class="num">8</span>Abrir <span class="vm">Ordens de serviço · mecânicos</span></h3>
+  <img src="marcadas/03b-botao-os-zoom1.png">
+  <p>Na tela Frota, toque na faixa <b>Ordens de serviço · mecânicos</b>, logo abaixo do título.</p>
+</div>
+<div class="passo">
+  <h3><span class="num">9</span>Escolher o kart, o defeito e o mecânico</h3>
+  <div class="lado">
+    <img class="tela" src="marcadas/09-os-preenchida-marcada.png">
+    <div class="quadro um">
+      <div><span class="rot">1 · Kart</span>Toque no kart da lista <b>Karts na oficina</b>. Kart e chassi se preenchem sozinhos e aparece o código da O.S.</div>
+      <div><span class="rot">2 · Defeito</span>Já vem com o motivo; mude se precisar.</div>
+      <div><span class="rot">3 · Mecânico</span>Toque em <b>Anderson</b>, <b>Johnny</b> ou <b>Doidim</b>.</div>
+      <div><span class="rot">4 · Criar</span><b>Criar ordem de serviço</b> e depois <b>Confirmar</b>.</div>
+    </div>
+  </div>
+</div>
+<div class="passo">
+  <h3><span class="num">10</span>Confirmar a criação</h3>
+  <img src="marcadas/10-os-criar-confirma-zoom1.png">
+  <p>A janela mostra o resumo (código, kart, chassi, defeito e mecânico). Toque em <b>Confirmar</b>.</p>
+</div>
+<div class="passo">
+  <h3><span class="num">11</span>Mecânico começa: <span class="vm">Iniciar atendimento</span></h3>
+  <div class="lado">
+    <img class="tela" src="marcadas/11-os-na-lista-marcada.png">
+    <div class="quadro um">
+      <div><span class="rot">Onde</span>Lista <b>Em atendimento</b>, mais abaixo na mesma tela.</div>
+      <div><span class="rot">Onde tocar</span><b>Iniciar atendimento</b> e <b>Confirmar</b>. O selo muda de ABERTA para <b>EM EXECUÇÃO</b>.</div>
+    </div>
+  </div>
+</div>
+<div class="passo">
+  <h3><span class="num">12</span>Terminou: <span class="vm">Concluir serviço</span></h3>
+  <div class="lado">
+    <img class="tela" src="marcadas/13-concluir-servico-marcada.png">
+    <div class="quadro um">
+      <div><span class="rot">Antes</span>Toque em <b>Concluir serviço · registrar o que foi feito ›</b>.</div>
+      <div><span class="rot">1 · O que foi feito</span>Escreva o serviço (ex.: “Pastilha de freio trocada”).</div>
+      <div><span class="rot">2 · Confirmar</span><b>Confirmar conclusão ›</b> e <b>Confirmar</b> na janela.</div>
+      <div><span class="rot">Atenção</span>Concluir a O.S. <b>não libera</b> o kart: ele continua bloqueado até a parte F e G.</div>
+    </div>
+  </div>
+</div>
+
+<h2 class="secao">F. Concluir a oficina</h2>
+<div class="passo">
+  <h3><span class="num">13</span>Na Frota, aba Oficina, abrir o kart e tocar em <span class="vm">Concluir oficina</span></h3>
+  <div class="lado">
+    <img class="tela" src="marcadas/16-kart-oficina-marcada.png">
+    <div class="quadro um">
+      <div><span class="rot">Onde tocar</span>Botão verde <b>Concluir oficina · enviar à abertura ›</b>.</div>
+      <div><span class="rot">O que acontece</span>O kart sai da Oficina e vai para <b>Pendentes</b>, esperando a abertura do dia.</div>
+    </div>
+  </div>
+</div>
+
+<h2 class="secao">G. Abertura do dia: liberar o kart</h2>
+<div class="passo">
+  <h3><span class="num">14</span>Checklist: selecionar o kart</h3>
+  <div class="lado">
+    <img class="tela" src="marcadas/18-abertura-selecao-marcada.png">
+    <div class="quadro um">
+      <div><span class="rot">Onde</span>Na tela Frota, role o painel da direita até <b>Checklist operacional do galpão · Abertura do dia</b>.</div>
+      <div><span class="rot">1ª etapa</span>Toque nos karts conferidos (ficam verdes com “✓ APTO”).</div>
+      <div><span class="rot">Itens</span>Acelerador e freio, calibragem e pneus lonados, corrente engraxada.</div>
+    </div>
+  </div>
+</div>
+<div class="passo">
+  <h3><span class="num">15</span>Tocar em <span class="vm">Check list finalizado</span> e confirmar</h3>
+  <div class="lado">
+    <img class="tela" src="marcadas/19-checklist-finalizar-marcada.png">
+    <div class="quadro um">
+      <div><span class="rot">Onde tocar</span><b>✓ Check list finalizado (N karts aptos)</b> e depois <b>Confirmar</b>.</div>
+      <div><span class="rot">O que acontece</span>O kart vai para a aba <b>Aguardando</b> (aceite do responsável).</div>
+      <div><span class="rot">Defeito?</span>Se achar defeito, use a 3ª etapa <b>Defeito no X?</b> em vez de finalizar.</div>
+    </div>
+  </div>
+</div>
+<div class="passo">
+  <h3><span class="num">16</span>Responsável: <span class="vm">Aceitar todos os conferidos</span></h3>
+  <div class="lado">
+    <img class="tela" src="marcadas/22-aceitar-marcada.png">
+    <div class="quadro um">
+      <div><span class="rot">Quem</span>Gerência ou responsável do dia.</div>
+      <div><span class="rot">Onde tocar</span><b>Aceitar todos os conferidos (N)</b> e <b>Confirmar</b> na janela “Aceitar abertura da frota”.</div>
+    </div>
+  </div>
+</div>
+<div class="passo">
+  <h3><span class="num">17</span>Pronto: kart <span class="vm">LIVRE</span> para o sorteio</h3>
+  <div class="lado">
+    <img class="tela" src="marcadas/24-livre-marcada.png">
+    <div class="quadro um">
+      <div><span class="rot">1 · Aba Livres</span>O kart aparece verde.</div>
+      <div><span class="rot">2 · Disponíveis</span>O contador da frota sobe 1 (no teste: 33 → 34 Light).</div>
+      <div><span class="rot">3 · Kart</span>Já entra no próximo sorteio da frota dele.</div>
+    </div>
+  </div>
+</div>
+
+<h2 class="secao pg">H. Problemas comuns</h2>
+<table>
+<tr><th style="width:40%">O que acontece</th><th>O que fazer</th></tr>
+<tr><td>Kart novo não aparece na Frota</td><td>Confira o cadastro no programa da cronometragem e se o selo <b>Conectado</b> está verde. Saia da tela Frota e entre de novo.</td></tr>
+<tr><td>“Informe kart, defeito e mecânico responsável (Anderson, Johnny, Doidim)”</td><td>Escolha um dos três mecânicos. Outros nomes não são aceitos.</td></tr>
+<tr><td>Lista de O.S. mostra “carregando…”</td><td>Espere alguns segundos. Se aparecer “Sem conexão com o servidor”, confira o Wi-Fi e tente de novo.</td></tr>
+<tr><td>“Sem confirmação: pode ter sido aplicado”</td><td>Não repita. O app confere sozinho e avisa “Confirmado” ou “O comando não chegou ao servidor”.</td></tr>
+<tr><td>“Nenhum kart Light/Super livre” no sorteio</td><td>Faça a abertura do dia (parte G).</td></tr>
+<tr><td>Kart com O.S. concluída continua bloqueado</td><td>Falta concluir a oficina (parte F) e liberar na abertura (parte G).</td></tr>
+<tr><td>Chassi errado na ficha</td><td>Troque na ficha do kart (parte C) ou no programa da cronometragem.</td></tr>
+</table>
+<p class="pe">Teste de 17/11/2026 no servidor de produção: card do kart 98 apareceu na hora após o cadastro na cronometragem; chassi trocado no app voltou para a cronometragem; tirar de operação, O.S. com Johnny e com Doidim (criar, iniciar, concluir), concluir oficina, checklist, aceite e kart LIVRE conferidos.</p>
+</body></html>
