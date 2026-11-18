@@ -9,8 +9,10 @@ import { cupomDoPedido, indexarPedido } from './extras';
 import { avisarPorEmail } from './emails-reserva';
 import { chaveDocumento, codigoReserva, digitos, validarReserva, type Acompanhante, type Agenda, type PreCadastro } from './validar';
 import { POLITICA_ACEITE, POLITICA_SECOES, POLITICA_TITULO, POLITICA_VERSAO } from '../../../src/config/politica-cancelamento';
+import { atribuicaoDaRequisicao, type AtribuicaoDoPedido } from '../../../src/config/atribuicao';
+import { registrarCompraNaMeta, type ConversaoDoPedido, type EnvConversaoMeta } from './conversao-meta';
 
-export interface EnvReservas extends AsaasEnv {
+export interface EnvReservas extends AsaasEnv, EnvConversaoMeta {
   PRE: R2Bucket;
   ASAAS_WEBHOOK_TOKEN?: string;
   RESERVAS_ATIVAS?: string;
@@ -46,6 +48,10 @@ export type Pedido = {
   erro?: string;
   /** E-mails de status já enviados (status → quando). */
   emails?: Record<string, string>;
+  /** De onde veio quem reservou (cookie de campanha do domínio, cookies da Meta, IP e navegador). */
+  atribuicao?: AtribuicaoDoPedido;
+  /** Envio da venda à Meta (Purchase), quando o token estiver configurado. */
+  conversao?: ConversaoDoPedido;
 };
 
 const json = (status: number, body: unknown, cache = 'no-store') =>
@@ -63,6 +69,8 @@ async function lerPedido(env: EnvReservas, id: string) {
 
 async function gravarPedido(env: EnvReservas, p: Pedido, naFila: boolean) {
   p.atualizadoEm = new Date().toISOString();
+  // confirmado com valor e token configurado: a venda vai para a Meta (uma vez; o resultado fica no próprio pedido)
+  await registrarCompraNaMeta(env, p).catch((e) => console.error('conversão meta', (e as Error).message));
   await avisarPorEmail(env as never, p as never).catch((e) => console.error('email reserva', (e as Error).message));
   await env.PRE.put(chavePedido(p.id), JSON.stringify(p), { httpMetadata: { contentType: 'application/json' } });
   await indexarPedido(env as never, p as never).catch(() => undefined);
@@ -134,6 +142,7 @@ export async function criarPedido(req: Request, env: EnvReservas, excedeuLimite:
     ...(v.dados.modo ? { modo: v.dados.modo } : {}),
     cliente: { ...v.dados.cliente, chave: chaveDocumento('CPF', v.dados.cliente.documento) },
     politica: { versao: POLITICA_VERSAO, aceitaEm: agora },
+    atribuicao: atribuicaoDaRequisicao(req),
     // cupom: o SRVKART confere e aplica ao separar as vagas (o valor da cobrança já vem com o desconto)
     ...(cupomDoPedido((corpo as Record<string, unknown>).cupom) ? { cupom: cupomDoPedido((corpo as Record<string, unknown>).cupom)! } : {}),
   };

@@ -3,6 +3,8 @@ var __name = (target, value) => __defProp(target, "name", { value, configurable:
 
 // worker.js
 import PACOTE_POLITICA from "./0624e3d24ace81e58a6705bd9749f0ae127d8670-site-politica.js.txt";
+// Kartódromo OS (Fase 6): captura de campanha (UTM/fbclid/gclid) no cookie do domínio, lido pelo /api/reservas.
+import { SCRIPT_ATRIBUICAO } from "../src/config/atribuicao";
 var JS_VELHO = "/ui-assets/index-B2k-39J7.js";
 var JS_NOVO = "/ui-assets/index-politica-20261009.js";
 var __defProp2 = Object.defineProperty;
@@ -220,6 +222,8 @@ var worker_default = {
       const resposta = new Response(asset.body, { status: asset.status, headers });
       if (publicRoutes.has(path) && asset.status === 200) return new HTMLRewriter().on('script[src="' + JS_VELHO + '"]', { element(e) {
         e.setAttribute("src", JS_NOVO);
+      } }).on("head", { element(e) {
+        e.append(SCRIPT_ATRIBUICAO, { html: true });
       } }).transform(resposta);
       return resposta;
     }
