@@ -375,6 +375,7 @@ public class FormIncluirCliente : DialogoDesign
         var novo = new CheckBox { Text = "Novo cliente" };
         void Mostrar(JsonObject c) { _cli = c; cli.Text = c == null ? "" : $"{c.S("nome")} · {c.S("documento")}"; }
 
+        ObservacaoBateria(b);
         var gCli = Secao("Cliente");
         Campo(gCli, "Cliente", cli, 4, pesquisar);
         Campo(gCli, "Participantes", n, 1);
@@ -882,6 +883,41 @@ class BateriasDia : Control
     public event Action<JsonObject> Duplo;
     public event Action<JsonObject, Point> Menu;
     const int Alt = 56, Esp = 6;
+    // observação da bateria: sinal amarelo depois do nome e o texto ao passar o mouse (ou ao chegar nela pelo teclado)
+    readonly ToolTip _dica = new() { InitialDelay = 250, ReshowDelay = 80, AutoPopDelay = 30000, UseFading = false };
+    int _hover = -1;
+    static string Obs(JsonObject b) => b?.S("observacao")?.Trim() ?? "";
+    static string Quebrar(string t, int largura = 64)
+    {
+        var linhas = new List<string>();
+        foreach (var par in t.Replace("\r", "").Split('\n'))
+        {
+            var atual = "";
+            foreach (var p in par.Split(' '))
+            {
+                if (atual.Length > 0 && atual.Length + 1 + p.Length > largura) { linhas.Add(atual); atual = p; }
+                else atual = atual.Length == 0 ? p : atual + " " + p;
+            }
+            linhas.Add(atual);
+        }
+        return string.Join("\n", linhas);
+    }
+    void MostrarDica(int i, Point onde)
+    {
+        var o = i >= 0 && i < _itens.Count ? Obs(_itens[i]) : "";
+        if (o.Length == 0) { _dica.Hide(this); return; }
+        _dica.Show("Observação: " + Quebrar(o), this, onde, 30000);
+    }
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        var i = Em(e.Location);
+        if (i == _hover) return;
+        _hover = i;
+        MostrarDica(i, new Point(e.X + 14, e.Y + 18));
+    }
+    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); _hover = -1; _dica.Hide(this); }
+    protected override void Dispose(bool disposing) { if (disposing) _dica.Dispose(); base.Dispose(disposing); }
 
     public BateriasDia()
     {
@@ -935,7 +971,22 @@ class BateriasDia : Control
         else return;
         _sel = Math.Clamp(proximo, 0, _itens.Count - 1);
         _topo = Math.Clamp(_sel * (Alt + Esp) - Height / 2, 0, Math.Max(0, _itens.Count * (Alt + Esp) - Height));
+        AccessibleDescription = Obs(Atual).Length > 0 ? "Observação: " + Obs(Atual) : "Use as setas para selecionar uma bateria, Enter para abrir e Shift+F10 para ações.";
+        MostrarDica(_sel, new Point(74, _sel * (Alt + Esp) - _topo + Alt));
         Invalidate(); e.Handled = true; e.SuppressKeyPress = true;
+    }
+
+    /// <summary>Sinal amarelo com "!" (16 px), o mesmo do painel web.</summary>
+    static void DesenharSinalObs(Graphics g, float x, float y)
+    {
+        var r = new RectangleF(x, y, 16, 16);
+        using (var f = new SolidBrush(Tokens.Primitivo.AmareloOuro)) g.FillEllipse(f, r);
+        using (var borda = new Pen(Color.FromArgb(224, 161, 0), 1f)) g.DrawEllipse(borda, r);
+        var cx = x + 8f;
+        using var tinta = new Pen(Color.FromArgb(31, 22, 0), 2.2f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round };
+        g.DrawLine(tinta, cx, y + 3.8f, cx, y + 9.4f);
+        using var ponto = new SolidBrush(Color.FromArgb(31, 22, 0));
+        g.FillEllipse(ponto, cx - 1.3f, y + 11.1f, 2.6f, 2.6f);
     }
 
     static (string texto, Color cor, bool pista, bool fim) Situacao(JsonObject b)
@@ -968,7 +1019,10 @@ class BateriasDia : Control
             var wDir = Math.Max(TextRenderer.MeasureText(oc, fOc).Width, TextRenderer.MeasureText(texto, fEst).Width) + 4;
             var nomeW = Width - 74 - wDir - 20;
             var nome = b.S("nome") + (b.S("categoria") == "Super Kart" && !b.S("nome").Contains("Super", StringComparison.OrdinalIgnoreCase) ? " · Super Kart" : "");
-            TextRenderer.DrawText(g, nome, fNome, new Rectangle(74, y + 9, nomeW, 20), PecasDesign.CorTexto, TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            var temObs = Obs(b).Length > 0;
+            var wNome = temObs ? Math.Min(TextRenderer.MeasureText(nome, fNome, Size.Empty, TextFormatFlags.NoPrefix).Width, nomeW - 24) : nomeW;
+            TextRenderer.DrawText(g, nome, fNome, new Rectangle(74, y + 9, wNome, 20), PecasDesign.CorTexto, TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            if (temObs) DesenharSinalObs(g, 74 + wNome + 4, y + 11);
             var barra = new RectangleF(74, y + 34, nomeW, 4);
             using (var bf = Forma.Redondo(barra, 2)) using (var bb = new SolidBrush(Tokens.Claro.CorBordaSutil)) g.FillPath(bb, bf);
             var pct = Math.Min(1f, ins / (float)vagas);

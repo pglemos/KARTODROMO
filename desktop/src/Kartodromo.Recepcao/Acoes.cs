@@ -600,6 +600,7 @@ public class FormListaParticipantes : DialogoDesign
         "M4 6h16M4 12h16M4 18h10", "linear-gradient(180deg, #6CB8FF, #1E6FE8)")
     {
         var batId = bateria.S("id");
+        ObservacaoBateria(bateria);
         var tabela = SecaoTabelaDesign(null);
         tabela.Selecionavel = true;
         tabela.AccessibleDescription = "Selecione uma pessoa para mover a reserva ou excluir a vaga da bateria.";

@@ -1,4 +1,5 @@
 using System.Drawing.Drawing2D;
+using System.Text.Json.Nodes;
 
 namespace Kartodromo.Comum;
 
@@ -180,6 +181,19 @@ public class DialogoDesign : CartaoModal
         s.BackColor = Fundo; g.BackColor = Fundo;
         foreach (Control c in s.Controls) c.BackColor = Fundo;
         s.Padding = new Padding(16, 14, 16, 8);
+        return s;
+    }
+
+    /// <summary>Quadro amarelo com a observação da bateria, no topo dos diálogos que mexem nela.</summary>
+    public Control ObservacaoBateria(JsonObject bateria)
+    {
+        var texto = bateria?.S("observacao")?.Trim();
+        if (string.IsNullOrEmpty(texto)) return null;
+        var g = Secao("Observação da bateria", texto);
+        var s = (TableLayoutPanel)g.Parent;
+        var fundo = Color.FromArgb(255, 246, 214);
+        s.BackColor = fundo; g.BackColor = fundo;
+        foreach (Control c in s.Controls) c.BackColor = fundo;
         return s;
     }
 

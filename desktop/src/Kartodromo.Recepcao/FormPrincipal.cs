@@ -1022,7 +1022,8 @@ public class FormPrincipal : Form
                 _grade.Colunas([
                     new("dataHora", "Data/Hora", TipoCol.DataHora), new("nome", "Nome", Largura: 190), new("produto", "Produto", Largura: 220), new("vagas", "Vagas (máx)", TipoCol.Inteiro),
                     new("disponiveis", "Vagas (disponíveis)", TipoCol.Inteiro, 120), new("pagos", "Pagos", TipoCol.Inteiro, 60), new("preReservas", "Pré-reservas", TipoCol.Inteiro, 90),
-                    new("responsavel", "Responsável", Largura: 170), new("status", "Situação", Largura: 80, Valor: r => r.S("status") == "aberta" ? "Aberta" : "Fechada"), new("autoAtendimento", "Totem", TipoCol.Bool)]);
+                    new("responsavel", "Responsável", Largura: 170), new("status", "Situação", Largura: 80, Valor: r => r.S("status") == "aberta" ? "Aberta" : "Fechada"), new("autoAtendimento", "Totem", TipoCol.Bool),
+                    new("observacao", "Observação", Largura: 280)]);
                 _grade.CorLinha = r => r.S("status") == "fechada" ? Color.Gray : null;
                 _menuAtual = MenuBaterias;
                 rows = await Sessao.Api.ListaAsync($"/api/office/baterias?status={_status}&{Periodo()}");
@@ -1326,7 +1327,8 @@ public class FormPrincipal : Form
             "online" => $"Pilotos pagos: {v.Where(r => r.S("status") is "pago" or "resolvido").Sum(r => r.I("quantidade"))} · Recebido: {Fmt.Brl(v.Where(r => r.S("status") is "pago" or "resolvido").Sum(r => r.L("valor") ?? 0))}",
             _ => "",
         };
-        var bat = _filtroBateria != null ? $" · Bateria: {_filtroBateria.S("nome")} {Fmt.DmyHm(_filtroBateria.S("dataHora"))} (use a árvore para ver todas)" : "";
+        var obsBat = _filtroBateria?.S("observacao")?.Trim();
+        var bat = _filtroBateria != null ? $" · Bateria: {_filtroBateria.S("nome")} {Fmt.DmyHm(_filtroBateria.S("dataHora"))}{(string.IsNullOrEmpty(obsBat) ? "" : $" · Observação: {obsBat.Replace('\n', ' ')}")} (use a árvore para ver todas)" : "";
         _total.Text = $"Total de registros: {v.Count}  ·  {extra}{bat}";
     }
 
