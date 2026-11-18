@@ -109,10 +109,10 @@ const IC = {
 const svg = (d, tam = 14, cor = 'currentColor', larg = 2.2) => `<svg width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="${larg}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"></path></svg>`;
 // Observação da bateria: aparece para toda a equipe sem abrir "Editar bateria".
 // Sinal amarelo com o texto ao passar o mouse (title) e para leitor de tela; no painel e no grupo, quadro no topo.
-const IC_OBS = 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7.5v5.5M12 16.5h.01';
+const IC_OBS = 'M12 5.5v8M12 18.5h.01';
 const obsDe = (b) => String((b && b.observacao) || '').trim();
-const marcaObs = (b) => { const o = obsDe(b); return o ? `<span class="marcaObs" title="${esc('Observação: ' + o)}" role="img" aria-label="${esc('Tem observação: ' + o)}">${svg(IC_OBS, 12, 'currentColor', 2.8)}</span>` : ''; };
-const avisoObs = (b) => { const o = obsDe(b); return o ? `<section class="avisoObs" role="note" aria-label="Observação da bateria"><span class="marcaObs grande" aria-hidden="true">${svg(IC_OBS, 15, 'currentColor', 2.6)}</span><span class="avisoObsCorpo"><b>Observação</b><span class="avisoObsTxt">${esc(o)}</span></span></section>` : ''; };
+const marcaObs = (b) => { const o = obsDe(b); return o ? `<span class="marcaObs" title="${esc('Observação: ' + o)}" role="img" aria-label="${esc('Tem observação: ' + o)}">${svg(IC_OBS, 12, 'currentColor', 3.4)}</span>` : ''; };
+const avisoObs = (b) => { const o = obsDe(b); return o ? `<section class="avisoObs" role="note" aria-label="Observação da bateria"><span class="marcaObs grande" aria-hidden="true">${svg(IC_OBS, 16, 'currentColor', 3.2)}</span><span class="avisoObsCorpo"><b>Observação</b><span class="avisoObsTxt">${esc(o)}</span></span></section>` : ''; };
 
 const NAV = [
   { t: 'Operação', itens: [['visao', 'Visão geral', IC.inicio, G('var(--kib-cor-borda-campo)', 'var(--kib-cor-texto-corpo)')], ['agenda', 'Agenda', IC.agenda, G('var(--kib-cor-categoria-laranja-topo)', 'var(--kib-cor-categoria-laranja-base)')], ['recepcao', 'Recepção', IC.recepcao, G('var(--kib-cor-categoria-verde-topo)', 'var(--kib-cor-categoria-verde-base)')]] },
