@@ -579,6 +579,20 @@ function syncCatalogTransponders(previous: TimingCatalog, next: TimingCatalog) {
 }
 
 /** ID bruto do transponder -> numero do kart. Numeros pequenos sem mapa ja sao o kart. */
+/** Sensores lidos na linha sem kart cadastrado (últimos 30 min): o app do galpão usa para cadastrar kart novo. */
+const sensoresSemKart = new Map<string, { transponder: string; em: string; leituras: number }>();
+function anotarSensorSemKart(raw: number) {
+  const chave = String(raw);
+  const atual = sensoresSemKart.get(chave);
+  sensoresSemKart.delete(chave);
+  sensoresSemKart.set(chave, { transponder: chave, em: new Date().toISOString(), leituras: (atual?.leituras ?? 0) + 1 });
+  while (sensoresSemKart.size > 30) sensoresSemKart.delete(sensoresSemKart.keys().next().value!);
+}
+function listarSensoresSemKart() {
+  const limite = Date.now() - 30 * 60_000;
+  return [...sensoresSemKart.values()].filter((x) => Date.parse(x.em) >= limite && !transponderMap[x.transponder]).reverse().slice(0, 8);
+}
+
 function kartFor(raw: number): string | null {
   const mapped = transponderMap[String(raw)];
   if (mapped) return mapped;
@@ -854,6 +868,7 @@ function handleDecoderPassing(p: TrxPassing) {
   const session = runningSession();
   const id = randomUUID();
   let result = kart ? 'sem-bateria' : 'transponder-desconhecido';
+  if (!kart) anotarSensorSemKart(p.transponder);
   let lapMs: number | null = null;
 
   if (session && kart) {
@@ -4046,6 +4061,9 @@ function ligarAppOperacional() {
       listarSessoes: sortedSessions,
       inicioPorAgenda: () => inicioPorAgenda,
       kartsCadastrados,
+      sensoresSemKart: listarSensoresSemKart,
+      sensorDoKart: (kart) => Object.entries(transponderMap).find(([, k]) => k === kart)?.[0] ?? null,
+      kartDoSensor: (raw) => transponderMap[raw] ?? null,
       verSessao: (id) => sessions.get(id),
       assinarMudancas: (cb) => { assinantesApp.add(cb); return () => assinantesApp.delete(cb); },
     });

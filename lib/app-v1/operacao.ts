@@ -30,6 +30,9 @@ export type DepsOperacao = {
   verSessao: (id: string) => unknown;
   inscricoes: (agendaId: number) => Promise<Inscricao[]>;
   kartsCadastrados?: () => string[];
+  sensoresSemKart?: () => { transponder: string; em: string; leituras: number }[];
+  sensorDoKart?: (kart: string) => string | null;
+  kartDoSensor?: (transponder: string) => string | null;
   listarSessoes?: () => unknown[];
   sessoesHistoricas?: () => unknown[];
   routeMode?: string;
@@ -424,7 +427,7 @@ export function criarOperacao(d: DepsOperacao) {
       }
       const cadastrados = d.kartsCadastrados?.() ?? [];
       const semTeste = d.store.db.prepare('SELECT kart, sessionId, autor, em, ajusteMm FROM karts_sem_teste ORDER BY em DESC').all() as { kart: string; sessionId: string; autor: string; em: string; ajusteMm: number | null }[];
-      return { fora, naPista, cadastrados, semTeste, chassis: chassisFrota(d.store), abertura: abertura.resumo(), sessionRevision: d.store.revisao('frota') };
+      return { fora, naPista, cadastrados, semTeste, chassis: chassisFrota(d.store), sensoresSemKart: d.sensoresSemKart?.() ?? [], abertura: abertura.resumo(), sessionRevision: d.store.revisao('frota') };
     },
     ordensServico() {
       const ordens = d.store.db.prepare('SELECT * FROM ordens_servico ORDER BY criadaEm DESC LIMIT 200').all();
@@ -511,6 +514,28 @@ export function criarOperacao(d: DepsOperacao) {
           d.store.subirRevisao('manutencao');
         });
         return { id };
+      });
+    },
+    /** Kart novo pelo galpão: número da placa + sensor (transponder) na cronometragem + chassi, numa operação só. */
+    async cadastrarKart(q: Identidade, b: Record<string, unknown>) {
+      const pl = (b.payload ?? {}) as Record<string, unknown>;
+      const kartTxt = texto(pl.kart, 4);
+      const transponder = texto(pl.transponder, 12);
+      const chassi = texto(pl.chassi, 80);
+      if (!/^\d{1,3}$/.test(kartTxt) || Number(kartTxt) < 1) throw new ErroApp(400, 'INVALID_REQUEST', 'Número do kart inválido: use só números de 1 a 999.');
+      const kart = String(Number(kartTxt));
+      if (!/^\d{4,10}$/.test(transponder)) throw new ErroApp(400, 'INVALID_REQUEST', 'Informe o número do sensor (transponder) do kart, só números.');
+      if (!chassi || /\p{Cc}/u.test(chassi)) throw new ErroApp(400, 'INVALID_REQUEST', 'Informe o número do chassi.');
+      if (!d.sensorDoKart || !d.kartDoSensor) throw new ErroApp(503, 'UNAVAILABLE', 'Cadastro de kart indisponível neste servidor.');
+      const sensorAtual = d.sensorDoKart(kart);
+      if (sensorAtual && sensorAtual !== transponder) throw new ErroApp(409, 'STATE_CONFLICT', `O kart ${kart} já está cadastrado com o sensor ${sensorAtual}. Para trocar o sensor, use a cronometragem.`);
+      const donoSensor = d.kartDoSensor(transponder);
+      if (donoSensor && donoSensor !== kart) throw new ErroApp(409, 'STATE_CONFLICT', `O sensor ${transponder} já está no kart ${donoSensor}. Confira o número ou tire o sensor do kart ${donoSensor} na cronometragem.`);
+      return roda(q, 'frota.gerir', { ...b, payload: { kart, transponder, chassi } }, 'frota', 'fleet-kart-create', async () => {
+        exigeMotivo(b);
+        if (!sensorAtual) await d.legado('PUT', '/api/transponders', { raw: transponder, kart });
+        const r = gravarChassi(d.store, kart, chassi, q.usuario, d.kartsCadastrados?.());
+        return { ...r, transponder };
       });
     },
     chassiKart(q: Identidade, kart: string, b: Record<string, unknown>) {

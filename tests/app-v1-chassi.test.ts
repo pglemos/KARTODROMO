@@ -22,6 +22,6 @@ describe('chassi da frota', () => {
     expect(chassisFrota(s)).toEqual({ '27': '301' });
   });
   it('recusa kart não cadastrado na cronometragem', () => {
-    expect(() => gravarChassi(novo(), '99', '10', 'teste', ['27'])).toThrow('kart cadastrado');
+    expect(() => gravarChassi(novo(), '99', '10', 'teste', ['27'])).toThrow('não existe na cronometragem');
   });
 });

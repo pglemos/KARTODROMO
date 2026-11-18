@@ -6,7 +6,8 @@ export function chassisFrota(store: AppStore): Record<string, string> {
 }
 
 export function gravarChassi(store: AppStore, kart: string, valor: unknown, usuario: string, cadastrados?: string[]) {
-  if (!/^\d{1,3}$/.test(kart) || (cadastrados && !cadastrados.includes(kart))) throw new ErroApp(400, 'INVALID_REQUEST', 'Informe um kart cadastrado com até três dígitos.');
+  if (!/^\d{1,3}$/.test(kart)) throw new ErroApp(400, 'INVALID_REQUEST', 'Número do kart inválido: use só números de 1 a 999.');
+  if (cadastrados && !cadastrados.includes(kart)) throw new ErroApp(400, 'INVALID_REQUEST', `O kart ${kart} ainda não existe na cronometragem (sem sensor). Use "Cadastrar kart novo" com o número do sensor e do chassi.`);
   if (typeof valor !== 'string' || !valor.trim() || valor.trim().length > 80 || /\p{Cc}/u.test(valor)) throw new ErroApp(400, 'INVALID_REQUEST', 'Informe a identificação do chassi com até 80 caracteres.');
   const chassi = valor.trim();
   let liberadoDe: string | null = null;

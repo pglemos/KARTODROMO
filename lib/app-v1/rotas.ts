@@ -25,6 +25,10 @@ export type DepsApp = {
   /** Horário de cada bateria da agenda de hoje, por id; vazio quando a agenda não respondeu. */
   inicioPorAgenda?: () => ReadonlyMap<string, string>;
   kartsCadastrados?: () => string[];
+  /** Sensores lidos na linha sem kart (cadastro de kart novo pelo app). */
+  sensoresSemKart?: () => { transponder: string; em: string; leituras: number }[];
+  sensorDoKart?: (kart: string) => string | null;
+  kartDoSensor?: (transponder: string) => string | null;
   verSessao: (id: string) => unknown;
   assinarMudancas: (cb: () => void) => () => void;
   batidaMs?: number;
@@ -101,7 +105,7 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
   const revisoesPendentes = new Map<string, string | undefined>();
   let loginsEmCurso = 0;
   const listarFila = () => semBateriasPassadas(d.listarSessoes(), d.inicioPorAgenda?.() ?? new Map<string, string>());
-  const operacao = d.legado && d.inscricoes ? criarOperacao({ store: d.store, legado: d.legado, verSessao: d.verSessao, inscricoes: d.inscricoes, kartsCadastrados: d.kartsCadastrados, listarSessoes: listarFila, sessoesHistoricas: d.listarSessoes, routeMode: d.routeMode }) : null;
+  const operacao = d.legado && d.inscricoes ? criarOperacao({ store: d.store, legado: d.legado, verSessao: d.verSessao, inscricoes: d.inscricoes, kartsCadastrados: d.kartsCadastrados, sensoresSemKart: d.sensoresSemKart, sensorDoKart: d.sensorDoKart, kartDoSensor: d.kartDoSensor, listarSessoes: listarFila, sessoesHistoricas: d.listarSessoes, routeMode: d.routeMode }) : null;
   let indisponivel = d.segredo.length < TAMANHO_MINIMO_SEGREDO;
   let revisaoFalhou = false;
 
@@ -259,6 +263,7 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
       if (m && metodo === 'POST') return enviar(res, 200, await operacao.atualizarOrdemServico(quem, m[1], await lerCorpo(req)));
       m = /^fleet\/opening\/(conferir|aceitar|excecao|escala)$/.exec(caminho);
       if (m && metodo === 'POST') return enviar(res, 200, await operacao.aberturaFrota(quem, m[1], await lerCorpo(req)));
+      if (caminho === 'fleet/karts/create' && metodo === 'POST') return enviar(res, 200, await operacao.cadastrarKart(quem, await lerCorpo(req)));
       m = /^fleet\/(\d{1,3})\/chassis$/.exec(caminho);
       if (m && metodo === 'POST') return enviar(res, 200, await operacao.chassiKart(quem, m[1], await lerCorpo(req)));
       m = /^fleet\/(\d{1,4})$/.exec(caminho);
