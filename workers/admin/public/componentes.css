@@ -139,7 +139,14 @@
 .dicaDet[open] { display: block; margin: var(--kib-espaco-meio) 0 0; }
 .dicaDet[open] > span { display: block; padding: var(--kib-espaco-1) var(--kib-espaco-denso-12); border-radius: var(--kib-raio-botao); background: var(--kib-cor-superficie-campo); color: var(--kib-cor-texto-corpo); font-size: var(--kib-fonte-tamanho-pequeno); line-height: var(--kib-fonte-altura-linha-corpo); }
 .maisOpcoes { padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); }
-.maisOpcoes > summary { cursor: pointer; font-weight: var(--kib-fonte-peso-semibold); min-height: var(--kib-componente-controle-altura-p); display: flex; align-items: center; }
+.maisOpcoes > summary { list-style: none; cursor: pointer; font-weight: var(--kib-fonte-peso-semibold); min-height: var(--kib-componente-controle-altura-p); display: flex; align-items: center; gap: var(--kib-espaco-1); }
+.maisOpcoes > summary::-webkit-details-marker { display: none; }
+/* seta de abrir/fechar: sem ela o resumo parece texto solto, não um controle */
+.maisOpcoes > summary::before { content: ''; flex: none; width: 8px; height: 8px; margin: 0 2px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s ease; opacity: .7; }
+.maisOpcoes[open] > summary::before { transform: rotate(45deg) translate(-1px, -1px); }
+.maisOpcoes > summary:hover { color: var(--kib-cor-marca-principal); }
+.maisOpcoes.enxuto { padding: var(--kib-espaco-1) 0 0; }
+.maisOpcoes.enxuto > summary { color: var(--kib-cor-marca-principal); }
 .maisOpcoes[open] > summary { margin-bottom: var(--kib-espaco-1); }
 
 /* ---------- atalho escrito dentro do botão e botão dentro do aviso */
@@ -369,7 +376,7 @@ input[type="checkbox"], input[type="radio"] {
 /* Tabela de Pilotos do Grupo */
 .cabTabelaGrupo {
   display: grid;
-  grid-template-columns: 36px minmax(180px, 1.4fr) minmax(140px, 1.1fr) 82px minmax(170px, 1.3fr) minmax(185px, 1.4fr) 136px;
+  grid-template-columns: 32px minmax(220px, 2fr) 152px 80px minmax(150px, 1fr) minmax(176px, 1.15fr) 68px;
   gap: var(--kib-espaco-1);
   align-items: center;
   height: 36px;
@@ -387,7 +394,7 @@ input[type="checkbox"], input[type="radio"] {
 
 .linhaPilotoGrupo {
   display: grid;
-  grid-template-columns: 36px minmax(180px, 1.4fr) minmax(140px, 1.1fr) 82px minmax(170px, 1.3fr) minmax(185px, 1.4fr) 136px;
+  grid-template-columns: 32px minmax(220px, 2fr) 152px 80px minmax(150px, 1fr) minmax(176px, 1.15fr) 68px;
   gap: var(--kib-espaco-1);
   align-items: center;
   min-height: 52px;
