@@ -378,7 +378,7 @@ input[type="checkbox"], input[type="radio"] {
 /* Tabela de Pilotos do Grupo */
 .cabTabelaGrupo {
   display: grid;
-  grid-template-columns: 32px minmax(200px, 2fr) 140px 88px minmax(118px, 0.9fr) minmax(236px, 1.4fr) 72px;
+  grid-template-columns: 32px minmax(236px, 1.6fr) 150px 84px 124px minmax(208px, 1fr) 76px;
   gap: var(--kib-espaco-1);
   align-items: center;
   height: 36px;
@@ -396,7 +396,7 @@ input[type="checkbox"], input[type="radio"] {
 
 .linhaPilotoGrupo {
   display: grid;
-  grid-template-columns: 32px minmax(200px, 2fr) 140px 88px minmax(118px, 0.9fr) minmax(236px, 1.4fr) 72px;
+  grid-template-columns: 32px minmax(236px, 1.6fr) 150px 84px 124px minmax(208px, 1fr) 76px;
   gap: var(--kib-espaco-1);
   align-items: center;
   min-height: 52px;
@@ -836,12 +836,35 @@ input[type="checkbox"], input[type="radio"] {
 .divisorMenu { border: 0; border-top: 1px solid var(--kib-cor-borda-sutil); margin: 4px 0; }
 .linhaAcoesLink .btn, .linhaAcoesLink .btnZapWhatsApp, .linhaAcoesLink .entrada { height: 36px; min-height: 36px; }
 .modalGrupo .btnCobrarSumario { height: 32px; }
-.modalGrupo .btnMoverPilotoGrupo, .modalGrupo .btnRemoverPiloto { width: 32px; height: 32px; }
+.modalGrupo .btnMoverPilotoGrupo, .modalGrupo .btnRemoverPiloto { width: 36px; height: 36px; }
 .formaTravada .btn { color: var(--kib-cor-texto-principal); background: var(--kib-cor-superficie-padrao); border: 1px solid var(--kib-cor-borda-forte); }
-.valorComAcao .btn.link { min-height: 28px; }
+.valorComAcao .btn.link { min-height: 32px; }
 .linhaPag { flex-wrap: nowrap; }
 .linhaPag .avatar.p { font-size: 12px; flex: none; }
 .linhaPag > b.mono { flex: none; }
 @media (max-width: 560px) { .linhaPag { flex-wrap: wrap; } }
 .itemAuto .tile { color: var(--kib-cor-marca-principal) !important; }
 .itemAuto .tile svg { stroke: currentColor; }
+
+/* rodada 3 do critique */
+.chipOrigemPag { flex: none; padding: 1px 6px; border-radius: var(--kib-raio-chip); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 600; background: color-mix(in srgb, var(--kib-cor-estado-info-solido) 10%, transparent); color: var(--kib-cor-estado-info-texto); }
+.chipOrigemPag.manual { background: var(--kib-cor-superficie-campo); color: var(--kib-cor-texto-principal); }
+.tileLink { width: 28px; height: 28px; flex: none; display: inline-grid; place-items: center; border-radius: var(--kib-raio-botao); background: color-mix(in srgb, var(--kib-cor-estado-info-solido) 12%, transparent); color: var(--kib-cor-estado-info-texto); }
+/* desktop: a coluna do dinheiro acompanha a rolagem da lista de pilotos */
+@media (min-width: 1100px) {
+  .modalGrupo .colunaPagamento { position: sticky; top: 0; max-height: calc(100dvh - 260px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+}
+/* tablet e notebook pequeno: cada piloto vira um cartão de duas linhas (nada de rolar para o lado) */
+@media (max-width: 1080px) {
+  .modalGrupo .rolagemX > div { min-width: 0 !important; }
+  .modalGrupo .cabTabelaGrupo { display: none; }
+  .modalGrupo .linhaPilotoGrupo { grid-template-columns: 32px minmax(0, 150px) 84px minmax(0, 1fr) auto; grid-template-rows: auto auto; row-gap: 6px; }
+  .modalGrupo .linhaPilotoGrupo > :nth-child(1) { grid-row: 1 / span 2; align-self: start; }
+  .modalGrupo .linhaPilotoGrupo > :nth-child(2) { grid-column: 2 / span 3; grid-row: 1; }
+  .modalGrupo .linhaPilotoGrupo > :nth-child(7) { grid-column: 5; grid-row: 1; }
+  .modalGrupo .linhaPilotoGrupo > :nth-child(3) { grid-column: 2; grid-row: 2; }
+  .modalGrupo .linhaPilotoGrupo > :nth-child(4) { grid-column: 3; grid-row: 2; }
+  .modalGrupo .linhaPilotoGrupo > :nth-child(5) { grid-column: 4; grid-row: 2; }
+  .modalGrupo .linhaPilotoGrupo > :nth-child(6) { grid-column: 4 / span 2; grid-row: 2; justify-self: end; }
+  .modalGrupo .linhaPilotoGrupo > :nth-child(5) { justify-self: start; }
+}

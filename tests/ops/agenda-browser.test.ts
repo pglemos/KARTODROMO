@@ -50,7 +50,7 @@ describe('Agenda: integração real do frontend sem dados de produção',{ timeo
  it('não oferece cobrança de sinal zero e calcula capacidade líquida do grupo',async()=>{
   await page.route(/\/api\/office\/grupos\/87(\?.*)?$/,route=>json(route,{...g,disponiveis:10}));
   await page.locator('#calendario [data-sel="394"]').first().click();await page.locator('[data-grupo-abrir]').first().click();await page.locator('[data-cancelar-grupo]').waitFor();
-  expect(await page.locator('[data-cobrar=""]').count()).toBe(0);expect(await page.locator('#camada').innerText()).toContain('até 25');expect(errors).toEqual([]);await page.close();
+  expect(await page.locator('[data-cobrar=""]').count()).toBe(0);expect(await page.locator('#camada').innerText()).toContain('máx. 25');expect(errors).toEqual([]);await page.close();
  });
  it('busca cadastro por CPF/nome numa vaga do grupo e vincula puxando os dados do banco',async()=>{
   let vinc:any=null;
