@@ -59,7 +59,7 @@ const Grupo = (() => {
     return `Olá${p.nome ? ', ' + primeiro(p.nome) : ''}! Sua vaga na bateria do Kartódromo de Betim (${quando(g.inicio)}) já está guardada na reserva de ${primeiro(g.responsavel)}. Faça seu cadastro (1 minuto): ${p.link} — no dia é só digitar o CPF no totem.`;
   }
   // avatar: verde = pago e cadastrado; cor do grupo = pago; cinza = ainda falta pagar (o mesmo em todo o modal)
-  const corAvatar = (p, i) => !p ? `background: ${CORG[i % 6]}; color: var(--kib-branco)`
+  const corAvatar = (p, i) => !p ? (i === 0 ? 'background: var(--kib-cor-marca-principal); color: var(--kib-branco)' : 'background: var(--kib-cor-superficie-campo); color: var(--kib-cor-texto-secundario); box-shadow: inset 0 0 0 1px var(--kib-cor-borda-forte)')
     : p.pago && p.cadastro === 'completo' ? 'background: var(--kib-cor-estado-sucesso-texto); color: var(--kib-branco)'
       : p.pago ? `background: ${CORG[i % 6]}; color: var(--kib-branco)`
         : 'background: var(--kib-cor-superficie-campo); color: var(--kib-cor-texto-secundario); box-shadow: inset 0 0 0 1px var(--kib-cor-borda-forte)';
@@ -138,13 +138,13 @@ const Grupo = (() => {
     if (rascAnt && !rascAnt.precoManual) rascAnt = { ...rascAnt, preco: precoPara(rascAnt.origem || 'whatsapp', b) };
     const n = Math.min(qtd || 2, Math.max(1, +b.disponiveis || 1));
     estado = {
-      b, g: null, aoMudar, voltar, reg: { valor: '', quem: '', forma: 'Pix' }, enviarAgora: true, pagAberto: ehHH(b), busca: '', achados: [],
+      b, g: null, aoMudar, voltar, reg: { valor: '', quem: '', forma: 'Pix' }, enviarAgora: true, pagAberto: true, busca: '', achados: [],
       rasc: rascAnt ? { ...rascAnt, pilotos: Array.from({ length: n }, (_, i) => rascAnt.pilotos[i] || { nome: '', telefone: '', menor: false }) } : { responsavel: null, origem: lembrado('origem', ORIGENS.map((o) => o[0]), 'whatsapp'), modo: lembrado('modo', MODOS.map((m) => m[0]), 'individual'), preco: precoPara(lembrado('origem', ORIGENS.map((o) => o[0]), 'whatsapp'), b), precoManual: false, sinalPct: 30, pilotos: Array.from({ length: n }, () => ({ nome: '', telefone: '', menor: false })) },
     };
     estado.janela = modal('', 'Nova reserva'); estado.janela.style.maxWidth = '1140px';
     pintar();
     if (recuperado) toast('Recuperei o que você tinha digitado nesta reserva');
-    setTimeout(() => { const c = document.querySelector('#camada [data-campo="nome"][data-i="0"]') || document.getElementById('qResp'); if (c) c.focus(); }, 60);
+    setTimeout(() => { const c = document.getElementById('qResp') || document.querySelector('#camada [data-campo="nome"][data-i="0"]'); if (c) c.focus(); }, 60);
   }
   // há algo digitado que se perderia ao fechar? (só vale para reserva nova ainda não salva)
   const sujo = () => !!(estado && !estado.g && estado.rasc && (estado.rasc.responsavel || estado.rasc.pilotos.some((p) => (p.nome || '').trim() || (p.telefone || '').trim())));
@@ -406,7 +406,7 @@ const Grupo = (() => {
         cad = chipCad(p);
         if (modo === 'unico') { pg = p.pago ? ['verde', 'Pago pelo grupo'] : resp ? ['laranja', 'Paga o grupo · falta ' + brlCurto(g.falta)] : ['cinza', 'Responsável paga']; }
         else if (modo === 'sinal') { pg = p.pago ? ['verde', p.pagoNoCaixa ? 'Pago no caixa' : 'Pago'] : ['laranja', 'Resto ' + brlCurto(p.falta_centavos) + ' na Recepção']; }
-        else { pg = p.pago ? ['verde', p.pagoNoCaixa ? 'Pago no caixa' : 'Pago'] : p.valorPago > 0 ? ['laranja', `Pagou ${brlCurto(p.valorPago)} · falta ${brlCurto(p.falta_centavos)}`] : ['vermelho', 'Falta ' + brlCurto(p.falta_centavos)]; }
+        else { pg = p.pago ? ['verde', p.pagoNoCaixa ? 'Pago no caixa' : 'Pago'] : p.valorPago > 0 ? ['laranja', `Falta ${brlCurto(p.falta_centavos)}`, `Pagou ${brlCurto(p.valorPago)} de ${brlCurto(p.valorPago + p.falta_centavos)} · falta ${brlCurto(p.falta_centavos)}`] : ['vermelho', 'Falta ' + brlCurto(p.falta_centavos)]; }
         const cobExist = modo === 'unico' ? g.cobrancaGrupo : p.cobranca;
         if (!p.pago && (modo !== 'unico' || resp)) {
           acoesPg = `<details class="menuCobrar">
@@ -414,7 +414,8 @@ const Grupo = (() => {
             <div class="menuCobrarLista" role="group" aria-label="Como cobrar ${esc(nomeVal || 'piloto ' + (i + 1))}">
               <button type="button" class="btn peq" data-cobrar="${modo === 'unico' ? '' : p.id}" title="Gera o link Asaas (Pix ou cartão) e abre o WhatsApp para enviar">${svg(IC.zap, 13, 'var(--kib-cor-marca-principal)')} Enviar link de pagamento</button>
               ${cobExist && cobExist.link ? `<button type="button" class="btn peq" data-ver-cobranca="${modo === 'unico' ? '' : p.id}" title="Copia o link de pagamento (${brlCurto(cobExist.valor)}) e mostra o botão do WhatsApp">${svg(IC.reservas, 13, 'var(--kib-cor-estado-info-texto)')} Copiar link (${brlCurto(cobExist.valor)})</button>` : ''}
-              <button type="button" class="btn peq" data-quitar-voucher="${modo === 'unico' ? '' : p.id}" title="Quita a vaga do piloto com um voucher de pagamento">${svg(IC.ticket || IC.ok, 13, 'var(--kib-cor-marca-principal)')} Quitar com voucher</button>
+              <button type="button" class="btn peq" data-quitar-voucher="${modo === 'unico' ? '' : p.id}" title="Quita a vaga do piloto com um voucher de pagamento">${svg('M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4zM10 7v10', 13, 'var(--kib-cor-marca-principal)')} Quitar com voucher</button>
+              <hr class="divisorMenu">
               <button type="button" class="btn peq" data-recebi="${modo === 'unico' ? '' : p.id}" title="O cliente já pagou por fora (Pix direto, dinheiro, maquininha)">${svg(IC.ok, 13, 'var(--kib-cor-status-ok)')} Marcar ${modo === 'unico' ? brlCurto(g.falta) : brlCurto(p.falta_centavos)} como pago</button>
             </div>
           </details>`;
@@ -428,18 +429,18 @@ const Grupo = (() => {
         <span class="avatar m" style="${corAvatar(novo ? null : p, i)}; font-weight: 700;" aria-hidden="true">${esc(iniciaisNome)}</span>
         <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
           <div style="display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0;">
-            ${fixo ? `<span class="valorFixo trunc" title="${esc(nomeBonito(nomeVal))}">${esc(nomeBonito(nomeVal))}</span>` : respExistente ? `<span class="entrada" style="height: 36px; flex: 1; min-width: 0; display: flex; align-items: center; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${nomeVal ? '' : 'color: var(--mudo2)'}">${esc(nomeBonito(nomeVal) || 'Escolha o responsável')}</span>` : `<input class="entrada" style="height: 36px; flex: 1; min-width: 0; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 500;" value="${esc(nomeBonito(nomeVal))}" placeholder="${resp ? 'Nome do responsável' : 'Nome (opcional)'}" aria-label="Nome do piloto ${i + 1}" title="${esc(nomeBonito(nomeVal) || (resp ? '' : 'Pode deixar vazio: a pessoa preenche pelo link do grupo'))}" aria-describedby="erroGrupo" data-campo="nome" data-i="${i}" ${!novo && resp ? 'readonly' : ''}>`}
+            ${fixo ? `<span class="valorFixo trunc" title="${esc(nomeBonito(nomeVal))}">${esc(nomeBonito(nomeVal))}</span>` : respExistente ? `<span class="entrada" style="height: 36px; flex: 1; min-width: 0; display: flex; align-items: center; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${nomeVal ? '' : 'color: var(--mudo2)'}">${esc(nomeBonito(nomeVal) || 'Escolha o responsável')}</span>` : `<input class="entrada" style="height: 36px; flex: 1; min-width: 0; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 500;" value="${esc(nomeBonito(nomeVal))}" placeholder="${resp ? 'Nome do responsável' : 'Nome (opcional)'}" aria-label="Nome do piloto ${i + 1}" title="${esc(nomeBonito(nomeVal) || (resp ? '' : 'Pode deixar vazio: a pessoa preenche pelo link do grupo'))}" aria-describedby="erroGrupo" data-campo="nome" data-i="${i}" ${!novo && resp ? 'readonly' : ''}>`}${!resp && !p.clienteId && !novo ? `<button type="button" class="btnIconeLinha" data-buscar-vaga="${i}" aria-label="Buscar cadastro do piloto ${i + 1} por CPF, nome ou telefone" title="Buscar cadastro (CPF, nome ou telefone)">${svg(IC.busca, 15, 'currentColor', 2.2)}</button>` : !resp && !p.clienteId && novo ? `<button type="button" class="btnIconeLinha" data-buscar-vaga="${i}" aria-label="Buscar cadastro do piloto ${i + 1} por CPF, nome ou telefone" title="Buscar cadastro (CPF, nome ou telefone)">${svg(IC.busca, 15, 'currentColor', 2.2)}</button>` : ''}
           </div>
           ${resp ? `<div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"><span class="badgeRespTag" title="Responsável pela reserva">${svg(IC.ok, 10, 'currentColor')} RESPONSÁVEL</span>${respExistente ? '<span class="peq cor-apoio" style="font-size: 12px; line-height: 1.35">cliente já cadastrado · <button type="button" class="btn link peq" data-trocar-resp="1" style="font-size: 12px; padding: 0">Trocar</button></span>' : ''}</div>` : ''}
-          ${!resp && !p.clienteId ? `<button type="button" class="btn link peq btnBuscarVaga" data-buscar-vaga="${i}" aria-label="Buscar cadastro do piloto ${i + 1} por CPF, nome ou telefone" title="Buscar por CPF, nome ou telefone">${svg(IC.busca, 11)} Buscar cadastro</button>` : ''}
+          ${false ? `<button type="button" class="btn link peq btnBuscarVaga" data-buscar-vaga="${i}" aria-label="Buscar cadastro do piloto ${i + 1} por CPF, nome ou telefone" title="Buscar por CPF, nome ou telefone">${svg(IC.busca, 11)} Buscar cadastro</button>` : ''}
         </div>
         ${respExistente || fixo ? `<span class="valorFixo mono">${esc(foneVal || '—')}</span>` : `<input class="entrada mono" style="height: 36px; font-size: var(--kib-fonte-tamanho-pequeno);" value="${esc(foneVal)}" placeholder="WhatsApp com DDD" inputmode="tel" aria-label="WhatsApp do piloto ${i + 1}" aria-describedby="erroGrupo" data-campo="telefone" data-i="${i}" ${!novo && resp ? 'readonly' : ''}>`}
         <button type="button" class="btnToggleIdade ${p.menor ? 'menor' : 'adulto'}" role="switch" aria-checked="${!!p.menor}" data-menor="${i}" title="${p.menor ? 'Menor de idade · clique para trocar para adulto' : 'Adulto · clique para trocar para menor de idade'}" aria-label="Idade do piloto ${i + 1}: ${p.menor ? 'menor de idade' : 'adulto'}. Trocar">${p.menor ? 'Menor' : 'Adulto'} ${svg('M7 16l-4-4 4-4M17 8l4 4-4 4M3 12h18', 11, 'currentColor', 2.2)}</button>
         <div style="display: flex; align-items: center; min-width: 0;">
-          ${novo ? `<span class="chipTotemStatus aguardando">${esc(cad[1])}</span>` : cad[0] === 'verde' ? `<span class="chipTotemStatus completo" title="Cadastro completo: pronto para o totem">${svg(IC.ok, 12, 'currentColor', 2.2)} Pronto</span>` : `<span class="chipTotemStatus incompleto" title="${esc(cad[1])}">${svg(IC_ALERTA, 12, 'currentColor', 2)} <span class="trunc">${esc(cad[1] === 'Aguardando cadastro' ? 'Aguardando' : cad[1])}</span></span>`}
+          ${novo ? `<span class="textoPendenteNovo">${esc(cad[1])}</span>` : cad[0] === 'verde' ? `<span class="chipTotemStatus completo" title="Cadastro completo: pronto para o totem">${svg(IC.ok, 12, 'currentColor', 2.2)} Pronto</span>` : `<span class="chipTotemStatus incompleto" title="${esc(cad[1])}">${svg(IC_ALERTA, 12, 'currentColor', 2)} <span class="trunc">${esc(cad[1] === 'Aguardando cadastro' ? 'Aguardando' : cad[1])}</span></span>`}
         </div>
-        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-          ${novo ? `<span class="chipPgStatus aguardando">${esc(pg[1])}</span>` : pg[0] === 'verde' ? `<span class="chipPgStatus pago" title="${esc(pg[1])}">${svg(IC.ok, 12, 'currentColor', 2.2)} ${esc(pg[1])}</span>` : pg[0] === 'vermelho' && urgenteGrupo ? `<span class="chipPgStatus falta" title="${esc(pg[1])} · a bateria começa em menos de 2 horas">${svg(IC_ALERTA, 11, 'currentColor', 2.2)} ${esc(pg[1])}</span>` : `<span class="chipPgStatus ${pg[0] === 'cinza' ? 'aguardando' : 'parcial'}" title="${esc(pg[1])}">${pg[0] === 'cinza' ? '' : svg(IC_RELOGIO, 11, 'currentColor', 2.2)} ${esc(pg[1])}</span>`}
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0;">
+          ${novo ? `<span class="textoPendenteNovo num">${esc(pg[1])}</span>` : pg[0] === 'verde' ? `<span class="chipPgStatus pago" title="${esc(pg[1])}">${svg(IC.ok, 12, 'currentColor', 2.2)} ${esc(pg[1])}</span>` : pg[0] === 'vermelho' && urgenteGrupo ? `<span class="chipPgStatus falta" title="${esc(pg[1])} · a bateria começa em menos de 2 horas">${svg(IC_ALERTA, 11, 'currentColor', 2.2)} ${esc(pg[1])}</span>` : `<span class="chipPgStatus ${pg[0] === 'cinza' ? 'aguardando' : 'parcial'}" title="${esc(pg[2] || pg[1])}">${pg[0] === 'cinza' ? '' : svg(IC_RELOGIO, 11, 'currentColor', 2.2)} ${esc(pg[1])}</span>`}
           ${acoesPg}
         </div>
         ${resp ? '<span></span>' : `<div style="display: flex; align-items: center; justify-content: flex-end; gap: 4px;">
@@ -460,10 +461,10 @@ const Grupo = (() => {
     const faltamCad = novo ? [] : g.pilotos.filter((p) => p.cadastro !== 'completo');
     const blocoLinks = novo ? '' : `<div style="padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); border-top: 1px solid var(--linha); display: flex; flex-direction: column; gap: var(--kib-espaco-1)">
       <span class="linha gap-1"><b class="t-corpo">Link de cadastro do grupo</b><span class="chip ${faltamCad.length ? 'laranja' : 'verde'} empurra">${faltamCad.length ? `faltam ${faltamCad.length} de ${g.n}` : 'todos cadastrados'}</span></span>
-      <div class="linha-quebra gap-1" style="align-items: center"><input class="entrada peq mono cresce" style="flex: 1 1 280px; min-width: 0" readonly value="${esc(linkDoGrupo(g))}" aria-label="Link de cadastro do grupo" onfocus="this.select()"><button type="button" class="btn peq sec" data-copiar-links="1">Copiar</button><button type="button" class="btnZapWhatsApp peq" data-enviar-grupo="1">${svg(IC.zap, 13, 'var(--kib-branco)')} Enviar no WhatsApp</button></div>
+      <div class="linha-quebra gap-1 linhaAcoesLink" style="align-items: center"><input class="entrada peq mono cresce" style="flex: 1 1 280px; min-width: 0" readonly value="${esc(linkDoGrupo(g))}" aria-label="Link de cadastro do grupo" onfocus="this.select()"><button type="button" class="btn peq sec" data-copiar-links="1">Copiar</button><button type="button" class="btnZapWhatsApp peq" data-enviar-grupo="1">${svg(IC.zap, 13, 'var(--kib-branco)')} Enviar no WhatsApp</button></div>
       <span class="peq cor-apoio" style="line-height: 1.4">Mande o mesmo link para todo mundo (grupo de WhatsApp, por exemplo). Quem abrir e se cadastrar ocupa a próxima vaga livre${faltamCad.length ? ': ainda faltam ' + esc(faltamCad.map((p) => p.nome || 'piloto ' + p.ordem).join(', ')) : ''}.</span>
       ${g.linkPainel ? `<span class="linha gap-1" style="margin-top: var(--kib-espaco-1)"><b class="t-corpo">Painel do responsável</b><span class="peq cor-apoio">só para ${esc(primeiro(g.responsavel))}: mostra quem já se cadastrou e pagou</span></span>
-      <div class="linha-quebra gap-1"><button type="button" class="btn peq sec" data-copiar-painel="1">Copiar link do painel</button><button type="button" class="btnZapWhatsApp peq" data-enviar-painel="1">${svg(IC.zap, 13, 'var(--kib-branco)')} Enviar ao responsável</button></div>` : ''}
+      <div class="linha-quebra gap-1 linhaAcoesLink"><button type="button" class="btn peq sec" data-copiar-painel="1">Copiar link do painel</button><button type="button" class="btnZapWhatsApp peq" data-enviar-painel="1">${svg(IC.zap, 13, 'var(--kib-branco)')} Enviar ao responsável</button></div>` : ''}
     </div>`;
     const respOk = novo ? respValido(rasc) : true;
     const erroNovo = novo ? faltaResp(rasc) : '';
@@ -485,7 +486,6 @@ const Grupo = (() => {
             <span class="badgeNomeBateria">${generico(b.nome) ? '' : esc(b.nome) + ' · '}${esc(produtoTxt || 'Bateria')} · ${durMin} min</span>
             ${novo && estado.voltar ? '<button type="button" class="btn link peq" data-voltar-horario="1" style="font-size: var(--kib-fonte-tamanho-pequeno);">‹ Trocar horário</button>' : ''}
           </div>
-          ${typeof avisoObs === 'function' ? avisoObs(b, obsContradiz ? `<span class="avisoContradiz">${svg(IC_ALERTA, 13, 'currentColor', 2.2)} A promoção de aniversariante está desligada nesta reserva. Confira antes de cobrar.</span>` : '') : ''}
         </div>
         ${novo ? '' : `<div class="resumoGrupo" aria-live="polite">
             <span class="resumoGrupoValor"><b class="num">${brl(g.pago)}</b> pagos de ${brl(g.total)}</span>
@@ -498,12 +498,13 @@ const Grupo = (() => {
       </div>
       <div class="modalGrupoCorpo">
       <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--kib-espaco-2); padding: var(--kib-espaco-2)">
+        ${obsTexto ? `<div class="obsNoCorpo">${typeof avisoObs === 'function' ? avisoObs(b, obsContradiz ? `<span class="avisoContradiz">${svg(IC_ALERTA, 13, 'currentColor', 2.2)} A observação fala em aniversariante, mas a promoção não está ligada. Descubra quem é o aniversariante antes de cobrar: a promoção vale só para o responsável.</span>` : '') : ''}</div>` : ''}
         <div style="flex: 999 1 860px; min-width: 0; display: flex; flex-direction: column; gap: var(--kib-espaco-denso-12)">
           <section class="cartao leve">
             <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--kib-espaco-1) var(--kib-espaco-denso-12); padding: var(--kib-espaco-denso-12) var(--kib-espaco-2) var(--kib-espaco-1)">
               <div class="col" style="gap: 2px; flex: 1 1 260px">
                 <b class="t-subtitulo" style="font-size: var(--kib-fonte-tamanho-subtitulo);">Pilotos do grupo</b>
-                <span class="peq" style="line-height: 1.4; color: var(--kib-cor-texto-secundario);">${novo ? 'A linha 1 é o responsável. Cliente novo: só nome completo e WhatsApp; o resto ele completa pelo link.' : `<b>${g.cadastrados}</b> de ${g.n} prontos para o totem · <b>${g.pagos}</b> de ${g.n} pagos`}</span>
+                <span class="peq" style="line-height: 1.4; color: var(--kib-cor-texto-secundario);">${novo ? 'A linha 1 é o responsável. Cliente novo: só nome completo e WhatsApp; o resto ele completa pelo link.' : (g.falta ? 'Quem falta pagar tem o botão “Receber” na própria linha.' : 'Todos pagos. Falta só quem não tem cadastro completar pelo link.')}</span>
               </div>
               <div class="linha gap-1" style="align-items: center;">
                 <span class="peq peso-semibold" style="color: var(--kib-cor-texto-principal);">Vagas do grupo:</span>
@@ -517,7 +518,7 @@ const Grupo = (() => {
               <span style="display: flex; flex-wrap: wrap; align-items: center; gap: var(--kib-espaco-1)"><span class="peq peso-semibold">Chegou por</span><span class="seg">${ORIGENS.map(([v, t]) => `<button type="button" data-origem="${v}" class="${rasc.origem === v ? 'sel' : ''}">${t}</button>`).join('')}</span></span></div>` : ''}
             <div id="listaLinks"></div>
             <div class="rolagemX">
-              <div style="min-width: 920px">
+              <div style="min-width: 940px">
                 <div class="cabTabelaGrupo" aria-hidden="true">
                   <span></span>
                   <span>Nome</span>
@@ -536,8 +537,7 @@ const Grupo = (() => {
             </div>
             ${blocoLinks}
           </section>
-          ${!novo ? `
-          <details class="secao maisOpcoes" data-det-key="automatico"><summary class="titulo t-subtitulo">O que acontece sozinho até a corrida</summary><div class="listaAuto">${integra.map(([t, d, st, ok, ic]) => `<div class="itemAuto"><span class="tile" aria-hidden="true">${svg(ic, 14, 'currentColor')}</span><span class="col" style="gap: 1px; flex-grow: 1"><b>${t}</b><span class="peq" style="line-height: 1.4">${d}</span></span><span class="chip ${ok ? 'verde' : 'laranja'}">${st}</span></div>`).join('')}</div></details>` : ''}
+
         </div>
         <div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: var(--kib-espaco-denso-12)">
           ${novo ? `<details class="secao maisOpcoes" data-det-pag="1" ${estado.pagAberto ? 'open' : ''}><summary class="titulo t-subtitulo">Como vai pagar: ${esc((MODOS.find((x) => x[0] === modo) || [])[1] || '')} · ${brl(preco)} por piloto · total ${brl(c.total)}</summary>` : ''}
@@ -582,37 +582,29 @@ const Grupo = (() => {
             ${isHappy ? `
               <div data-hh-banner="1" style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: var(--kib-raio-cartao); background: color-mix(in srgb, var(--kib-cor-estado-aviso-solido) 10%, var(--kib-cor-superficie-padrao)); border: 1px solid color-mix(in srgb, var(--kib-cor-estado-aviso-solido) 35%, transparent);">
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
-                  <b class="t-pequeno" style="color: var(--kib-cor-texto-principal); letter-spacing: 0.02em;">PROMOÇÃO HAPPY HOUR (De Terça a Quinta)</b>
-                  <span class="chip laranja">Duração: ${durMin} minutos de corrida</span>
+                  <b class="t-pequeno" style="color: var(--kib-cor-texto-principal);">Happy Hour · terça a quinta</b>
+                  <span class="chip cinza">${durMin} min de pista</span>
                 </div>
-                <span class="peq" style="line-height: 1.4; color: var(--kib-cor-texto-secundario);">Valor especial para sua 1ª vez: <b style="color: var(--kib-cor-texto-principal);">${brl(HAPPY_PRIMEIRA_VEZ)}</b> (valor normal promocional: <b style="color: var(--kib-cor-texto-principal);">${brl(HAPPY_NORMAL)}</b>).</span>
+                <span class="peq" style="line-height: 1.4; color: var(--kib-cor-texto-secundario);">1ª vez no kartódromo: <b style="color: var(--kib-cor-texto-principal);">${brl(HAPPY_PRIMEIRA_VEZ)}</b> · demais pilotos: <b style="color: var(--kib-cor-texto-principal);">${brl(HAPPY_NORMAL)}</b></span>
                 ${podeTrocarPreco ? `
                   <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px;">
                     <button type="button" class="btn peq ${preco === HAPPY_PRIMEIRA_VEZ ? 'prim' : 'sec'}" data-preco-preset="${HAPPY_PRIMEIRA_VEZ}" aria-pressed="${preco === HAPPY_PRIMEIRA_VEZ}">1ª vez · ${brl(HAPPY_PRIMEIRA_VEZ)}</button>
-                    <button type="button" class="btn peq ${preco === HAPPY_NORMAL ? 'prim' : 'sec'}" data-preco-preset="${HAPPY_NORMAL}" aria-pressed="${preco === HAPPY_NORMAL}">Normal promocional · ${brl(HAPPY_NORMAL)}</button>
+                    <button type="button" class="btn peq ${preco === HAPPY_NORMAL ? 'prim' : 'sec'}" data-preco-preset="${HAPPY_NORMAL}" aria-pressed="${preco === HAPPY_NORMAL}">Demais · ${brl(HAPPY_NORMAL)}</button>
                   </div>
                 ` : ''}
-                <span class="peq" style="line-height: 1.35; color: var(--kib-cor-texto-secundario);">Pelo link individual, o sistema confere o CPF e cobra ${brl(HAPPY_PRIMEIRA_VEZ)} automaticamente para quem corre pela 1ª vez.</span>
+                <span class="peq" style="line-height: 1.35; color: var(--kib-cor-texto-secundario);">No link de cada piloto, o sistema confere o CPF e cobra ${brl(HAPPY_PRIMEIRA_VEZ)} de quem corre pela 1ª vez.</span>
               </div>
             ` : ''}
             <button type="button" role="switch" aria-checked="${aniv}" data-aniv="1" class="cartaoInterruptor ${aniv ? 'ligado' : ''}" title="Promoção do site: o aniversariante que traz pelo menos ${ANIV_MIN} convidados pagantes corre por ${brl(ANIV_PRECO)}">
               <span class="col" style="gap: 2px; flex: 1; min-width: 0">
                 <b class="t-subtitulo" style="color: var(--kib-cor-texto-principal);">Responsável é o aniversariante</b>
-                <span class="peq" style="line-height: 1.35; color: var(--kib-cor-texto-secundario);">${!aniv ? `Promoção: com ${ANIV_MIN} convidados ou mais, o aniversariante paga só ${brl(ANIV_PRECO)}. Exige documento com foto no dia.` : promoOk ? `Promoção valendo: ${convidadosAniv} convidados · aniversariante paga ${brl(Math.min(preco, ANIV_PRECO))}, convidados ${brl(preco)}.` : `Faltam ${ANIV_MIN - convidadosAniv} convidado${ANIV_MIN - convidadosAniv > 1 ? 's' : ''} para a promoção (${convidadosAniv} de ${ANIV_MIN}). Até lá ele paga ${brl(preco)}.`}</span>
+                <span class="peq" style="line-height: 1.35; color: var(--kib-cor-texto-secundario);">${!aniv ? `Vale para o responsável da reserva: com ${ANIV_MIN} convidados ou mais, ele paga só ${brl(ANIV_PRECO)}. Peça documento com foto no dia.` : promoOk ? `Promoção valendo: ${convidadosAniv} convidados · aniversariante paga ${brl(Math.min(preco, ANIV_PRECO))}, convidados ${brl(preco)}.` : `Faltam ${ANIV_MIN - convidadosAniv} convidado${ANIV_MIN - convidadosAniv > 1 ? 's' : ''} para a promoção (${convidadosAniv} de ${ANIV_MIN}). Até lá ele paga ${brl(preco)}.`}</span>
               </span>
             <span class="chave ${aniv ? 'on' : ''}" aria-hidden="true"></span>
             </button>
             <div style="display: flex; flex-direction: column; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12); border-radius: var(--kib-raio-cartao); background: var(--kib-cor-superficie-padrao); border: 1px solid var(--kib-cor-borda-sutil);">
-              ${novo ? `<div style="display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
-                <div style="display: flex; align-items: baseline; gap: 6px;">
-                  <span class="num t-titulo-grande peso-negrito" style="color: var(--kib-cor-texto-principal);">${brl(c.pago)}</span>
-                  <span class="peq" style="color: var(--kib-cor-texto-secundario);">de ${brl(c.total)}</span>
-                </div>
-                <span class="chipPgStatus ${novo ? 'aguardando' : c.falta ? 'parcial' : 'pago'}">
-                  Cobra após salvar
-                </span>
-              </div>` : `<span class="cardMetricaFinanceiraLabel">Situação do pagamento</span>`}
-              <div class="barra" style="height: 7px; border-radius: var(--kib-raio-chip); background: color-mix(in srgb, var(--kib-cor-texto-principal) 8%, transparent); overflow: hidden; display: flex;">
+              <span class="cardMetricaFinanceiraLabel">${novo ? 'Cobrança' : 'Situação do pagamento'}</span>
+              <div class="barra" ${novo ? 'hidden' : ''} style="height: 7px; border-radius: var(--kib-raio-chip); background: color-mix(in srgb, var(--kib-cor-texto-principal) 8%, transparent); overflow: hidden; display: flex;">
                 <span style="width: 100%; transform: scaleX(${c.total ? Math.min(100, Math.round(c.pago / c.total * 100)) / 100 : 1}); transform-origin: left; background: ${c.falta ? 'var(--kib-cor-estado-aviso-solido)' : 'var(--kib-cor-status-ok)'}; transition: transform .3s ease;"></span>
               </div>
               ${novo ? `
@@ -638,11 +630,9 @@ const Grupo = (() => {
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                   <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="width: 26px; height: 26px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; background: var(--kib-acao-info); color: var(--kib-branco); font-size: var(--kib-fonte-tamanho-corpo); font-weight: 800;">A</span>
-                    <b class="t-subtitulo" style="color: var(--kib-cor-texto-principal);">Asaas · Pix e cartão</b>
+                    <b class="t-subtitulo" style="color: var(--kib-cor-texto-principal);">Links de pagamento (Asaas: Pix e cartão)</b>
                   </div>
-                  <span class="chipPgStatus ${!g.falta ? 'pago' : g.pago ? 'parcial' : 'aguardando'}">
-                    ${!g.falta ? 'Pago' : g.pago ? 'Parcial' : 'Aguardando'}
-                  </span>
+
                 </div>
                 <span class="peq" style="line-height: 1.45; color: var(--kib-cor-texto-secundario);">
                   ${modo === 'individual' ? `Cada piloto paga a própria vaga (${brl(preco)}) pelo link do grupo. Para mandar um link só para uma pessoa, use “Receber” na linha dela.` : modo === 'sinal' ? `Sinal: ${brl(g.sinal)} (${sinalPct}%). O restante cada piloto acerta na Recepção.` : `Cobrança total do grupo: ${brl(g.falta)}.`}
@@ -666,6 +656,8 @@ const Grupo = (() => {
               <button type="button" class="btn prim peq" style="grid-column: 1 / -1" data-registrar="1">Lançar pagamento</button>
             </div></details></section>` : ''}
         </div>
+          ${!novo ? `
+          <details class="secao maisOpcoes blocoAuto" data-det-key="automatico"><summary class="titulo t-subtitulo">O que acontece sozinho até a corrida</summary><div class="listaAuto">${integra.map(([t, d, st, ok, ic]) => `<div class="itemAuto"><span class="tile" aria-hidden="true">${svg(ic, 14, 'currentColor')}</span><span class="col" style="gap: 1px; flex-grow: 1"><b>${t}</b><span class="peq" style="line-height: 1.4">${d}</span></span><span class="chip ${ok ? 'verde' : 'laranja'}">${st}</span></div>`).join('')}</div></details>` : ''}
       </div>
       </div>
       <div class="modalRodape" style="display: flex; align-items: center; gap: var(--kib-espaco-1); padding: 12px var(--kib-espaco-denso-20); background: var(--kib-cor-superficie-padrao); border-top: 1px solid var(--kib-cor-borda-sutil);">
@@ -838,8 +830,13 @@ const Grupo = (() => {
         val = formatarTelefone(t.value);
         t.value = val;
       }
+      const antes = { nome: p.nome, telefone: p.telefone, menor: p.menor };
+      if ((t.dataset.campo === 'nome' ? String(antes.nome || '') : formatarTelefone(antes.telefone)) === val) return;
       const corpo = { nome: t.dataset.campo === 'nome' ? val : p.nome, telefone: t.dataset.campo === 'telefone' ? val : p.telefone, menor: p.menor };
-      await atualizar(() => office(`/grupos/${estado.g.id}/pilotos/${p.id}`, { method: 'PUT', body: corpo }));
+      const gid = estado.g.id;
+      if (await atualizar(() => office(`/grupos/${gid}/pilotos/${p.id}`, { method: 'PUT', body: corpo }))) {
+        toastAcao(`${t.dataset.campo === 'nome' ? 'Nome' : 'WhatsApp'} de ${nomeBonito(antes.nome) || 'piloto ' + p.ordem} alterado`, 'Desfazer', () => atualizar(() => office(`/grupos/${gid}/pilotos/${p.id}`, { method: 'PUT', body: antes }), 'Alteração desfeita'));
+      }
     }
   });
   document.addEventListener('click', async (e) => {

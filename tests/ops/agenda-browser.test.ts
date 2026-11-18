@@ -146,8 +146,8 @@ describe('Agenda: integração real do frontend sem dados de produção',{ timeo
   const precoInp=page.locator('#camada [data-preco="1"]');
   expect(await precoInp.inputValue()).toBe('99.90');
   const modalTxt=await page.locator('#camada').innerText();
-  expect(modalTxt).toContain('PROMOÇÃO HAPPY HOUR');
-  expect(modalTxt).toContain('15 minutos de corrida');
+  expect(modalTxt).toContain('Happy Hour · terça a quinta');
+  expect(modalTxt).toContain('15 min de pista');
   expect(modalTxt).toContain('89,90');
   expect(modalTxt).toContain('99,90');
   expect(modalTxt).toContain('199,80');

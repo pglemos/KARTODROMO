@@ -378,7 +378,7 @@ input[type="checkbox"], input[type="radio"] {
 /* Tabela de Pilotos do Grupo */
 .cabTabelaGrupo {
   display: grid;
-  grid-template-columns: 32px minmax(196px, 2fr) 146px 88px minmax(128px, 1fr) minmax(188px, 1.2fr) 68px;
+  grid-template-columns: 32px minmax(200px, 2fr) 140px 88px minmax(118px, 0.9fr) minmax(236px, 1.4fr) 72px;
   gap: var(--kib-espaco-1);
   align-items: center;
   height: 36px;
@@ -396,7 +396,7 @@ input[type="checkbox"], input[type="radio"] {
 
 .linhaPilotoGrupo {
   display: grid;
-  grid-template-columns: 32px minmax(196px, 2fr) 146px 88px minmax(128px, 1fr) minmax(188px, 1.2fr) 68px;
+  grid-template-columns: 32px minmax(200px, 2fr) 140px 88px minmax(118px, 0.9fr) minmax(236px, 1.4fr) 72px;
   gap: var(--kib-espaco-1);
   align-items: center;
   min-height: 52px;
@@ -418,7 +418,7 @@ input[type="checkbox"], input[type="radio"] {
   gap: 3px;
   padding: 2px 6px;
   border-radius: var(--kib-raio-chip);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.2;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -777,7 +777,11 @@ input[type="checkbox"], input[type="radio"] {
 .resumoGrupoValor { font-size: var(--kib-fonte-tamanho-corpo); color: var(--kib-cor-texto-secundario); font-variant-numeric: tabular-nums; }
 .resumoGrupoValor b { font-size: var(--kib-fonte-tamanho-subtitulo); color: var(--kib-cor-texto-principal); }
 .resumoGrupoConta { font-size: var(--kib-fonte-tamanho-pequeno); color: var(--kib-cor-texto-secundario); }
-@media (max-width: 900px) { .resumoGrupo { align-items: flex-start; text-align: left; margin-left: 0; max-width: none; flex-basis: 100%; order: 3; } }
+@media (max-width: 900px) {
+  .modalGrupo .modalGrupoTopo { flex-wrap: wrap; }
+  .modalGrupo .modalGrupoTopoInfo { flex: 1 1 0; min-width: 0; }
+  .resumoGrupo { align-items: flex-start; text-align: left; margin-left: 0; max-width: none; flex-basis: 100%; order: 3; }
+}
 .avisoContradiz { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700; color: var(--kib-aviso-texto-escuro); }
 
 .valorFixo { display: flex; align-items: center; min-height: 36px; min-width: 0; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 600; color: var(--kib-cor-texto-principal); }
@@ -821,3 +825,23 @@ input[type="checkbox"], input[type="radio"] {
 .campoMoeda input::-webkit-inner-spin-button, .campoMoeda input::-webkit-outer-spin-button, .campoNumero::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 /* na Nova reserva o bloco já está dentro do resumo recolhível: sem segunda moldura */
 .maisOpcoes > .secao.dentroDoResumo { border: 0; box-shadow: none; background: transparent; padding: var(--kib-espaco-1) 0 0 !important; }
+
+/* rodada 2 do critique */
+.obsNoCorpo, .modalGrupoCorpo .blocoAuto { flex: 1 1 100%; min-width: 0; }
+.obsNoCorpo .avisoObs { max-width: none; }
+.btnIconeLinha { flex: none; width: 32px; height: 32px; display: inline-grid; place-items: center; border-radius: var(--kib-raio-botao); border: 1px solid var(--kib-cor-borda-sutil); background: var(--kib-cor-superficie-padrao); color: var(--kib-cor-marca-principal); cursor: pointer; }
+.btnIconeLinha:hover { border-color: var(--kib-cor-marca-principal); }
+.btnIconeLinha:focus-visible { outline: var(--kib-foco-largura) solid var(--kib-cor-borda-foco); outline-offset: var(--kib-foco-deslocamento); }
+.textoPendenteNovo { font-size: var(--kib-fonte-tamanho-pequeno); color: var(--kib-cor-texto-secundario); }
+.divisorMenu { border: 0; border-top: 1px solid var(--kib-cor-borda-sutil); margin: 4px 0; }
+.linhaAcoesLink .btn, .linhaAcoesLink .btnZapWhatsApp, .linhaAcoesLink .entrada { height: 36px; min-height: 36px; }
+.modalGrupo .btnCobrarSumario { height: 32px; }
+.modalGrupo .btnMoverPilotoGrupo, .modalGrupo .btnRemoverPiloto { width: 32px; height: 32px; }
+.formaTravada .btn { color: var(--kib-cor-texto-principal); background: var(--kib-cor-superficie-padrao); border: 1px solid var(--kib-cor-borda-forte); }
+.valorComAcao .btn.link { min-height: 28px; }
+.linhaPag { flex-wrap: nowrap; }
+.linhaPag .avatar.p { font-size: 12px; flex: none; }
+.linhaPag > b.mono { flex: none; }
+@media (max-width: 560px) { .linhaPag { flex-wrap: wrap; } }
+.itemAuto .tile { color: var(--kib-cor-marca-principal) !important; }
+.itemAuto .tile svg { stroke: currentColor; }
