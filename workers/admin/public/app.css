@@ -861,7 +861,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
 .chip.roxo { background: color-mix(in srgb, var(--roxo) 14%, transparent); color: var(--kib-cor-categoria-roxo-texto); }
 
 /* Observação da bateria — sinal amarelo na agenda e quadro no topo do painel e do grupo */
-.marcaObs { display: inline-grid; place-items: center; flex-shrink: 0; width: 16px; height: 16px; border-radius: 50%; background: var(--kib-cor-categoria-amarelo-topo); color: #1f1600; box-shadow: 0 0 0 1px color-mix(in srgb, var(--kib-cor-categoria-amarelo-base) 70%, transparent); cursor: help; vertical-align: -3px; }
+.marcaObs { display: inline-grid; place-items: center; flex-shrink: 0; width: 16px; height: 16px; border-radius: 50%; background: var(--kib-cor-categoria-amarelo-topo); color: var(--kib-aviso-texto-escuro); box-shadow: 0 0 0 1px color-mix(in srgb, var(--kib-cor-categoria-amarelo-base) 70%, transparent); cursor: help; vertical-align: -3px; }
 .marcaObs.grande { width: 24px; height: 24px; cursor: default; }
 .bloco2 .linha1 .marcaObs { margin-left: 2px; }
 .tituloComObs { display: inline-flex; align-items: center; gap: var(--kib-espaco-meio); max-width: 100%; }
