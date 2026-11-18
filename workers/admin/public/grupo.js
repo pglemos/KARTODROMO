@@ -465,6 +465,7 @@ const Grupo = (() => {
             <span class="badgeNomeBateria">${esc(b.nome || 'Bateria')}${b.produto ? ' · ' + esc(b.produto) : ''} · ${durMin} min</span>
             ${novo && estado.voltar ? '<button type="button" class="btn link peq" data-voltar-horario="1" style="font-size: var(--kib-fonte-tamanho-pequeno);">‹ Trocar horário</button>' : ''}
           </div>
+          ${typeof avisoObs === 'function' ? avisoObs(b) : ''}
         </div>
         <button type="button" class="btnFecharModal hov" data-acao="fechar" aria-label="Fechar janela" title="Fechar (Esc)">
           ${svg(IC.fechar, 16, 'currentColor', 2.4)}
