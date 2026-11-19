@@ -467,3 +467,14 @@ html.kib-embutido[data-tela-kib="visao"] .cab .btn:not(.prim):not(.escuro) {
   box-shadow: none;
 }
 [data-tema="claro"] .chip.roxo svg { stroke: currentColor; }
+
+/* ── Reservas online no V22 (19/11/2026): o total recebido vira o cartão verde-escuro de destaque. ── */
+[data-tema="claro"] #kpisRes .kpi:last-child {
+  color: #ffffff;
+  background:
+    radial-gradient(300px 120px at 90% 0%, rgba(143, 224, 196, 0.22), transparent 70%),
+    linear-gradient(150deg, #155443 0%, #0f3b31 65%, #0b2e26 100%);
+  box-shadow: 0 22px 40px -24px rgba(15, 59, 49, 0.75);
+}
+[data-tema="claro"] #kpisRes .kpi:last-child :is(.rot, .val) { color: #ffffff !important; }
+[data-tema="claro"] #kpisRes .kpi:last-child .sub { color: #b9d2c7; }
