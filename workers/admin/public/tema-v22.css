@@ -405,3 +405,20 @@ html.kib-embutido[data-tela-kib="visao"] .cab .btn:not(.prim):not(.escuro) {
 [data-tema="claro"] #ficha .fichaTopo .avatar.xg {
   box-shadow: 0 0 0 4px #ffffff, 0 12px 24px -12px rgba(15, 35, 28, 0.55) !important;
 }
+
+/* ── Pilotos no V22 (19/11/2026) ──
+   · iniciais sem foto num menta suave (antes cinza; a cor continua sem significado, é uma só);
+   · no perfil do piloto, a foto fica redonda como o perfil da referência, o nome em peso médio e os números
+     (baterias, voltas, vitórias, pódios) em pequenos cartões de vidro dentro do herói. */
+[data-tema="claro"] .avatarNeutro { background: #e2f6ee; color: #0f3b31; }
+:is([data-tema="claro"], [data-tema="escuro"]) .heroPiloto .fotoGrande { border-radius: 50%; }
+:is([data-tema="claro"], [data-tema="escuro"]) .heroPiloto .btnFoto { right: 0; bottom: 0; }
+:is([data-tema="claro"], [data-tema="escuro"]) .nomeHero { font-weight: 500; letter-spacing: -0.02em; }
+:is([data-tema="claro"], [data-tema="escuro"]) .numerosHero { gap: 10px; }
+:is([data-tema="claro"], [data-tema="escuro"]) .numerosHero > span {
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: rgba(234, 243, 238, 0.08);
+  box-shadow: 0 0 0 1px rgba(234, 243, 238, 0.1) inset;
+}
+:is([data-tema="claro"], [data-tema="escuro"]) .numerosHero b { font-weight: 500; }
