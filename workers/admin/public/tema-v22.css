@@ -478,3 +478,27 @@ html.kib-embutido[data-tela-kib="visao"] .cab .btn:not(.prim):not(.escuro) {
 }
 [data-tema="claro"] #kpisRes .kpi:last-child :is(.rot, .val) { color: #ffffff !important; }
 [data-tema="claro"] #kpisRes .kpi:last-child .sub { color: #b9d2c7; }
+
+/* ── Patrocinadores no V22 (20/11/2026) ──
+   As abas (Resumo, Contratos, Cobranças…) viram a pílula de vidro com a escolhida em verde-escuro, e os
+   indicadores (receita contratada, a receber, em atraso, espaços) viram cartões de vidro com número leve. */
+[data-tema="claro"] .ev-abas {
+  width: fit-content;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.9) inset, 0 8px 18px -14px rgba(15, 35, 28, 0.35);
+}
+[data-tema="claro"] .ev-abas button { height: 32px; border-radius: 999px; background: transparent; box-shadow: none; color: var(--kib-cor-texto-corpo); }
+[data-tema="claro"] .ev-abas button.sel { background: var(--v22-floresta); color: #ffffff; box-shadow: 0 8px 16px -10px rgba(15, 59, 49, 0.6); }
+[data-tema="claro"] .i2-num .cartao { border-radius: 20px; }
+[data-tema="claro"] .i2-num b { font-weight: 500; letter-spacing: -0.02em; }
+[data-tema="claro"] .i2-num .cartao:first-child {
+  color: #ffffff;
+  background: linear-gradient(150deg, #155443 0%, #0f3b31 65%, #0b2e26 100%);
+  box-shadow: 0 22px 40px -24px rgba(15, 59, 49, 0.75);
+}
+[data-tema="claro"] .i2-f { border-color: transparent; border-radius: 999px; background: rgba(255, 255, 255, 0.72); }
