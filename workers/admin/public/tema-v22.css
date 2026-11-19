@@ -324,3 +324,53 @@ html.kib-embutido[data-tela-kib="visao"] .cab .btn:not(.prim):not(.escuro) {
   }
   [data-tema="claro"] .visaoLado .pendencia > .btn:not(.perigo):hover { background: #155443; }
 }
+
+/* ── Agenda no V22 (19/11/2026) ──
+   · seletores segmentados (Dia/Semana/Lista e os da Recepção) em pílula de vidro, o escolhido em verde-escuro,
+     como o "Weekly/Monthly" da referência;
+   · o dia de hoje no cabeçalho da semana vira o bloco verde-escuro do calendário do V22, e a coluna dele ganha
+     um véu menta;
+   · blocos de 12px com sombra suave, e a etiqueta de tipo (EVENTO, CAMP.) numa pílula escura. As cores dos
+     blocos seguem as do significado (livre, reserva, fechada, evento). */
+:is([data-tema="claro"], [data-tema="escuro"]) .seg {
+  border-radius: 999px;
+  padding: 4px;
+  gap: 2px;
+}
+[data-tema="claro"] .seg {
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.9) inset, 0 8px 18px -14px rgba(15, 35, 28, 0.35);
+}
+:is([data-tema="claro"], [data-tema="escuro"]) .seg button { border-radius: 999px; }
+[data-tema="claro"] .seg button.sel {
+  background: var(--v22-floresta);
+  color: #ffffff;
+  box-shadow: 0 8px 16px -10px rgba(15, 59, 49, 0.6);
+}
+[data-tema="escuro"] .seg button.sel { background: var(--v22-menta); color: var(--v22-floresta); }
+
+[data-tema="claro"] .cabDia.hoje {
+  border-radius: 16px;
+  background: linear-gradient(160deg, #155443 0%, #0f3b31 70%);
+  box-shadow: 0 12px 24px -16px rgba(15, 59, 49, 0.7);
+}
+[data-tema="claro"] .cabDia.hoje :is(.nomeDia, .resumoDia) { color: #b9d2c7; }
+[data-tema="claro"] .cabDia.hoje .numDia { background: transparent; color: #ffffff; }
+[data-tema="claro"] .cabDia.hoje .ocDia { background: rgba(234, 243, 238, 0.2); }
+[data-tema="claro"] .cabDia.hoje + .cabDia { border-left-color: transparent; }
+[data-tema="claro"] .colDia2.hoje { background: rgba(143, 224, 196, 0.12); }
+
+:is([data-tema="claro"], [data-tema="escuro"]) .bloco2 { border-radius: 12px; }
+[data-tema="claro"] .bloco2:not(.livre):not(.bloq) {
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.6) inset, 0 8px 16px -14px rgba(15, 35, 28, 0.45);
+}
+:is([data-tema="claro"], [data-tema="escuro"]) .bloco2 .tipoB {
+  border: 0;
+  border-radius: 999px;
+  padding: 1px 7px;
+  background: var(--v22-floresta);
+  color: #ffffff;
+  letter-spacing: 0.04em;
+}
