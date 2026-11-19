@@ -378,7 +378,7 @@ input[type="checkbox"], input[type="radio"] {
 /* Tabela de Pilotos do Grupo */
 .cabTabelaGrupo {
   display: grid;
-  grid-template-columns: 32px minmax(236px, 1.6fr) 150px 84px 124px minmax(208px, 1fr) 76px;
+  grid-template-columns: 32px minmax(216px, 1.6fr) 150px 84px 124px minmax(208px, 1fr) 76px;
   gap: var(--kib-espaco-1);
   align-items: center;
   height: 36px;
@@ -396,7 +396,7 @@ input[type="checkbox"], input[type="radio"] {
 
 .linhaPilotoGrupo {
   display: grid;
-  grid-template-columns: 32px minmax(236px, 1.6fr) 150px 84px 124px minmax(208px, 1fr) 76px;
+  grid-template-columns: 32px minmax(216px, 1.6fr) 150px 84px 124px minmax(208px, 1fr) 76px;
   gap: var(--kib-espaco-1);
   align-items: center;
   min-height: 52px;
