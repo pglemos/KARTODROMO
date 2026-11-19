@@ -85,6 +85,25 @@ export function invalidarAbertura(store: AppStore | null, karts: string[]) {
   if (alterados) store.subirRevisao('frota');
 }
 
+/**
+ * Kart que ENTRA numa equalização perde a liberação do dia (vai ser mexido). Antes toda gravação da sessão de
+ * equalização (cada redutor, cada checklist, cada passagem) apagava a abertura de todos os karts dela: o galpão
+ * fazia o checklist e minutos depois estava tudo pendente de novo (19/11). Agora só o kart novo na sessão.
+ */
+export function criarVigiaEqualizacao(store: () => AppStore | null) {
+  const vistos = new Map<string, Set<string>>();
+  return (sessaoId: string, karts: string[]) => {
+    const agora = new Set(karts.filter(Boolean));
+    const antes = vistos.get(sessaoId);
+    vistos.set(sessaoId, agora);
+    // primeira vez que a sessão aparece (servidor acabou de subir ou sessão nova): só anota
+    if (!antes) return [];
+    const novos = [...agora].filter(k => !antes.has(k));
+    if (novos.length) invalidarAbertura(store(), novos);
+    return novos;
+  };
+}
+
 export function normalizarItensChecklist(itensRecebidos: string[]): string[] {
   const conj = new Set(itensRecebidos);
   if (conj.has('pneus')) {

@@ -121,3 +121,22 @@ describe('abertura diária da frota', () => {
     expect(c.abertura.resumo().karts[0].estado).toBe('bloqueado');
   });
 });
+
+describe('equalização não apaga o checklist do galpão', () => {
+  it('só o kart que entra na equalização perde a liberação; gravar de novo não mexe em nada', async () => {
+    const { abrirStore } = await import('../../lib/app-v1/store');
+    const { criarVigiaEqualizacao } = await import('../../lib/app-v1/abertura-frota');
+    const store = abrirStore(':memory:');
+    const dia = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+    const em = new Date().toISOString();
+    for (const k of ['1', '2', '3']) store.db.prepare('INSERT INTO abertura_frota VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(dia, k, '[]', 'op', em, 'ger', em, null);
+    const vigia = criarVigiaEqualizacao(() => store);
+    expect(vigia('eq', ['1', '2'])).toEqual([]); // sessão já existente: só anota
+    expect(vigia('eq', ['1', '2'])).toEqual([]); // redutor/checklist da equalização: nada muda
+    expect(vigia('eq', ['1', '2'])).toEqual([]);
+    expect(store.db.prepare('SELECT COUNT(*) n FROM abertura_frota').get()).toEqual({ n: 3 });
+    expect(vigia('eq', ['1', '2', '3'])).toEqual(['3']); // kart 3 entrou na equalização
+    expect((store.db.prepare('SELECT kart FROM abertura_frota ORDER BY kart').all() as { kart: string }[]).map(r => r.kart)).toEqual(['1', '2']);
+    store.fechar();
+  });
+});

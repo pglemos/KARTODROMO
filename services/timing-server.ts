@@ -1,4 +1,4 @@
-import { invalidarAbertura } from '../lib/app-v1/abertura-frota';
+import { criarVigiaEqualizacao } from '../lib/app-v1/abertura-frota';
 import { chassisFrota, gravarChassi } from '../lib/app-v1/chassi';
 /**
  * Servico de cronometragem proprio (substitui o LapTime.Server).
@@ -383,10 +383,13 @@ function assinaturaDeComando(s: Session) {
   return JSON.stringify([s.state, s.competitors.map((c) => [c.kart, c.name, c.customerId ?? null, c.autoAdded ? 1 : 0, c.penalidades?.length ?? 0, c.flag ?? null]), s.manualPositions ?? {}, s.type === 'equalizacao' ? s.equalizacao ?? null : null]);
 }
 
+const vigiaEqualizacao = criarVigiaEqualizacao(() => storeOperacional);
+// equalizações já gravadas: anota os karts de agora para não invalidar a frota inteira na primeira gravação
+for (const s of sessions.values()) if (s.type === 'equalizacao') vigiaEqualizacao(s.id, s.competitors.map((c) => c.kart));
 function saveSession(s: Session) {
   const targetPath = resolveSessionFilePath(s);
   try {
-    if (s.type === 'equalizacao') invalidarAbertura(storeOperacional, s.competitors.map(c => c.kart));
+    if (s.type === 'equalizacao') vigiaEqualizacao(s.id, s.competitors.map(c => c.kart));
     writeJsonAtomic(targetPath, s);
     const previousPath = sessionPaths.get(s.id);
     if (previousPath && previousPath !== targetPath && existsSync(previousPath)) {
