@@ -380,7 +380,18 @@ Invoke-Command 192.168.20.53 -Credential $c { Get-Process Kartodromo* }   # um c
   - A página selecionada é compartilhada pelo serviço do ORBITS em `GET/POST /api/painel-led-page` e no campo `painelLed` de `/api/state`; o CRONO1 controla 1–10, 11–20 e 21–30 pela rede, sem precisar da COM3.
   - A saída "Alimentador do painel" (RMonitor) do Orbits 4 foi **desligada**, com autorização do
     dono, para liberar a COM3.
-- **Telão de LED da TB50** (posições 1–20; PC **192.168.20.250**, `DESKTOP-UATKK4T`, usuário `laptime1`):
+- **Telão de LED da TB50 — como está desde 18/11/2026 (sem PC):** o PC `.250` saiu do telão. A
+  processadora TB50 (`192.168.20.253`, ViPlex em `https://192.168.20.253:16674`) toca sozinha o
+  programa HTML **CRONOMETRAGEM**, que abre `http://192.168.20.249:4050/tb50` (a página do placar
+  servida pela própria cronometragem do ORBITS). Nada precisa ficar ligado além do ORBITS e da TB50.
+  - Se o painel perder o placar (TB50 resetada, programa trocado), reaplicar a partir do ORBITS:
+    `Invoke-Command -ComputerName 192.168.20.13 -Credential (Obter-CredencialKartodromo) { Set-Location
+    C:\KARTODROMO-TB50; & 'C:\Program Files\nodejs\node.exe' node_modules\tsx\dist\cli.mjs
+    scripts\configure-tb50-podium.ts }` (o SRVKART guarda o acesso ao ViPlex; o script pode ficar
+    pendurado depois de pôr o programa no ar — encerrar o `node` dele no SRVKART).
+  - As tarefas antigas do SRVKART ("Kartodromo TB50 Podium", "... Watchdog", "TB50 Streaming Stack",
+    "TB50 Watchdog") continuam **desativadas**: o Next na 3100 e o scraper não são mais necessários.
+- **Telão de LED da TB50 — histórico (até 18/11/2026, com PC)** (posições 1–20; PC **192.168.20.250**, `DESKTOP-UATKK4T`, usuário `laptime1`):
   - O PC sai em HDMI 2048×600 para a processadora TB50 (`.253`). Chrome em kiosk (tarefa
     "TB50 Kiosk Watchdog (EngRev)") abre `http://localhost:3000/placar-telao-tb50?layout=designer`,
     servido por uma cópia antiga do Next em `C:\KARTODROMO\telao` (tarefas "TB50 Streaming Stack" e
