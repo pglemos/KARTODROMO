@@ -909,3 +909,18 @@ button.chipPilotoPendente:hover { border-color: var(--kib-aviso-texto-escuro); }
 .linhaPilotoGrupo.destaque, .linhaPag.destaque { animation: destaqueLinha 1.6s ease-out; }
 @keyframes destaqueLinha { from { background: color-mix(in srgb, var(--kib-cor-categoria-amarelo-topo) 45%, transparent); } to { background: transparent; } }
 @media (prefers-reduced-motion: reduce) { .linhaPilotoGrupo.destaque, .linhaPag.destaque { animation: none; outline: 2px solid var(--kib-cor-categoria-amarelo-base); } }
+
+/* rodada 8 do critique */
+.resumoGrupoFalta.livre { color: var(--kib-cor-texto-principal); }
+.chipAvisoLinha { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px; border-radius: var(--kib-raio-chip); border: 1px solid var(--kib-aviso-borda); background: var(--kib-aviso-fundo-claro); color: var(--kib-aviso-texto-escuro); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700; cursor: pointer; }
+.avisoConferido { display: flex; align-items: center; gap: 6px; margin: 0 0 var(--kib-espaco-1); font-size: var(--kib-fonte-tamanho-pequeno); color: var(--kib-cor-texto-secundario); }
+.avisoConferido .btn.link { min-height: 24px; padding: 0 4px; }
+.linhaPilotoGrupo.destaque, .linhaPag.destaque, .obsNoCorpo.destaque { animation: destaqueLinha 2s ease-out; }
+@keyframes destaqueLinha { 0%, 40% { background: color-mix(in srgb, var(--kib-cor-categoria-amarelo-topo) 60%, transparent); box-shadow: inset 0 0 0 2px var(--kib-cor-categoria-amarelo-base); } 100% { background: transparent; box-shadow: none; } }
+.modalGrupo .btnToggleIdade.adulto { background: var(--kib-cor-superficie-campo); border-color: var(--kib-cor-borda-sutil); color: var(--kib-cor-texto-principal); }
+/* tablet: configuração do pagamento antes da lista; histórico de recebidos depois */
+@media (max-width: 1080px) {
+  .modalGrupo .colunaPagamento { display: contents; }
+  .modalGrupo .colunaPagamento > * { order: -1; flex: 1 1 100%; min-width: 0; }
+  .modalGrupo .colunaPagamento > .pagRecebidos { order: 5; }
+}

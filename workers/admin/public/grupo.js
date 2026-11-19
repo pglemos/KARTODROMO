@@ -60,8 +60,7 @@ const Grupo = (() => {
   }
   // avatar: verde = pago e cadastrado; cor do grupo = pago; cinza = ainda falta pagar (o mesmo em todo o modal)
   const corAvatar = (p, i) => !p ? (i === 0 ? 'background: var(--kib-cor-marca-principal); color: var(--kib-branco)' : 'background: var(--kib-cor-superficie-campo); color: var(--kib-cor-texto-secundario); box-shadow: inset 0 0 0 1px var(--kib-cor-borda-forte)')
-    : p.pago && p.cadastro === 'completo' ? 'background: var(--kib-cor-estado-sucesso-texto); color: var(--kib-branco)'
-      : (p.pago || String(p.nome || '').trim() || p.clienteId) ? `background: ${CORG[i % 6]}; color: var(--kib-branco)`
+    : (p.pago || String(p.nome || '').trim() || p.clienteId) ? 'background: color-mix(in srgb, var(--kib-cor-marca-principal) 14%, var(--kib-cor-superficie-padrao)); color: var(--kib-cor-marca-principal)'
         : 'background: var(--kib-cor-superficie-campo); color: var(--kib-cor-texto-secundario); box-shadow: inset 0 0 0 1px var(--kib-cor-borda-forte)';
   const vagaLivre = (p) => !!p && !p.responsavel && !String(p.nome || '').trim() && !p.clienteId && !p.pago && !(+p.valorPago > 0);
   const faltamLista = (g) => g.pilotos.filter((p) => p.cadastro !== 'completo').map((p) => p.id);
@@ -385,7 +384,9 @@ const Grupo = (() => {
     const minutosAte = (deIso(b.dataHora) - new Date()) / 60000;
     const urgenteGrupo = minutosAte < 120; // falta de pagamento só vira alarme vermelho perto da bateria
     const obsTexto = String((b && b.observacao) || '').trim();
-    const obsContradiz = !novo && /anivers/i.test(obsTexto) && !aniv;
+    const chaveAviso = !novo ? `kib-aviso-ok-${g.id}-${obsTexto.length}-${obsTexto.slice(0, 40)}` : '';
+    let avisoConferido = ''; try { avisoConferido = chaveAviso ? localStorage.getItem(chaveAviso) || '' : ''; } catch (e) { avisoConferido = ''; }
+    const obsContradiz = !novo && /anivers/i.test(obsTexto) && !aniv && !avisoConferido;
     const pagsAniv = !novo ? (g.pagamentos || []).filter((pg) => +pg.valor === ANIV_PRECO && pg.pilotoId) : [];
     const pagouPrecoAniv = pagsAniv.map((pg) => nomeBonito(pg.pilotoNome || (g.pilotos.find((x) => x.id === pg.pilotoId) || {}).nome || '')).filter(Boolean);
     const travaForma = !novo && pagamentosFeitos > 0 && !estado.trocarModo;
@@ -451,6 +452,7 @@ const Grupo = (() => {
         </div>
         <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0;">
           ${novo ? `<span class="textoPendenteNovo num">${esc(pg[1])}</span>` : pg[0] === 'verde' ? `<span class="chipPgStatus pago" title="${esc(pg[1])}">${svg(IC.ok, 12, 'currentColor', 2.2)} ${esc(pg[1])}</span>` : pg[0] === 'vermelho' && urgenteGrupo ? `<span class="chipPgStatus falta" title="${esc(pg[1])} · a bateria começa em menos de 2 horas">${svg(IC_ALERTA, 11, 'currentColor', 2.2)} ${esc(pg[1])}</span>` : `<span class="chipPgStatus ${pg[0] === 'cinza' ? 'aguardando' : 'parcial'}" title="${esc(pg[2] || pg[1])}">${pg[0] === 'cinza' ? '' : svg(IC_RELOGIO, 11, 'currentColor', 2.2)} ${esc(pg[1])}</span>`}
+          ${obsContradiz && pagsAniv.some((pg) => pg.pilotoId === p.id) ? `<button type="button" class="chipAvisoLinha" data-ir-linha="avisoObs" title="Antes de cobrar, confira o aviso da observação">${svg(IC_ALERTA, 11, 'currentColor', 2.2)} Ver aviso</button>` : ''}
           ${acoesPg}
         </div>
         ${resp ? '<span></span>' : `<div style="display: flex; align-items: center; justify-content: flex-end; gap: 4px;">
@@ -498,9 +500,9 @@ const Grupo = (() => {
           </div>
         </div>
         ${novo ? '' : `<div class="resumoGrupo" aria-live="polite">
-            <span class="resumoGrupoFalta ${!g.falta ? 'ok' : urgenteGrupo ? 'urgente' : ''}">${g.falta ? `Falta ${brl(g.falta)}` : 'Tudo pago'}</span>
+            <span class="resumoGrupoFalta ${!g.falta ? 'ok' : !devedores.length && modo === 'individual' ? 'livre' : urgenteGrupo ? 'urgente' : ''}">${!g.falta ? 'Tudo pago' : modo === 'individual' && livres.length ? (devedores.length ? `Falta cobrar ${brl(faltaDevedores)}` : 'Nada a cobrar agora') : `Falta ${brl(g.falta)}`}</span>
             <span class="resumoGrupoConta"><span class="nw">${brlCurto(g.pago)} de ${brlCurto(g.total)} recebidos</span> · <span class="nw">${g.pagos}/${g.n} pagos${parciais ? ` (+${parciais} em parte)` : ''}</span> · <span class="nw">${g.cadastrados}/${g.n} com cadastro</span></span>
-            ${g.falta && livres.length && modo === 'individual' ? `<span class="resumoGrupoConta">${devedores.length ? `${brlCurto(faltaDevedores)} de ${plural(devedores.length, 'pessoa', 'pessoas')} + ` : ''}${brlCurto(faltaLivres)} de ${plural(livres.length, 'vaga livre', 'vagas livres')} (pelo link)</span>` : ''}
+            ${g.falta && livres.length && modo === 'individual' ? `<span class="resumoGrupoConta"><span class="nw">${plural(livres.length, 'vaga livre', 'vagas livres')}: ${brlCurto(faltaLivres)} pelo link</span> · <span class="nw">total em aberto ${brlCurto(g.falta)}</span></span>` : ''}
           </div>`}
         <button type="button" class="btnFecharModal hov" data-acao="fechar" aria-label="Fechar janela" title="Fechar (Esc)">
           ${svg(IC.fechar, 16, 'currentColor', 2.4)}
@@ -508,7 +510,7 @@ const Grupo = (() => {
       </div>
       <div class="modalGrupoCorpo">
       <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--kib-espaco-2); padding: var(--kib-espaco-2)">
-        ${obsTexto ? `<div class="obsNoCorpo">${typeof avisoObs === 'function' ? avisoObs(b, obsContradiz ? `<span class="avisoContradiz">${svg(IC_ALERTA, 13, 'currentColor', 2.2)} A observação fala em aniversariante, mas a promoção não está ligada.${pagouPrecoAniv.length ? ` ${pagouPrecoAniv.join(', ')} pagou ${brl(ANIV_PRECO)}, o valor de aniversariante.` : ''} Confirme quem é o aniversariante antes de cobrar: a promoção vale só para o responsável.${pagsAniv.length ? ` <button type="button" class="btn link peq" data-ir-linha="pag-${pagsAniv[0].id}">Ver o pagamento</button>` : ''}</span>` : '') : ''}</div>` : ''}
+        ${obsTexto ? `<div class="obsNoCorpo" id="avisoObs">${avisoConferido ? `<p class="avisoConferido">${svg(IC.ok, 12, 'currentColor', 2.2)} Aviso do aniversariante conferido neste computador em ${esc(avisoConferido)}. <button type="button" class="btn link peq" data-aviso-desfazer="${esc(chaveAviso)}">Mostrar de novo</button></p>` : ''}${typeof avisoObs === 'function' ? avisoObs(b, obsContradiz ? `<span class="avisoContradiz">${svg(IC_ALERTA, 13, 'currentColor', 2.2)} A observação fala em aniversariante, mas a promoção não está ligada.${pagouPrecoAniv.length ? ` ${pagouPrecoAniv.join(', ')} pagou ${brl(ANIV_PRECO)}, o valor de aniversariante.` : ''} Confirme quem é o aniversariante antes de cobrar: a promoção vale só para o responsável.${pagsAniv.length ? ` <button type="button" class="btn link peq" data-ir-linha="pag-${pagsAniv[0].id}">Ver o pagamento</button>` : ''} <button type="button" class="btn link peq" data-aviso-ok="${esc(chaveAviso)}">Já conferi</button></span>` : '') : ''}</div>` : ''}
         <div style="flex: 999 1 860px; min-width: 0; display: flex; flex-direction: column; gap: var(--kib-espaco-denso-12)">
           <section class="cartao leve">
             <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--kib-espaco-1) var(--kib-espaco-denso-12); padding: var(--kib-espaco-denso-12) var(--kib-espaco-2) var(--kib-espaco-1)">
@@ -543,7 +545,7 @@ const Grupo = (() => {
             </div>
             <div style="display: flex; flex-wrap: wrap; align-items: center; gap: var(--kib-espaco-1) var(--kib-espaco-denso-12); padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); background: var(--kib-cor-superficie-suave); border-top: 1px solid var(--kib-cor-borda-sutil)">
               <button class="btn branco peq" data-qtd="1" ${c.n >= max ? 'disabled' : ''}>+ Adicionar piloto</button>
-              <span class="peq cresce" style="flex: 1 1 220px; line-height: 1.4; color: var(--kib-cor-texto-secundario);">${c.n >= max ? 'A bateria não tem mais vagas livres.' : novo ? 'Depois de salvar sai um link só para o grupo: cada pessoa abre e se cadastra.' : `Ainda cabem ${max - c.n} na bateria. A vaga nova fica livre para o link do grupo.`}</span>
+              <span class="peq cresce" style="flex: 1 1 220px; line-height: 1.4; color: var(--kib-cor-texto-secundario);">${c.n >= max ? 'A bateria não tem mais vagas livres.' : novo ? 'Depois de salvar sai um link só para o grupo: cada pessoa abre e se cadastra.' : ''}</span>
             </div>
             ${blocoLinks}
           </section>
@@ -864,6 +866,8 @@ const Grupo = (() => {
     const ctx = estado; if (ctx.ocupado) return;
     const { g, rasc, b } = ctx; let x0;
     if (e.target.closest('[data-grupo-atualizar]')) return refrescar(true);
+    if ((x0 = el('[data-aviso-ok]'))) { const a = new Date(); try { localStorage.setItem(x0.dataset.avisoOk, `${pad(a.getDate())}/${pad(a.getMonth() + 1)} ${pad(a.getHours())}:${pad(a.getMinutes())}`); } catch (e) { /* sem armazenamento */ } pintar(); return; }
+    if ((x0 = el('[data-aviso-desfazer]'))) { try { localStorage.removeItem(x0.dataset.avisoDesfazer); } catch (e) { /* sem armazenamento */ } pintar(); return; }
     if ((x0 = el('[data-ir-linha]'))) { const alvo = document.getElementById(x0.dataset.irLinha); if (alvo) { alvo.scrollIntoView({ block: 'center', behavior: 'smooth' }); alvo.classList.remove('destaque'); void alvo.offsetWidth; alvo.classList.add('destaque'); const f = alvo.classList.contains('linhaPilotoGrupo') ? alvo.querySelector('summary.btnCobrarSumario') : null; if (!f) alvo.setAttribute('tabindex', '-1'); setTimeout(() => (f || alvo).focus({ preventScroll: true }), 350); } return; }
     if (el('[data-ver-livres]')) { ctx.verLivres = true; pintar(); const f = $('#camada .linhaPilotoGrupo [data-campo="nome"]'); if (f) f.focus(); return; }
     if ((x0 = el('[data-editar-linha]'))) { ctx.editandoLinha = +x0.dataset.editarLinha; pintar(); const ci = $(`#camada [data-campo="nome"][data-i="${ctx.editandoLinha}"]`); if (ci) { ci.focus(); ci.select(); } return; }
