@@ -50,6 +50,9 @@ export function calcularCancelamento(p: { valorCentavos: number; inicio?: string
 }
 
 /** POST /api/reservas/cancelar { cpf, codigo, pedidoId, simular? } */
+/** Uma trava de cancelamento mais velha que isto é de uma tentativa que caiu: não bloqueia mais o cliente. */
+const TRAVA_CANCELAMENTO_MS = 5 * 60_000;
+
 export async function cancelarReserva(env: EnvCancelamento, b: Record<string, unknown>, agora = Date.now()) {
   const cpf = digitos(b.cpf), codigo = String(b.codigo ?? '').trim().toUpperCase(), id = String(b.pedidoId ?? '');
   if (cpf.length !== 11 || !/^[A-Z0-9]{6}$/.test(codigo) || !UUID.test(id)) return json(400, { erro: 'Dados do cancelamento inválidos.' });
@@ -69,18 +72,26 @@ export async function cancelarReserva(env: EnvCancelamento, b: Record<string, un
   if (c.reembolsoCentavos > 0 && !p.pagamento?.asaasId) return json(409, { erro: 'Não achamos o pagamento desta reserva. Fale com a recepção para o estorno.' });
   if (b.confirmo !== true) return json(400, { erro: 'Confirme o cancelamento.' });
 
-  // trava contra clique duplo: um cancelamento por pedido
+  // trava contra clique duplo: um cancelamento por pedido. Com PRAZO: uma trava que ficou para trás (o processo caiu
+  // no meio) bloqueava o cliente para sempre com "já em andamento" (revisão de 19/11/2026).
   const trava = `reservas/cancelando/${id}`;
-  if (await env.PRE.get(trava)) return json(409, { erro: 'O cancelamento já está em andamento. Aguarde alguns segundos.' });
+  const travaAtual = await (await env.PRE.get(trava))?.json<{ em?: string }>().catch(() => null);
+  if (travaAtual && agora - Date.parse(travaAtual.em ?? '') < TRAVA_CANCELAMENTO_MS)
+    return json(409, { erro: 'O cancelamento já está em andamento. Aguarde alguns segundos.' });
   await env.PRE.put(trava, JSON.stringify({ em: new Date(agora).toISOString() }), JSON_R2);
 
-  let estornoId: string | null = null;
-  if (c.reembolsoCentavos > 0) {
+  // Estorno já feito numa tentativa que caiu antes de gravar o cancelamento: termina o cancelamento sem estornar de novo.
+  const marcaDoEstorno = `reservas/estornos/${id}.json`;
+  const estornoFeito = await (await env.PRE.get(marcaDoEstorno))?.json<{ estornoId?: string | null }>().catch(() => null);
+  let estornoId: string | null = estornoFeito ? estornoFeito.estornoId ?? null : null;
+  if (c.reembolsoCentavos > 0 && !estornoFeito) {
     try {
       const r = await chamar<{ id?: string; status?: string }>(env, `/payments/${encodeURIComponent(p.pagamento!.asaasId)}/refund`, {
         method: 'POST', body: JSON.stringify({ value: c.reembolsoCentavos / 100, description: `Cancelamento da reserva ${p.codigo} pelo site (90%)` }),
       });
       estornoId = r?.id ?? null;
+      // Grava LOGO DEPOIS do estorno: se o processo cair daqui até o fim, a próxima tentativa conclui sem estornar de novo.
+      await env.PRE.put(marcaDoEstorno, JSON.stringify({ estornoId, reembolsoCentavos: c.reembolsoCentavos, em: new Date(agora).toISOString() }), JSON_R2);
     } catch (e) {
       console.error('estorno asaas', p.codigo, (e as Error).message);
       await env.PRE.delete(trava);
@@ -90,10 +101,12 @@ export async function cancelarReserva(env: EnvCancelamento, b: Record<string, un
   p.status = 'cancelado';
   p.cancelamento = { em: new Date(agora).toISOString(), reembolsoCentavos: c.reembolsoCentavos, horasAntes: Math.round(c.horasAntes * 10) / 10, estornoId };
   p.atualizadoEm = p.cancelamento.em;
-  await avisarPorEmail(env, p as never).catch(() => false);
+  // O pedido cancelado é gravado ANTES do e-mail: o aviso é o que pode demorar ou falhar.
   await env.PRE.put(`reservas/pedidos/${id}.json`, JSON.stringify(p), JSON_R2);
+  await avisarPorEmail(env, p as never).catch(() => false);
   await indexarPedido(env as never, p as never).catch(() => undefined);
   await env.PRE.put(`cancelamentos/${id}.json`, JSON.stringify({ pedidoId: id, codigo: p.codigo, em: p.cancelamento.em, reembolsoCentavos: c.reembolsoCentavos, state: 'pending' }), JSON_R2);
+  await env.PRE.delete(trava).catch(() => undefined);
   return json(200, { ok: true, reembolsoCentavos: c.reembolsoCentavos });
 }
 

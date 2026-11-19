@@ -160,13 +160,24 @@ export async function situacaoPedido(env: EnvReservas, id: string, ctx: Executio
   const p = await lerPedido(env, id);
   if (!p) return json(404, { erro: 'Reserva não encontrada.' });
   if (p.status === 'aguardando_pagamento' && p.asaas?.pagamentoId && asaasLigado(env)) {
-    const ultima = p.asaas.consultadoEm ? Date.parse(p.asaas.consultadoEm) : 0;
+    // O controle de "a cada 15 s" fica FORA do pedido. Antes a consulta regravava o pedido inteiro com a cópia lida
+    // antes de chamar a Asaas: se o webhook marcasse "pago" nesse intervalo, o pedido voltava a aguardar e saía da
+    // fila (revisão de 19/11/2026). Agora o pedido só é regravado quando a Asaas diz que pagou, e a partir de uma
+    // leitura NOVA.
+    const chaveConsulta = `reservas/consultas/${p.id}`;
+    const ultima = Number(await (await env.PRE.get(chaveConsulta))?.text().catch(() => '0')) || 0;
     if (Date.now() - ultima > 15_000) {
-      p.asaas.consultadoEm = new Date().toISOString();
+      await env.PRE.put(chaveConsulta, String(Date.now()));
       try {
         const c = await consultar(env, p.asaas.pagamentoId);
-        const pagou = PAGO.has(c.status) && marcarPago(p, c.id, c.billingType);
-        await gravarPedido(env, p, pagou);
+        if (PAGO.has(c.status)) {
+          const atual = await lerPedido(env, id);
+          if (atual && atual.status === 'aguardando_pagamento' && marcarPago(atual, c.id, c.billingType)) {
+            await gravarPedido(env, atual, true);
+            return json(200, visaoPublica(atual));
+          }
+          if (atual) return json(200, visaoPublica(atual));
+        }
       } catch (e) { console.error('consulta asaas', (e as Error).message); }
     }
   }

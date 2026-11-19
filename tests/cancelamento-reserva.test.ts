@@ -66,4 +66,26 @@ describe('cancelamento pelo site', () => {
     expect((await cancelarReserva(env(pedido('2026-11-15T18:00:00')) as never, { ...corpo, cpf: '11144477735' }, AGORA)).status).toBe(404);
     expect((await cancelarReserva(env(pedido('2026-11-09T18:00:00')) as never, corpo, AGORA)).status).toBe(409);
   });
+
+  it('estorno feito numa tentativa que caiu: a próxima conclui SEM estornar de novo (revisão 19/11)', async () => {
+    const f = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', f);
+    const e = env(pedido('2026-11-15T18:00:00'));
+    e.PRE.m.set(`reservas/estornos/${ID}.json`, JSON.stringify({ estornoId: 'est_1', reembolsoCentavos: 27000 }));
+    e.PRE.m.set(`reservas/cancelando/${ID}`, JSON.stringify({ em: new Date(AGORA - 10 * 60_000).toISOString() }));
+    const r = await cancelarReserva(e as never, corpo, AGORA);
+    expect(r.status).toBe(200);
+    expect(f.mock.calls.some((c) => String((c as unknown[])[0]).includes('/refund'))).toBe(false);
+    const p = JSON.parse(e.PRE.m.get(`reservas/pedidos/${ID}.json`)!);
+    expect(p.status).toBe('cancelado');
+    expect(p.cancelamento.estornoId).toBe('est_1');
+    expect(e.PRE.m.has(`reservas/cancelando/${ID}`)).toBe(false);
+  });
+
+  it('trava recente ainda segura o clique duplo', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })));
+    const e = env(pedido('2026-11-15T18:00:00'));
+    e.PRE.m.set(`reservas/cancelando/${ID}`, JSON.stringify({ em: new Date(AGORA - 30_000).toISOString() }));
+    expect((await cancelarReserva(e as never, corpo, AGORA)).status).toBe(409);
+  });
 });

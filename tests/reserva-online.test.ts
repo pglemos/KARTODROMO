@@ -219,6 +219,29 @@ describe('fluxo da reserva no site', () => {
     expect(((await (await syncPedidos(env)).json()) as Pedido[]).length).toBe(0);
   });
 
+  it('o aviso de pago que chega DURANTE a consulta à Asaas não é desfeito (revisão 19/11)', async () => {
+    const { m, env } = ambiente();
+    m.set('reservas/agenda.json', JSON.stringify(agenda));
+    const asaas = asaasFalsa();
+    vi.stubGlobal('fetch', asaas.f);
+    const { id } = (await (await criarPedido(pedir({ ...base, quantidade: 1, t: Date.now() - 10_000 }), env, semLimite)).json()) as { id: string };
+    const k = ctx();
+    await syncResultado(new Request('https://x', { method: 'POST', body: JSON.stringify([{ id, acao: 'reservado', valorCentavos: 14500, expiraEm: '2026-10-01T12:15:00-03:00', descricao: 'x', inicio: '2026-10-03T09:15' }]) }), env, k.c);
+    await k.esperar();
+    // enquanto a tela consulta a Asaas (que ainda diz PENDING), o webhook marca pago
+    const original = asaas.f.getMockImplementation()!;
+    asaas.f.mockImplementation(async (url: string, init: RequestInit = {}) => {
+      if (String(url).endsWith('/payments/pay_1') && !init.method) {
+        const aviso = new Request('https://x/api/asaas/webhook', { method: 'POST', headers: { 'asaas-access-token': 'w'.repeat(40) }, body: JSON.stringify({ event: 'PAYMENT_RECEIVED', payment: { id: 'pay_1', externalReference: id, billingType: 'PIX' } }) });
+        await webhookAsaas(aviso, env);
+      }
+      return original(url, init);
+    });
+    await situacaoPedido(env, id, ctx().c);
+    const fila = (await (await syncPedidos(env)).json()) as Pedido[];
+    expect(fila.map((p) => p.status)).toEqual(['pago']);
+  });
+
   it('sem pagamento no prazo: expira e cancela a cobrança na Asaas', async () => {
     const { m, env } = ambiente();
     m.set('reservas/agenda.json', JSON.stringify(agenda));
