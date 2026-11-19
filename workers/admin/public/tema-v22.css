@@ -250,3 +250,16 @@ html[data-tema="escuro"] body {
   --kib-cor-agenda-reserva-topo-fim: #2c270e;
   --kib-cor-agenda-reserva-topo-texto: #f6dbb2;
 }
+
+/* ── Detalhes do V29, nos dois temas ──
+   · o "sobre" (data e atualização) desce para baixo do título, como subtítulo — o título abre a tela;
+   · números dos indicadores em peso médio, não negrito (título grande e leve);
+   · a parte vazia das barras é listrada, a cheia segue lisa. */
+:is([data-tema="claro"], [data-tema="escuro"]) .cab .sobre { order: 2; }
+:is([data-tema="claro"], [data-tema="escuro"]) .kpi .val { font-weight: 500; }
+:is([data-tema="claro"], [data-tema="escuro"]) .barra {
+  height: 8px;
+  background:
+    repeating-linear-gradient(-45deg, color-mix(in srgb, var(--kib-cor-texto-discreto) 22%, transparent) 0 3px, transparent 3px 7px),
+    color-mix(in srgb, var(--kib-cor-texto-discreto) 8%, transparent);
+}
