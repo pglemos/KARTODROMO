@@ -187,9 +187,18 @@ TELAS.sistema = async (tela) => {
     const s = await office('/painel/sinais');
     if (!tela.isConnected) return;
     const srv = $('#servicos', tela), pcs = $('#pcs', tela);
-    if (r && srv) srv.innerHTML = [['Servidor da operação', 'SRVKART · KartodromoOps', r.ops], ['Cronometragem', 'ORBITS · decoder', r.crono]].map(([t, d, x]) => `<div class="kpi"><span class="rot"><span class="ponto" style="width: 8px; height: 8px; background: ${x.ok ? 'var(--kib-cor-status-ok)' : 'var(--kib-cor-estado-perigo-solido)'}"></span>${t}</span><span class="val t-titulo-grande">${x.ok ? x.ms + ' ms' : 'sem resposta'}</span><span class="peq">${d}</span></div>`).join('')
+    const servicos = !r ? '' : [['Servidor da operação', 'SRVKART · KartodromoOps', r.ops], ['Cronometragem', 'ORBITS · decoder', r.crono]].map(([t, d, x]) => `<div class="kpi"><span class="rot"><span class="ponto" style="width: 8px; height: 8px; background: ${x.ok ? 'var(--kib-cor-status-ok)' : 'var(--kib-cor-estado-perigo-solido)'}"></span>${t}</span><span class="val t-titulo-grande">${x.ok ? x.ms + ' ms' : 'sem resposta'}</span><span class="peq">${d}</span></div>`).join('')
       + `<div class="kpi"><span class="rot">Versões publicadas</span><span class="col" style="gap: var(--kib-espaco-meio); margin-top: var(--kib-espaco-meio)">${Object.entries(s.publicadas || {}).map(([a, v]) => `<span style="display: flex; justify-content: space-between; font-size: var(--kib-fonte-tamanho-corpo)"><span>${NOME_APP[a] || esc(a)}</span><b class="mono">${esc(v || '—')}</b></span>`).join('')}</span></div>`;
     const off = s.pcs.filter((p) => !p.online);
+    /* Resumo da rede em cartões (V22): sai sempre da lista de PCs, mesmo quando a checagem de saúde não respondeu. */
+    const apps = s.pcs.flatMap((p) => p.apps || []);
+    const emDia = apps.filter((a) => !a.atualizando).length;
+    const resumo = [
+      [IC.sistema, 'Computadores no ar', `${s.pcs.length - off.length} de ${s.pcs.length}`, 'rede 192.168.20.x'],
+      [IC.sistema, 'Sem resposta', String(off.length), off.length ? off.map((p) => esc(p.nome)).join(' · ') : 'todos respondendo'],
+      [IC.sistema, 'Programas em dia', `${emDia} de ${apps.length}`, apps.length - emDia ? `${apps.length - emDia} baixando a versão nova` : 'na versão publicada'],
+    ].map(([ic, t, v, d]) => `<div class="kpi"><span class="rot">${svg(ic, 14, 'currentColor', 2.2)}${t}</span><span class="val num">${v}</span><span class="peq">${d}</span></div>`).join('');
+    if (srv) srv.innerHTML = resumo + servicos;
     selo('sistema', off.length ? String(off.length) : '', 'vermelho');
     const progs = (p) => p.apps.length ? p.apps.map((a) => `<span style="display: flex; align-items: center; gap: var(--kib-espaco-meio); flex-wrap: wrap"><b class="t-pequeno">${NOME_APP[a.app] || esc(a.app)}</b><span class="mono t-pequeno">${esc(a.versao || '')}</span>${a.atualizando ? '<span class="chip laranja">atualizando</span>' : '<span class="chip verde">em dia</span>'}<span class="peq">${quandoMin(a.minutos)}</span></span>`).join('')
       : p.totem ? `<span class="peq">Totem em uso ${quandoMin(p.totem.minutos)}</span>` : `<span class="peq">${p.online ? 'nenhum programa pediu atualização desde ' + (s.desde < 60 ? `${s.desde} min` : `${Math.round(s.desde / 60)} h`) : '—'}</span>`;
