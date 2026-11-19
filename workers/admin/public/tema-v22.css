@@ -113,3 +113,74 @@ html[data-tema="claro"] body {
 [data-tema="claro"] .lateral .tile { background: transparent !important; box-shadow: none; }
 [data-tema="claro"] .lateral .tile svg { stroke: currentColor; }
 [data-tema="claro"] .lateral .buscaBtn { background: rgba(234, 243, 238, 0.1); color: #d7e6df; box-shadow: none; border-radius: 999px; }
+
+/* ── Escuro (o painel dentro do CRM segue o tema do CRM; ver kartodromo-os/scripts/kartodromo/kib-admin/embutido.js)
+   Mesmo mundo à noite: verde quase preto, menta no lugar do verde-neon, pêssego no aviso.
+   Contraste sobre #0a1511: texto 16,1:1 / secundário 8,6:1 / terciário 5,6:1; #0f3b31 sobre menta 8,1:1;
+   pêssego 11,0:1. O cartão "inverso" (placar, faixa da pista) fica menta-clara com texto verde-escuro (10,2:1). */
+[data-tema="escuro"],
+.kib-tema-escuro {
+  --kib-cor-fundo-app: #0a1511;
+  --kib-cor-superficie-padrao: #101e19;
+  --kib-cor-superficie-suave: #0d1915;
+  --kib-cor-superficie-campo: #172a23;
+  --kib-cor-superficie-lateral: #07130f;
+  --kib-cor-superficie-inversa: #e2f6ee;
+  --kib-cor-texto-inverso: #0f3b31;
+  --kib-cor-texto-principal: #eaf3ee;
+  --kib-cor-texto-secundario: #a9bdb4;
+  --kib-cor-texto-terciario: #85998f;
+  --kib-cor-texto-desabilitado: #56695f;
+  --kib-cor-borda-sutil: #eaf3ee17;
+  --kib-cor-borda-forte: #2f463d;
+  --kib-cor-borda-campo: #5a6f66;
+  --kib-cor-borda-foco: #8fe0c4;
+  --kib-cor-acao-principal: #8fe0c4;
+  --kib-cor-acao-principal-pressionado: #6fcfae;
+  --kib-cor-acao-sobre-principal: #0f3b31;
+  --kib-cor-acao-secundaria: #172a23;
+  --kib-cor-acao-sobre-secundaria: #eaf3ee;
+  --kib-cor-marca-principal: #8fe0c4;
+  --kib-cor-status-online: #8fe0c4;
+  --kib-cor-selecao-fundo: #183a2f;
+  --kib-cor-selecao-texto: #eaf3ee;
+  --kib-cor-sobreposicao: #020806b3;
+  --kib-cor-estado-aviso-fundo: #2e1f15;
+  --kib-cor-estado-aviso-solido: #ffb48a;
+  --kib-cor-estado-aviso-sobre-solido: #3d1f0b;
+  --kib-cor-estado-aviso-texto: #ffc4a3;
+  --kib-cor-estado-sucesso-fundo: #12291f;
+  --kib-cor-estado-sucesso-solido: #8fe0c4;
+  --kib-cor-estado-sucesso-texto: #8fe0c4;
+  --kib-cor-estado-perigo-fundo: #2c1513;
+  --kib-cor-estado-perigo-solido: #ff8f80;
+  --kib-cor-estado-perigo-texto: #ff9d90;
+  --kib-cor-estado-info-fundo: #11232d;
+  --kib-cor-estado-info-solido: #7cc0e6;
+  --kib-cor-estado-info-texto: #8ccbee;
+  --kib-elevacao-1: 0 2px 6px -2px rgba(0, 0, 0, 0.5);
+  --kib-elevacao-2: 0 14px 30px -16px rgba(0, 0, 0, 0.7), 0 2px 6px -2px rgba(0, 0, 0, 0.4);
+  --kib-elevacao-3: 0 32px 64px -28px rgba(0, 0, 0, 0.8);
+  --kib-fonte-familia-destaque: "Outfit", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --kib-fonte-familia-interface: "Outfit", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --kib-raio-botao: 999px;
+  --kib-raio-campo: 12px;
+  --kib-raio-chip: 999px;
+  --kib-raio-cartao: 20px;
+  --kib-raio-janela: 24px;
+  --v22-floresta: #0f3b31;
+  --v22-menta: #8fe0c4;
+  --v22-pessego: #ffb48a;
+  --raio: 20px;
+  --sombra: var(--kib-elevacao-2);
+}
+html[data-tema="escuro"],
+html[data-tema="escuro"] body {
+  background:
+    radial-gradient(1200px 800px at 0% 0%, #0f2a20, transparent 62%),
+    radial-gradient(1000px 720px at 100% 100%, #2a1d15, transparent 62%),
+    #0a1511;
+  background-attachment: fixed;
+}
+[data-tema="escuro"] .btn { border-radius: 999px; }
+[data-tema="escuro"] .cab h1 { font-weight: 400; letter-spacing: -0.02em; }
