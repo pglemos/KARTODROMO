@@ -399,7 +399,9 @@ const Grupo = (() => {
         ${itens || (v.q.trim().length >= 2 ? '<span class="peq">Nenhum cadastro encontrado. Preencha nome e WhatsApp na linha, ou mande o link de cadastro.</span>' : '<span class="peq">Digite pelo menos 2 letras ou 4 números. Ao escolher, nome, WhatsApp e idade vêm do cadastro.</span>')}
       </div>`;
     };
+    const agruparLivres = !novo && livres.length > 1 && !estado.verLivres;
     const linhas = pilotos.map((p, i) => {
+      if (agruparLivres && vagaLivre(p)) return '';
       const resp = i === 0;
       const respExistente = resp && novo && !!rasc.responsavel;
       const rawNome = respExistente ? rasc.responsavel.nome : (novo ? (p.nome || '') : nomePiloto(g, p));
@@ -489,14 +491,14 @@ const Grupo = (() => {
           <h2 class="modalGrupoTitulo">${novo ? 'Nova reserva: quem vai correr?' : titulo}</h2>
           <div class="modalGrupoBadges">
             ${novo ? '' : `<span class="badgeCodigoReserva">Reserva ${esc(g.codigo)}</span>`}
-            <span class="badgeDataBateria">${svg(IC.agenda, 14, 'var(--kib-cor-texto-secundario)')} ${quando(b.dataHora)}</span>
+            <span class="badgeDataBateria">${svg(IC.agenda, 14, 'var(--kib-cor-texto-secundario)')} ${quando(b.dataHora)}${(() => { const min = Math.round((deIso(b.dataHora) - new Date()) / 60000); if (min < -40) return ' · já passou'; if (min < 0) return ' · na pista'; if (min < 60) return ` · em ${min} min`; if (min < 24 * 60 && deIso(b.dataHora).getDate() === new Date().getDate()) return ` · hoje, em ${Math.round(min / 60)} h`; const dias = Math.round((new Date(deIso(b.dataHora).toDateString()) - new Date(new Date().toDateString())) / 86400000); return dias === 1 ? ' · amanhã' : ` · em ${dias} dias`; })()}</span>
             <span class="badgeNomeBateria">${/^\s*bateria\s*[\d:h]*\s*$/i.test(b.nome || '') ? '' : esc(b.nome) + ' · '}${esc(produtoTxt || 'Bateria')} · ${durMin} min</span>
             ${novo && estado.voltar ? '<button type="button" class="btn link peq" data-voltar-horario="1" style="font-size: var(--kib-fonte-tamanho-pequeno);">‹ Trocar horário</button>' : ''}
           </div>
         </div>
         ${novo ? '' : `<div class="resumoGrupo" aria-live="polite">
             <span class="resumoGrupoFalta ${!g.falta ? 'ok' : urgenteGrupo ? 'urgente' : ''}">${g.falta ? `Falta ${brl(g.falta)}` : 'Tudo pago'}</span>
-            <span class="resumoGrupoConta">${brlCurto(g.pago)} de ${brlCurto(g.total)} recebidos · ${g.pagos}/${g.n} pagos${parciais ? ` (+${parciais} em parte)` : ''} · ${g.cadastrados}/${g.n} com cadastro</span>
+            <span class="resumoGrupoConta"><span class="nw">${brlCurto(g.pago)} de ${brlCurto(g.total)} recebidos</span> · <span class="nw">${g.pagos}/${g.n} pagos${parciais ? ` (+${parciais} em parte)` : ''}</span> · <span class="nw">${g.cadastrados}/${g.n} com cadastro</span></span>
             ${g.falta && livres.length && modo === 'individual' ? `<span class="resumoGrupoConta">${devedores.length ? `${brlCurto(faltaDevedores)} de ${plural(devedores.length, 'pessoa', 'pessoas')} + ` : ''}${brlCurto(faltaLivres)} de ${plural(livres.length, 'vaga livre', 'vagas livres')} (pelo link)</span>` : ''}
           </div>`}
         <button type="button" class="btnFecharModal hov" data-acao="fechar" aria-label="Fechar janela" title="Fechar (Esc)">
@@ -535,7 +537,7 @@ const Grupo = (() => {
                   <span>Pagamento</span>
                   <span></span>
                 </div>
-                ${linhas}
+                ${linhas}${agruparLivres ? `<div class="linhaLivres"><span class="avatar m" style="${corAvatar({ pago: false }, 0)}; font-weight: 700" aria-hidden="true">${livres.length}</span><span class="col" style="gap: 1px; min-width: 0"><b>${plural(livres.length, 'vaga livre', 'vagas livres')}</b><span class="peq">${brlCurto(faltaLivres)} pelo link do grupo: quem abrir e se cadastrar ocupa uma vaga.</span></span><button type="button" class="btn sec peq" data-ver-livres="1">Preencher à mão</button></div>` : ''}
               </div>
             </div>
             <div style="display: flex; flex-wrap: wrap; align-items: center; gap: var(--kib-espaco-1) var(--kib-espaco-denso-12); padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); background: var(--kib-cor-superficie-suave); border-top: 1px solid var(--kib-cor-borda-sutil)">
@@ -635,7 +637,7 @@ const Grupo = (() => {
                 </div>
               `}
             </div>
-            ${!novo ? `
+            ${!novo && (modo !== 'individual' || g.cobrancaGrupo) ? `
               <div style="display: flex; flex-direction: column; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12); border-radius: var(--kib-raio-cartao); background: var(--kib-cor-superficie-padrao); border: 1px solid var(--kib-cor-borda-sutil);">
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                   <div style="display: flex; align-items: center; gap: 8px;">
@@ -655,7 +657,7 @@ const Grupo = (() => {
           ${!novo ? `<section class="secao pagRecebidos">
             <div class="pagRecebidosCab"><span class="col" style="gap: 1px; min-width: 0"><span class="titulo t-subtitulo" style="margin: 0">Recebidos <span class="contaPag">${pagamentos.length}</span></span>${estado.conferidoEm ? `<span class="peq" style="color: var(--kib-cor-texto-secundario)">Conferido no Asaas às ${estado.conferidoEm}</span>` : ''}</span><button type="button" class="btn peq sec" data-conferir-asaas="1" title="Busca no Asaas os Pix e cartões que ainda não apareceram aqui (a tela já confere sozinha a cada minuto)">${svg(IC.sync, 12, 'currentColor')} Conferir no Asaas</button></div>
             ${modo === 'individual' && pagamentos.some((pg) => !pg.pilotoId) ? `<div class="aviso-faixa" role="note">Há pagamento sem piloto (${brl(g.pagamentosSemPiloto || pagamentos.filter((pg) => !pg.pilotoId).reduce((a, pg) => a + (+pg.valor || 0), 0))}). Em "cada um paga o seu" ele não é dividido entre as vagas: escolha o piloto abaixo ou estorne.</div>` : ''}
-            ${(() => { const linhaPg = (pg) => { const pp = pg.pilotoId ? g.pilotos.find((x) => x.id === pg.pilotoId) : null; const ip = pp ? g.pilotos.indexOf(pp) : 0; const data = (pg.criadoEm || '').slice(8, 10) + '/' + (pg.criadoEm || '').slice(5, 7) + ' ' + (pg.criadoEm || '').slice(11, 16); return `<div class="linhaPag"><span class="avatar p" style="${pg.pilotoId ? corAvatar(pp || { pago: true }, ip) : 'background: var(--kib-cor-texto-principal); color: var(--kib-branco)'}" aria-hidden="true">${esc(pg.pilotoId ? iniciais(nomeBonito(nomeDe(pg.pilotoId))) : 'G')}</span><span class="linhaPagCorpo"><span class="linhaPagTopo"><b class="trunc" title="${esc(nomeBonito(pg.pilotoNome || nomeDe(pg.pilotoId)))}">${esc(nomeBonito(pg.pilotoNome || nomeDe(pg.pilotoId)))}${pg.pilotoCancelado ? ' · vaga cancelada' : ''}${modo === 'individual' && !pg.pilotoId ? ' · sem piloto' : ''}</b><b class="mono cor-ok">${brl(pg.valor)}</b></span><span class="linhaPagInfo">${pg.origem === 'manual' ? '<span class="chipOrigemPag manual">Lançado na recepção</span>' : ''}<span>${esc(pg.forma)} · ${esc(data)}${pg.usuario ? ' · por ' + esc(pg.usuario) : ''}</span>${pg.origem === 'manual' ? `<button type="button" class="btn peq linkPerigo" data-estornar="${pg.id}" title="Desfaz este lançamento feito na recepção">Estornar</button>` : ''}</span>${modo === 'individual' && !pg.pilotoId ? `<select class="entrada peq" style="max-width: 220px; height: 32px" aria-label="Escolher o piloto deste pagamento" data-vincular-pg="${pg.id}"><option value="">Escolher piloto…</option>${g.pilotos.map((p) => `<option value="${p.id}">${esc(nomeBonito(p.nome) || 'Piloto ' + p.ordem)}</option>`).join('')}</select>` : ''}</span></div>`; }; if (!pagamentos.length) return '<span class="peq" style="color: var(--kib-cor-texto-secundario);">Nenhum pagamento ainda. Os do Asaas aparecem aqui sozinhos.</span>'; const manuais = pagamentos.filter((pg) => pg.origem === 'manual'); const outros = pagamentos.filter((pg) => pg.origem !== 'manual'); const visiveis = [...manuais, ...outros.slice(0, Math.max(0, 4 - manuais.length))]; const resto = pagamentos.filter((pg) => !visiveis.includes(pg)); return visiveis.map(linhaPg).join('') + (resto.length ? `<details class="maisOpcoes enxuto maisRecebidos" data-det-key="recebidos"><summary>Ver mais ${plural(resto.length, 'pagamento', 'pagamentos')}</summary>${resto.map(linhaPg).join('')}</details>` : ''); })()}
+            ${(() => { const linhaPg = (pg) => { const pp = pg.pilotoId ? g.pilotos.find((x) => x.id === pg.pilotoId) : null; const ip = pp ? g.pilotos.indexOf(pp) : 0; const data = (pg.criadoEm || '').slice(8, 10) + '/' + (pg.criadoEm || '').slice(5, 7) + ' ' + (pg.criadoEm || '').slice(11, 16); return `<div class="linhaPag"><span class="avatar p" style="${pg.pilotoId ? corAvatar(pp || { pago: true }, ip) : 'background: var(--kib-cor-texto-principal); color: var(--kib-branco)'}" aria-hidden="true">${esc(pg.pilotoId ? iniciais(nomeBonito(nomeDe(pg.pilotoId))) : 'G')}</span><span class="linhaPagCorpo"><span class="linhaPagTopo"><b class="trunc" title="${esc(nomeBonito(pg.pilotoNome || nomeDe(pg.pilotoId)))}">${esc(nomeBonito(pg.pilotoNome || nomeDe(pg.pilotoId)))}${pg.pilotoCancelado ? ' · vaga cancelada' : ''}${modo === 'individual' && !pg.pilotoId ? ' · sem piloto' : ''}</b><b class="mono cor-ok">${brl(pg.valor)}</b></span><span class="linhaPagInfo">${pg.origem === 'manual' ? '<span class="chipOrigemPag manual">Lançado na recepção</span>' : ''}<span>${esc(pg.forma)} · ${esc(data)}${pg.usuario ? ' · por ' + esc(pg.usuario) : ''}</span>${pg.origem === 'manual' ? `<button type="button" class="btn peq linkPerigo" data-estornar="${pg.id}" title="Desfaz este lançamento feito na recepção">Estornar</button>` : ''}</span>${modo === 'individual' && !pg.pilotoId ? `<select class="entrada peq" style="max-width: 220px; height: 32px" aria-label="Escolher o piloto deste pagamento" data-vincular-pg="${pg.id}"><option value="">Escolher piloto…</option>${g.pilotos.map((p) => `<option value="${p.id}">${esc(nomeBonito(p.nome) || 'Piloto ' + p.ordem)}</option>`).join('')}</select>` : ''}</span></div>`; }; if (!pagamentos.length) return '<span class="peq" style="color: var(--kib-cor-texto-secundario);">Nenhum pagamento ainda. Os do Asaas aparecem aqui sozinhos.</span>'; const visiveis = pagamentos.slice(0, 4); const resto = pagamentos.filter((pg) => !visiveis.includes(pg)); return visiveis.map(linhaPg).join('') + (resto.length ? `<details class="maisOpcoes enxuto maisRecebidos" data-det-key="recebidos"><summary>Ver mais ${plural(resto.length, 'pagamento', 'pagamentos')}</summary>${resto.map(linhaPg).join('')}</details>` : ''); })()}
             ${devedores.length > 1 && modo === 'individual' ? `<button type="button" class="btn sec peq" data-todos-pagos="1" style="width: fit-content; display: inline-flex; align-items: center; gap: 6px;" title="Pede confirmação com os nomes e a forma de pagamento">${svg(IC.ok, 13, 'currentColor')} Marcar os ${devedores.length} que faltam como pagos (${brl(devedores.reduce((a, p) => a + p.falta_centavos, 0))})</button>` : ''}
             <details class="maisOpcoes enxuto" data-det-key="registrar" ${estado.reg.valor ? 'open' : ''}><summary>Lançar um valor recebido na recepção</summary>
             <div class="formRegistrar">
@@ -861,6 +863,7 @@ const Grupo = (() => {
     const ctx = estado; if (ctx.ocupado) return;
     const { g, rasc, b } = ctx; let x0;
     if (e.target.closest('[data-grupo-atualizar]')) return refrescar(true);
+    if (el('[data-ver-livres]')) { ctx.verLivres = true; pintar(); const f = $('#camada .linhaPilotoGrupo [data-campo="nome"]'); if (f) f.focus(); return; }
     if ((x0 = el('[data-editar-linha]'))) { ctx.editandoLinha = +x0.dataset.editarLinha; pintar(); const ci = $(`#camada [data-campo="nome"][data-i="${ctx.editandoLinha}"]`); if (ci) { ci.focus(); ci.select(); } return; }
     if (el('[data-buscar-vaga]')) { ctx.bv = { i: +el('[data-buscar-vaga]').dataset.buscarVaga, q: '', achados: [] }; pintar(); const qi = $('#qVaga'); if (qi) { qi.focus(); qi.scrollIntoView({ block: 'center' }); } return; }
     if (el('[data-fechar-bv]')) { ctx.bv = null; pintar(); return; }

@@ -888,3 +888,16 @@ input[type="checkbox"], input[type="radio"] {
 
 .modalGrupo .dicaDet > summary { width: 32px; height: 32px; }
 @media (max-width: 1080px) { .resumoGrupo .resumoGrupoConta + .resumoGrupoConta { display: none; } }
+
+/* rodada 6 do critique */
+@media (max-width: 1080px) { .modalGrupo .obsNoCorpo { order: -2; } }
+.modalGrupo .titulo.t-subtitulo, .modalGrupo .pagRecebidosCab .titulo { font-weight: 700; }
+.modalGrupo .btnZapWhatsApp { background: var(--kib-cor-superficie-padrao); color: var(--kib-cor-estado-sucesso-texto) !important; border: 1px solid color-mix(in srgb, var(--kib-cor-estado-sucesso-texto) 45%, transparent); }
+.modalGrupo .btnZapWhatsApp svg { stroke: currentColor; }
+.modalGrupo .formRegistrar [data-registrar] { grid-column: auto; width: fit-content; }
+.modalGrupo .badgeNomeBateria { background: var(--kib-cor-superficie-campo); color: var(--kib-cor-texto-principal); }
+.modalGrupo .cardMetricaFinanceiraLabel { text-transform: none; letter-spacing: 0; font-size: var(--kib-fonte-tamanho-pequeno); }
+.nw { white-space: nowrap; }
+.linhaLivres { display: flex; align-items: center; gap: var(--kib-espaco-1); padding: 10px var(--kib-espaco-2); border-top: 1px dashed var(--kib-cor-borda-sutil); background: var(--kib-cor-superficie-suave); }
+.linhaLivres .col { flex: 1; }
+.linhaLivres .peq { color: var(--kib-cor-texto-secundario); }

@@ -57,6 +57,8 @@ describe('Agenda: integração real do frontend sem dados de produção',{ timeo
   await page.route(/\/api\/office\/clientes\?q=/,route=>json(route,[{id:555,nome:'MARIA AMIGA',documento:'111.222.333-44',telefone:'(31) 98888-7777',nascimento:'1990-05-01'}]));
   await page.route(/\/api\/office\/grupos\/87\/vincular$/,route=>{vinc=JSON.parse(route.request().postData()||'{}');return json(route,{...g,pilotos:g.pilotos.map((p:any,i:number)=>i===1?{...p,nome:'MARIA AMIGA',clienteId:555}:p)});});
   await page.locator('#calendario [data-sel="394"]').first().click();await page.locator('[data-grupo-abrir]').first().click();await page.locator('[data-cancelar-grupo]').waitFor();
+  // vagas livres ficam agrupadas numa linha: a recepção abre com "Preencher à mão"
+  if (await page.locator('[data-ver-livres]').count()) await page.locator('[data-ver-livres]').click();
   await page.locator('[data-buscar-vaga="1"]').click();await page.locator('#qVaga').fill('11122233344');
   await page.locator('[data-pick-vaga]').first().waitFor();await page.locator('[data-pick-vaga]').first().click();
   await page.waitForFunction(()=>!document.querySelector('#qVaga'));
