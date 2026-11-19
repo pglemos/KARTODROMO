@@ -1,0 +1,115 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Painel do kartódromo — o mundo V22 (19/11/2026, pedido do dono)
+
+   Mesmo design system do CRM (template Kartódromo em kartodromo-os/app/app/aparencia.css):
+   layout do "Ember Dashboard V29" com a paleta do "Dashboard V22" — campo menta e pêssego,
+   cartões brancos de 20px, botões em pílula verde-escura, selos em pílula, menu verde-escuro
+   com o item atual em menta, fonte Outfit e títulos leves.
+
+   Camada carregada DEPOIS de tokens.css/app.css/componentes.css. O tokens.css é gerado de
+   tokens/kib.tokens.json e alimenta também o desktop, o Android e o telão: por isso o mundo
+   novo do painel mora aqui, e não no JSON.
+
+   Contraste (WCAG): texto 14,6:1 / secundário 6,7:1 / terciário 4,7:1 sobre o campo; branco
+   sobre #0f3b31 10,9:1; #0f3b31 sobre menta 8,1:1; texto do aviso #83480f sobre #ffe8da 6,1:1.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@font-face {
+  font-family: "Outfit";
+  src: url("fontes/outfit-100-900-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+[data-tema="claro"],
+.kib-tema-claro {
+  --kib-cor-fundo-app: #edf3ef;
+  --kib-cor-superficie-padrao: #ffffff;
+  --kib-cor-superficie-suave: #f5f8f6;
+  --kib-cor-superficie-campo: #f2f6f3;
+  --kib-cor-superficie-lateral: #e6eee9;
+  --kib-cor-superficie-inversa: #0f3b31;
+  --kib-cor-texto-principal: #0f231c;
+  --kib-cor-texto-secundario: #46594f;
+  --kib-cor-texto-terciario: #5d7068;
+  --kib-cor-borda-sutil: #dfe8e3;
+  --kib-cor-borda-forte: #c7d4cd;
+  --kib-cor-borda-campo: #9aaba3;
+  --kib-cor-acao-secundaria: #e6eee9;
+  --kib-cor-acao-sobre-secundaria: #0f231c;
+  --kib-cor-selecao-fundo: #d4efe3;
+  --kib-cor-selecao-texto: #0f231c;
+  --kib-cor-sobreposicao: #091c1666;
+  --kib-cor-estado-aviso-fundo: #ffe8da;
+  --kib-cor-estado-aviso-solido: #ffb48a;
+  --kib-cor-estado-aviso-sobre-solido: #3d1f0b;
+  --kib-cor-estado-aviso-texto: #83480f;
+  --kib-cor-estado-sucesso-fundo: #e2f6ee;
+  --kib-cor-estado-sucesso-texto: #1d6646;
+  --kib-cor-estado-perigo-fundo: #f9e3df;
+  --kib-cor-estado-perigo-solido: #c2493b;
+  --kib-cor-estado-perigo-texto: #952e22;
+  --kib-cor-estado-info-fundo: #e3eef4;
+  --kib-cor-estado-info-solido: #3b7fa3;
+  --kib-cor-estado-info-texto: #285f7c;
+  --kib-elevacao-1: 0 2px 6px -2px rgba(15, 35, 28, 0.08), 0 1px 2px 0 rgba(15, 35, 28, 0.04);
+  --kib-elevacao-2: 0 10px 24px -14px rgba(15, 35, 28, 0.18), 0 2px 6px -2px rgba(15, 35, 28, 0.06);
+  --kib-elevacao-3: 0 32px 64px -28px rgba(15, 35, 28, 0.3), 0 10px 22px -10px rgba(15, 35, 28, 0.1);
+  --kib-fonte-familia-destaque: "Outfit", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --kib-fonte-familia-interface: "Outfit", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --kib-raio-campo: 12px;
+  --kib-raio-chip: 999px;
+  --kib-raio-cartao: 20px;
+  --kib-raio-janela: 24px;
+  --v22-floresta: #0f3b31;
+  --v22-menta: #8fe0c4;
+  --v22-pessego: #ffb48a;
+}
+
+/* o campo do mundo V22 e os cartões sem contorno, com sombra difusa */
+html[data-tema="claro"],
+html[data-tema="claro"] body {
+  background:
+    radial-gradient(1200px 800px at 0% 0%, #dcefe5, transparent 62%),
+    radial-gradient(1000px 720px at 100% 100%, #f8e8dc, transparent 62%),
+    #edf3ef;
+  background-attachment: fixed;
+}
+[data-tema="claro"] {
+  --raio: 20px;
+  --sombra: var(--kib-elevacao-2);
+}
+
+/* botões em pílula; o principal em verde-escuro */
+[data-tema="claro"] .btn { border-radius: 999px; }
+[data-tema="claro"] .btn.prim,
+[data-tema="claro"] .btn.escuro {
+  background: var(--v22-floresta);
+  color: #ffffff;
+  box-shadow: 0 8px 18px -10px rgba(15, 59, 49, 0.55);
+}
+[data-tema="claro"] .btn.branco { box-shadow: var(--kib-elevacao-1); }
+
+/* título da tela grande e leve, como o V29 */
+[data-tema="claro"] .cab h1 { font-weight: 400; letter-spacing: -0.02em; }
+
+/* menu lateral (admin fora do CRM): trilho verde-escuro, ícones claros, item atual em menta */
+[data-tema="claro"] .lateral {
+  margin: 8px 0 8px 10px;
+  border-radius: 28px;
+  border-right: 0;
+  background: var(--v22-floresta);
+  color: #eaf3ee;
+}
+[data-tema="claro"] .lateral .marca { color: #eaf3ee; }
+[data-tema="claro"] .lateral .grupo-titulo { color: #a9c4b9; }
+[data-tema="claro"] .lateral .navItem { color: #d7e6df; border-radius: 999px; }
+[data-tema="claro"] .lateral .navItem:hover { color: #ffffff; background: rgba(234, 243, 238, 0.08); }
+[data-tema="claro"] .lateral .navItem.atual {
+  background: var(--v22-menta);
+  color: var(--v22-floresta);
+  box-shadow: 0 0 0 4px rgba(143, 224, 196, 0.16), 0 10px 22px -8px rgba(143, 224, 196, 0.6);
+}
+[data-tema="claro"] .lateral .tile { background: transparent !important; box-shadow: none; }
+[data-tema="claro"] .lateral .tile svg { stroke: currentColor; }
+[data-tema="claro"] .lateral .buscaBtn { background: rgba(234, 243, 238, 0.1); color: #d7e6df; box-shadow: none; border-radius: 999px; }
