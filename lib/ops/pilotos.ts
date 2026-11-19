@@ -8,7 +8,7 @@
  * reabrir uma, o finishedAt muda e ela é lida de novo). Só entra no ranking volta de bateria sem chuva, fora da
  * equalização, de piloto com nome (não "Kart 12") e não desclassificado.
  */
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { rename, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { CLIENTE_COLS, one, onlyDigits, query } from './db';
@@ -198,8 +198,6 @@ const ARQ_LEGADO = resolve(join(process.cwd(), '.runtime', 'pilotos-laptime.json
 let rankAntigo: RankAntigo[] = [];
 let legadoCarregado = false;
 try { if (existsSync(ARQ_LEGADO)) { const arq = JSON.parse(readFileSync(ARQ_LEGADO, 'utf8')); rankAntigo = arq.rankings ?? []; legadoCarregado = arq.versao === 6 && rankAntigo.length > 0 && Object.keys(indice).some((k) => k.startsWith('lt-')); } } catch { rankAntigo = []; }
-const msDe = (t: unknown) => (t instanceof Date ? t.getTime() : null);
-const tipoAntigo: Record<string, string> = { '1': 'treino', '2': 'treino', '3': 'classificacao', '4': 'corrida' };
 
 async function carregarLegado(log?: (m: string) => void) {
   // O histórico dos sistemas antigos (2018 a set/2026) já está gravado no índice (.runtime/pilotos-cronometragem.json,

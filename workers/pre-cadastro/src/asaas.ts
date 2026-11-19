@@ -83,8 +83,13 @@ export type CobrancaPaga = {
 export async function pagasDesde(env: AsaasEnv, data: string) {
   const todas: CobrancaPaga[] = [];
   for (const status of ['RECEIVED', 'CONFIRMED']) {
-    const r = await chamar<{ data?: CobrancaPaga[] }>(env, `/payments?status=${status}&paymentDate%5Bge%5D=${data}&limit=100`);
-    todas.push(...(r.data ?? []));
+    // Paginado: num fim de semana cheio passa de 100 em 2 dias, e o que o webhook perdesse além do corte
+    // nunca era conciliado (revisão de 19/11/2026). Teto de 20 páginas (2.000 cobranças) por segurança.
+    for (let pagina = 0, offset = 0; pagina < 20; pagina++, offset += 100) {
+      const r = await chamar<{ data?: CobrancaPaga[]; hasMore?: boolean }>(env, `/payments?status=${status}&paymentDate%5Bge%5D=${data}&limit=100&offset=${offset}`);
+      todas.push(...(r.data ?? []));
+      if (!r.hasMore || !(r.data ?? []).length) break;
+    }
   }
   return todas;
 }

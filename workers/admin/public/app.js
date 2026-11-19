@@ -24,6 +24,8 @@ const hojeIso = () => (_lerRelogio(), _relHoje);
 const agoraMin = () => (_lerRelogio(), _relMin);
 const pad = (n) => String(n).padStart(2, '0');
 const deIso = (s) => { const [a, m, d] = s.slice(0, 10).split('-').map(Number); return new Date(a, m - 1, d); };
+/** Data E hora locais de '2026-11-20T18:40' (deIso descarta a hora e marcava a bateria das 20h como "já passou" de manhã). */
+const deIsoHora = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(s || '')); return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : deIso(String(s || '')); };
 const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const somaDias = (s, n) => { const d = deIso(s); d.setDate(d.getDate() + n); return iso(d); };
 const hm = (s) => { const m = /^(\d{1,2}):(\d{2})/.exec(String(s || '')); return m ? (+m[1] * 60) + +m[2] : NaN; };

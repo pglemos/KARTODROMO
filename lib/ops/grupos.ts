@@ -983,6 +983,19 @@ export async function desvincularPilotoDoGrupo(
     );
     if (!p) throw new HttpError(404, 'Piloto não encontrado no grupo.');
     if (p.responsavel) throw new HttpError(400, 'Não é possível desvincular o responsável principal da reserva.');
+    // O pagamento fica preso à linha do piloto no grupo de origem, que recebe uma vaga nova: mover quem já pagou
+    // fazia o mesmo dinheiro cobrir a pessoa movida E a vaga que ficou (revisão de 19/11/2026). Até existir a
+    // transferência do pagamento junto com a pessoa, a recepção ajusta o pagamento antes de mover.
+    const [dinheiro] = await run(
+      `SELECT
+         (SELECT COALESCE(SUM(valor_centavos), 0) FROM kart.reserva_grupo_pagamento WHERE grupo_id = @g AND piloto_id = @pid AND cancelado = false) "pago",
+         (SELECT COUNT(*) FROM kart.reserva_grupo_cobranca WHERE grupo_id = @g AND piloto_id = @pid AND status = 'aguardando') "cobrancas"`,
+      { g: grupoId, pid: pilotoId },
+    );
+    if (Number(dinheiro?.pago ?? 0) > 0)
+      throw new HttpError(409, 'Este piloto já tem pagamento no grupo. Estorne ou passe o pagamento para outra vaga antes de mover.');
+    if (Number(dinheiro?.cobrancas ?? 0) > 0)
+      throw new HttpError(409, 'Este piloto tem um link de pagamento aberto. Cancele a cobrança antes de mover.');
 
     const inscricaoId = p.inscricaoId ? Number(p.inscricaoId) : null;
     const clienteId = p.clienteId ? Number(p.clienteId) : null;
@@ -999,7 +1012,7 @@ export async function desvincularPilotoDoGrupo(
           { i: inscricaoId, cod: g.codigo },
         );
         if (opts.novaBateriaId && Number(opts.novaBateriaId) !== Number(g.bateriaId)) {
-          await moverReservas([inscricaoId], Number(opts.novaBateriaId));
+          await moverReservas([inscricaoId], Number(opts.novaBateriaId), undefined, { run });
         }
       }
 
@@ -1026,19 +1039,8 @@ export async function desvincularPilotoDoGrupo(
       if (!ng) throw new HttpError(404, 'Grupo de destino não encontrado ou inativo.');
 
       if (inscricaoId && Number(g.bateriaId) !== Number(ng.bateriaId)) {
-        await moverReservas([inscricaoId], Number(ng.bateriaId));
+        await moverReservas([inscricaoId], Number(ng.bateriaId), undefined, { run });
       }
-
-      // Restaura a vaga no grupo de origem
-      const cidOrigem = await cadastroDaVaga(run, Number(g.responsavelId), ordem, null, null);
-      const [novaInscOrigem] = await inscreverN(Number(g.bateriaId), Number(g.responsavelId), 1, 'recepcao', sessaoUid, 'Reserva em grupo pelo painel web', false, { vagaDoGrupo: true, run });
-      await run(`UPDATE kart.inscricao SET cliente_id = @c WHERE id = @i`, { c: cidOrigem, i: novaInscOrigem });
-      await run(
-        `UPDATE kart.reserva_grupo_piloto
-            SET cliente_id = @c, nome = '', telefone = NULL, cadastro_em = NULL, inscricao_id = @novaInsc, pago_pelo_grupo = false
-          WHERE id = @pid`,
-        { c: cidOrigem, novaInsc: novaInscOrigem, pid: p.id },
-      );
 
       // No novo grupo: procura vaga aguardando
       const [vagaDestino] = await run(
@@ -1098,6 +1100,19 @@ export async function desvincularPilotoDoGrupo(
         await novoPiloto(run, novoGrupoId, proxima, { nome: p.nome ?? '', telefone: p.telefone ?? '', menor: false }, finalInsc, false, clienteId);
         await run(`UPDATE kart.reserva_grupo_piloto SET cadastro_em = now() WHERE grupo_id = @ng AND ordem = @o`, { ng: novoGrupoId, o: proxima });
       }
+
+      // Restaura a vaga no grupo de origem DEPOIS de ocupar o destino: na mesma bateria lotada, a vaga do destino
+      // (cancelada acima) é a que a origem reaproveita; na ordem antiga a bateria precisava de uma vaga a mais e
+      // "Mover para outro grupo" falhava com "Não há vagas" (revisão de 19/11/2026).
+      const cidOrigem = await cadastroDaVaga(run, Number(g.responsavelId), ordem, null, null);
+      const [novaInscOrigem] = await inscreverN(Number(g.bateriaId), Number(g.responsavelId), 1, 'recepcao', sessaoUid, 'Reserva em grupo pelo painel web', false, { vagaDoGrupo: true, run });
+      await run(`UPDATE kart.inscricao SET cliente_id = @c WHERE id = @i`, { c: cidOrigem, i: novaInscOrigem });
+      await run(
+        `UPDATE kart.reserva_grupo_piloto
+            SET cliente_id = @c, nome = '', telefone = NULL, cadastro_em = NULL, inscricao_id = @novaInsc, pago_pelo_grupo = false
+          WHERE id = @pid`,
+        { c: cidOrigem, novaInsc: novaInscOrigem, pid: p.id },
+      );
 
       log(`grupo ${grupoId}: piloto ${p.id} transferido para o grupo ${novoGrupoId} (${ng.codigo})`);
     } else {
@@ -1456,21 +1471,41 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
         : Number(v.Valor);
       if (v.DescontoMaximoCentavos) d = Math.min(d, Number(v.DescontoMaximoCentavos));
       d = Math.min(valor, d);
+      if (d <= 0) throw new HttpError(400, 'Este voucher não dá desconto nesta vaga.');
       voucherAplicado = { id: v.Id, codigo: v.Codigo, descontoCentavos: d };
     }
+    // O voucher quita só o desconto que ele vale (R$ 20 numa vaga de R$ 145 deixa R$ 125 devendo).
+    // Antes gravava a falta inteira e a vaga aparecia 100% paga (revisão de 19/11/2026).
+    const valorGravado = voucherAplicado ? voucherAplicado.descontoCentavos : valor;
 
     await tx(async (run) => {
       const [ativo] = await run(`SELECT id "Id", responsavel_id "ResponsavelId" FROM kart.reserva_grupo WHERE id = @g AND status = 'ativa' for update`, { g: id });
       if (!ativo) throw new HttpError(409, 'Esta reserva não está ativa.');
       const [anterior] = await run(`SELECT piloto_id "pilotoId", valor_centavos valor, forma forma, cancelado cancelado FROM kart.reserva_grupo_pagamento WHERE grupo_id = @g AND idempotency_key = @key`, { g: id, key });
       if (anterior) {
-        if (anterior.cancelado || Number(anterior.valor) !== valor || (anterior.pilotoId ?? null) !== pilotoId || anterior.forma !== (isVoucher ? 'Voucher' : forma))
+        if (anterior.cancelado || Number(anterior.valor) !== valorGravado || (anterior.pilotoId ?? null) !== pilotoId || anterior.forma !== (isVoucher ? 'Voucher' : forma))
           throw new HttpError(409, 'Esta chave já pertence a outro recebimento.');
         return;
       }
+      if (voucherAplicado) {
+        // A elegibilidade foi checada fora da transação: dois recebimentos ao mesmo tempo com o mesmo voucher de uso
+        // único passavam os dois. A trava por voucher serializa, e a recontagem aqui dentro decide.
+        await run(`SELECT pg_advisory_xact_lock(918273, @vid)`, { vid: voucherAplicado.id });
+        const [usos] = await run(
+          `SELECT v.uso_unico "UsoUnico", v.uso_max_total "UsoMaxTotal",
+             (SELECT COUNT(*) FROM kart.voucher_uso WHERE voucher_id = v.id AND estornado = false)
+             + (SELECT COUNT(*) FROM kart.reserva_online_voucher_uso WHERE voucher_id = v.id AND estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+             + (SELECT COUNT(*) FROM kart.reserva_grupo_voucher_uso WHERE voucher_id = v.id AND estado IN ('reservado', 'consumido')) "n"
+             FROM kart.voucher v WHERE v.id = @vid`,
+          { vid: voucherAplicado.id },
+        );
+        const n = Number(usos?.n ?? 0);
+        if ((usos?.UsoUnico && n > 0) || (usos?.UsoMaxTotal != null && n >= Number(usos.UsoMaxTotal)))
+          throw new HttpError(409, 'Este voucher acabou de ser usado em outro recebimento.');
+      }
       const aidVoucher = voucherAplicado ? ('vch_' + key).slice(0, 60) : null;
       await run(`INSERT INTO kart.reserva_grupo_pagamento (grupo_id, piloto_id, valor_centavos, forma, origem, usuario_id, idempotency_key, asaas_id)
-        VALUES (@g, @p, @v, @f, 'manual', @u, @key, @aid)`, { g: id, p: pilotoId, v: valor, f: isVoucher ? 'Voucher' : forma, u: sessao.uid, key, aid: aidVoucher });
+        VALUES (@g, @p, @v, @f, 'manual', @u, @key, @aid)`, { g: id, p: pilotoId, v: valorGravado, f: isVoucher ? 'Voucher' : forma, u: sessao.uid, key, aid: aidVoucher });
 
       if (voucherAplicado && aidVoucher) {
         const cidUso = pilDb?.clienteId ?? Number(ativo.ResponsavelId);

@@ -237,15 +237,17 @@ async function despachar(req: IncomingMessage): Promise<{ r: Response; nome: str
 
 export function iniciar(porta: number) {
   const wss = new WebSocketServer({ noServer: true });
+  // A query leva tokens (`?r=` do link do grupo, chave do painel do responsável): nunca vai para o log.
+  const semQuery = (url: string | undefined) => (url ?? '').split('?')[0];
   const servidor = createServer(async (req, res) => {
     const t0 = Date.now();
     try {
       const { r, nome } = await despachar(req);
       if (r.status === 101) throw new Error('resposta 101 sem pedido de upgrade');
       await escrever(res, r);
-      if (LOG) console.log(`${r.status} ${Date.now() - t0}ms ${nome} ${req.method} ${req.headers.host}${req.url}`);
+      if (LOG) console.log(`${r.status} ${Date.now() - t0}ms ${nome} ${req.method} ${req.headers.host}${semQuery(req.url)}`);
     } catch (e) {
-      console.error(`[edge] erro ${req.method} ${req.headers.host}${req.url}:`, (e as Error).stack ?? e);
+      console.error(`[edge] erro ${req.method} ${req.headers.host}${semQuery(req.url)}:`, (e as Error).stack ?? e);
       if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
       res.end('Erro interno');
     }

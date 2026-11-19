@@ -981,11 +981,11 @@ class BateriasDia : Control
     {
         var r = new RectangleF(x, y, 16, 16);
         using (var f = new SolidBrush(Tokens.Primitivo.AmareloOuro)) g.FillEllipse(f, r);
-        using (var borda = new Pen(Color.FromArgb(224, 161, 0), 1f)) g.DrawEllipse(borda, r);
+        using (var borda = new Pen(Tokens.Claro.CorEstadoAvisoSolido, 1f)) g.DrawEllipse(borda, r);
         var cx = x + 8f;
-        using var tinta = new Pen(Color.FromArgb(31, 22, 0), 2.2f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round };
+        using var tinta = new Pen(Tokens.Claro.CorEstadoAvisoSobreSolido, 2.2f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round };
         g.DrawLine(tinta, cx, y + 3.8f, cx, y + 9.4f);
-        using var ponto = new SolidBrush(Color.FromArgb(31, 22, 0));
+        using var ponto = new SolidBrush(Tokens.Claro.CorEstadoAvisoSobreSolido);
         g.FillEllipse(ponto, cx - 1.3f, y + 11.1f, 2.6f, 2.6f);
     }
 

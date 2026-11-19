@@ -6,6 +6,8 @@ describe('/api/viplex-programs', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+    // Gravar no telão exige login desde 13/11/2026 (lib/telao-write-auth.ts); o teste usa a chave de serviço.
+    vi.stubEnv('TELAO_WRITE_KEY', 'chave-de-teste');
   });
 
   afterEach(() => {
@@ -89,6 +91,7 @@ describe('/api/viplex-programs', () => {
     const response = await PUT(
       new NextRequest('http://localhost/api/viplex-programs', {
         method: 'PUT',
+        headers: { 'x-telao-key': 'chave-de-teste' },
         body: JSON.stringify({ identifier: 'program-1' }),
       }),
     );
@@ -110,6 +113,7 @@ describe('/api/viplex-programs', () => {
     const response = await PUT(
       new NextRequest('http://localhost/api/viplex-programs', {
         method: 'PUT',
+        headers: { 'x-telao-key': 'chave-de-teste' },
         body: JSON.stringify({ identifier: 'program-1' }),
       }),
     );

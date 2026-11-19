@@ -169,7 +169,8 @@ async function readBody(req: http.IncomingMessage): Promise<Record<string, unkno
 }
 
 function requireKey(req: http.IncomingMessage) {
-  if (!KEY) return;
+  // Sem OPS_RECEPCAO_KEY o servidor ficava ABERTO (grid com nomes e fotos, termo forjável). Agora fecha.
+  if (!KEY) throw new HttpError(503, 'Servidor sem OPS_RECEPCAO_KEY configurada.');
   const got = Buffer.from(String(req.headers['x-ops-key'] ?? ''));
   const want = Buffer.from(KEY);
   if (got.length !== want.length || !timingSafeEqual(got, want)) throw new HttpError(401, 'Chave inválida.');

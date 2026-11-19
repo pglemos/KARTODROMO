@@ -8,17 +8,13 @@ import { one, onlyDigits, query, tx } from './db';
 
 type Reader = (text: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>[]>;
 
-let schemaPronto = false;
-
-export function resetarCacheSchemaVouchers() {
-  schemaPronto = false;
-}
+/** Mantida para os chamadores antigos: não há mais cache de schema (as colunas vêm das migrations). */
+export function resetarCacheSchemaVouchers() {}
 
 /** Garante de forma idempotente as colunas e a tabela de beneficiários do módulo de vouchers. */
 export async function garantirSchemaVouchers(): Promise<void> {
   // No Postgres o schema (kart.voucher.uso_max_total/restrito_clientes, kart.voucher_cliente, kart.inscricao.voucher_id)
   // vem das migrations do Kartódromo OS (supabase/kartodromo/migrations); nada a criar em tempo de execução.
-  schemaPronto = true;
 }
 
 export function normalizarDocVoucher(v: unknown): string | null {

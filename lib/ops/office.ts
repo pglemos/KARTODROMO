@@ -594,9 +594,17 @@ export interface ResultadoMover { trocasDeServico: number; diferencaCentavos: nu
  * padrão). A reserva passa para o produto/preço da bateria nova, continua paga com o valor já pago, e a diferença fica
  * anotada na observação para cobrar no caixa. O tipo de kart continua tendo de ser o mesmo.
  */
-export async function moverReservas(ids: number[], destino: number, grupoId?: number, opcoes: { trocarServico?: boolean } = {}): Promise<ResultadoMover> {
+export async function moverReservas(
+  ids: number[],
+  destino: number,
+  grupoId?: number,
+  // `run`: transação de quem chama. Sem ela, desvincular piloto (que já travou a linha do piloto e a inscrição)
+  // abria uma segunda transação que esperava a primeira até o statement_timeout de 30 s (revisão de 19/11/2026).
+  opcoes: { trocarServico?: boolean; run?: Parameters<Parameters<typeof tx>[0]>[0] } = {},
+): Promise<ResultadoMover> {
   const resultado: ResultadoMover = { trocasDeServico: 0, diferencaCentavos: 0 };
-  await tx(async (run) => {
+  const executar = (corpo: (run: Parameters<Parameters<typeof tx>[0]>[0]) => Promise<void>) => (opcoes.run ? corpo(opcoes.run) : tx(corpo));
+  await executar(async (run) => {
     if (grupoId) {
       const [g] = await run(`SELECT id "Id" FROM kart.reserva_grupo WHERE id = @g AND status = 'ativa' for update`, { g: grupoId });
       if (!g) throw new HttpError(404, 'Reserva em grupo não encontrada.');
@@ -757,7 +765,7 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
       let usosExtra = 0;
       const usosPorClienteExtra = new Map<number, number>();
       for (const alvo of alvos) {
-        let cliAlvoId: number | null = alvo.itemClienteId ?? clienteId;
+        const cliAlvoId: number | null = alvo.itemClienteId ?? clienteId;
         let cliAlvoDoc: string | null = null;
         if (v.RestritoClientes && cliAlvoId) {
           const [cli] = await run(`SELECT documento "Documento", documento_num "DocumentoNum" FROM kart.cliente WHERE id = @cid`, { cid: cliAlvoId });

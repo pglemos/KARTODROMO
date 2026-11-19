@@ -310,7 +310,7 @@ const Grupo = (() => {
       }
     }).catch((err) => {
       if (fechado || !veu.isConnected) return;
-      selGrupo.innerHTML = `<option value="">Erro ao carregar grupos (${err.message})</option>`;
+      selGrupo.innerHTML = `<option value="">Erro ao carregar grupos (${esc(err.message)})</option>`;
     });
 
     veu.querySelector('[data-acao="fecharDlg"]').onclick = fechar;
@@ -381,7 +381,7 @@ const Grupo = (() => {
     const livres = novo ? [] : g.pilotos.filter(vagaLivre);
     const devedores = novo ? [] : g.pilotos.filter((p) => !p.pago && !vagaLivre(p));
     const faltaDevedores = devedores.reduce((a, p) => a + (+p.falta_centavos || 0), 0), faltaLivres = livres.reduce((a, p) => a + (+p.falta_centavos || 0), 0);
-    const minutosAte = (deIso(b.dataHora) - new Date()) / 60000;
+    const minutosAte = (deIsoHora(b.dataHora) - new Date()) / 60000;
     const urgenteGrupo = minutosAte < 120; // falta de pagamento só vira alarme vermelho perto da bateria
     const obsTexto = String((b && b.observacao) || '').trim();
     const chaveAviso = !novo ? `kib-aviso-ok-${g.id}-${obsTexto.length}-${obsTexto.slice(0, 40)}` : '';
@@ -495,7 +495,7 @@ const Grupo = (() => {
           <h2 class="modalGrupoTitulo">${novo ? 'Nova reserva: quem vai correr?' : titulo}</h2>
           <div class="modalGrupoBadges">
             ${novo ? '' : `<span class="badgeCodigoReserva">Reserva ${esc(g.codigo)}</span>`}
-            <span class="badgeDataBateria">${svg(IC.agenda, 14, 'var(--kib-cor-texto-secundario)')} ${quando(b.dataHora)}${(() => { const min = Math.round((deIso(b.dataHora) - new Date()) / 60000); if (min < -40) return ' · já passou'; if (min < 0) return ' · na pista'; if (min < 60) return ` · em ${min} min`; if (min < 24 * 60 && deIso(b.dataHora).getDate() === new Date().getDate()) return ` · hoje, em ${Math.round(min / 60)} h`; const dias = Math.round((new Date(deIso(b.dataHora).toDateString()) - new Date(new Date().toDateString())) / 86400000); return dias === 1 ? ' · amanhã' : ` · em ${dias} dias`; })()}</span>
+            <span class="badgeDataBateria">${svg(IC.agenda, 14, 'var(--kib-cor-texto-secundario)')} ${quando(b.dataHora)}${(() => { const min = Math.round((deIsoHora(b.dataHora) - new Date()) / 60000); if (min < -40) return ' · já passou'; if (min < 0) return ' · na pista'; if (min < 60) return ` · em ${min} min`; if (min < 24 * 60 && deIso(b.dataHora).getDate() === new Date().getDate()) return ` · hoje, em ${Math.round(min / 60)} h`; const dias = Math.round((new Date(deIso(b.dataHora).toDateString()) - new Date(new Date().toDateString())) / 86400000); return dias === 1 ? ' · amanhã' : ` · em ${dias} dias`; })()}</span>
             <span class="badgeNomeBateria">${/^\s*bateria\s*[\d:h]*\s*$/i.test(b.nome || '') ? '' : esc(b.nome) + ' · '}${esc(produtoTxt || 'Bateria')} · ${durMin} min</span>
             ${novo && estado.voltar ? '<button type="button" class="btn link peq" data-voltar-horario="1" style="font-size: var(--kib-fonte-tamanho-pequeno);">‹ Trocar horário</button>' : ''}
           </div>
@@ -561,7 +561,7 @@ const Grupo = (() => {
               <span class="titulo t-subtitulo" role="heading" aria-level="3" style="font-size: var(--kib-fonte-tamanho-subtitulo); margin: 0">Como o grupo vai pagar?</span>
               ${dica("Escolha uma opção: o responsável paga tudo em um link; cada piloto paga o seu; ou o responsável paga um sinal agora e o resto é acertado na Recepção.", "como o grupo vai pagar")}
             </div>
-            ${travaForma ? (() => { const [, t, d] = MODOS.find((x) => x[0] === modo) || MODOS[0]; return `<div class="formaTravada"><span class="col" style="gap: 2px; min-width: 0"><b class="t-subtitulo">${t}</b><span class="peq">${d}</span></span><button type="button" class="btn sec peq" data-trocar-modo="1" title="Já há pagamento nesta reserva: trocar pede confirmação">Trocar</button></div>`; })() : `<div role="radiogroup" aria-label="Como o grupo vai pagar" style="display: flex; flex-direction: column; gap: 8px">
+            ${travaForma ? (() => { const [, t, d] = MODOS.find((x) => x[0] === modo) || MODOS[0]; return `<div class="formaTravada"><span class="col" style="gap: 2px; min-width: 0"><b class="t-subtitulo">${t}</b><span class="peq">${d}</span></span><span class="peq" style="max-width: 16ch; text-align: right; color: var(--kib-cor-texto-secundario)">Já há pagamento: a forma não muda mais.</span></div>`; })() : `<div role="radiogroup" aria-label="Como o grupo vai pagar" style="display: flex; flex-direction: column; gap: 8px">
               ${MODOS.map(([v, t, d]) => `
                 <button type="button" role="radio" aria-checked="${modo === v}" data-modo="${v}" class="cardModoPagamento ${modo === v ? 'selecionado' : ''}">
                   <span class="radioCirculoIndicador"></span>
@@ -575,7 +575,7 @@ const Grupo = (() => {
             <div class="gradeMetricas">
               <div class="cardMetricaFinanceira">
                 <label class="cardMetricaFinanceiraLabel" for="precoGrupo">Por piloto${novo ? (isHappy ? ' · Happy Hour' : rasc.origem === 'recepcao' ? ' · balcão' : ' · antecipado') : ''}</label>
-                ${travaPreco ? `<div class="valorComAcao"><span class="num valorGrande" id="precoGrupo">${brl(preco)}</span><button type="button" class="btn link peq" data-alterar-preco="1" aria-label="Alterar o preço por piloto" title="Já há pagamento: alterar pede confirmação">Alterar</button></div>` : `<label class="campoMoeda"><span aria-hidden="true">R$</span><input id="precoGrupo" type="number" min="0" step="0.01" value="${(preco / 100).toFixed(2)}" data-preco="1" aria-label="Preço por piloto em reais"></label>`}
+                ${travaPreco ? `<div class="valorComAcao"><span class="num valorGrande" id="precoGrupo">${brl(preco)}</span><span class="peq" style="color: var(--kib-cor-texto-secundario)">Já há pagamento: o preço não muda mais.</span></div>` : `<label class="campoMoeda"><span aria-hidden="true">R$</span><input id="precoGrupo" type="number" min="0" step="0.01" value="${(preco / 100).toFixed(2)}" data-preco="1" aria-label="Preço por piloto em reais"></label>`}
               </div>
               ${modo === 'sinal' ? `
                 <div class="cardMetricaFinanceira">
@@ -635,7 +635,7 @@ const Grupo = (() => {
                   <span class="peq" style="font-weight: 600; color: var(--kib-cor-texto-principal);">${devedores.length > 1 ? `Falta receber de ${devedores.length} pessoas:` : devedores.length ? 'Falta receber de 1 pessoa (está na lista com “Receber”).' : 'Ninguém com nome deve nada.'}</span>
                   <div class="chipsPendentesLista">
                     ${(devedores.length > 1 ? devedores : []).slice(0, 6).map((p) => `<button type="button" class="chipPilotoPendente" data-ir-linha="linhaPiloto-${p.id}" title="Ir até a linha de ${esc(nomeBonito(p.nome) || 'Piloto ' + p.ordem)} para receber">${esc(nomeBonito(p.nome) || 'Piloto ' + p.ordem)} · ${brlCurto(p.falta_centavos)}</button>`).join('')}
-                    ${devedores.length > 6 ? `<span class="chipPilotoPendenteMais" title="${devedores.slice(6).map((p) => nomeBonito(p.nome) || 'Piloto ' + p.ordem).join(', ')}">+${devedores.length - 6} outros</span>` : ''}
+                    ${devedores.length > 6 ? `<span class="chipPilotoPendenteMais" title="${esc(devedores.slice(6).map((p) => nomeBonito(p.nome) || 'Piloto ' + p.ordem).join(', '))}">+${devedores.length - 6} outros</span>` : ''}
                     ${livres.length ? `<span class="peq" style="flex-basis: 100%; color: var(--kib-cor-texto-secundario);">${plural(livres.length, 'vaga livre paga', 'vagas livres pagam')} pelo link ao se cadastrar.</span>` : ''}
                   </div>
                 </div>
@@ -1070,11 +1070,11 @@ const Grupo = (() => {
           if (vchs.length) sugerido = vchs[0].codigo;
         }
       } catch {}
-      const cod = await pedirVoucher(`Quitar vaga de ${esc(p ? (p.nome || 'Piloto ' + p.ordem) : g.responsavel)}`, `Valor da vaga: ${brl(valor)}. Digite o código do voucher:`, sugerido);
+      const cod = await pedirVoucher(`Quitar vaga de ${p ? (p.nome || 'Piloto ' + p.ordem) : g.responsavel}`, `Valor da vaga: ${brl(valor)}. Digite o código do voucher:`, sugerido);
       if (!cod || !ativo(ctx)) return;
       const recebido = await atualizar(() => office(`/grupos/${g.id}/pagamentos`, {
         method: 'POST',
-        body: { pilotoId: pid, valorCentavos: valor, forma: 'Voucher', voucherCodigo: cod, idempotencyKey: 'vch_' + g.id + '_' + (pid || 'g') + '_' + Date.now() },
+        body: { pilotoId: pid, valorCentavos: valor, forma: 'Voucher', voucherCodigo: cod },
       }), 'Vaga quitada com voucher');
       return;
     }
@@ -1095,7 +1095,7 @@ const Grupo = (() => {
             if (vchs.length) sugerido = vchs[0].codigo;
           }
         } catch {}
-        voucherCodigo = await pedirVoucher(`Quitar com voucher`, `Digite o código do voucher para ${esc(p ? (p.nome || 'Piloto ' + p.ordem) : g.responsavel)}:`, sugerido);
+        voucherCodigo = await pedirVoucher(`Quitar com voucher`, `Digite o código do voucher para ${p ? (p.nome || 'Piloto ' + p.ordem) : g.responsavel}:`, sugerido);
         if (!voucherCodigo || !ativo(ctx)) return;
       }
       const corpoPg = { pilotoId: pid, valorCentavos: valor, forma: forma.trim(), ...(voucherCodigo ? { voucherCodigo } : {}) };

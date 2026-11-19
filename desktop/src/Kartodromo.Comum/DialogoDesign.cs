@@ -191,7 +191,7 @@ public class DialogoDesign : CartaoModal
         if (string.IsNullOrEmpty(texto)) return null;
         var g = Secao("Observação da bateria", texto);
         var s = (TableLayoutPanel)g.Parent;
-        var fundo = Color.FromArgb(255, 246, 214);
+        var fundo = Tokens.Claro.CorEstadoAvisoFundo;
         s.BackColor = fundo; g.BackColor = fundo;
         foreach (Control c in s.Controls) c.BackColor = fundo;
         return s;
