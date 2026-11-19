@@ -872,3 +872,31 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
 .avisoObsCorpo b { font-size: var(--kib-fonte-tamanho-pequeno); letter-spacing: .02em; }
 .avisoObsTxt { white-space: pre-line; line-height: 1.5; overflow-wrap: anywhere; }
 .modalGrupoTopoInfo .avisoObs { margin-top: var(--kib-espaco-1); max-width: 72ch; }
+
+/* ---------- Visão geral em duas colunas (19/11/2026): a principal (indicadores, agora e a seguir, linha do dia)
+   e a lateral (semana, pendências, placar), como o painel de referência V22. Abaixo de 1200px vira uma coluna
+   só, com as pendências primeiro — a recepção não pode esperar. */
+.visaoGrade { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--kib-espaco-3); align-items: start; }
+.visaoCol, .visaoLado { display: contents; }
+.visaoLado #pendencias { order: 1; }
+.visaoCol #kpis { order: 2; }
+.visaoCol #agoraSeguir { order: 3; }
+.visaoLado #emPista { order: 4; }
+.visaoCol #linhaDia { order: 5; }
+.visaoLado .semanaVisao { order: 6; }
+@media (min-width: 1200px) {
+  .visaoGrade { grid-template-columns: minmax(0, 1fr) 360px; }
+  .visaoCol, .visaoLado { display: flex; flex-direction: column; gap: var(--kib-espaco-3); min-width: 0; }
+  .visaoCol { grid-column: 1; grid-row: 1; }
+  .visaoLado { grid-column: 2; grid-row: 1; }
+  .visaoGrade :is(#pendencias, #kpis, #agoraSeguir, #emPista, #linhaDia, .semanaVisao) { order: 0; }
+}
+.semanaVisao .cartaoCab { justify-content: space-between; }
+.semanaVisao .cartaoCab h2 { font-size: var(--kib-fonte-tamanho-titulo); }
+.faixaSemana { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--kib-espaco-meio); padding: 0 var(--kib-espaco-2) var(--kib-espaco-2); }
+.diaSemana { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 52px; padding: var(--kib-espaco-1) 0; border: 0; border-radius: var(--kib-raio-campo); background: transparent; color: var(--kib-cor-texto-secundario); font: inherit; cursor: pointer; }
+.diaSemana span { font-size: var(--kib-fonte-tamanho-pequeno); text-transform: capitalize; }
+.diaSemana b { font-size: var(--kib-fonte-tamanho-subtitulo); font-weight: 500; color: var(--kib-cor-texto-principal); font-variant-numeric: tabular-nums; }
+button.diaSemana:hover { background: var(--kib-cor-superficie-suave); }
+.diaSemana.hoje { background: var(--kib-cor-superficie-inversa); color: var(--kib-cor-acao-sobre-principal); }
+.diaSemana.hoje b { color: var(--kib-cor-acao-sobre-principal); }

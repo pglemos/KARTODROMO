@@ -209,7 +209,7 @@ html[data-tema="escuro"] body {
 }
 [data-tema="escuro"] .btn { border-radius: 999px; }
 [data-tema="escuro"] .cab h1 { font-weight: 400; letter-spacing: -0.02em; }
-[data-tema="escuro"] :is(.placar, .placarVazio, .faixaPista, .heroPiloto, .fotoGrande.semFoto) {
+[data-tema="escuro"] :is(.placar, .placarVazio, .faixaPista, .heroPiloto, .fotoGrande.semFoto, .diaSemana.hoje) {
   --kib-cor-acao-sobre-principal: #eaf3ee;
   --kib-cor-borda-sutil: #b9cec5;
 }
@@ -305,4 +305,22 @@ html.kib-embutido[data-tela-kib="visao"] .cab .btn:not(.prim):not(.escuro) {
   background: rgba(234, 243, 238, 0.12);
   color: #eaf3ee;
   box-shadow: none;
+}
+
+/* Visão geral, coluna lateral (V22): a semana com o dia de hoje num bloco verde-escuro, e as pendências como a
+   lista de notificações da referência — ação num botão pequeno escuro em pílula. */
+[data-tema="claro"] .diaSemana.hoje { box-shadow: 0 10px 20px -12px rgba(15, 59, 49, 0.6); }
+@media (min-width: 1200px) {
+  [data-tema="claro"] .visaoLado .pendencia { gap: 6px 10px; padding-top: 12px; padding-bottom: 12px; }
+  [data-tema="claro"] .visaoLado .pendencia > .btn:not(.perigo) {
+    height: 30px;
+    min-height: 30px;
+    margin-left: 34px;
+    padding: 0 12px;
+    font-size: 12px;
+    background: var(--v22-floresta);
+    color: #ffffff;
+    box-shadow: none;
+  }
+  [data-tema="claro"] .visaoLado .pendencia > .btn:not(.perigo):hover { background: #155443; }
 }

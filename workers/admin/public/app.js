@@ -416,6 +416,24 @@ const amostra = (t, on) => t === 'livre'
     : on ? 'background: ' + TIPOS[t].cor : 'background: var(--kib-cor-superficie-padrao); box-shadow: inset 0 0 0 1.5px var(--kib-cor-borda-forte)';
 
 // ------------------------------------------------------------------ busca geral
+/* A semana em faixa da Visão geral (o calendário do topo da coluna lateral do V22): segunda a domingo,
+ * hoje em destaque; cada dia abre a Agenda naquele dia (`data-ir-dia`, já tratado no clique da tela). */
+function semanaDaVisao(d, podeAgenda) {
+  const seg = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7));
+  const iso = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  const curtos = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+  const dias = curtos.map((nome, i) => {
+    const x = new Date(seg.getFullYear(), seg.getMonth(), seg.getDate() + i);
+    const hoje = iso(x) === iso(d);
+    const rotulo = `${DIAS[x.getDay()]}, ${x.getDate()} de ${MESES[x.getMonth()]}${hoje ? ' (hoje)' : ''}`;
+    return podeAgenda
+      ? `<button type="button" class="diaSemana${hoje ? ' hoje' : ''}" data-ir-dia="${iso(x)}" aria-label="Abrir a agenda de ${rotulo}"${hoje ? ' aria-current="date"' : ''}><span>${nome}</span><b>${x.getDate()}</b></button>`
+      : `<span class="diaSemana${hoje ? ' hoje' : ''}"${hoje ? ' aria-current="date"' : ''}><span>${nome}</span><b>${x.getDate()}</b></span>`;
+  }).join('');
+  const mes = MESES[d.getMonth()];
+  return `<section class="cartao semanaVisao" aria-label="Esta semana"><div class="cartaoCab"><h2>${mes[0].toUpperCase() + mes.slice(1)}, ${d.getFullYear()}</h2>${podeAgenda ? '<a class="btn sec peq" href="#/agenda">Agenda</a>' : ''}</div><div class="faixaSemana">${dias}</div></section>`;
+}
+
 function abrirBusca() {
   const m = modal(`<div style="padding: 0"><label style="display: flex; align-items: center; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); border-bottom: 1px solid var(--linha2); background: var(--kib-cor-superficie-padrao)">${svg(IC.busca, 17, 'var(--kib-cor-texto-apoio)')}<input id="qBusca" placeholder="Nome, CPF, telefone ou nome de tela…" aria-label="Buscar" style="flex-grow: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: var(--kib-fonte-tamanho-subtitulo)"><button class="btn sec peq" data-acao="fechar">Fechar</button></label><div id="resBusca" style="max-height: 440px; overflow-y: auto; padding: var(--kib-espaco-meio); background: var(--kib-cor-superficie-padrao)"></div></div>`);
   m.style.maxWidth = '600px';
@@ -465,13 +483,18 @@ TELAS.visao = async (tela) => {
   ].filter(Boolean).join('');
   tela.innerHTML = `${cabecalho(`${DIAS[d.getDay()][0].toUpperCase() + DIAS[d.getDay()].slice(1)}, ${d.getDate()} de ${MESES[d.getMonth()]}<span id="atualizadoV" style="color: var(--mudo2); font-weight: 500"></span>`, nomeU ? `${saud}, ${esc(nomeU)}` : saud, acoesTopo)}
   <main class="principal">
-    <section id="pendencias" aria-live="polite" aria-label="Pendências"><div class="esqueleto" style="height: 56px"></div></section>
-    <section class="kpis kpis4" id="kpis" aria-label="Indicadores de hoje">${'<div class="esqueleto" style="height: 112px"></div>'.repeat(4)}</section>
-    <div class="linhaFlex" style="align-items: stretch">
-      <section class="cartao" id="agoraSeguir" aria-label="Agora e a seguir" style="flex: 999 1 540px; min-width: 0"><div class="esqueleto" style="height: 220px; margin: var(--kib-espaco-2)"></div></section>
-      <section class="placar" id="emPista" aria-label="Placar ao vivo" style="flex: 1 1 360px; min-width: 0"><div style="padding: var(--kib-espaco-2); color: var(--kib-cor-icone-suave)">Carregando a cronometragem…</div></section>
+    <div class="visaoGrade">
+      <div class="visaoCol">
+        <section class="kpis kpis4" id="kpis" aria-label="Indicadores de hoje">${'<div class="esqueleto" style="height: 112px"></div>'.repeat(4)}</section>
+        <section class="cartao" id="agoraSeguir" aria-label="Agora e a seguir"><div class="esqueleto" style="height: 220px; margin: var(--kib-espaco-2)"></div></section>
+        <section class="cartao" id="linhaDia" aria-label="Linha do dia"><div class="esqueleto" style="height: 150px; margin: var(--kib-espaco-2)"></div></section>
+      </div>
+      <aside class="visaoLado" aria-label="Hoje no kartódromo">
+        ${semanaDaVisao(d, podeAgenda)}
+        <section id="pendencias" aria-live="polite" aria-label="Pendências"><div class="esqueleto" style="height: 56px"></div></section>
+        <section class="placar" id="emPista" aria-label="Placar ao vivo"><div style="padding: var(--kib-espaco-2); color: var(--kib-cor-icone-suave)">Carregando a cronometragem…</div></section>
+      </aside>
     </div>
-    <section class="cartao" id="linhaDia" aria-label="Linha do dia"><div class="esqueleto" style="height: 150px; margin: var(--kib-espaco-2)"></div></section>
     <p class="peq" style="margin: 0; text-align: center"><a href="#/ajuda" data-ajuda-visao="1">Como ler esta tela</a></p>
   </main>`;
   const q = (s) => $(s, tela);
