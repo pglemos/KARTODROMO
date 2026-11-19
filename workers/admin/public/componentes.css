@@ -378,7 +378,7 @@ input[type="checkbox"], input[type="radio"] {
 /* Tabela de Pilotos do Grupo */
 .cabTabelaGrupo {
   display: grid;
-  grid-template-columns: 32px minmax(224px, 1.7fr) 150px 84px 124px minmax(208px, 1fr) 72px;
+  grid-template-columns: 32px minmax(200px, 1.7fr) 136px 76px 112px minmax(236px, 1fr) var(--colAcoes, 100px);
   gap: var(--kib-espaco-1);
   align-items: center;
   height: 36px;
@@ -396,7 +396,7 @@ input[type="checkbox"], input[type="radio"] {
 
 .linhaPilotoGrupo {
   display: grid;
-  grid-template-columns: 32px minmax(224px, 1.7fr) 150px 84px 124px minmax(208px, 1fr) 72px;
+  grid-template-columns: 32px minmax(200px, 1.7fr) 136px 76px 112px minmax(236px, 1fr) var(--colAcoes, 100px);
   gap: var(--kib-espaco-1);
   align-items: center;
   min-height: 52px;
@@ -837,7 +837,8 @@ input[type="checkbox"], input[type="radio"] {
 .divisorMenu { border: 0; border-top: 1px solid var(--kib-cor-borda-sutil); margin: 4px 0; }
 .linhaAcoesLink .btn, .linhaAcoesLink .btnZapWhatsApp, .linhaAcoesLink .entrada { height: 36px; min-height: 36px; }
 .modalGrupo .btnCobrarSumario { height: 32px; }
-.modalGrupo .btnMoverPilotoGrupo, .modalGrupo .btnRemoverPiloto { width: 36px; height: 36px; }
+.modalGrupo .btnRemoverPiloto { width: 36px; height: 36px; }
+.modalGrupo .btnMoverPilotoGrupo { width: auto; height: 36px; padding: 0 8px; gap: 4px; color: var(--kib-cor-texto-principal); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 600; }
 .formaTravada .btn { color: var(--kib-cor-texto-principal); background: var(--kib-cor-superficie-padrao); border: 1px solid var(--kib-cor-borda-forte); }
 .valorComAcao .btn.link { min-height: 32px; }
 .linhaPag .avatar.p { font-size: 12px; flex: none; }
@@ -917,6 +918,7 @@ button.chipPilotoPendente:hover { border-color: var(--kib-aviso-texto-escuro); }
 .avisoConferido .btn.link { min-height: 24px; padding: 0 4px; }
 .linhaPilotoGrupo.destaque, .linhaPag.destaque, .obsNoCorpo.destaque { animation: destaqueLinha 2s ease-out; }
 @keyframes destaqueLinha { 0%, 40% { background: color-mix(in srgb, var(--kib-cor-categoria-amarelo-topo) 60%, transparent); box-shadow: inset 0 0 0 2px var(--kib-cor-categoria-amarelo-base); } 100% { background: transparent; box-shadow: none; } }
+.modalGrupo .btnToggleIdade { padding: 0 8px; }
 .modalGrupo .btnToggleIdade.adulto { background: var(--kib-cor-superficie-campo); border-color: var(--kib-cor-borda-sutil); color: var(--kib-cor-texto-principal); }
 /* tablet: configuração do pagamento antes da lista; histórico de recebidos depois */
 @media (max-width: 1080px) {
@@ -924,3 +926,19 @@ button.chipPilotoPendente:hover { border-color: var(--kib-aviso-texto-escuro); }
   .modalGrupo .colunaPagamento > * { order: -1; flex: 1 1 100%; min-width: 0; }
   .modalGrupo .colunaPagamento > .pagRecebidos { order: 5; }
 }
+
+/* rodada 9 do critique */
+.colunaPagamento { flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: var(--kib-espaco-denso-12); }
+@media (max-width: 1080px) { .modalGrupo .colunaPagamento { display: contents; } }
+.avisoNoMenu { display: flex; align-items: flex-start; gap: 6px; margin: 0 0 4px; padding: 6px 8px; border-radius: var(--kib-raio-chip); background: var(--kib-aviso-fundo-claro); color: var(--kib-aviso-texto-escuro); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 600; line-height: 1.35; max-width: 240px; }
+.chipAvisoLinha { width: 28px; padding: 0; justify-content: center; }
+.subtituloPag { margin: var(--kib-espaco-1) 0 0; font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700; color: var(--kib-cor-texto-secundario); }
+.estadoAuto { margin-left: 6px; font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 600; color: var(--kib-aviso-texto-escuro); }
+.estadoAuto.ok { color: var(--kib-cor-estado-sucesso-texto); }
+@media (max-width: 1080px) { .modalGrupo .resumoGrupoFalta + .resumoGrupoConta { display: none; } }
+@media (max-width: 1080px) { .modalGrupo .btnMoverPilotoGrupo .rotMover { display: none; } .modalGrupo .btnMoverPilotoGrupo { width: 36px; padding: 0; } }
+
+/* "Mover" escrito só em tela larga; abaixo disso, ícone com dica (o nome e o pagamento ganham o espaço) */
+.modalGrupo { --colAcoes: 76px; }
+.modalGrupo .btnMoverPilotoGrupo .rotMover { display: none; }
+.modalGrupo .btnMoverPilotoGrupo { width: 36px; padding: 0; }
