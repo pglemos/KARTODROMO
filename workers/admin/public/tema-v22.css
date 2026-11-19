@@ -171,6 +171,9 @@ html[data-tema="claro"] body {
   --kib-cor-estado-aviso-solido: #ffb48a;
   --kib-cor-estado-aviso-sobre-solido: #3d1f0b;
   --kib-cor-estado-aviso-texto: #ffc4a3;
+  --kib-cor-estado-aviso-texto-forte: #ffc4a3;
+  --kib-cor-estado-perigo-texto-forte: #ff9d90;
+  --kib-cor-estado-info-texto-forte: #8ccbee;
   --kib-cor-estado-sucesso-fundo: #12291f;
   --kib-cor-estado-sucesso-solido: #8fe0c4;
   --kib-cor-estado-sucesso-texto: #8fe0c4;
