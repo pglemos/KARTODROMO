@@ -443,3 +443,27 @@ html.kib-embutido[data-tela-kib="visao"] .cab .btn:not(.prim):not(.escuro) {
 [data-tema="claro"] .cartaoPodio.primeiro :is(.podioNome, .podioTempo b) { color: #ffffff; }
 [data-tema="claro"] .cartaoPodio.primeiro .podioTempo .peq { color: #b9d2c7 !important; }
 [data-tema="claro"] .cartaoPodio.primeiro .avatarNeutro { background: rgba(234, 243, 238, 0.14); color: #ffffff; }
+
+/* ── Vouchers (e todo indicador com ícone) no V22 (19/11/2026) ──
+   · o ícone do rótulo do indicador fica num ladrilho suave — menta, pêssego, céu alternando —, como os
+     ladrilhos coloridos da referência;
+   · o selo roxo (pessoas/grupo) sai da paleta: vira a etiqueta escura em pílula do V22 ("Video", "Doc"). */
+[data-tema="claro"] .kpi .rot > svg:first-child {
+  box-sizing: content-box;
+  padding: 6px;
+  border-radius: 10px;
+  background: #e2f6ee;
+  stroke: #0f3b31;
+}
+[data-tema="claro"] .kpi:nth-child(3n + 2) .rot > svg:first-child { background: #ffe8da; stroke: #8a4a22; }
+[data-tema="claro"] .kpi:nth-child(3n) .rot > svg:first-child { background: #e3eef4; stroke: #285f7c; }
+[data-tema="claro"] .chip.roxo {
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
+  align-self: flex-start;
+  background: var(--v22-floresta);
+  color: #ffffff;
+  box-shadow: none;
+}
+[data-tema="claro"] .chip.roxo svg { stroke: currentColor; }
