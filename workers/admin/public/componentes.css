@@ -378,7 +378,7 @@ input[type="checkbox"], input[type="radio"] {
 /* Tabela de Pilotos do Grupo */
 .cabTabelaGrupo {
   display: grid;
-  grid-template-columns: 32px minmax(216px, 1.6fr) 150px 84px 124px minmax(208px, 1fr) 76px;
+  grid-template-columns: 32px minmax(224px, 1.7fr) 150px 84px 124px minmax(208px, 1fr) 72px;
   gap: var(--kib-espaco-1);
   align-items: center;
   height: 36px;
@@ -396,7 +396,7 @@ input[type="checkbox"], input[type="radio"] {
 
 .linhaPilotoGrupo {
   display: grid;
-  grid-template-columns: 32px minmax(216px, 1.6fr) 150px 84px 124px minmax(208px, 1fr) 76px;
+  grid-template-columns: 32px minmax(224px, 1.7fr) 150px 84px 124px minmax(208px, 1fr) 72px;
   gap: var(--kib-espaco-1);
   align-items: center;
   min-height: 52px;
@@ -538,9 +538,10 @@ input[type="checkbox"], input[type="radio"] {
   gap: 5px;
   transition: background 0.15s ease;
 }
-.btnCobrarSumario:hover {
-  background: var(--kib-sucesso-texto-escuro);
-  border-color: var(--kib-sucesso-texto-escuro);
+.btnCobrarSumario:hover, .menuCobrar[open] > .btnCobrarSumario {
+  background: var(--kib-cor-marca-principal);
+  border-color: var(--kib-cor-marca-principal);
+  color: var(--kib-branco) !important;
 }
 
 /* Botão WhatsApp Compartilhar Link */
@@ -773,7 +774,7 @@ input[type="checkbox"], input[type="radio"] {
 .botoesRodape { display: flex; gap: var(--kib-espaco-1); flex: none; }
 @media (max-width: 720px) { .modalGrupo .modalRodape { flex-wrap: wrap; } .botoesRodape { margin-left: auto; } }
 
-.resumoGrupo { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; margin-left: auto; text-align: right; flex: none; max-width: 340px; }
+.resumoGrupo { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; margin-left: auto; text-align: right; flex: 0 1 auto; max-width: 480px; }
 .resumoGrupoValor { font-size: var(--kib-fonte-tamanho-corpo); color: var(--kib-cor-texto-secundario); font-variant-numeric: tabular-nums; }
 .resumoGrupoValor b { font-size: var(--kib-fonte-tamanho-subtitulo); color: var(--kib-cor-texto-principal); }
 .resumoGrupoConta { font-size: var(--kib-fonte-tamanho-pequeno); color: var(--kib-cor-texto-secundario); }
@@ -875,3 +876,15 @@ input[type="checkbox"], input[type="radio"] {
 .valorEditavel:hover, .valorEditavel:focus-visible { border-color: var(--kib-cor-borda-campo); background: var(--kib-cor-superficie-padrao); }
 .valorEditavel:hover svg, .valorEditavel:focus-visible svg { opacity: 1; }
 .valorEditavel:focus-visible { outline: var(--kib-foco-largura) solid var(--kib-cor-borda-foco); outline-offset: 1px; }
+
+/* rodada 5 do critique */
+.resumoGrupoFalta { font-size: var(--kib-fonte-tamanho-titulo); font-weight: 700; color: var(--kib-aviso-texto-escuro); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.resumoGrupoFalta.urgente { color: var(--kib-perigo-texto-escuro); }
+.resumoGrupoFalta.ok { color: var(--kib-cor-estado-sucesso-texto); }
+.formRegistrar { grid-template-columns: 110px minmax(0, 1fr); }
+.formRegistrar .campoQuem { grid-column: 1 / -1; }
+.maisRecebidos > summary { font-size: var(--kib-fonte-tamanho-pequeno); color: var(--kib-cor-marca-principal); min-height: 32px; }
+@media (max-width: 1080px) { .modalGrupo .colunaPagamento { order: -1; flex-basis: 100%; } }
+
+.modalGrupo .dicaDet > summary { width: 32px; height: 32px; }
+@media (max-width: 1080px) { .resumoGrupo .resumoGrupoConta + .resumoGrupoConta { display: none; } }
