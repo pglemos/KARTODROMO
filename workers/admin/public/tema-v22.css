@@ -374,3 +374,34 @@ html.kib-embutido[data-tela-kib="visao"] .cab .btn:not(.prim):not(.escuro) {
   color: #ffffff;
   letter-spacing: 0.04em;
 }
+
+/* ── Recepção no V22 (19/11/2026) ──
+   · os indicadores da bateria viram cartões de vidro separados, como "Projects shipped / Followers" da referência;
+   · a ficha do piloto ganha a faixa verde-escura do perfil do V22, com a foto sobreposta num anel branco. */
+:is([data-tema="claro"], [data-tema="escuro"]) .indRec {
+  gap: 10px;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+:is([data-tema="claro"], [data-tema="escuro"]) .indRecItem {
+  padding: 12px 14px;
+  border-radius: 16px;
+}
+[data-tema="claro"] .indRecItem {
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.9) inset, 0 10px 22px -18px rgba(15, 35, 28, 0.35);
+}
+[data-tema="escuro"] .indRecItem { background: var(--kib-cor-superficie-campo); }
+:is([data-tema="claro"], [data-tema="escuro"]) .indRecItem .num { font-weight: 500 !important; }
+
+[data-tema="claro"] #ficha .fichaTopo {
+  padding-top: 40px;
+  background:
+    radial-gradient(260px 90px at 85% 0%, rgba(143, 224, 196, 0.25), transparent 70%) top / 100% 76px no-repeat,
+    linear-gradient(160deg, #155443 0%, #0f3b31 70%) top / 100% 76px no-repeat;
+}
+[data-tema="claro"] #ficha .fichaTopo .avatar.xg {
+  box-shadow: 0 0 0 4px #ffffff, 0 12px 24px -12px rgba(15, 35, 28, 0.55) !important;
+}
