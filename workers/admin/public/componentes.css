@@ -887,7 +887,6 @@ input[type="checkbox"], input[type="radio"] {
 @media (max-width: 1080px) { .modalGrupo .colunaPagamento { order: -1; flex-basis: 100%; } }
 
 .modalGrupo .dicaDet > summary { width: 32px; height: 32px; }
-@media (max-width: 1080px) { .resumoGrupo .resumoGrupoConta + .resumoGrupoConta { display: none; } }
 
 /* rodada 6 do critique */
 @media (max-width: 1080px) { .modalGrupo .obsNoCorpo { order: -2; } }
@@ -901,3 +900,12 @@ input[type="checkbox"], input[type="radio"] {
 .linhaLivres { display: flex; align-items: center; gap: var(--kib-espaco-1); padding: 10px var(--kib-espaco-2); border-top: 1px dashed var(--kib-cor-borda-sutil); background: var(--kib-cor-superficie-suave); }
 .linhaLivres .col { flex: 1; }
 .linhaLivres .peq { color: var(--kib-cor-texto-secundario); }
+
+/* rodada 7 do critique */
+.linhaLivres .btn.sec { color: var(--kib-cor-texto-principal); background: var(--kib-cor-superficie-padrao); border: 1px solid var(--kib-cor-borda-forte); }
+button.chipPilotoPendente { cursor: pointer; font-family: inherit; }
+button.chipPilotoPendente:hover { border-color: var(--kib-aviso-texto-escuro); }
+.avisoContradiz .btn.link { min-height: 24px; padding: 0 4px; font-weight: 700; }
+.linhaPilotoGrupo.destaque, .linhaPag.destaque { animation: destaqueLinha 1.6s ease-out; }
+@keyframes destaqueLinha { from { background: color-mix(in srgb, var(--kib-cor-categoria-amarelo-topo) 45%, transparent); } to { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .linhaPilotoGrupo.destaque, .linhaPag.destaque { animation: none; outline: 2px solid var(--kib-cor-categoria-amarelo-base); } }
