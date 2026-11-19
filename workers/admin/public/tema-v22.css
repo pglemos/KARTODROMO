@@ -32,6 +32,16 @@
   --kib-cor-texto-principal: #0f231c;
   --kib-cor-texto-secundario: #46594f;
   --kib-cor-texto-terciario: #5d7068;
+  --kib-cor-texto-corpo: #2c3d36;
+  --kib-cor-texto-apoio: #4f6158;
+  --kib-cor-texto-discreto: #5d7068;
+  /* a escala cinza fixa que app.css usa com !important (rótulos, "sobre" do cabeçalho, filtros) */
+  --kib-cinza-100: #e6eee9;
+  --kib-cinza-500: #5d7068;
+  --kib-cinza-600: #4f6158;
+  --kib-cinza-700: #2c3d36;
+  --kib-cinza-800: #1c2b25;
+  --kib-cinza-900: #0f3b31;
   --kib-cor-borda-sutil: #dfe8e3;
   --kib-cor-borda-forte: #c7d4cd;
   --kib-cor-borda-campo: #9aaba3;
@@ -117,7 +127,8 @@ html[data-tema="claro"] body {
 /* ── Escuro (o painel dentro do CRM segue o tema do CRM; ver kartodromo-os/scripts/kartodromo/kib-admin/embutido.js)
    Mesmo mundo à noite: verde quase preto, menta no lugar do verde-neon, pêssego no aviso.
    Contraste sobre #0a1511: texto 16,1:1 / secundário 8,6:1 / terciário 5,6:1; #0f3b31 sobre menta 8,1:1;
-   pêssego 11,0:1. O cartão "inverso" (placar, faixa da pista) fica menta-clara com texto verde-escuro (10,2:1). */
+   pêssego 11,0:1. O cartão "inverso" (placar, faixa da pista, herói do piloto) fica verde-floresta, como no claro;
+   dentro dele o "texto sobre a ação principal" volta a ser claro (o botão principal do escuro é menta com texto escuro). */
 [data-tema="escuro"],
 .kib-tema-escuro {
   --kib-cor-fundo-app: #0a1511;
@@ -125,8 +136,19 @@ html[data-tema="claro"] body {
   --kib-cor-superficie-suave: #0d1915;
   --kib-cor-superficie-campo: #172a23;
   --kib-cor-superficie-lateral: #07130f;
-  --kib-cor-superficie-inversa: #e2f6ee;
-  --kib-cor-texto-inverso: #0f3b31;
+  --kib-cor-superficie-inversa: #0f3b31;
+  --kib-cor-texto-inverso: #eaf3ee;
+  --kib-cor-texto-corpo: #d3e2db;
+  --kib-cor-texto-apoio: #a9bdb4;
+  --kib-cor-texto-discreto: #93a69d;
+  --kib-cor-icone-suave: #8fa69c;
+  --kib-cor-status-ok: #6fd6ad;
+  --kib-cinza-100: #172a23;
+  --kib-cinza-500: #93a69d;
+  --kib-cinza-600: #a9bdb4;
+  --kib-cinza-700: #c3d4cc;
+  --kib-cinza-800: #dbe7e1;
+  --kib-cinza-900: #8fe0c4;
   --kib-cor-texto-principal: #eaf3ee;
   --kib-cor-texto-secundario: #a9bdb4;
   --kib-cor-texto-terciario: #85998f;
@@ -184,3 +206,44 @@ html[data-tema="escuro"] body {
 }
 [data-tema="escuro"] .btn { border-radius: 999px; }
 [data-tema="escuro"] .cab h1 { font-weight: 400; letter-spacing: -0.02em; }
+[data-tema="escuro"] :is(.placar, .placarVazio, .faixaPista, .heroPiloto, .fotoGrande.semFoto) {
+  --kib-cor-acao-sobre-principal: #eaf3ee;
+  --kib-cor-borda-sutil: #b9cec5;
+}
+[data-tema="escuro"] .placar { box-shadow: 0 0 0 1px rgba(143, 224, 196, 0.14), var(--kib-elevacao-2); }
+
+/* Agenda no escuro: cada cor mantém o significado (livre, reserva, fechada, evento, bloqueado), com fundo escuro tingido
+   e texto claro tingido. Texto sobre o bloco: 10,1 a 10,4:1; sobre o topo: 8,4 a 9,0:1 (medido em 19/11/2026). */
+[data-tema="escuro"],
+.kib-tema-escuro {
+  --kib-cor-agenda-bloqueado-fundo: #242d2b;
+  --kib-cor-agenda-bloqueado-texto: #dddddf;
+  --kib-cor-agenda-bloqueado-topo-inicio: #323938;
+  --kib-cor-agenda-bloqueado-topo-fim: #1f2826;
+  --kib-cor-agenda-bloqueado-topo-texto: #dddddf;
+  --kib-cor-agenda-campeonato-fundo: #0a291e;
+  --kib-cor-agenda-campeonato-texto: #b6d7cb;
+  --kib-cor-agenda-campeonato-topo-inicio: #0a3325;
+  --kib-cor-agenda-campeonato-topo-fim: #0a251c;
+  --kib-cor-agenda-campeonato-topo-texto: #b6d7cb;
+  --kib-cor-agenda-evento-fundo: #0e273c;
+  --kib-cor-agenda-evento-texto: #bcd4f8;
+  --kib-cor-agenda-evento-topo-inicio: #103052;
+  --kib-cor-agenda-evento-topo-fim: #0d2333;
+  --kib-cor-agenda-evento-topo-texto: #bcd4f8;
+  --kib-cor-agenda-fechada-fundo: #331a14;
+  --kib-cor-agenda-fechada-texto: #f4c0bc;
+  --kib-cor-agenda-fechada-topo-inicio: #481c16;
+  --kib-cor-agenda-fechada-topo-fim: #2b1913;
+  --kib-cor-agenda-fechada-topo-texto: #f4c0bc;
+  --kib-cor-agenda-livre-fundo: #0b302d;
+  --kib-cor-agenda-livre-texto: #b7e1e1;
+  --kib-cor-agenda-livre-topo-inicio: #0b3e3b;
+  --kib-cor-agenda-livre-topo-fim: #0b2b27;
+  --kib-cor-agenda-livre-topo-texto: #b7e1e1;
+  --kib-cor-agenda-reserva-fundo: #352c0e;
+  --kib-cor-agenda-reserva-texto: #f6dbb2;
+  --kib-cor-agenda-reserva-topo-inicio: #4a370c;
+  --kib-cor-agenda-reserva-topo-fim: #2c270e;
+  --kib-cor-agenda-reserva-topo-texto: #f6dbb2;
+}
