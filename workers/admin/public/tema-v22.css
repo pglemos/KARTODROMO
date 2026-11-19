@@ -280,6 +280,8 @@ html.kib-embutido[data-tema="claro"] :is(.cartao, .kpi) {
 
 /* Visão geral: o cabeçalho vira o cartão-herói verde-escuro do V22, com a ação principal em pêssego. */
 html.kib-embutido[data-tela-kib="visao"] .cab {
+  /* mesma largura útil da .principal (máx. 1560px com 24px de cada lado), alinhado à esquerda como ela */
+  max-width: calc(1560px - 2 * var(--kib-espaco-3));
   margin: var(--kib-espaco-2) var(--kib-espaco-3) 0;
   padding: 26px 28px;
   border-radius: 24px;
@@ -291,7 +293,8 @@ html.kib-embutido[data-tela-kib="visao"] .cab {
   box-shadow: 0 22px 44px -26px rgba(15, 59, 49, 0.65);
 }
 html.kib-embutido[data-tela-kib="visao"] .cab h1 { color: #ffffff; font-size: 30px; font-weight: 400; }
-html.kib-embutido[data-tela-kib="visao"] .cab .sobre { color: #a9c4b9 !important; }
+html.kib-embutido[data-tela-kib="visao"] .cab .sobre,
+html.kib-embutido[data-tela-kib="visao"] .cab .sobre * { color: #b9d2c7 !important; }
 html.kib-embutido[data-tela-kib="visao"] .cab .btn.prim,
 html.kib-embutido[data-tela-kib="visao"] .cab .btn.escuro {
   background: #ffb48a;
