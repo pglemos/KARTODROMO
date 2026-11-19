@@ -58,7 +58,7 @@ TELAS.usuarios = async (tela) => {
         <input class="entrada" id="busca" placeholder="Buscar nome, login ou perfil" aria-label="Buscar nome, login ou perfil" value="${esc(U.q)}" style="max-width: 260px; margin-left: auto"></div>
       <div class="rolagemX"><div style="min-width: 760px"><div class="cabTabela" style="grid-template-columns: ${g}"><span>Nome</span><span>Login</span><span>Perfil</span><span>Último acesso</span><span>Ativo</span><span></span></div>
       ${lista.map((u) => `<div class="linhaTabela" style="grid-template-columns: ${g}; ${u.ativo ? '' : 'opacity: .55'}">
-        <b class="trunc">${esc(u.nome)}${u.admin ? ' <span class="chip azul">admin</span>' : ''}${u.id === S.usuario.id ? ' <span class="chip">você</span>' : ''}</b>
+        <span class="clienteRes"><span class="avatar avatarNeutro" aria-hidden="true">${esc(iniciais(u.nome))}</span><b class="trunc">${esc(u.nome)}${u.admin ? ' <span class="chip azul">admin</span>' : ''}${u.id === S.usuario.id ? ' <span class="chip">você</span>' : ''}</b></span>
         <span class="mono trunc t-pequeno">${esc(u.login)}</span>
         <span class="trunc">${u.perfil ? esc(u.perfil) : '<span class="peq">sem perfil</span>'}</span>
         <span class="peq">${dataCurta(u.ultimoAcesso)}</span>

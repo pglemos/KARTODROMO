@@ -502,3 +502,6 @@ html.kib-embutido[data-tela-kib="visao"] .cab .btn:not(.prim):not(.escuro) {
   box-shadow: 0 22px 40px -24px rgba(15, 59, 49, 0.75);
 }
 [data-tema="claro"] .i2-f { border-color: transparent; border-radius: 999px; background: rgba(255, 255, 255, 0.72); }
+
+/* ── Usuários e acessos no V22 (20/11/2026): interruptor ligado em verde-escuro, como os da referência. ── */
+[data-tema="claro"] .chave.on { background: var(--v22-floresta); }
