@@ -808,7 +808,7 @@ input[type="checkbox"], input[type="radio"] {
 .pagRecebidosCab { display: flex; align-items: center; justify-content: space-between; gap: var(--kib-espaco-1); margin-bottom: var(--kib-espaco-1); }
 .pagRecebidosCab .titulo { font-size: var(--kib-fonte-tamanho-subtitulo); }
 .contaPag { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 8px; border-radius: var(--kib-raio-pilula); background: var(--kib-cor-superficie-campo); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 600; color: var(--kib-cor-texto-secundario); vertical-align: 2px; }
-.linhaPag { display: flex; align-items: center; flex-wrap: wrap; gap: var(--kib-espaco-1); padding: var(--kib-espaco-1) 0; border-top: 1px solid var(--linha); }
+.linhaPag { display: flex; align-items: flex-start; gap: var(--kib-espaco-1); padding: var(--kib-espaco-1) 0; border-top: 1px solid var(--linha); }
 .linkPerigo { background: transparent; color: var(--erroTxt); padding: 0 6px; }
 .linkPerigo:hover { background: var(--kib-perigo-fundo-claro); }
 .formRegistrar { display: grid; grid-template-columns: 96px minmax(0, 1fr) 104px; gap: var(--kib-espaco-1); padding-top: var(--kib-espaco-1); align-items: end; }
@@ -839,10 +839,7 @@ input[type="checkbox"], input[type="radio"] {
 .modalGrupo .btnMoverPilotoGrupo, .modalGrupo .btnRemoverPiloto { width: 36px; height: 36px; }
 .formaTravada .btn { color: var(--kib-cor-texto-principal); background: var(--kib-cor-superficie-padrao); border: 1px solid var(--kib-cor-borda-forte); }
 .valorComAcao .btn.link { min-height: 32px; }
-.linhaPag { flex-wrap: nowrap; }
 .linhaPag .avatar.p { font-size: 12px; flex: none; }
-.linhaPag > b.mono { flex: none; }
-@media (max-width: 560px) { .linhaPag { flex-wrap: wrap; } }
 .itemAuto .tile { color: var(--kib-cor-marca-principal) !important; }
 .itemAuto .tile svg { stroke: currentColor; }
 
@@ -850,10 +847,7 @@ input[type="checkbox"], input[type="radio"] {
 .chipOrigemPag { flex: none; padding: 1px 6px; border-radius: var(--kib-raio-chip); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 600; background: color-mix(in srgb, var(--kib-cor-estado-info-solido) 10%, transparent); color: var(--kib-cor-estado-info-texto); }
 .chipOrigemPag.manual { background: var(--kib-cor-superficie-campo); color: var(--kib-cor-texto-principal); }
 .tileLink { width: 28px; height: 28px; flex: none; display: inline-grid; place-items: center; border-radius: var(--kib-raio-botao); background: color-mix(in srgb, var(--kib-cor-estado-info-solido) 12%, transparent); color: var(--kib-cor-estado-info-texto); }
-/* desktop: a coluna do dinheiro acompanha a rolagem da lista de pilotos */
-@media (min-width: 1100px) {
-  .modalGrupo .colunaPagamento { position: sticky; top: 0; max-height: calc(100dvh - 260px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
-}
+
 /* tablet e notebook pequeno: cada piloto vira um cartão de duas linhas (nada de rolar para o lado) */
 @media (max-width: 1080px) {
   .modalGrupo .rolagemX > div { min-width: 0 !important; }
@@ -868,3 +862,16 @@ input[type="checkbox"], input[type="radio"] {
   .modalGrupo .linhaPilotoGrupo > :nth-child(6) { grid-column: 4 / span 2; grid-row: 2; justify-self: end; }
   .modalGrupo .linhaPilotoGrupo > :nth-child(5) { justify-self: start; }
 }
+
+/* rodada 4 do critique */
+.linhaPagCorpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.linhaPagTopo { display: flex; align-items: baseline; justify-content: space-between; gap: var(--kib-espaco-1); min-width: 0; }
+.linhaPagTopo > b.mono { flex: none; }
+.linhaPagInfo { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; font-size: var(--kib-fonte-tamanho-pequeno); color: var(--kib-cor-texto-secundario); }
+.linhaPagInfo .linkPerigo { margin-left: auto; min-height: 28px; }
+.menuCobrar[open] .menuCobrarLista { z-index: 80; }
+.valorEditavel { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; min-height: 36px; padding: 0 8px; margin-left: -8px; border: 1px solid transparent; border-radius: var(--kib-raio-campo); background: transparent; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 600; color: var(--kib-cor-texto-principal); text-align: left; cursor: text; }
+.valorEditavel svg { flex: none; opacity: 0; color: var(--kib-cor-texto-secundario); transition: opacity .15s ease; }
+.valorEditavel:hover, .valorEditavel:focus-visible { border-color: var(--kib-cor-borda-campo); background: var(--kib-cor-superficie-padrao); }
+.valorEditavel:hover svg, .valorEditavel:focus-visible svg { opacity: 1; }
+.valorEditavel:focus-visible { outline: var(--kib-foco-largura) solid var(--kib-cor-borda-foco); outline-offset: 1px; }
