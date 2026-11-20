@@ -112,14 +112,14 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 #momento{position:absolute;left:0;top:0;width:2048px;height:512px;z-index:50;overflow:hidden;display:none;color:#fff;font-family:'KIB Cond',Arial,sans-serif}
 #momento.on{display:block}
 #momento .m-base{position:absolute;left:-12%;top:0;width:124%;height:512px;background:#0b0b0b;-webkit-transform:translateX(-110%) skewX(-12deg);transform:translateX(-110%) skewX(-12deg)}
-#momento.on .m-base{-webkit-animation:m-cobre 3.6s cubic-bezier(.7,0,.2,1) both;animation:m-cobre 3.6s cubic-bezier(.7,0,.2,1) both}
+#momento.on .m-base{-webkit-animation:m-cobre 7s cubic-bezier(.7,0,.2,1) both;animation:m-cobre 7s cubic-bezier(.7,0,.2,1) both}
 #momento .m-faixa{position:absolute;top:-40px;height:600px;left:0;background:#fff;opacity:0;-webkit-transform:skewX(-12deg);transform:skewX(-12deg)}
 #momento .f1{width:90px}#momento .f2{width:34px}#momento .f3{width:14px}
 #momento.on .m-faixa{-webkit-animation:m-faixa 1.25s linear .35s infinite;animation:m-faixa 1.25s linear .35s infinite}
 #momento.on .f2{-webkit-animation-delay:.6s;animation-delay:.6s}
 #momento.on .f3{-webkit-animation-delay:.8s;animation-delay:.8s}
 #momento .m-conteudo{position:absolute;left:0;top:0;width:2048px;height:512px;opacity:0}
-#momento.on .m-conteudo{-webkit-animation:m-texto 3.6s cubic-bezier(.2,.8,.2,1) both;animation:m-texto 3.6s cubic-bezier(.2,.8,.2,1) both}
+#momento.on .m-conteudo{-webkit-animation:m-texto 7s cubic-bezier(.2,.8,.2,1) both;animation:m-texto 7s cubic-bezier(.2,.8,.2,1) both}
 #momento .m-kicker{position:absolute;left:96px;top:56px;font-size:64px;line-height:1;letter-spacing:8px;font-weight:700;white-space:nowrap}
 #momento .m-kart{position:absolute;left:84px;top:132px;font:900 300px/1 'KIB Num',Arial,sans-serif;letter-spacing:-6px;white-space:nowrap}
 #momento .m-nome{position:absolute;left:760px;top:170px;width:1220px;font-size:104px;line-height:1;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -150,12 +150,12 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 #momento.tema-verde .m-base{background:#00c853}#momento.tema-verde .m-faixa{background:#fff}#momento.tema-verde{color:#03140a}
 #momento.tema-final .m-base{background-color:#000;background-image:linear-gradient(45deg,#1d1d1d 25%,transparent 25%,transparent 75%,#1d1d1d 75%),linear-gradient(45deg,#1d1d1d 25%,transparent 25%,transparent 75%,#1d1d1d 75%);background-size:96px 96px;background-position:0 0,48px 48px}
 #momento.tema-final .m-faixa{background:#fff}
-@-webkit-keyframes m-cobre{0%{-webkit-transform:translateX(-110%) skewX(-12deg)}13%,87%{-webkit-transform:translateX(0) skewX(-12deg)}100%{-webkit-transform:translateX(110%) skewX(-12deg)}}
-@keyframes m-cobre{0%{transform:translateX(-110%) skewX(-12deg)}13%,87%{transform:translateX(0) skewX(-12deg)}100%{transform:translateX(110%) skewX(-12deg)}}
+@-webkit-keyframes m-cobre{0%{-webkit-transform:translateX(-110%) skewX(-12deg)}9%,91%{-webkit-transform:translateX(0) skewX(-12deg)}100%{-webkit-transform:translateX(110%) skewX(-12deg)}}
+@keyframes m-cobre{0%{transform:translateX(-110%) skewX(-12deg)}9%,91%{transform:translateX(0) skewX(-12deg)}100%{transform:translateX(110%) skewX(-12deg)}}
 @-webkit-keyframes m-faixa{0%{opacity:.85;-webkit-transform:translateX(-200px) skewX(-12deg)}100%{opacity:.85;-webkit-transform:translateX(2300px) skewX(-12deg)}}
 @keyframes m-faixa{0%{opacity:.85;transform:translateX(-200px) skewX(-12deg)}100%{opacity:.85;transform:translateX(2300px) skewX(-12deg)}}
-@-webkit-keyframes m-texto{0%,12%{opacity:0;-webkit-transform:translateX(-120px)}22%,82%{opacity:1;-webkit-transform:none}92%,100%{opacity:0;-webkit-transform:translateX(120px)}}
-@keyframes m-texto{0%,12%{opacity:0;transform:translateX(-120px)}22%,82%{opacity:1;transform:none}92%,100%{opacity:0;transform:translateX(120px)}}
+@-webkit-keyframes m-texto{0%,7%{opacity:0;-webkit-transform:translateX(-120px)}14%,86%{opacity:1;-webkit-transform:none}93%,100%{opacity:0;-webkit-transform:translateX(120px)}}
+@keyframes m-texto{0%,7%{opacity:0;transform:translateX(-120px)}14%,86%{opacity:1;transform:none}93%,100%{opacity:0;transform:translateX(120px)}}
 @-webkit-keyframes m-luz1{0%{background:#2a0505}15%{background:#ff1a1a}88%{background:#2a0505}}
 @keyframes m-luz1{0%{background:#2a0505}15%{background:#ff1a1a}88%{background:#2a0505}}
 @-webkit-keyframes m-luz2{0%{background:#2a0505}30%{background:#ff1a1a}88%{background:#2a0505}}
@@ -175,14 +175,36 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 #largada .lg-rot{left:70px;text-align:left}
 #largada .lg-agu{right:70px;text-align:right}
 #largada .lg-num{position:absolute;left:0;right:0;top:-34px;font:900 540px/1 'KIB Num',Arial,sans-serif;letter-spacing:-10px}
-#largada .lg-num.troca{-webkit-animation:largada-num .45s cubic-bezier(.2,.9,.3,1.2) both;animation:largada-num .45s cubic-bezier(.2,.9,.3,1.2) both}
+#largada .lg-num.troca{-webkit-animation:largada-num 1s cubic-bezier(.2,.9,.3,1) both;animation:largada-num 1s cubic-bezier(.2,.9,.3,1) both}
+#largada .lg-faixas{position:absolute;left:-300px;top:0;width:2700px;height:512px;background:repeating-linear-gradient(-60deg,rgba(0,0,0,.10) 0,rgba(0,0,0,.10) 46px,rgba(0,0,0,0) 46px,rgba(0,0,0,0) 138px);-webkit-animation:largada-corre 1.2s linear infinite;animation:largada-corre 1.2s linear infinite}
+#largada .lg-onda{position:absolute;left:774px;top:6px;width:500px;height:500px;border-radius:50%;border:22px solid rgba(0,0,0,.30);opacity:0}
+#largada .lg-onda.troca{-webkit-animation:largada-onda 1s ease-out both;animation:largada-onda 1s ease-out both}
+#largada .lg-barra{position:absolute;left:0;bottom:0;width:2048px;height:30px;background:rgba(0,0,0,.6);-webkit-transform-origin:0 50%;transform-origin:0 50%;-webkit-animation:largada-barra 10s linear both;animation:largada-barra 10s linear both}
+#largada .lg-flash{position:absolute;left:0;top:0;width:2048px;height:512px;background:#fff;opacity:0}
+#largada.fim .lg-barra,#largada.fim .lg-onda{display:none}
+#largada.fim .lg-faixas{-webkit-animation-duration:.35s;animation-duration:.35s}
+#largada.fim .lg-flash{-webkit-animation:largada-flash .7s ease-out both;animation:largada-flash .7s ease-out both}
+#largada.fim .lg-num.troca{-webkit-animation:largada-bate .6s cubic-bezier(.2,.9,.3,1.3) both;animation:largada-bate .6s cubic-bezier(.2,.9,.3,1.3) both}
+#largada.ultimos .lg-num.troca{-webkit-animation-name:largada-num-forte;animation-name:largada-num-forte}
+@-webkit-keyframes largada-corre{from{-webkit-transform:translateX(0)}to{-webkit-transform:translateX(159px)}}
+@keyframes largada-corre{from{transform:translateX(0)}to{transform:translateX(159px)}}
+@-webkit-keyframes largada-onda{0%{opacity:.8;-webkit-transform:scale(.35)}100%{opacity:0;-webkit-transform:scale(2.6)}}
+@keyframes largada-onda{0%{opacity:.8;transform:scale(.35)}100%{opacity:0;transform:scale(2.6)}}
+@-webkit-keyframes largada-barra{from{-webkit-transform:scaleX(1)}to{-webkit-transform:scaleX(0)}}
+@keyframes largada-barra{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+@-webkit-keyframes largada-flash{0%{opacity:.95}100%{opacity:0}}
+@keyframes largada-flash{0%{opacity:.95}100%{opacity:0}}
+@-webkit-keyframes largada-bate{0%{opacity:0;-webkit-transform:scale(2.6)}60%{opacity:1;-webkit-transform:scale(.94)}100%{opacity:1;-webkit-transform:none}}
+@keyframes largada-bate{0%{opacity:0;transform:scale(2.6)}60%{opacity:1;transform:scale(.94)}100%{opacity:1;transform:none}}
+@-webkit-keyframes largada-num-forte{0%{opacity:0;-webkit-transform:scale(2.4) rotate(-6deg)}16%{opacity:1;-webkit-transform:scale(.92)}26%{-webkit-transform:scale(1.04)}34%,82%{opacity:1;-webkit-transform:none}100%{opacity:0;-webkit-transform:scale(.6)}}
+@keyframes largada-num-forte{0%{opacity:0;transform:scale(2.4) rotate(-6deg)}16%{opacity:1;transform:scale(.92)}26%{transform:scale(1.04)}34%,82%{opacity:1;transform:none}100%{opacity:0;transform:scale(.6)}}
 #largada.fim{-webkit-animation:largada-fim .5s steps(1) infinite;animation:largada-fim .5s steps(1) infinite}
 #largada.fim .lg-rot,#largada.fim .lg-agu{display:none}
 #largada.fim .lg-num{top:96px;font-size:300px;letter-spacing:6px}
 @-webkit-keyframes largada-pulsa{0%,100%{background:#00ff3c}50%{background:#00a82a}}
 @keyframes largada-pulsa{0%,100%{background:#00ff3c}50%{background:#00a82a}}
-@-webkit-keyframes largada-num{0%{-webkit-transform:scale(1.35);opacity:.2}100%{-webkit-transform:none;opacity:1}}
-@keyframes largada-num{0%{transform:scale(1.35);opacity:.2}100%{transform:none;opacity:1}}
+@-webkit-keyframes largada-num{0%{opacity:0;-webkit-transform:scale(1.9)}18%{opacity:1;-webkit-transform:scale(.96)}28%,82%{opacity:1;-webkit-transform:none}100%{opacity:0;-webkit-transform:scale(.7)}}
+@keyframes largada-num{0%{opacity:0;transform:scale(1.9)}18%{opacity:1;transform:scale(.96)}28%,82%{opacity:1;transform:none}100%{opacity:0;transform:scale(.7)}}
 @-webkit-keyframes largada-fim{0%{background:#00ff3c}50%{background:#7dffa0}}
 @keyframes largada-fim{0%{background:#00ff3c}50%{background:#7dffa0}}
 
@@ -587,7 +609,7 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 </head>
 <body>
 <div id="tela">
-  <div id="largada"><div class="lg-rot" id="lg-rot">LARGADA<br>EM</div><div class="lg-agu">AGUARDE<br>NO GRID</div><div class="lg-num" id="lg-num">10</div></div>
+  <div id="largada"><div class="lg-faixas"></div><div class="lg-onda" id="lg-onda"></div><div class="lg-barra"></div><div class="lg-flash"></div><div class="lg-rot" id="lg-rot">LARGADA<br>EM</div><div class="lg-agu">AGUARDE<br>NO GRID</div><div class="lg-num" id="lg-num">10</div></div>
   <div id="momento">
     <div class="m-base"></div>
     <i class="m-faixa f1"></i><i class="m-faixa f2"></i><i class="m-faixa f3"></i>
@@ -1173,9 +1195,11 @@ function shortPodiumName(nome, dupFirst) {
     var txt = resta > 0 ? String(resta) : largadaFrase;
     if (lgNum.textContent !== txt) {
       lgNum.textContent = txt;
-      lgNum.style.fontSize = resta > 0 ? '' : (txt.length > 9 ? '220px' : '300px');
+      lgNum.style.fontSize = resta > 0 ? '' : (txt.length > 9 ? '210px' : '262px');
       lgNum.className = 'lg-num'; void lgNum.offsetWidth; lgNum.className = 'lg-num troca';
-      var cls = resta > 0 ? 'on' : 'on fim';
+      var onda = document.getElementById('lg-onda');
+      onda.className = 'lg-onda'; void onda.offsetWidth; onda.className = 'lg-onda troca';
+      var cls = resta > 3 ? 'on' : resta > 0 ? 'on ultimos' : 'on fim';
       if (largadaEl.className !== cls) largadaEl.className = cls;
     }
   }
@@ -1230,7 +1254,7 @@ function shortPodiumName(nome, dupFirst) {
       momentoAtivo = false;
       if (m.depois) filaMomentos.unshift(m.depois);
       setTimeout(proximoMomento, m.depois ? 0 : 700);
-    }, m.dur || 3600);
+    }, m.dur || 7000);
   }
 
   var mmSessao = null, mmFlag = null, mmFinal = false;
@@ -1874,7 +1898,7 @@ function shortPodiumName(nome, dupFirst) {
     }
   }
 
-  var TB50_VERSAO = '2026-11-20-largada2';
+  var TB50_VERSAO = '2026-11-20-largada3';
   var ultimoErro = '';
   window.onerror = function (msg, src, linha) {
     var e = String(msg || '').slice(0, 120) + '@' + (linha || 0);
