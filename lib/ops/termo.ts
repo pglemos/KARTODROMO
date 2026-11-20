@@ -221,9 +221,13 @@ function participanteHtml(
     '</article>' +
     // igual ao termo do LapTime: data e as duas linhas de assinatura logo depois do texto (sem posição fixa,
     // que deixava o texto passar por cima quando era longo)
+    // 20/11/2026: data e as duas assinaturas num bloco só, que nunca se parte; o espaço para assinar é padding
+    // (margem no topo de uma página nova é descartada pelo navegador e a linha do responsável colava na do piloto)
+    '<div class="assinaturas">' +
     '<div class="date">' + esc(dataImpressao(date, city)) + '</div>' +
     '<div class="assinatura piloto"><div class="linha"></div><div class="rotulo">PARTICIPANTE PILOTO</div></div>' +
     '<div class="assinatura"><div class="linha"></div><div class="rotulo">RESPONSÁVEL LEGAL</div><div class="obs">(obrigatório para menores de 18 anos)</div></div>' +
+    '</div>' +
     '</section>'
   );
 }
@@ -257,17 +261,23 @@ export function renderTermoResponsabilidade(options: RenderTermoOptions) {
     '.legal{font:8pt/1.1 Arial,Helvetica,sans-serif;text-align:justify;margin:1.52mm 0 0;flex:none}' +
     '.legal p{margin:0;orphans:2;widows:2}' +
     '.legal strong{font-weight:700}' +
-    '.date{font:8pt/1.25 Arial,Helvetica,sans-serif;text-align:center;margin:3mm 0 0;flex:none}' +
+    '.date{font:8pt/1.25 Arial,Helvetica,sans-serif;text-align:center;margin:0;padding-top:3mm}' +
     // 20/11/2026 (dono): o espaço do piloto não dava para assinar — linha na largura toda da bobina e 24 mm livres acima;
     // logo, título e data cederam espaço para o termo continuar cabendo nos 297 mm da página (antes já dava 298)
-    '.assinatura{margin:12mm 0 0;width:100%;text-align:center;flex:none;break-inside:avoid;page-break-inside:avoid}' +
-    '.assinatura.piloto{margin-top:24mm}' +
+    '.assinaturas{flex:none;break-inside:avoid;page-break-inside:avoid;padding-bottom:4mm}' +
+    '.assinatura{margin:0;padding-top:20mm;width:100%;text-align:center;break-inside:avoid;page-break-inside:avoid}' +
+    '.assinatura.piloto{padding-top:24mm}' +
     '.assinatura .linha{border-top:.6pt solid #000}' +
     '.assinatura .rotulo{font:bold 8pt/1.3 Arial,Helvetica,sans-serif;margin-top:.8mm}' +
     '.assinatura .obs{font:6.5pt/1.2 Arial,Helvetica,sans-serif}' +
     '@media print{html,body{width:80mm}.page{margin:0;box-shadow:none}}' +
     '</style></head><body>' +
     (pages || '<p>Nada para imprimir.</p>') +
+    // 20/11/2026: o termo real passa de 297 mm (texto + bateria + assinaturas) e quebrava em duas páginas na bobina.
+    // A página cresce até caber o termo inteiro: sai num pedaço só, sem a virada que comia o espaço das assinaturas.
+    '<script>(function(){var h=0;document.querySelectorAll(".page").forEach(function(p){h=Math.max(h,p.scrollHeight)});' +
+    'var alt=Math.ceil(h*25.4/96)+2;if(alt>297){var s=document.createElement("style");' +
+    's.textContent="@page{size:80mm "+alt+"mm;margin:0}.page{min-height:"+alt+"mm}";document.head.appendChild(s);}})();</script>' +
     '<script>window.addEventListener("load",()=>setTimeout(()=>window.print(),300));</script>' +
     '</body></html>'
   );
