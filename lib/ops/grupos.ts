@@ -1863,6 +1863,70 @@ export async function soltarVagasNaoPagasDoSite(log: Log) {
   return vagas.length;
 }
 
+// ---------------------------------------------------------------- reservas do agente de IA (20/11/2026)
+
+/** Começo da observação dos grupos que o agente de IA do CRM cria (`MARCA_DO_AGENTE` em kartodromo-os). */
+export const MARCA_DO_AGENTE = 'Agente de IA (WhatsApp)';
+/** Regra do dono (20/11/2026): sem pagamento em 2 h a reserva cai; nunca depois de 1 h antes da bateria. */
+export const PRAZO_DO_AGENTE_MIN = 120;
+
+/**
+ * Solta as vagas dos grupos criados pelo agente de IA que ninguém pagou no prazo (2 h, ou até 1 h antes da bateria,
+ * o que vier antes; nunca menos de 15 min). Só grupo com a MARCA do agente: grupo que a equipe criou à mão, mesmo
+ * com origem WhatsApp, nunca expira sozinho. Grupo com qualquer pagamento (painel, caixa, Asaas) ou com vaga paga,
+ * vendida, com termo ou kart não é tocado. A cobrança aberta é cancelada no Asaas antes, para ninguém pagar vaga solta.
+ */
+export async function expirarGruposDoAgente(log: Log) {
+  const vencidos = await query<{ id: number; codigo: string }>(
+    `SELECT g.id id, g.codigo codigo
+       FROM kart.reserva_grupo g JOIN kart.bateria b ON b.id = g.bateria_id
+      WHERE g.status = 'ativa' AND g.observacao LIKE @marca AND b.inicio > now()
+        AND greatest(g.criado_em + make_interval(mins => 15),
+                     least(g.criado_em + make_interval(mins => @prazo::int), b.inicio - make_interval(mins => 60))) < now()
+        AND NOT EXISTS (SELECT 1 FROM kart.reserva_grupo_pagamento pg WHERE pg.grupo_id = g.id AND pg.cancelado = false)
+        AND NOT EXISTS (SELECT 1 FROM kart.reserva_grupo_piloto p JOIN kart.inscricao i ON i.id = p.inscricao_id
+                         WHERE p.grupo_id = g.id AND i.status <> 'cancelada'
+                           AND (i.pago = true OR i.venda_id IS NOT NULL OR i.termo_impresso_em IS NOT NULL OR i.kart IS NOT NULL))`,
+    { marca: `${MARCA_DO_AGENTE}%`, prazo: PRAZO_DO_AGENTE_MIN },
+  );
+  let soltos = 0;
+  for (const g of vencidos) {
+    const abertas = await query<{ id: number; asaasId: string }>(
+      `SELECT id id, asaas_id "asaasId" FROM kart.reserva_grupo_cobranca WHERE grupo_id = @g AND status = 'aguardando'`, { g: g.id });
+    let cobrancaPresa = false;
+    for (const c of abertas) {
+      try {
+        const s = (await site(`/api/sync/cobranca/${encodeURIComponent(c.asaasId)}`)) as { pago?: boolean };
+        if (s.pago) { cobrancaPresa = true; break; } // pagou agora: a conferência das cobranças registra; não solta
+        await site(`/api/sync/cobranca/${encodeURIComponent(c.asaasId)}`, { method: 'DELETE' });
+        await query(`UPDATE kart.reserva_grupo_cobranca SET status = 'cancelada' WHERE id = @id AND status = 'aguardando'`, { id: c.id });
+      } catch (e) {
+        cobrancaPresa = true; // sem certeza de que a cobrança morreu, a vaga fica: tenta no próximo ciclo
+        log(`grupo ${g.id} (${g.codigo}): não consegui cancelar a cobrança ${c.asaasId} (${(e as Error).message})`);
+        break;
+      }
+    }
+    if (cobrancaPresa) continue;
+    const feito = await tx(async (run) => {
+      const [ainda] = await run(`SELECT id "Id" FROM kart.reserva_grupo WHERE id = @id AND status = 'ativa' for update`, { id: g.id });
+      if (!ainda) return false;
+      const [pago] = await run(`SELECT 1 x FROM kart.reserva_grupo_pagamento WHERE grupo_id = @id AND cancelado = false limit 1`, { id: g.id });
+      if (pago) return false;
+      await run(`UPDATE kart.inscricao SET status = 'cancelada', atualizado_em = now()
+                  WHERE id IN (SELECT inscricao_id FROM kart.reserva_grupo_piloto WHERE grupo_id = @id) AND pago = false AND venda_id IS NULL AND status <> 'cancelada'`, { id: g.id });
+      await run(`UPDATE kart.reserva_grupo SET status = 'cancelada', atualizado_em = now(),
+                   observacao = left(concat_ws(' · ', nullif(observacao, ''), 'vagas liberadas: sem pagamento no prazo'), 400) WHERE id = @id`, { id: g.id });
+      return true;
+    });
+    if (feito) {
+      soltos++;
+      log(`grupo ${g.id} (${g.codigo}): reserva do agente sem pagamento no prazo, vagas liberadas`);
+    }
+  }
+  if (soltos) ultimoResumoSite = '';
+  return soltos;
+}
+
 // ---------------------------------------------------------------- lembretes por e-mail (12/11/2026)
 
 let proximosLembretes = 0;
