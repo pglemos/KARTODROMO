@@ -222,7 +222,7 @@ function participanteHtml(
     // igual ao termo do LapTime: data e as duas linhas de assinatura logo depois do texto (sem posição fixa,
     // que deixava o texto passar por cima quando era longo)
     '<div class="date">' + esc(dataImpressao(date, city)) + '</div>' +
-    '<div class="assinatura"><div class="linha"></div><div class="rotulo">PARTICIPANTE PILOTO</div></div>' +
+    '<div class="assinatura piloto"><div class="linha"></div><div class="rotulo">PARTICIPANTE PILOTO</div></div>' +
     '<div class="assinatura"><div class="linha"></div><div class="rotulo">RESPONSÁVEL LEGAL</div><div class="obs">(obrigatório para menores de 18 anos)</div></div>' +
     '</section>'
   );
@@ -244,8 +244,8 @@ export function renderTermoResponsabilidade(options: RenderTermoOptions) {
     'body{font:8pt/1.22 Arial,Helvetica,sans-serif}' +
     '.page{position:relative;width:80mm;min-height:297mm;padding:0 5.7mm 0;display:flex;flex-direction:column;margin:0 auto;background:#fff;break-after:page;page-break-after:always}' +
     '.page:last-child{break-after:auto;page-break-after:auto}' +
-    '.logo{display:block;width:38.1mm;height:20.3mm;object-fit:contain;filter:grayscale(1) contrast(1.15);margin:.7mm auto .7mm}' +
-    'h1{font:bold 12pt/1.2 Arial,Helvetica,sans-serif;text-align:center;height:7.62mm;flex:none;margin:0}' +
+    '.logo{display:block;width:30mm;height:16mm;object-fit:contain;filter:grayscale(1) contrast(1.15);margin:.7mm auto .7mm}' +
+    'h1{font:bold 12pt/1.2 Arial,Helvetica,sans-serif;text-align:center;height:6.6mm;flex:none;margin:0}' +
     '.rule{height:0;border:0;border-top:.45pt solid #000;width:100%;flex:none}' +
     '.customer-info{font:8pt/1.35 Arial,Helvetica,sans-serif;margin:1.67mm 0 0;flex:none}' +
     '.row{min-height:3.81mm;display:block;overflow-wrap:anywhere}' +
@@ -257,8 +257,11 @@ export function renderTermoResponsabilidade(options: RenderTermoOptions) {
     '.legal{font:8pt/1.1 Arial,Helvetica,sans-serif;text-align:justify;margin:1.52mm 0 0;flex:none}' +
     '.legal p{margin:0;orphans:2;widows:2}' +
     '.legal strong{font-weight:700}' +
-    '.date{font:8pt/1.25 Arial,Helvetica,sans-serif;text-align:center;margin:5mm 0 0;flex:none}' +
-    '.assinatura{margin:16mm auto 0;width:50mm;text-align:center;flex:none;break-inside:avoid;page-break-inside:avoid}' +
+    '.date{font:8pt/1.25 Arial,Helvetica,sans-serif;text-align:center;margin:3mm 0 0;flex:none}' +
+    // 20/11/2026 (dono): o espaço do piloto não dava para assinar — linha na largura toda da bobina e 24 mm livres acima;
+    // logo, título e data cederam espaço para o termo continuar cabendo nos 297 mm da página (antes já dava 298)
+    '.assinatura{margin:12mm 0 0;width:100%;text-align:center;flex:none;break-inside:avoid;page-break-inside:avoid}' +
+    '.assinatura.piloto{margin-top:24mm}' +
     '.assinatura .linha{border-top:.6pt solid #000}' +
     '.assinatura .rotulo{font:bold 8pt/1.3 Arial,Helvetica,sans-serif;margin-top:.8mm}' +
     '.assinatura .obs{font:6.5pt/1.2 Arial,Helvetica,sans-serif}' +

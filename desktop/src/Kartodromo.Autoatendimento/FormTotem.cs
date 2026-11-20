@@ -854,10 +854,9 @@ public class FormTotem : Form, IMessageFilter
     {
         var c = NovaTela(etapa: 3);
         c.Controls.Add(Rot("Você veio com um grupo de amigos?", 150, 108, F(44, false, FontStyle.Bold), Estilo.Texto));
-        c.Controls.Add(Rot("Toque no grupo dos seus amigos. Quem reservou já pagou a corrida de todos. Se veio sozinho, toque em \"Vim sozinho\".", 150, 164, F(19), Estilo.Suave, 1066, 56));
+        c.Controls.Add(Rot("Toque no grupo dos seus amigos (pode marcar mais de um, se vai correr em mais de uma bateria). Quem reservou já pagou a corrida de todos. Se veio sozinho, toque em \"Vim sozinho\".", 150, 164, F(19), Estilo.Suave, 1066, 56));
         var painel = CartaoEm(c, 150, 230, 1066, 411);
         var lista = new ListaOpcoes(_k) { Bounds = new Rectangle(0, 0, P(1066), P(411)) };
-        var itens = new List<OpcaoLinha>();
         foreach (var g in grupos)
         {
             var aguardando = g.I("aguardando");
@@ -868,8 +867,7 @@ public class FormTotem : Form, IMessageFilter
                 Linha2 = $"Corrida às {Fmt.Hm(g.S("inicio"))} · {g.I("total")} amigos no total",
                 Direita = aguardando + (aguardando == 1 ? " vaga esperando" : " vagas esperando"),
             };
-            item.Mudou += () => { if (item.Marcado) foreach (var o in itens) if (o != item && o.Marcado) o.Marcado = false; };
-            itens.Add(item);
+            // 20/11/2026: antes só um grupo por vez — quem tinha vaga paga em 2 grupos (2 baterias) passava duas vezes no totem
             lista.Adicionar(item);
         }
         painel.Controls.Add(lista);
@@ -877,30 +875,56 @@ public class FormTotem : Form, IMessageFilter
         var voltar = Botao(c, "Voltar", 914, 660, 140, false, () => { if (_menor) TelaMenores(); else TelaCadastro(_cadastroExistente); return Task.CompletedTask; });
         var entrar = Botao(c, "Entrar no grupo", 1070, 660, 200, true, async () =>
         {
-            var escolhido = lista.Marcados().FirstOrDefault();
-            if (escolhido == 0) { Alertar("Toque no grupo dos seus amigos ou em \"Vim sozinho\"."); return; }
-            JsonNode r;
-            try { r = await _api.PostAsync("/api/totem/grupo/entrar", new JsonObject { ["grupoId"] = escolhido, ["clienteId"] = _cliente.L("id"), ["token"] = _token }); }
-            catch (Exception ex) { Alertar(ex.Message.Length > 0 ? ex.Message : "Não foi possível entrar no grupo. Procure a recepção."); return; }
-            if (r is not JsonObject ok) { Alertar("Não foi possível entrar no grupo. Procure a recepção."); return; }
-            _sel = new HashSet<long> { ok.L("bateriaId") ?? 0 };
-            TelaBoasVindasGrupo(ok);
+            var escolhidos = lista.Marcados().Where(id => id > 0).ToList();
+            if (escolhidos.Count == 0) { Alertar("Toque no grupo dos seus amigos ou em \"Vim sozinho\"."); return; }
+            var entrou = new List<JsonObject>();
+            var falhas = new List<string>();
+            foreach (var escolhido in escolhidos)
+            {
+                try
+                {
+                    var r = await _api.PostAsync("/api/totem/grupo/entrar", new JsonObject { ["grupoId"] = escolhido, ["clienteId"] = _cliente.L("id"), ["token"] = _token });
+                    if (r is JsonObject ok && (ok.L("bateriaId") ?? 0) > 0) entrou.Add(ok);
+                    else falhas.Add("Não foi possível entrar no grupo.");
+                }
+                catch (Exception ex) { falhas.Add(ex.Message.Length > 0 ? ex.Message : "Não foi possível entrar no grupo."); }
+            }
+            if (entrou.Count == 0) { Alertar((falhas.FirstOrDefault() ?? "Não foi possível entrar no grupo.") + " Procure a recepção."); return; }
+            if (falhas.Count > 0) Program.Log($"totem: entrou em {entrou.Count} de {escolhidos.Count} grupo(s): {string.Join(" | ", falhas)}");
+            _sel = entrou.Select(g => g.L("bateriaId") ?? 0).Where(id => id > 0).ToHashSet();
+            TelaBoasVindasGrupo(entrou, falhas.Count);
         });
         sozinho.BringToFront(); voltar.BringToFront(); entrar.BringToFront();
         Mostrar("grupos", c, () => MontarGrupos(grupos));
     }
 
     // quem reservou para todos é valorizado: o amigo vê o nome dele(a) antes de continuar
-    void TelaBoasVindasGrupo(JsonObject g)
+    void TelaBoasVindasGrupo(List<JsonObject> grupos, int falhas = 0)
     {
         var c = NovaTela(etapa: 3);
-        c.Controls.Add(Rot("Você está no grupo do(a) " + g.S("responsavel") + "!", 150, 130, F(44, false, FontStyle.Bold), Estilo.Texto, 1066, 70));
+        var g = grupos[0];
+        var responsaveis = grupos.Select(x => x.S("responsavel")).Where(s => s.Length > 0).Distinct().ToList();
+        var titulo = grupos.Count == 1 || responsaveis.Count <= 1
+            ? "Você está no grupo do(a) " + g.S("responsavel") + "!"
+            : "Você está nos grupos de " + string.Join(" e ", responsaveis) + "!";
+        c.Controls.Add(Rot(titulo, 150, 130, F(44, false, FontStyle.Bold), Estilo.Texto, 1066, 70));
         var cartao = CartaoEm(c, 150, 250, 1066, 280);
-        cartao.Controls.Add(Rot(g.S("mensagem"), 40, 40, F(26, false, FontStyle.Bold), Estilo.VerdeSuave, 986, 110));
-        cartao.Controls.Add(Rot($"Sua vaga já está paga · corrida às {Fmt.Hm(g.S("inicio"))}. Que tal agradecer {g.S("responsavel")} pelo convite?", 40, 120, F(20), Estilo.Suave, 986, 80));
+        if (grupos.Count == 1)
+        {
+            cartao.Controls.Add(Rot(g.S("mensagem"), 40, 40, F(26, false, FontStyle.Bold), Estilo.VerdeSuave, 986, 110));
+            cartao.Controls.Add(Rot($"Sua vaga já está paga · corrida às {Fmt.Hm(g.S("inicio"))}. Que tal agradecer {g.S("responsavel")} pelo convite?", 40, 120, F(20), Estilo.Suave, 986, 80));
+        }
+        else
+        {
+            var horarios = string.Join(", ", grupos.Select(x => Fmt.Hm(x.S("inicio"))).Distinct());
+            cartao.Controls.Add(Rot($"Suas {grupos.Count} vagas já estão pagas · corridas às {horarios}.", 40, 40, F(26, false, FontStyle.Bold), Estilo.VerdeSuave, 986, 110));
+            cartao.Controls.Add(Rot($"Que tal agradecer {string.Join(" e ", responsaveis)} pelo convite?", 40, 120, F(20), Estilo.Suave, 986, 80));
+        }
+        if (falhas > 0)
+            cartao.Controls.Add(Rot(falhas == 1 ? "Não deu para entrar em um dos grupos marcados — confirme na recepção." : $"Não deu para entrar em {falhas} dos grupos marcados — confirme na recepção.", 40, 200, F(18, false, FontStyle.Bold), Estilo.Amarelo, 986, 40));
         var seguir = Botao(c, "Continuar", 1030, 660, 186, true, async () => { await Inscrever(null); });
         seguir.BringToFront();
-        Mostrar("boasvindasgrupo", c, () => TelaBoasVindasGrupo(g));
+        Mostrar("boasvindasgrupo", c, () => TelaBoasVindasGrupo(grupos, falhas));
     }
 
     // ------------------------------------------------------------------ 4. baterias
@@ -1284,6 +1308,16 @@ public class ListaOpcoes : Panel
         Padding = new Padding((int)(24 * _k), 0, (int)(24 * _k), 0), AccessibleRole = AccessibleRole.StaticText, AccessibleName = msg,
     });
     public IEnumerable<long> Marcados() => Controls.OfType<OpcaoLinha>().Where(o => o.Marcado).Select(o => o.Id);
+    // tocar numa linha cortada embaixo dava foco e o painel rolava sozinho entre o toque e o soltar: o Click
+    // não chegava e a 3ª linha em diante "não marcava". A rolagem agora é só pelo arraste do dedo.
+    protected override Point ScrollToControl(Control activeControl) => DisplayRectangle.Location;
+    /// <summary>Arraste vertical (tela de toque): desloca a lista em <paramref name="dy"/> pixels a partir de <paramref name="inicio"/>.</summary>
+    public void Arrastar(int inicio, int dy)
+    {
+        var max = Math.Max(0, DisplayRectangle.Height - ClientSize.Height);
+        AutoScrollPosition = new Point(0, Math.Clamp(inicio - dy, 0, max));
+    }
+    public int Rolagem => -AutoScrollPosition.Y;
     protected override void OnResize(EventArgs e)
     {
         base.OnResize(e);
@@ -1327,11 +1361,41 @@ public class OpcaoLinha : Control
         AccessibleRole = AccessibleRole.CheckButton;
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor | ControlStyles.Selectable, true);
         BackColor = Color.Transparent;
-        Click += (_, _) => Marcado = !Marcado;
         MouseEnter += (_, _) => { _sobre = true; Invalidate(); };
         MouseLeave += (_, _) => { _sobre = false; Invalidate(); };
         GotFocus += (_, _) => { _foco = true; Invalidate(); };
         LostFocus += (_, _) => { _foco = false; Invalidate(); };
+    }
+
+    // toque: soltar sem arrastar marca/desmarca; arrastar rola a lista. O toggle é no MouseUp (não no Click) porque
+    // toques rápidos seguidos viravam DoubleClick e o 2º toque se perdia.
+    int _yToque, _rolagemToque;
+    bool _tocando, _arrastou;
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (e.Button != MouseButtons.Left) return;
+        _tocando = true; _arrastou = false;
+        _yToque = Cursor.Position.Y;
+        _rolagemToque = (Parent as ListaOpcoes)?.Rolagem ?? 0;
+        Capture = true;
+    }
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        if (!_tocando || Parent is not ListaOpcoes lista) return;
+        var dy = Cursor.Position.Y - _yToque;
+        if (!_arrastou && Math.Abs(dy) < (int)(14 * _k)) return;
+        _arrastou = true;
+        lista.Arrastar(_rolagemToque, dy);
+    }
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        base.OnMouseUp(e);
+        if (!_tocando) return;
+        _tocando = false;
+        Capture = false;
+        if (!_arrastou && e.Button == MouseButtons.Left) Marcado = !Marcado;
     }
     protected override void OnCreateControl()
     {
