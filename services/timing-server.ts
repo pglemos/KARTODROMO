@@ -97,7 +97,7 @@ import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ra
 import { condicaoChuvaPeloTracado, dataBrasilia, historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
 import { calcularComAnteriores, retomarEqualizacao, validarFaixasRedutor, type FaixaRedutor, faixasDaRegra, importarKarts, REGRA_PADRAO, regraDa, SISTEMAS_KART, tempoVoltaParaMs, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
 import { nomeProprio } from '../lib/nomes';
-import { configPublica, ehCotaDiariaDoResend, ehErroLimitePorHora, enviarEmailSimples, proximaRenovacaoDoResend, enviarResultado, enviarTeste, lerConfig, salvarConfig, semEmailAosPilotos, traduzirErro, verificarTransporteEmail, type Dependencias, type OpcoesEnvio } from './timing-email';
+import { configPublica, ehErroLimitePorHora, enviarEmailSimples, servidorForaAte, enviarResultado, enviarTeste, lerConfig, salvarConfig, semEmailAosPilotos, traduzirErro, verificarTransporteEmail, type Dependencias, type OpcoesEnvio } from './timing-email';
 import { usoKartsDaSessao } from '../lib/timing/kart-fisico';
 import { serializeMobilePublication } from '../lib/timing/mobile-results';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
@@ -1905,31 +1905,44 @@ const EMAIL_FILE = join(DATA_DIR, 'email.json');
  * Sem o arquivo, tudo segue como antes.
  */
 const EMAIL_RESERVA_FILE = join(DATA_DIR, 'email-reserva.json');
-let resendSemCotaAte = 0;
-/** O arquivo de e-mail da vez: o principal; com o Resend sem cota hoje, a reserva (se existir). */
-function arquivoDeEmail() {
-  return Date.now() < resendSemCotaAte && existsSync(EMAIL_RESERVA_FILE) ? EMAIL_RESERVA_FILE : EMAIL_FILE;
+const EMAIL_GMAIL_FILE = join(DATA_DIR, 'email-gmail.json');
+/** Até quando cada servidor de envio fica fora da cadeia (arquivo de configuração -> instante). */
+const servidorFora = new Map<string, number>();
+const nomeDoServidor = (arquivo: string) => (arquivo === EMAIL_FILE ? 'principal (Resend)' : arquivo === EMAIL_RESERVA_FILE ? 'HostGator' : 'Gmail');
+/** A cadeia de envio, na ordem: principal (Resend), HostGator, Gmail — só os que estão configurados. */
+function cadeiaDeEmail() {
+  return [EMAIL_FILE, EMAIL_RESERVA_FILE, EMAIL_GMAIL_FILE].filter((a, i) => i === 0 || existsSync(a));
 }
-/** Marca o Resend sem cota até a renovação, quando o erro é a cota diária e existe a saída de reserva. */
-function marcarResendSemCota(texto: string) {
-  if (!ehCotaDiariaDoResend(texto) || !existsSync(EMAIL_RESERVA_FILE)) return false;
-  if (Date.now() >= resendSemCotaAte) log('e-mail: Resend sem cota hoje; usando a saída de reserva (email-reserva.json) até as 21h');
-  resendSemCotaAte = proximaRenovacaoDoResend();
+/** O primeiro servidor da cadeia que não está fora agora (todos fora: o principal, para o erro aparecer). */
+function arquivoDeEmail() {
+  const agora = Date.now();
+  return cadeiaDeEmail().find((a) => (servidorFora.get(a) ?? 0) <= agora) ?? EMAIL_FILE;
+}
+/** Tira o servidor da cadeia quando o erro é dele (cota, limite, certificado, senha, conexão); não quando é do destinatário. */
+function marcarServidorFora(arquivo: string, texto: string) {
+  const ate = servidorForaAte(texto);
+  if (!ate) return false;
+  if ((servidorFora.get(arquivo) ?? 0) <= Date.now()) {
+    log(`e-mail: ${nomeDoServidor(arquivo)} fora até ${new Date(ate).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })} (${texto.slice(0, 120)}); segue pelo próximo da cadeia`);
+  }
+  servidorFora.set(arquivo, ate);
   return true;
 }
-/** Um e-mail avulso pela saída da vez; se o Resend acabou de esgotar a cota, tenta na hora pela reserva. */
+/** Um e-mail avulso (fila do site): tenta cada servidor da cadeia até um aceitar. Erro do destinatário não troca de servidor. */
 async function enviarEmailComReserva(m: { to: string; subject: string; text: string; html: string }) {
-  const arquivo = arquivoDeEmail();
-  try {
-    await enviarEmailSimples(arquivo, SIMULATE, m);
-  } catch (e) {
-    const bruta = e instanceof Error ? e.message : String(e);
-    if (arquivo === EMAIL_FILE && marcarResendSemCota(bruta)) {
-      await enviarEmailSimples(arquivoDeEmail(), SIMULATE, m);
+  let ultimo: unknown = new Error('nenhum servidor de e-mail disponível');
+  for (const arquivo of cadeiaDeEmail()) {
+    if ((servidorFora.get(arquivo) ?? 0) > Date.now()) continue;
+    try {
+      await enviarEmailSimples(arquivo, SIMULATE, m);
       return;
+    } catch (e) {
+      ultimo = e;
+      const bruta = e instanceof Error ? e.message : String(e);
+      if (!marcarServidorFora(arquivo, bruta) && !marcarServidorFora(arquivo, traduzirErro(e))) throw e;
     }
-    throw e;
   }
+  throw ultimo;
 }
 const LOGO_EMAIL = (() => {
   // versão pequena (360 px, 35 KB): o logo original (263 KB) ia 3 vezes por e-mail e deixava cada um com 1,1 MB
@@ -2054,9 +2067,12 @@ function enviarResultadoEmFila(s: Session, op: OpcoesEnvio) {
   let trabalhoReal: Promise<void> = Promise.resolve();
   const iniciou = new Promise<void>((resolve) => { iniciar = resolve; });
   const tarefa = () => {
-    const trabalho = enviarResultado(s, arquivoDeEmail(), depEmail, op).then((r) => {
-      // Resend sem cota: a próxima tentativa (o ciclo de reenvio) já sai pela reserva
-      for (const f of r?.falhas ?? []) if (marcarResendSemCota(String(f.erro ?? ''))) break;
+    const arquivoUsado = arquivoDeEmail();
+    const trabalho = enviarResultado(s, arquivoUsado, depEmail, op).then((r) => {
+      // o servidor caiu (cota, limite, certificado, senha, conexão): sai da cadeia, e se houver outro disponível o reenvio
+      // dos que faltaram é adiantado para segundos (sem esperar o recuo de até 30 min)
+      const caiu = (r?.falhas ?? []).some((f) => marcarServidorFora(arquivoUsado, String(f.erro ?? '')));
+      if (caiu && r && arquivoDeEmail() !== arquivoUsado) r.proximaTentativaEm = Date.now() + 5_000;
       return r;
     });
     trabalhoReal = trabalho.then(() => undefined, () => undefined);

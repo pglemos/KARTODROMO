@@ -740,6 +740,20 @@ export function proximaRenovacaoDoResend(agora = Date.now()): number {
   return d.getTime();
 }
 
+/**
+ * Até quando um servidor de envio fica fora da cadeia depois deste erro (0 = o erro é do destinatário, não do servidor).
+ * Cota diária do Resend: até a renovação (21h de Brasília); mensal: 24 h; limite da hospedagem/Gmail: 1 h (Gmail diário:
+ * 24 h); certificado, senha, endereço ou conexão: 15 min (tenta de novo depois, sem travar o envio dos outros).
+ */
+export function servidorForaAte(texto: string, agora = Date.now()): number {
+  if (ehCotaDiariaDoResend(texto)) return proximaRenovacaoDoResend(agora);
+  if (/monthly_quota_exceeded|monthly email sending quota|limite MENSAL do plano do Resend/i.test(texto)) return agora + 24 * 3_600_000;
+  if (/Daily user sending limit/i.test(texto)) return agora + 24 * 3_600_000;
+  if (ehErroLimitePorHora(texto) || /limite de e-mails por hora/i.test(texto)) return agora + 3_600_000;
+  if (/certificate|altname|self.signed|\b535\b|Invalid login|authentication|usuário\/senha|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNREFUSED|ECONNRESET|timeout|sem conexão|não configurado|n[ãa]o encontrado/i.test(texto)) return agora + 15 * 60_000;
+  return 0;
+}
+
 /** Erros do servidor de e-mail em português (a tela e o registro mostram isso para o operador). */
 export function traduzirErro(e: unknown): string {
   const m = e instanceof Error ? e.message : String(e);
