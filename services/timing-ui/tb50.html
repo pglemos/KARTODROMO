@@ -50,7 +50,7 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 .casa.vazia .n,.casa.vazia .t{color:transparent}
 
 /* 1b. ANIMAÇÕES DA CORRIDA (só transform/opacity: leves para a TB50) */
-.casa .sw{position:absolute;top:0;bottom:0;left:-62%;width:62%;opacity:0;pointer-events:none;background:linear-gradient(100deg,rgba(255,255,255,0) 0%,rgba(0,230,118,.38) 50%,rgba(255,255,255,0) 100%);-webkit-transform:skewX(-14deg);transform:skewX(-14deg)}
+.casa .sw{position:absolute;top:0;bottom:0;left:-62%;width:62%;opacity:0;pointer-events:none;background:linear-gradient(100deg,rgba(255,255,255,0) 0%,rgba(0,230,118,.7) 50%,rgba(255,255,255,0) 100%);-webkit-transform:skewX(-14deg);transform:skewX(-14deg)}
 .casa .in:after{content:'';position:absolute;left:0;top:0;right:0;bottom:0;border:4px solid #e05cff;border-radius:12px;opacity:0;pointer-events:none}
 .casa .tag{position:absolute;display:none;height:44px;padding:0 14px;border-radius:8px;font:700 26px/44px 'KIB Cond',Arial,sans-serif;letter-spacing:1px;white-space:nowrap;color:#03140a;background:#00e676}
 .casa.larga .tag{left:78px;top:16px}
@@ -64,10 +64,13 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 .in.tag-sobe .tag:before{content:'';display:inline-block;width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-bottom:15px solid #03140a;margin-right:9px;vertical-align:3px}
 /* volta completada: o tempo "salta" */
 .in.fx-volta .t{-webkit-animation:fx-pop .7s cubic-bezier(.2,.9,.3,1.3) both;animation:fx-pop .7s cubic-bezier(.2,.9,.3,1.3) both}
+.in.fx-volta{-webkit-animation:fx-flash 1s ease-out both;animation:fx-flash 1s ease-out both}
+@-webkit-keyframes fx-flash{0%{background-color:#3a5546}100%{background-color:#0b100d}}
+@keyframes fx-flash{0%{background-color:#3a5546}100%{background-color:#0b100d}}
 /* melhor volta do piloto: brilho verde atravessa o cartão */
 .in.fx-pb .sw{-webkit-animation:fx-sweep 1.1s ease-out both;animation:fx-sweep 1.1s ease-out both}
 /* volta mais rápida da sessão: brilho roxo + moldura pulsando */
-.in.fx-rec .sw{background:linear-gradient(100deg,rgba(255,255,255,0) 0%,rgba(224,92,255,.5) 50%,rgba(255,255,255,0) 100%);-webkit-animation:fx-sweep 1.1s ease-out 2 both;animation:fx-sweep 1.1s ease-out 2 both}
+.in.fx-rec .sw{background:linear-gradient(100deg,rgba(255,255,255,0) 0%,rgba(224,92,255,.8) 50%,rgba(255,255,255,0) 100%);-webkit-animation:fx-sweep 1.1s ease-out 2 both;animation:fx-sweep 1.1s ease-out 2 both}
 .in.fx-rec:after{-webkit-animation:fx-moldura .7s ease-in-out 5 both;animation:fx-moldura .7s ease-in-out 5 both}
 /* ultrapassagem: o número sobe (ganhou) ou desce (perdeu) para o lugar */
 .in.fx-sobe .k{-webkit-animation:fx-sobe .65s cubic-bezier(.2,.9,.25,1.15) both;animation:fx-sobe .65s cubic-bezier(.2,.9,.25,1.15) both}
@@ -75,14 +78,14 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 /* entrada escalonada (início de sessão / página carregada) */
 .in.fx-entra{-webkit-animation:fx-entra .7s cubic-bezier(.2,.9,.3,1) both;animation:fx-entra .7s cubic-bezier(.2,.9,.3,1) both}
 /* líder: reflexo dourado passando de tempos em tempos */
-.casa.pos1 .in:before{content:'';position:absolute;top:0;bottom:0;left:-50%;width:50%;pointer-events:none;background:linear-gradient(100deg,rgba(255,204,51,0) 0%,rgba(255,204,51,.22) 50%,rgba(255,204,51,0) 100%);-webkit-animation:fx-lider 7s ease-in-out 2s infinite;animation:fx-lider 7s ease-in-out 2s infinite}
+.casa.pos1 .in:before{content:'';position:absolute;top:0;bottom:0;left:-50%;width:50%;pointer-events:none;background:linear-gradient(100deg,rgba(255,204,51,0) 0%,rgba(255,204,51,.38) 50%,rgba(255,204,51,0) 100%);-webkit-animation:fx-lider 7s ease-in-out 2s infinite;animation:fx-lider 7s ease-in-out 2s infinite}
 /* bandeiras: faixa do topo de todos os cartões */
 #grid-box.flag-yellow .bar,#grid-box.flag-red .bar,#grid-box.flag-chk .bar{height:12px}
 #grid-box.flag-yellow .bar{background:#ffd400;-webkit-animation:fx-pisca 1s steps(1) infinite;animation:fx-pisca 1s steps(1) infinite}
 #grid-box.flag-red .bar{background:#ff2d2d;-webkit-animation:fx-pisca .8s steps(1) infinite;animation:fx-pisca .8s steps(1) infinite}
 #grid-box.flag-chk .bar{background-color:#fff;background-image:linear-gradient(45deg,#000 25%,transparent 25%,transparent 75%,#000 75%),linear-gradient(45deg,#000 25%,transparent 25%,transparent 75%,#000 75%);background-size:12px 12px;background-position:0 0,6px 6px}
-@-webkit-keyframes fx-pop{0%{-webkit-transform:scale(1.28);opacity:.25}100%{-webkit-transform:scale(1);opacity:1}}
-@keyframes fx-pop{0%{transform:scale(1.28);opacity:.25}100%{transform:scale(1);opacity:1}}
+@-webkit-keyframes fx-pop{0%{-webkit-transform:scale(1.4);opacity:.25}100%{-webkit-transform:scale(1);opacity:1}}
+@keyframes fx-pop{0%{transform:scale(1.4);opacity:.25}100%{transform:scale(1);opacity:1}}
 @-webkit-keyframes fx-sweep{0%{opacity:1;-webkit-transform:translateX(0) skewX(-14deg)}100%{opacity:1;-webkit-transform:translateX(280%) skewX(-14deg)}}
 @keyframes fx-sweep{0%{opacity:1;transform:translateX(0) skewX(-14deg)}100%{opacity:1;transform:translateX(280%) skewX(-14deg)}}
 @-webkit-keyframes fx-moldura{0%,100%{opacity:0}50%{opacity:1}}
@@ -1514,7 +1517,7 @@ function shortPodiumName(nome, dupFirst) {
 
   function aplicarEventos(el, e, is14Ms) {
     var inn = el._in;
-    if (e.volta && is14Ms) animar(inn, 'fx-volta', 900);
+    if (e.volta && is14Ms) animar(inn, 'fx-volta', 1100);
     if (e.rec) { animar(inn, 'fx-rec', 4000); mostrarTag(el, e.rec, 'rec', 5000); }
     else if (e.pb) { animar(inn, 'fx-pb', 1400); mostrarTag(el, 'MELHOR VOLTA', 'pb', 3500); }
     else if (e.sobe) mostrarTag(el, is14Ms ? (e.sobe + (e.sobe > 1 ? ' POSIÇÕES' : ' POSIÇÃO')) : String(e.sobe), 'sobe', 3000);
@@ -2009,9 +2012,15 @@ function shortPodiumName(nome, dupFirst) {
     }
   }
 
+  var TB50_VERSAO = '2026-11-20-anim3';
+  var ultimoErro = '';
+  window.onerror = function (msg, src, linha) {
+    var e = String(msg || '').slice(0, 120) + '@' + (linha || 0);
+    if (e !== ultimoErro) { ultimoErro = e; try { ping(); } catch (err) {} }
+  };
   function ping() {
     var x = new XMLHttpRequest();
-    x.open('GET', '/api/tb50-ping?ua=' + encodeURIComponent(navigator.userAgent || '') + '&w=' + (window.innerWidth || 0) + '&h=' + (window.innerHeight || 0) + '&_ts=' + new Date().getTime(), true);
+    x.open('GET', '/api/tb50-ping?ua=' + encodeURIComponent((navigator.userAgent || '') + ' |v=' + TB50_VERSAO + (ultimoErro ? ' |erro=' + ultimoErro : '')) + '&w=' + (window.innerWidth || 0) + '&h=' + (window.innerHeight || 0) + '&_ts=' + new Date().getTime(), true);
     x.send(null);
   }
 
