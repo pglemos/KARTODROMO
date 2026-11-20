@@ -2248,6 +2248,7 @@ function assinaturaResultado(s: Session) {
 // nova tentativa a cada 5 min só para quem falhou (servidor de e-mail fora, internet caiu), até 6 h depois do encerramento.
 // Bateria encerrada há mais de 3 min sem registro de envio = o envio morreu no meio (servidor reiniciado logo depois do
 // encerramento: 10/10 09:50 e 11/10 17:25 ficaram sem resultado) → manda de novo.
+// E-mail do resultado a cada 15 s (20/11/2026: era a cada 60 s junto da publicação no app). Uma sessão por ciclo.
 setInterval(() => {
   const agora = Date.now();
   const limite = agora - 6 * 3_600_000;
@@ -2256,17 +2257,30 @@ setInterval(() => {
   for (const s of sessions.values()) {
     const e = s.emailsResultado;
     const fim = s.finishedAt ?? s.createdAt;
-    const bloqueadoPorQuota = e?.falhas.some((f) => ehErroLimitePorHora(f.erro)) ?? false;
+    // falha de SERVIDOR (cota, limite, certificado, conexão): a cadeia troca de saída; não desiste em 12 tentativas
+    const bloqueadoPorQuota = e?.falhas.some((f) => ehErroLimitePorHora(f.erro) || servidorForaAte(f.erro) > 0) ?? false;
     if (s.state !== 'encerrada' || fim <= (bloqueadoPorQuota ? limiteQuota : limite) || emailsAgendados.has(s.id)) continue;
     const suprimidoHistorico100Milhas = e?.status === 'sem-email-pilotos' && /100\s*milhas/i.test(`${nomeEventoDa(s)} ${s.name}`);
     const horaRetry = e?.proximaTentativaEm ?? 0;
     const possuiFalhaTransitoria = e?.falhas.some((f) => !f.permanente || ehErroLimitePorHora(f.erro)) ?? false;
     const statusRetentavel = e?.status === 'parcial' || e?.status === 'falhou' || (e?.status === 'falhou-permanente' && possuiFalhaTransitoria);
-    const maxTentativas = bloqueadoPorQuota ? 60 : 12;
+    const maxTentativas = bloqueadoPorQuota ? 200 : 12;
     if (!disparouEmailNesteCiclo && (suprimidoHistorico100Milhas || (e ? statusRetentavel && possuiFalhaTransitoria && e.tentativas < maxTentativas && agora >= horaRetry : fim < agora - 3 * 60_000))) {
       disparouEmailNesteCiclo = true;
       void emailsAoEncerrar(s);
     }
+  }
+}, 15_000);
+// publicação no app: mesmo filtro do ciclo antigo (encerrada, nas últimas 6 h — 36 h se o e-mail esperava servidor —,
+// sem e-mail agendado e com 3 min de folga), a cada 60 s
+setInterval(() => {
+  const agora = Date.now();
+  const limite = agora - 6 * 3_600_000;
+  const limiteQuota = agora - 36 * 3_600_000;
+  for (const s of sessions.values()) {
+    const fim = s.finishedAt ?? s.createdAt;
+    const bloqueadoPorQuota = s.emailsResultado?.falhas.some((f) => ehErroLimitePorHora(f.erro) || servidorForaAte(f.erro) > 0) ?? false;
+    if (s.state !== 'encerrada' || fim <= (bloqueadoPorQuota ? limiteQuota : limite) || emailsAgendados.has(s.id)) continue;
     if (fim < agora - 3 * 60_000) void publicarNoAppAutomatico(s);
   }
 }, 60_000);

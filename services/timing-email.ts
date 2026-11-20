@@ -328,6 +328,11 @@ export function opcoesTransporte(cfg: ConfigEmail, simulador: boolean) {
     connectionTimeout: 10_000,
     greetingTimeout: 10_000,
     socketTimeout: 20_000,
+    // Uma conexão só, reaproveitada pelo lote inteiro (20/11/2026): sem isto cada e-mail abria uma conexão SMTP nova
+    // (TLS de novo, 1–2 s cada) e a HostGator derrubava depois de ~6 seguidas — "6 de 44 enviados, sem conexão".
+    pool: true,
+    maxConnections: 1,
+    maxMessages: 200,
   };
 }
 
@@ -694,7 +699,13 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
     semEmail,
     mensagens,
     assinaturaResultado: assinatura,
-    proximaTentativaEm: falhas.some((f) => !f.permanente) ? Date.now() + Math.min(30 * 60_000, 60_000 * 2 ** Math.min(anterior?.tentativas ?? 0, 5)) + Math.floor(Math.random() * 30_000) : undefined,
+    // falha do SERVIDOR (cota, limite, certificado, conexão): a cadeia troca de saída, então tenta de novo em 30 s em vez
+    // de recuar até 30 min; falha só de destinatário segue o recuo de sempre
+    proximaTentativaEm: falhas.some((f) => !f.permanente)
+      ? Date.now() + (falhas.filter((f) => !f.permanente).every((f) => servidorForaAte(f.erro) > 0)
+        ? 30_000
+        : Math.min(30 * 60_000, 60_000 * 2 ** Math.min(anterior?.tentativas ?? 0, 5)) + Math.floor(Math.random() * 30_000))
+      : undefined,
     falhasPermanentes: [...new Set(falhasPermanentes)],
     ...(situacaoEntrega ? {
       aceite: situacaoEntrega.status,
