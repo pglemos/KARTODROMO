@@ -170,6 +170,39 @@
         "value": "menlo",
         "createdAt": "2026-11-12T15:52:21.525Z",
         "reason": "código Pix copia-e-cola em monoespaçada, já existia antes do reskin"
+      },
+      {
+        "rule": "oversized-h1",
+        "value": "*",
+        "files": [
+          "docs/cronometragem/manual-kart/manual.html"
+        ],
+        "createdAt": "2026-11-17T23:24:19.389Z",
+        "reason": "Claude: capa de PDF A4 impresso, página inteira dedicada ao título; não é viewport web"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "workers/admin/public/index.html"
+        ],
+        "createdAt": "2026-11-20T02:12:34.802Z",
+        "reason": "dono escolheu o Dashboard V22 (19-20/11/2026): brilho menta do item atual do menu é da referência"
+      },
+      {
+        "rule": "radial-halo",
+        "value": "*",
+        "files": [
+          "workers/admin/public/index.html"
+        ],
+        "createdAt": "2026-11-20T02:12:34.814Z",
+        "reason": "dono escolheu o Dashboard V22: degradê menta/pêssego do fundo é da referência"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "outfit",
+        "createdAt": "2026-11-20T02:12:34.825Z",
+        "reason": "Outfit é a fonte do mundo V22 escolhido pelo dono; declarada no DESIGN.md do kartodromo-os"
       }
     ]
   }
