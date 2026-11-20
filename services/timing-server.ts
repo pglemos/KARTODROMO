@@ -2022,7 +2022,9 @@ const depEmail: Dependencias = {
 const filaEmails = new Map<string, Promise<void>>();
 let filaGlobalEmails: Promise<void> = Promise.resolve();
 // Item 14: Redução do limite de bloqueio de 30 min para 3 min por envio
-const LIMITE_ENVIO_EMAILS_MS = 3 * 60_000;
+// 10 min (20/11/2026): pela HostGator ou pelo Gmail (saídas de reserva) cada e-mail leva ~3–7 s com o PDF; com 3 min
+// uma bateria de 44 pilotos nunca terminava numa tentativa só e esperava o recuo de minutos entre as rodadas.
+const LIMITE_ENVIO_EMAILS_MS = 10 * 60_000;
 const envioATodosAtivo = new Set<string>();
 
 // Item 13: Fila de e-mails persistida em disco (pending-emails.json) contra perda em reinicializações
@@ -2079,7 +2081,7 @@ function enviarResultadoEmFila(s: Session, op: OpcoesEnvio) {
     iniciar();
     let timer: NodeJS.Timeout | undefined;
     const limite = new Promise<never>((_, falhar) => {
-      timer = setTimeout(() => falhar(new Error('o envio atingiu o tempo limite de 3 min; tentando de novo no próximo ciclo')), LIMITE_ENVIO_EMAILS_MS);
+      timer = setTimeout(() => falhar(new Error('o envio atingiu o tempo limite de 10 min; tentando de novo no próximo ciclo')), LIMITE_ENVIO_EMAILS_MS);
     });
     // A resposta pode expirar para o chamador, mas a fila permanece ocupada até o trabalho real terminar.
     // Isso impede que a tentativa seguinte envie duplicatas enquanto um SMTP/PDF antigo ainda executa.
