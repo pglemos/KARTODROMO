@@ -1,5 +1,8 @@
 /** Regras do sorteio sem IO: elegibilidade (docs/app-operacional/ELEGIBILIDADE.md) e lastro (APK 1.6, função X1.b.o). */
 export type Inscricao = { clienteId: unknown; nome: string; aprovada: unknown; pago: unknown; termo: unknown; totalCentavos: unknown; endurance: unknown };
+// Calendário de Brasília criado uma vez: toLocaleDateString com timeZone recria o Intl a cada chamada e, chamado por
+// bateria/kart, chegou a 46% da CPU da cronometragem em 20/11/2026 (telão TB50 atrasando a passagem em segundos).
+const DIA_SP = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' });
 export type Elegibilidade = { situacao: 'ELEGIVEL' | 'INELEGIVEL' | 'INDETERMINADA'; motivo: string | null };
 
 const verdade = (v: unknown) => v === true || v === 1;
@@ -36,7 +39,7 @@ type SessaoDaFila = { state?: string; createdAt?: number; startedAt?: number | n
  * cujo horário já foi ultrapassado por uma bateria posterior que largou. Nada é alterado na cronometragem.
  */
 export function semBateriasPassadas<T>(sessoes: T[], inicioPorAgenda: ReadonlyMap<string, string>, agora = Date.now()): T[] {
-  const dia = (ms: number) => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  const dia = (ms: number) => DIA_SP.format(ms);
   const hoje = dia(agora);
   const inicio = (s: SessaoDaFila) => (s.agendaId == null ? undefined : inicioPorAgenda.get(String(s.agendaId)));
   const ultimaLargada = (sessoes as SessaoDaFila[])

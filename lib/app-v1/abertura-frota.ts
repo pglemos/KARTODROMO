@@ -1,6 +1,9 @@
 import { pode, type Identidade } from './auth';
 import { ErroApp, executar } from './comandos';
 import type { AppStore } from './store';
+// Calendário de Brasília criado uma vez: toLocaleDateString com timeZone recria o Intl a cada chamada e, chamado por
+// bateria/kart, chegou a 46% da CPU da cronometragem em 20/11/2026 (telão TB50 atrasando a passagem em segundos).
+const DIA_SP = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' });
 
 export type FrequenciaChecklist = '1x_dia' | 'cada_2_baterias' | 'cada_4_baterias';
 
@@ -57,7 +60,7 @@ export const ITENS_CHECKLIST_CONFIG: ItemChecklistDef[] = [
 ];
 
 export const ITENS_ABERTURA = ['freioAcelerador', 'calibragemPneus', 'pneusLonados', 'correnteEngraxada'] as const;
-export const diaAbertura = (agora = new Date()) => agora.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+export const diaAbertura = (agora = new Date()) => DIA_SP.format(agora);
 type Registro = {
   dia: string;
   kart: string;

@@ -9,6 +9,9 @@ import { pode, type Identidade } from './auth';
 import { ErroApp, executar, type Pedido } from './comandos';
 import { elegibilidade, frotaDoKart, pesoValido, planoLastro, type Inscricao } from './regras';
 import type { AppStore } from './store';
+// Calendário de Brasília criado uma vez: toLocaleDateString com timeZone recria o Intl a cada chamada e, chamado por
+// bateria/kart, chegou a 46% da CPU da cronometragem em 20/11/2026 (telão TB50 atrasando a passagem em segundos).
+const DIA_SP = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' });
 
 /** Chama a mesma rota que o programa Windows usa: as regras de prova continuam num lugar só. */
 export type Legado = (metodo: string, caminho: string, corpo?: unknown) => Promise<unknown>;
@@ -339,7 +342,7 @@ export function criarOperacao(d: DepsOperacao) {
     },
     /** Números do dia para o dono, só do que a cronometragem e o app sabem. */
     resumoDoDia(sessoes: unknown[], agora = new Date()) {
-      const dia = (ms: number) => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+      const dia = (ms: number) => DIA_SP.format(ms);
       const hoje = dia(agora.getTime());
       const doDia = (sessoes as (Sessao & { createdAt: number; type?: string })[]).filter((s) => dia(s.createdAt) === hoje && s.state !== 'cancelada' && s.type !== 'equalizacao');
       const desde = new Date(agora.getTime() - 86_400_000).toISOString();
@@ -371,7 +374,7 @@ export function criarOperacao(d: DepsOperacao) {
     },
     aulas() {
       const recibos = d.store.db.prepare('SELECT * FROM aulas ORDER BY criadoEm DESC LIMIT 200').all() as { id: string; instrutor: string; pilotos: number; aulas: number; valorCentavos: number; criadoEm: string; criadoPor: string; aceitoEm: string | null; aceitoPor: string | null }[];
-      const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+      const hoje = DIA_SP.format(Date.now());
       const desde = new Date(`${hoje}T00:00:00-03:00`).toISOString();
       const ate = new Date(Date.parse(desde) + 86400000).toISOString();
       const resumoHoje = d.store.db.prepare('SELECT instrutor, SUM(pilotos) pilotos, SUM(aulas) aulas FROM aulas WHERE criadoEm >= ? AND criadoEm < ? GROUP BY instrutor').all(desde, ate) as { instrutor: string; pilotos: number; aulas: number }[];
