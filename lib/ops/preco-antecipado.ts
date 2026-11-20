@@ -14,7 +14,7 @@ export const configOnline = () => {
       .filter(([prod, preco]) => prod > 0 && Number.isSafeInteger(preco) && preco > 0)) as Record<number, number>,
     antecedenciaMin: Number(e.OPS_ONLINE_ANTECEDENCIA_MIN || 120),
     maxPilotos: Number(e.OPS_ONLINE_MAX || 10),
-    prazoMin: Number(e.OPS_ONLINE_PRAZO_MIN || 15),
+    prazoMin: Number(e.OPS_ONLINE_PRAZO_MIN || 120), // regra do dono (20/11/2026): 2 horas para pagar
     diasAgenda: Number(e.OPS_ONLINE_DIAS || 500), // a agenda do ano seguinte inteiro abre em outubro
   };
 };

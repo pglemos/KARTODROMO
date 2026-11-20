@@ -42,7 +42,7 @@ export async function buscarCobrancaPorReferencia(env: AsaasEnv, referencia: str
   return response.data?.[0] ?? null;
 }
 
-/** Vencimento no dia (horário de Brasília): a vaga só fica segura por 15 min de qualquer jeito. */
+/** Vencimento no dia (horário de Brasília): a vaga fica segura por pouco tempo (até 2 h) de qualquer jeito. */
 export function hojeBrasilia(agora = new Date()) {
   return new Date(agora.getTime() - 3 * 3_600_000).toISOString().slice(0, 10);
 }
@@ -52,7 +52,7 @@ export async function criarCobranca(env: AsaasEnv, cliente: string, forma: 'pix'
     method: 'POST',
     body: JSON.stringify({
       customer: cliente,
-      // CREDIT_CARD: a fatura da Asaas também oferece débito (Visa/Master); boleto fica de fora (não compensa em 15 min)
+      // CREDIT_CARD: a fatura da Asaas também oferece débito (Visa/Master); boleto fica de fora (não compensa a tempo)
       billingType: forma === 'pix' ? 'PIX' : 'CREDIT_CARD',
       value: Math.round(valorCentavos) / 100,
       dueDate: hojeBrasilia(),

@@ -664,7 +664,7 @@ function EtapaPagamento({ r, setR, cada, horario, agenda, abertoEm, voltar, onCr
   };
   return (
     <>
-      <div className="etapa-topo"><span className="num">04</span><div><h2>Pagamento</h2><p className="muted">{`As vagas ficam separadas por ${agenda.prazoMin} minutos enquanto você paga.`}</p></div></div>
+      <div className="etapa-topo"><span className="num">04</span><div><h2>Pagamento</h2><p className="muted">{`As vagas ficam separadas por ${agenda.prazoMin >= 60 && agenda.prazoMin % 60 === 0 ? `${agenda.prazoMin / 60} hora${agenda.prazoMin === 60 ? '' : 's'}` : `${agenda.prazoMin} minutos`} enquanto você paga.`}</p></div></div>
       <dl className="conferir">
         <div><dt>Bateria</dt><dd>{diaLongo(dt)} · {hora(dt)}</dd></div>
         <div><dt>Chegada</dt><dd>{menosUmaHora(dt)} (1 hora antes)</dd></div>

@@ -70,6 +70,9 @@ async function painelDoGrupo(env: EnvExtras, codigo: string, chave: string) {
 
 import { TERMO_PADRAO } from './termo-padrao';
 
+/** Atraso tolerado (regra do dono, 20/11/2026): com mais de 10 min depois do início, o piloto perde a bateria. */
+export const TOLERANCIA_CHECKIN_MS = 10 * 60_000;
+
 export type Termo = { versao: string; titulo: string; empresa: string; paragrafos: { titulo?: string; texto: string }[] };
 let cacheTermo: { em: number; t: Termo | null } | null = null;
 async function termoPublicado(env: EnvExtras) {
@@ -125,7 +128,7 @@ export async function rotasPublicas(req: Request, env: EnvExtras, p: string, url
     const inicio = Date.parse(String(g.inicio).slice(0, 16) + ':00-03:00');
     const agora = Date.now();
     if (!Number.isFinite(inicio) || agora < inicio - 2 * 3_600_000) return json(409, { erro: 'O check-in abre 2 horas antes da largada.' });
-    if (agora > inicio + 15 * 60_000) return json(409, { erro: 'O horário de check-in desta bateria terminou. Fale com a recepção.' });
+    if (agora > inicio + TOLERANCIA_CHECKIN_MS) return json(409, { erro: 'O horário de check-in desta bateria terminou. Fale com a recepção.' });
     const lat = Number(b.lat), lng = Number(b.lng), precisao = Number(b.precisao);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return json(400, { erro: 'Permita a localização para fazer o check-in.' });
     if (Number.isFinite(precisao) && precisao > 300) return json(409, { erro: 'A localização está imprecisa. Tente de novo em um lugar aberto.' });
@@ -304,7 +307,7 @@ function distanciaM(a: { lat: number; lng: number }, b: { lat: number; lng: numb
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-/** Regras: reserva do CPF, paga e confirmada, de 2 h antes até 15 min depois da largada, a até 1 km da pista. */
+/** Regras: reserva do CPF, paga e confirmada, de 2 h antes até 10 min depois da largada, a até 1 km da pista. */
 async function fazerCheckin(env: EnvExtras, b: Record<string, unknown>) {
   const cpf = digitos(b.cpf), codigo = String(b.codigo ?? '').trim().toUpperCase(), id = String(b.pedidoId ?? '');
   if (cpf.length !== 11 || !/^[A-Z0-9]{6}$/.test(codigo) || !UUID.test(id)) return json(400, { erro: 'Dados do check-in inválidos.' });
@@ -317,7 +320,7 @@ async function fazerCheckin(env: EnvExtras, b: Record<string, unknown>) {
   if (!Number.isFinite(inicio)) return json(409, { erro: 'Horário da bateria não encontrado. Faça o check-in no totem.' });
   const agora = Date.now();
   if (agora < inicio - 2 * 3_600_000) return json(409, { erro: 'O check-in abre 2 horas antes da largada.' });
-  if (agora > inicio + 15 * 60_000) return json(409, { erro: 'O horário de check-in desta bateria terminou. Fale com a recepção.' });
+  if (agora > inicio + TOLERANCIA_CHECKIN_MS) return json(409, { erro: 'O horário de check-in desta bateria terminou. Fale com a recepção.' });
   const lat = Number(b.lat), lng = Number(b.lng), precisao = Number(b.precisao);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return json(400, { erro: 'Permita a localização para fazer o check-in.' });
   if (Number.isFinite(precisao) && precisao > 300) return json(409, { erro: 'A localização está imprecisa. Tente de novo em um lugar aberto.' });

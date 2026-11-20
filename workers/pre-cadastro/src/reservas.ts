@@ -2,7 +2,7 @@
  * Reserva online (reservas.kartodromodebetim.com.br) — lado do site. Guarda os pedidos no R2 até o servidor da recepção
  * (SRVKART) buscar pelo /api/sync, igual ao pré-cadastro. Fluxo de um pedido:
  *   novo → (servidor segura as vagas) aguardando_pagamento → (Asaas avisa) pago → (servidor confirma) confirmado
- *   e os desvios: recusado (sem vaga), expirado (15 min sem pagar), pago_sem_vaga (pagou depois e o horário lotou).
+ *   e os desvios: recusado (sem vaga), expirado (prazo sem pagar), pago_sem_vaga (pagou depois e o horário lotou).
  */
 import { asaasLigado, buscarCobrancaPorReferencia, cancelar, consultar, criarCobranca, EVENTOS_PAGO, garantirCliente, hojeBrasilia, PAGO, pagasDesde, qrPix, type AsaasEnv } from './asaas';
 import { cupomDoPedido, indexarPedido } from './extras';

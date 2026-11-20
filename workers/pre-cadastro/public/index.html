@@ -762,10 +762,10 @@
       if (tipo === 'CPF' && cpfOk(d)) atualizarPrecoGrupo(d);
     }
   }).catch(() => {});
-  // check-in pelo celular de quem entrou pelo link do grupo (abre 2 h antes da largada, até 15 min depois)
+  // check-in pelo celular de quem entrou pelo link do grupo (abre 2 h antes da largada, até 10 min depois)
   const mostrarCheckin = (g) => {
     const ini = Date.parse(String(g.inicio).slice(0, 16) + ':00-03:00'), agora = Date.now();
-    if (!(agora >= ini - 2 * 3600e3 && agora <= ini + 15 * 60e3)) return;
+    if (!(agora >= ini - 2 * 3600e3 && agora <= ini + 10 * 60e3)) return;
     $('checkinGrupo').hidden = false;
     $('ckCpf').addEventListener('input', (e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 11); e.target.value = d.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'); });
     const msg = (t, ok) => { const m = $('ckMsg'); m.hidden = false; m.textContent = t; m.style.color = ok ? 'var(--verde)' : ''; m.className = ok ? 'legenda' : 'msg-campo'; };

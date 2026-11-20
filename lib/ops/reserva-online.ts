@@ -152,6 +152,16 @@ type CouponQuote = { brutoCentavos: number; descontoCentavos: number; totalCenta
 type ReadOne = (text: string, params?: Record<string, unknown>) => Promise<Record<string, unknown> | null>;
 type ReadList = (text: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>[]>;
 
+/**
+ * Até quando a vaga fica segura sem pagamento. Regra do dono (20/11/2026): 2 horas (`OPS_ONLINE_PRAZO_MIN`), mas
+ * nunca depois de 1 hora antes da bateria (a hora de chegada), e nunca menos de 15 minutos, para quem reserva em cima.
+ */
+export const PRAZO_MINIMO_MIN = 15;
+export const MARGEM_ANTES_DA_BATERIA_MIN = 60;
+export const EXPIRA_SQL = `greatest(now() + make_interval(mins => @minimo::int),
+  least(now() + make_interval(mins => @prazo::int),
+        (select b.inicio from kart.bateria b where b.id = @bateria) - make_interval(mins => @margem::int)))`;
+
 async function calcularPedidoOnline(input: CouponInput, read: ReadOne, lock: boolean, clienteId?: number, readList?: ReadList): Promise<CouponQuote & { nome: string; inicio: string }> {
   const c = configOnline();
   const quantidade = Math.trunc(Number(input.quantidade));
@@ -344,14 +354,14 @@ export async function reservarPedido(p: PedidoSite, log: Log): Promise<Resultado
       const inscricoes = await inscreverN(Number(p.bateriaId), clienteId, n, 'site', null, obs, false, { produtoId: quote.produtoId, precos: quote.precos, clientes: pessoas, run });
       await run(
         `insert into kart.reserva_online (pedido_id, codigo, cliente_id, bateria_id, quantidade, valor_centavos, status, forma, inscricao_ids, pilotos, expira_em)
-         values (@pedido, @codigo, @cliente, @bateria, @n, @valor, 'aguardando', @forma, @insc, @pilotos, now() + make_interval(mins => @prazo::int))`,
-        { pedido: p.id, codigo: p.codigo, cliente: clienteId, bateria: Number(p.bateriaId), n, valor: quote.totalCentavos, forma: p.forma, insc: inscricoes.join(','), pilotos: (p.pilotos ?? []).join(', ').slice(0, 600) || null, prazo: c.prazoMin },
+         values (@pedido, @codigo, @cliente, @bateria, @n, @valor, 'aguardando', @forma, @insc, @pilotos, ${EXPIRA_SQL})`,
+        { pedido: p.id, codigo: p.codigo, cliente: clienteId, bateria: Number(p.bateriaId), n, valor: quote.totalCentavos, forma: p.forma, insc: inscricoes.join(','), pilotos: (p.pilotos ?? []).join(', ').slice(0, 600) || null, prazo: c.prazoMin, minimo: PRAZO_MINIMO_MIN, margem: MARGEM_ANTES_DA_BATERIA_MIN },
       );
       if (quote.voucherId !== null) {
         await run(
           `insert into kart.reserva_online_voucher_uso (pedido_id, voucher_id, cliente_id, desconto_centavos, validade_em, estado)
-           values (@pedido, @voucher, @cliente, @desconto, now() + make_interval(mins => @prazo::int), 'reservado')`,
-          { pedido: p.id, voucher: quote.voucherId, cliente: clienteId, desconto: quote.descontoCentavos, prazo: c.prazoMin },
+           values (@pedido, @voucher, @cliente, @desconto, (select expira_em from kart.reserva_online where pedido_id = @pedido), 'reservado')`,
+          { pedido: p.id, voucher: quote.voucherId, cliente: clienteId, desconto: quote.descontoCentavos },
         );
       }
       const nova = await read(`select to_char(expira_em, 'YYYY-MM-DD"T"HH24:MI:SS') expira from kart.reserva_online where pedido_id = @p`, { p: p.id });

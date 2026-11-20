@@ -136,7 +136,7 @@ function recoveryAgenda(body: ReservationInput): Agenda {
     atualizadoEm: '',
     precoCentavos: 0,
     maxPilotos: 10,
-    prazoMin: 15,
+    prazoMin: 120,
     antecedenciaMin: 0,
     horarios: [{ id: bateriaId, inicio: '', nome: '', livres: 10 }],
   };

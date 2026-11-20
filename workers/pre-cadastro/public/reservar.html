@@ -256,7 +256,7 @@
 
     <section class="cartao etapa" id="secPag" hidden>
       <h2><span class="n">5</span>Pagamento</h2>
-      <p class="sub">A vaga fica guardada por <b id="prazoTxt">15 minutos</b> enquanto você paga.</p>
+      <p class="sub">A vaga fica guardada por <b id="prazoTxt">2 horas</b> enquanto você paga.</p>
       <div class="formas" id="formas">
         <button type="button" class="forma" data-v="pix"><b>Pix</b><span>QR code ou copia e cola, confirma na hora</span></button>
         <button type="button" class="forma" data-v="cartao"><b>Cartão</b><span>Crédito ou débito, à vista</span></button>
@@ -478,7 +478,7 @@
       agenda = j;
       $('carregando').style.display = 'none'; $('form').style.display = 'block';
       $('fatoPreco').textContent = `${brl(j.precoCentavos).replace(',00', '')} por piloto`;
-      $('prazoTxt').textContent = `${j.prazoMin} minutos`;
+      $('prazoTxt').textContent = j.prazoMin >= 60 && j.prazoMin % 60 === 0 ? `${j.prazoMin / 60} hora${j.prazoMin === 60 ? '' : 's'}` : `${j.prazoMin} minutos`;
       desenharDias();
     } catch { if (!silencioso) fechado('Sem conexão com a agenda agora. Fale com a recepção pelo WhatsApp para reservar.'); }
     finally { agendaCarregando = false; }
