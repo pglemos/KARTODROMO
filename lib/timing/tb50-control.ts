@@ -133,8 +133,8 @@ export function defaultTb50Config(offsetInicial = 0): Tb50Config {
     autoPodioAoEncerrar: true,
     mostrarMilesimos: true,
     temaFundo: 'carbono',
-    corPrimaria: '#00E676',
-    corDestaque: '#FFB300',
+    corPrimaria: '#00E676', // design-lint-ignore: cor padrão do painel de LED (dado que o operador troca na tela, não estilo)
+    corDestaque: '#FFB300', // design-lint-ignore: cor padrão do painel de LED (dado que o operador troca na tela, não estilo)
     tamanhoFonteEscala: 100,
     tituloCustom: '',
     subtituloCustom: '',
@@ -154,9 +154,9 @@ export function defaultTb50Config(offsetInicial = 0): Tb50Config {
       fundo: true,
     },
     patrocinadores: [
-      { id: 'pat-kib', nome: 'Kartódromo de Betim', slogan: 'Tradição e Velocidade', cor: '#00E676', ativo: true },
-      { id: 'pat-500m', nome: '500 Milhas KIB 2026', slogan: 'Endurance Oficial', cor: '#FFB300', ativo: true },
-      { id: 'pat-ultras', nome: 'Academia & Performance', slogan: 'Parceiro Oficial', cor: '#38BDF8', ativo: true },
+      { id: 'pat-kib', nome: 'Kartódromo de Betim', slogan: 'Tradição e Velocidade', cor: '#00E676', ativo: true }, // design-lint-ignore: cor padrão do painel de LED (dado que o operador troca na tela, não estilo)
+      { id: 'pat-500m', nome: '500 Milhas KIB 2026', slogan: 'Endurance Oficial', cor: '#FFB300', ativo: true }, // design-lint-ignore: cor padrão do painel de LED (dado que o operador troca na tela, não estilo)
+      { id: 'pat-ultras', nome: 'Academia & Performance', slogan: 'Parceiro Oficial', cor: '#38BDF8', ativo: true }, // design-lint-ignore: cor padrão do painel de LED (dado que o operador troca na tela, não estilo)
     ],
     playlist: [
       { id: 'pl-1', ordem: 1, nome: 'Placar 14 Karts (Kart + Tempo ms)', tipo: 'Layout Ao Vivo', layoutOuMidia: 'grid-14-ms', duracaoSeg: 120, transicao: 'Corte', ativo: true },
@@ -167,16 +167,16 @@ export function defaultTb50Config(offsetInicial = 0): Tb50Config {
       { id: 'pl-6', ordem: 6, nome: 'Resultado Final / Pódio Top 5', tipo: 'Resultado', layoutOuMidia: 'podio-final', duracaoSeg: 30, transicao: 'Fade', ativo: false },
     ],
     biblioteca: [
-      { id: 'lib-top3', nome: 'Top 3 AO VIVO (Horizontal)', categoria: 'Layouts', subtitulo: 'P1-P3 destaque + ms + rodapé', layoutOuMidia: 'top3-live', duracaoSeg: 0, resolucao: '2048x512', cor: '#0B7A53', protegido: true },
-      { id: 'lib-lista', nome: 'Lista Completa LapTime', categoria: 'Layouts', subtitulo: 'Cronômetro + Pos + Kart + Piloto + ms', layoutOuMidia: 'lista-laptime', duracaoSeg: 0, resolucao: '2048x512', cor: '#0063B1', protegido: true },
-      { id: 'lib-14', nome: 'Placar 14 Karts (Kart + ms)', categoria: 'Layouts', subtitulo: 'Grade 7x2 grande em milésimos', layoutOuMidia: 'grid-14-ms', duracaoSeg: 0, resolucao: '2048x512', cor: '#00A859', protegido: true },
-      { id: 'lib-20', nome: 'Placar 20 Karts (Pos + Kart)', categoria: 'Layouts', subtitulo: 'Grade 10x2 clássico alta leitura', layoutOuMidia: 'grid-20-pos', duracaoSeg: 0, resolucao: '2048x512', cor: '#1D4ED8', protegido: true },
-      { id: 'lib-podio', nome: 'Resultado Final / Pódio', categoria: 'Layouts', subtitulo: 'Top 5 + Campeão em destaque', layoutOuMidia: 'podio-final', duracaoSeg: 0, resolucao: '2048x512', cor: '#D97706', protegido: true },
-      { id: 'lib-pat', nome: 'Patrocinadores & Informativo', categoria: 'Patrocinadores', subtitulo: 'Marcas parceiras e chamadas', layoutOuMidia: 'patrocinadores', duracaoSeg: 20, resolucao: '2048x512', cor: '#7C3AED', protegido: true },
-      { id: 'lib-vp-crono', nome: 'ViPlex: CRONOMETRAGEM', categoria: 'Programas ViPlex', subtitulo: 'Programa HTML tempo real TB50', layoutOuMidia: 'viplex:CRONOMETRAGEM', duracaoSeg: 0, resolucao: '2048x512', cor: '#0B7A53', protegido: true },
-      { id: 'lib-vp-video', nome: 'ViPlex: VIDEOS / Institucional', categoria: 'Programas ViPlex', subtitulo: 'Vídeos locais armazenados na TB50', layoutOuMidia: 'viplex:VIDEOS', duracaoSeg: 0, resolucao: '2048x512', cor: '#334155', protegido: true },
-      { id: 'lib-info-largada', nome: 'Chamada: Próxima Bateria', categoria: 'Informativos', subtitulo: 'Aviso de briefing e pista', layoutOuMidia: 'patrocinadores', duracaoSeg: 15, resolucao: '2048x512', cor: '#EA580C' },
-      { id: 'lib-trans-bandeira', nome: 'Vinheta: Bandeira Quadriculada', categoria: 'Starts/Transições', subtitulo: 'Abertura / Encerramento de prova', layoutOuMidia: 'podio-final', duracaoSeg: 10, resolucao: '2048x512', cor: '#111827' },
+      { id: 'lib-top3', nome: 'Top 3 AO VIVO (Horizontal)', categoria: 'Layouts', subtitulo: 'P1-P3 destaque + ms + rodapé', layoutOuMidia: 'top3-live', duracaoSeg: 0, resolucao: '2048x512', cor: '#0B7A53', protegido: true }, // design-lint-ignore: cor padrão do painel de LED (dado que o operador troca na tela, não estilo)
+      { id: 'lib-lista', nome: 'Lista Completa LapTime', categoria: 'Layouts', subtitulo: 'Cronômetro + Pos + Kart + Piloto + ms', layoutOuMidia: 'lista-laptime', duracaoSeg: 0, resolucao: '2048x512', cor: '#0063B1', protegido: true }, // design-lint-ignore: cor padrão do painel de LED (dado que o operador troca na tela, não estilo)
+      { id: 'lib-14', nome: 'Placar 14 Karts (Kart + ms)', categoria: 'Layouts', subtitulo: 'Grade 7x2 grande em milésimos', layoutOuMidia: 'grid-14-ms', duracaoSeg: 0, resolucao: '2048x512', cor: '#00A859', protegido: true }, // design-lint-ignore: cor padrão do painel de LED (dado que o operador troca na tela, não estilo)
+      { id: 'lib-20', nome: 'Placar 20 Karts (Pos + Kart)', categoria: 'Layouts', subtitulo: 'Grade 10x2 clássico alta leitura', layoutOuMidia: 'grid-20-pos', duracaoSeg: 0, resolucao: '2048x512', cor: '#1D4ED8', protegido: true }, // design-lint-ignore: cor padrão do painel de LED (dado que o operador troca na tela, não estilo)
+      { id: 'lib-podio', nome: 'Resultado Final / Pódio', categoria: 'Layouts', subtitulo: 'Top 5 + Campeão em destaque', layoutOuMidia: 'podio-final', duracaoSeg: 0, resolucao: '2048x512', cor: '#D97706', protegido: true }, // design-lint-ignore: cor padrão do painel de LED (dado que o operador troca na tela, não estilo)
+      { id: 'lib-pat', nome: 'Patrocinadores & Informativo', categoria: 'Patrocinadores', subtitulo: 'Marcas parceiras e chamadas', layoutOuMidia: 'patrocinadores', duracaoSeg: 20, resolucao: '2048x512', cor: '#7C3AED', protegido: true }, // design-lint-ignore: cor padrão do painel de LED (dado que o operador troca na tela, não estilo)
+      { id: 'lib-vp-crono', nome: 'ViPlex: CRONOMETRAGEM', categoria: 'Programas ViPlex', subtitulo: 'Programa HTML tempo real TB50', layoutOuMidia: 'viplex:CRONOMETRAGEM', duracaoSeg: 0, resolucao: '2048x512', cor: '#0B7A53', protegido: true }, // design-lint-ignore: cor padrão do painel de LED (dado que o operador troca na tela, não estilo)
+      { id: 'lib-vp-video', nome: 'ViPlex: VIDEOS / Institucional', categoria: 'Programas ViPlex', subtitulo: 'Vídeos locais armazenados na TB50', layoutOuMidia: 'viplex:VIDEOS', duracaoSeg: 0, resolucao: '2048x512', cor: '#334155', protegido: true }, // design-lint-ignore: cor padrão do painel de LED (dado que o operador troca na tela, não estilo)
+      { id: 'lib-info-largada', nome: 'Chamada: Próxima Bateria', categoria: 'Informativos', subtitulo: 'Aviso de briefing e pista', layoutOuMidia: 'patrocinadores', duracaoSeg: 15, resolucao: '2048x512', cor: '#EA580C' }, // design-lint-ignore: cor padrão do painel de LED (dado que o operador troca na tela, não estilo)
+      { id: 'lib-trans-bandeira', nome: 'Vinheta: Bandeira Quadriculada', categoria: 'Starts/Transições', subtitulo: 'Abertura / Encerramento de prova', layoutOuMidia: 'podio-final', duracaoSeg: 10, resolucao: '2048x512', cor: '#111827' }, // design-lint-ignore: cor padrão do painel de LED (dado que o operador troca na tela, não estilo)
     ],
     agendamentos: [
       { id: 'ag-1', nome: 'Modo Pista Manhã (Placar 14 Karts ms)', horario: '09:00', diasSemana: 'Sáb-Dom', acao: 'layout', destino: 'grid-14-ms', ativo: false },
