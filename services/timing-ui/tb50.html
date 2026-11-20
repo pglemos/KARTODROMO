@@ -164,61 +164,6 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 @-webkit-keyframes m-luz5{0%{background:#2a0505}75%{background:#ff1a1a}88%{background:#2a0505}}
 @keyframes m-luz5{0%{background:#2a0505}75%{background:#ff1a1a}88%{background:#2a0505}}
 
-/* 1d. TORRE ESTILO TRANSMISSÃO F1 (modo "Placar 14 karts"): sessão à esquerda + 2 colunas x 7 */
-#torre-view{background:#000}
-#torre-sessao{position:absolute;left:8px;top:8px;width:404px;height:496px;border-radius:10px;overflow:hidden;background:#0d0d14}
-#torre-sessao .ts-topo{position:absolute;left:0;top:0;width:404px;height:58px;background:#e10a17;color:#fff;font:700 24px/58px 'KIB Cond',Arial,sans-serif;letter-spacing:4px;text-align:center;white-space:nowrap}
-#torre-sessao .ts-topo:after{content:'';position:absolute;right:-30px;top:0;width:60px;height:58px;background:#0d0d14;-webkit-transform:skewX(-24deg);transform:skewX(-24deg)}
-#torre-sessao .ts-evento{position:absolute;left:24px;right:24px;top:78px;font:700 40px/1.05 'KIB Cond',Arial,sans-serif;color:#fff;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#torre-sessao .ts-tracado{position:absolute;left:24px;right:24px;top:124px;font:700 22px/1 'KIB Cond',Arial,sans-serif;letter-spacing:1.5px;color:#8c8c9c;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#torre-sessao .ts-rot{position:absolute;left:24px;top:172px;font:700 22px/1 'KIB Cond',Arial,sans-serif;letter-spacing:4px;color:#8c8c9c}
-#torre-sessao .ts-relogio{position:absolute;left:18px;right:18px;top:196px;font:700 112px/1 'KIB Cond',Arial,sans-serif;font-variant-numeric:tabular-nums;color:#fff;white-space:nowrap}
-#torre-sessao .ts-volta{position:absolute;left:24px;right:24px;top:322px;height:56px;border-top:2px solid #24242f;padding-top:12px;font:700 44px/1 'KIB Cond',Arial,sans-serif;color:#fff;white-space:nowrap}
-#torre-sessao .ts-volta b{font-weight:700;color:#8c8c9c;font-size:26px;letter-spacing:4px;margin-right:14px;vertical-align:6px}
-#torre-sessao .ts-bandeira{position:absolute;left:0;right:0;bottom:0;height:86px;font:700 34px/86px 'KIB Cond',Arial,sans-serif;letter-spacing:3px;text-align:center;background:#00d26a;color:#04170c}
-#torre-sessao .ts-bandeira.amarela{background:#ffd400;color:#161200;-webkit-animation:fx-pisca 1s steps(1) infinite;animation:fx-pisca 1s steps(1) infinite}
-#torre-sessao .ts-bandeira.vermelha{background:#ff2020;color:#fff;-webkit-animation:fx-pisca .8s steps(1) infinite;animation:fx-pisca .8s steps(1) infinite}
-#torre-sessao .ts-bandeira.final{color:#fff;background-color:#000;background-image:linear-gradient(45deg,#3a3a3a 25%,transparent 25%,transparent 75%,#3a3a3a 75%),linear-gradient(45deg,#3a3a3a 25%,transparent 25%,transparent 75%,#3a3a3a 75%);background-size:40px 40px;background-position:0 0,20px 20px;text-shadow:0 0 8px #000}
-#torre-sessao .ts-bandeira.encerrada{background:#2a2a35;color:#fff}
-#torre-linhas{position:absolute;left:424px;top:8px;width:1616px;height:496px}
-.tl{position:absolute;left:0;top:0;width:804px;height:71px}
-.tl .li{position:absolute;left:0;top:0;width:800px;height:66px;border-radius:6px;overflow:hidden;background:#0d0d14;font-family:'KIB Cond',Arial,sans-serif;font-weight:700;color:#fff;white-space:nowrap}
-.tl.vazia .li{background:#08080c}
-.tl .l-pos{position:absolute;left:0;top:0;width:72px;height:66px;background:#1d1d28;font-size:42px;line-height:66px;text-align:center;font-variant-numeric:tabular-nums}
-.tl.vazia .l-pos{background:#0e0e14;color:#33333f}
-.tl.lider .l-pos{background:#fff;color:#000}
-.tl .l-cor{position:absolute;left:72px;top:0;width:10px;height:66px}
-.tl .l-kart{position:absolute;left:94px;top:0;width:112px;font:900 50px/66px 'KIB Num',Arial,sans-serif;letter-spacing:-1px}
-.tl .l-nome{position:absolute;left:212px;top:0;width:200px;font-size:36px;line-height:66px;color:#d8d8e2;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis}
-.tl .l-seta{position:absolute;left:412px;top:13px;height:40px;padding:0 8px;border-radius:5px;font-size:28px;line-height:40px;display:none}
-.tl .l-seta:before{content:'';display:inline-block;width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;margin-right:6px;vertical-align:3px}
-.tl .li.sobe .l-seta{display:block;background:#00d26a;color:#04170c}
-.tl .li.sobe .l-seta:before{border-bottom:14px solid #04170c}
-.tl .li.desce .l-seta{display:block;background:#ff2d2d;color:#fff}
-.tl .li.desce .l-seta:before{border-top:14px solid #fff}
-.tl .l-gap{position:absolute;left:470px;top:0;width:150px;font-size:34px;line-height:66px;text-align:right;color:#fff;font-variant-numeric:tabular-nums}
-.tl.lider .l-gap{color:#8c8c9c;font-size:26px;letter-spacing:3px}
-.tl .l-tempo{position:absolute;left:630px;top:0;width:156px;font-size:38px;line-height:66px;text-align:right;font-variant-numeric:tabular-nums}
-.tl .l-fl{position:absolute;right:0;top:0;width:8px;height:66px;background:#b138ff;display:none}
-.tl.recorde .l-fl{display:block}
-.tl .sw{position:absolute;top:0;bottom:0;left:-40%;width:40%;opacity:0;pointer-events:none;background:linear-gradient(100deg,rgba(255,255,255,0) 0%,rgba(0,210,106,.4) 50%,rgba(255,255,255,0) 100%);-webkit-transform:skewX(-14deg);transform:skewX(-14deg)}
-.tl .li.fx-pb .sw{-webkit-animation:fx-sweep-l 1.1s ease-out both;animation:fx-sweep-l 1.1s ease-out both}
-.tl .li.fx-rec .sw{background:linear-gradient(100deg,rgba(255,255,255,0) 0%,rgba(177,56,255,.55) 50%,rgba(255,255,255,0) 100%);-webkit-animation:fx-sweep-l 1.1s ease-out 2 both;animation:fx-sweep-l 1.1s ease-out 2 both}
-.tl .li:after{content:'';position:absolute;left:0;top:0;right:0;bottom:0;border:3px solid #b138ff;border-radius:6px;opacity:0;pointer-events:none}
-.tl .li.fx-rec:after{-webkit-animation:fx-moldura .7s ease-in-out 5 both;animation:fx-moldura .7s ease-in-out 5 both}
-.tl .li.fx-volta .l-tempo{-webkit-animation:fx-pop .7s cubic-bezier(.2,.9,.3,1.3) both;animation:fx-pop .7s cubic-bezier(.2,.9,.3,1.3) both}
-.tl .li.fx-entra{-webkit-animation:fx-entra-l .6s cubic-bezier(.2,.9,.3,1) both;animation:fx-entra-l .6s cubic-bezier(.2,.9,.3,1) both}
-.tl.lider .li:before{content:'';position:absolute;top:0;bottom:0;left:-30%;width:30%;pointer-events:none;background:linear-gradient(100deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.12) 50%,rgba(255,255,255,0) 100%);-webkit-animation:fx-lider-l 8s ease-in-out 2s infinite;animation:fx-lider-l 8s ease-in-out 2s infinite}
-.tl.linha{will-change:transform;-webkit-transition:-webkit-transform .9s cubic-bezier(.65,0,.2,1),opacity .4s;transition:transform .9s cubic-bezier(.65,0,.2,1),opacity .4s}
-.tl.linha.sem-trans{-webkit-transition:none;transition:none}
-.tl.linha.sai{opacity:0}
-@-webkit-keyframes fx-sweep-l{0%{opacity:1;-webkit-transform:translateX(0) skewX(-14deg)}100%{opacity:1;-webkit-transform:translateX(370%) skewX(-14deg)}}
-@keyframes fx-sweep-l{0%{opacity:1;transform:translateX(0) skewX(-14deg)}100%{opacity:1;transform:translateX(370%) skewX(-14deg)}}
-@-webkit-keyframes fx-entra-l{0%{-webkit-transform:translateX(-60px);opacity:0}100%{-webkit-transform:none;opacity:1}}
-@keyframes fx-entra-l{0%{transform:translateX(-60px);opacity:0}100%{transform:none;opacity:1}}
-@-webkit-keyframes fx-lider-l{0%{-webkit-transform:translateX(0)}30%,100%{-webkit-transform:translateX(450%)}}
-@keyframes fx-lider-l{0%{transform:translateX(0)}30%,100%{transform:translateX(450%)}}
-
 /* 2. LISTA LAPTIME (relógio à esquerda + classificação à direita) */
 #lista-view{background:#000}
 #lista-esq{position:absolute;left:8px;top:8px;width:404px;height:496px;background:#0b100d;border-radius:14px;overflow:hidden;text-align:center}
@@ -854,19 +799,6 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
   </div>
 
   <!-- 2. Lista Completa LapTime -->
-  <div id="torre-view" class="camada">
-    <div id="torre-sessao">
-      <div class="ts-topo">KARTÓDROMO DE BETIM</div>
-      <div class="ts-evento" id="ts-evento">CRONOMETRAGEM</div>
-      <div class="ts-tracado" id="ts-tracado"></div>
-      <div class="ts-rot" id="ts-rot">TEMPO</div>
-      <div class="ts-relogio" id="ts-relogio">00:00</div>
-      <div class="ts-volta" id="ts-volta"><b>VOLTA</b><span>0</span></div>
-      <div class="ts-bandeira" id="ts-bandeira">BANDEIRA VERDE</div>
-    </div>
-    <div id="torre-linhas"></div>
-  </div>
-
   <div id="lista-view" class="camada">
     <div id="lista-esq">
       <div id="lista-logo"><img src="/brand/kartodromo-betim-logo.png" alt="KIB" onerror="this.src='/kib-logo.png'"><span>KARTÓDROMO DE BETIM</span></div>
@@ -962,8 +894,6 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
   var placarView = document.getElementById('placar-view');
   var gridBox = document.getElementById('grid-box');
   var listaView = document.getElementById('lista-view');
-  var torreView = document.getElementById('torre-view');
-  var torreBox = document.getElementById('torre-linhas');
   var top3View = document.getElementById('top3-view');
   var top3Grid = document.getElementById('top3-grid');
   var liveVideo = document.getElementById('live-podium-video');
@@ -1346,7 +1276,6 @@ function shortPodiumName(nome, dupFirst) {
 
   function esconderTodas(exceto) {
     if (exceto !== 'placar') placarView.style.display = 'none';
-    if (exceto !== 'torre') torreView.style.display = 'none';
     if (exceto !== 'lista') listaView.style.display = 'none';
     if (exceto !== 'top3') { top3View.style.display = 'none'; pararVideoTop3(); }
     if (exceto !== 'podio') podioView.style.display = 'none';
@@ -1437,179 +1366,6 @@ function shortPodiumName(nome, dupFirst) {
         var ce = cartoes[ke], sl = ce._slot;
         ce._in.style.webkitAnimationDelay = ce._in.style.animationDelay = (Math.floor(sl / cols) * 0.12 + (sl % cols) * 0.06) + 's';
         animar(ce._in, 'fx-entra', 1800);
-      }
-    }
-  }
-
-  // ---- Torre estilo transmissão F1 (modo "Placar 14 karts") ----
-  var CORES_EQUIPE = ['#ff8a00', '#00d2be', '#2f6bff', '#ff2a2a', '#00a86b', '#ffd400', '#f05fb4', '#9fd3ff', '#b8ff3a', '#c07bff', '#ffffff', '#ff6a3d', '#3ddcff', '#e3c38a'];
-  function corEquipe(kart) {
-    var n = parseInt(String(kart).replace(/\D/g, ''), 10);
-    if (!(n >= 0)) n = String(kart).length;
-    return CORES_EQUIPE[n % CORES_EQUIPE.length];
-  }
-  function sobrenome(nome) {
-    if (!tempoValido(nome) || /^kart\s*\d+$/i.test(String(nome).replace(/^\s+|\s+$/g, ''))) return '';
-    var p = nomeCurto(nome).split(' ');
-    return p[p.length - 1];
-  }
-  function mmss(ms) {
-    if (!(ms > 0)) ms = 0;
-    var t = Math.floor(ms / 1000), hh = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
-    return (hh ? hh + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (s < 10 ? '0' : '') + s;
-  }
-
-  var torreMontada = false;
-  var torreFundo = [];
-  var linhas = {};
-  function slotTorre(c) { return { x: Math.floor(c / 7) * 812, y: (c % 7) * 71 }; }
-  function montarTorre() {
-    if (torreMontada) return;
-    torreMontada = true;
-    torreBox.innerHTML = '';
-    for (var c = 0; c < 14; c++) {
-      var d = document.createElement('div');
-      var xy = slotTorre(c);
-      d.className = 'tl vazia';
-      d.style.webkitTransform = d.style.transform = 'translate3d(' + xy.x + 'px,' + xy.y + 'px,0)';
-      d.innerHTML = '<div class="li"><span class="l-pos">' + (c + 1) + '</span></div>';
-      d._p = d.firstChild.firstChild;
-      torreBox.appendChild(d);
-      torreFundo.push(d);
-    }
-  }
-  function criarLinha(kart, slot) {
-    var d = document.createElement('div');
-    d.className = 'tl linha';
-    d.innerHTML = '<div class="li"><i class="sw"></i><span class="l-pos"></span><i class="l-cor"></i><span class="l-kart"></span><span class="l-nome"></span><b class="l-seta"></b><span class="l-gap"></span><span class="l-tempo"></span><i class="l-fl"></i></div>';
-    var li = d.firstChild;
-    d._in = li; d._pos = li.childNodes[1]; d._cor = li.childNodes[2]; d._k = li.childNodes[3]; d._n = li.childNodes[4];
-    d._seta = li.childNodes[5]; d._gap = li.childNodes[6]; d._t = li.childNodes[7];
-    d._kart = kart; d._slot = -1;
-    d._cor.style.background = corEquipe(kart);
-    moverLinha(d, slot, false);
-    torreBox.appendChild(d);
-    linhas[kart] = d;
-    return d;
-  }
-  function moverLinha(d, slot, animado) {
-    if (d._slot === slot) return;
-    var xy = slotTorre(slot);
-    if (!animado) d.classList.add('sem-trans');
-    d.style.zIndex = !animado ? 2 : (slot < d._slot ? 5 : 3);
-    d.style.webkitTransform = d.style.transform = 'translate3d(' + xy.x + 'px,' + xy.y + 'px,0)';
-    if (!animado) { void d.offsetWidth; d.classList.remove('sem-trans'); }
-    d._slot = slot;
-  }
-  function tirarLinha(kart) {
-    var d = linhas[kart];
-    delete linhas[kart];
-    if (!d) return;
-    d.classList.add('sai');
-    setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 450);
-  }
-  var setas = {};
-  function painelSessao(s, pilotos, flag) {
-    var race = s.race || {};
-    texto(document.getElementById('ts-evento'), (cfg && cfg.tituloCustom) ? cfg.tituloCustom : (s.eventName || 'CRONOMETRAGEM'));
-    texto(document.getElementById('ts-tracado'), (cfg && cfg.subtituloCustom) ? cfg.subtituloCustom : (s.trackName || ''));
-    var agora = new Date().getTime();
-    var dec = race.elapsedMs > 0 ? race.elapsedMs : 0;
-    if (s.status === 'live' && race.startedAt) {
-      var t0 = new Date(race.startedAt).getTime();
-      if (t0 > 0 && agora - t0 > dec) dec = agora - t0;
-    }
-    var rot = 'TEMPO', rel = mmss(dec);
-    if (race.durationMs > 0 && s.status === 'live') { rot = 'RESTANTE'; rel = mmss(Math.max(0, race.durationMs - dec)); }
-    texto(document.getElementById('ts-rot'), rot);
-    texto(document.getElementById('ts-relogio'), rel);
-    var voltas = 0;
-    for (var i = 0; i < pilotos.length; i++) if (pilotos[i].position === 1) voltas = pilotos[i].laps || 0;
-    texto(document.getElementById('ts-volta').lastChild, String(voltas));
-    var b = document.getElementById('ts-bandeira'), cls = 'ts-bandeira', txt = 'BANDEIRA VERDE';
-    if (s.status === 'finished') { cls += ' encerrada'; txt = 'ENCERRADA'; }
-    else if (flag === 'yellow') { cls += ' amarela'; txt = 'BANDEIRA AMARELA'; }
-    else if (flag === 'red') { cls += ' vermelha'; txt = 'BANDEIRA VERMELHA'; }
-    else if (flag === 'checkered' || flag === 'quadriculada' || (race.durationMs > 0 && race.remainingMs <= 0)) { cls += ' final'; txt = 'BANDEIRA FINAL'; }
-    if (b.className !== cls) b.className = cls;
-    texto(b, txt);
-  }
-
-  function mostrarTorre(pilotos) {
-    esconderTodas('torre');
-    torreView.style.display = 'block';
-    podioChave = '';
-    montarTorre();
-    var sAtual = ultimo || {};
-    var corrida = sAtual.sessionType === 'race';
-    var flag = sAtual.status === 'finished' ? 'chk' : ((sAtual.race && sAtual.race.flag) || '');
-    var porPos = {};
-    for (var i = 0; i < pilotos.length; i++) porPos[pilotos[i].position] = pilotos[i];
-    var offReq = calcularOffsetEfetivo(pilotos, 14);
-    var temNaPagina = false;
-    for (var j = 0; j < pilotos.length; j++) if (pilotos[j].position > offReq && pilotos[j].position <= offReq + 14) temNaPagina = true;
-    var base = temNaPagina ? offReq : 0;
-    var corPri = (cfg && cfg.corPrimaria) ? cfg.corPrimaria : '#00d26a';
-    var showMs = !cfg || cfg.mostrarMilesimos !== false;
-    var recorde = melhorDaSessao(pilotos);
-    var pole = porPos[1] ? melhorVoltaMs(porPos[1]) : 0;
-    var eventos = detectarEventos(pilotos, (sAtual.race && sAtual.race.id) || sAtual.eventName || '', recorde, corrida);
-    var entrada = eventos === 'entrada';
-    if (entrada) eventos = {};
-    momentosDaSessao(sAtual, pilotos, eventos, entrada, flag);
-    painelSessao(sAtual, pilotos, flag);
-    var agora = new Date().getTime();
-    var usados = {};
-    for (var c = 0; c < 14; c++) {
-      var pos = base + c + 1;
-      var p = porPos[pos];
-      texto(torreFundo[c]._p, String(pos));
-      if (!p) continue;
-      var k = String(p.kart);
-      var el = linhas[k];
-      if (!el) { el = criarLinha(k, c); if (!entrada) animar(el._in, 'fx-entra', 1200); }
-      else moverLinha(el, c, true);
-      usados[k] = true;
-      var raw = corrida ? (tempoValido(p.last) || tempoValido(p.time)) : (tempoValido(p.time) || tempoValido(p.last));
-      var bestMs = melhorVoltaMs(p);
-      var cls = 'tl linha' + (pos === 1 ? ' lider' : '') + (recorde && bestMs === recorde ? ' recorde' : '');
-      if (el._cls !== cls) { el.className = cls; el._cls = cls; }
-      texto(el._pos, String(pos));
-      texto(el._k, k);
-      texto(el._n, sobrenome(p.name));
-      var gap;
-      if (pos === 1) gap = corrida ? 'LÍDER' : 'POLE';
-      else if (corrida) gap = tempoValido(p.gap) ? String(p.gap).replace(' voltas', 'V').replace(' volta', 'V') : '';
-      else gap = (bestMs && pole) ? '+' + ((bestMs - pole) / 1000).toFixed(3) : '';
-      texto(el._gap, gap);
-      var tTxt = '';
-      if (raw) { tTxt = mmssdc(raw) || raw; if (!showMs) tTxt = tTxt.replace(/\.\d{3}$/, ''); }
-      texto(el._t, tTxt);
-      var v = msDe(raw);
-      var cor = !v ? '#fff' : (recorde && v === recorde) ? '#b138ff' : (v === bestMs ? corPri : '#ffffff');
-      if (el._t.style.color !== cor) el._t.style.color = cor;
-      var ev = eventos[k];
-      if (ev) {
-        if (ev.volta) animar(el._in, 'fx-volta', 900);
-        if (ev.rec) animar(el._in, 'fx-rec', 4000);
-        else if (ev.pb) animar(el._in, 'fx-pb', 1400);
-        if (ev.sobe) setas[k] = { tipo: 'sobe', n: ev.sobe, ate: agora + 4500 };
-        else if (ev.desce) setas[k] = { tipo: 'desce', n: ev.desce === true ? 1 : ev.desce, ate: agora + 4500 };
-      }
-      var st = setas[k];
-      var sCls = (st && st.ate > agora) ? st.tipo : '';
-      if (el._setaCls !== sCls) {
-        el._setaCls = sCls;
-        el._in.classList.remove('sobe', 'desce');
-        if (sCls) { el._in.classList.add(sCls); texto(el._seta, String(st.n)); }
-      }
-    }
-    for (var kk in linhas) if (linhas.hasOwnProperty(kk) && !usados[kk]) tirarLinha(kk);
-    if (entrada) {
-      for (var ke in linhas) if (linhas.hasOwnProperty(ke)) {
-        var le = linhas[ke];
-        le._in.style.webkitAnimationDelay = le._in.style.animationDelay = (Math.floor(le._slot / 7) * 0.25 + (le._slot % 7) * 0.07) + 's';
-        animar(le._in, 'fx-entra', 1800);
       }
     }
   }
@@ -1714,7 +1470,7 @@ function shortPodiumName(nome, dupFirst) {
           else if (v && v === melhorVoltaMs(p)) e.pb = true;
         }
         if (p.position < ant.pos) { e.sobe = ant.pos - p.position; tem = true; }
-        else if (p.position > ant.pos) { e.desce = p.position - ant.pos; tem = true; }
+        else if (p.position > ant.pos) { e.desce = true; tem = true; }
       }
       fxEstado[k] = { pos: p.position, laps: p.laps || 0, last: last };
       if (tem) ev[k] = e;
@@ -2151,7 +1907,7 @@ function shortPodiumName(nome, dupFirst) {
     else if (layoutAlvo === 'top3-live') mostrarTop3Live(s);
     else if (layoutAlvo === 'lista-laptime') mostrarListaLapTime(s);
     else if (layoutAlvo === 'patrocinadores' || layoutAlvo === 'patrocinadores-rotativo' || layoutAlvo === 'chamada-evento') mostrarPatrocinadores(itemAtivo);
-    else if (layoutAlvo === 'grid-14-ms') mostrarTorre(pilotos);
+    else if (layoutAlvo === 'grid-14-ms') mostrarGrid(pilotos, true);
     else mostrarGrid(pilotos, false);
   }
 
