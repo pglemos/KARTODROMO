@@ -1794,7 +1794,7 @@ export async function grupoDaReservaOnline(o: {
       const gid = Number(g.id);
       const inserir = (ordem: number, responsavel: boolean, clienteId: number | null, inscricaoId: number | null) => run(
         `INSERT INTO kart.reserva_grupo_piloto (grupo_id, ordem, nome, telefone, menor, responsavel, cliente_id, inscricao_id, token)
-         VALUES (@g, @o, NULL, NULL, 0, @r, @c, @i, @k)`,
+         VALUES (@g, @o, NULL, NULL, false, @r, @c, @i, @k)`,
         { g: gid, o: ordem, r: responsavel ? 1 : 0, c: clienteId, i: inscricaoId, k: tokenNovo() },
       );
       // quem organiza: vaga 1 se pilota; senão sem vaga (InscricaoId NULL), só o link e o painel

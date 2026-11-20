@@ -57,6 +57,9 @@ export type Pedido = {
 const json = (status: number, body: unknown, cache = 'no-store') =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': cache } });
 
+/** "Cada um paga o seu" já confirmado cujo grupo (link dos amigos) ainda não foi criado pelo SRVKART. */
+export const faltaGrupo = (p: Pick<Pedido, 'status' | 'modo' | 'grupo'>) => p.status === 'confirmado' && p.modo === 'individual' && !p.grupo;
+
 const chavePedido = (id: string) => `reservas/pedidos/${id}.json`;
 const chaveFila = (id: string) => `reservas/fila/${id}`;
 const idValido = (id: string) => /^[a-f0-9-]{36}$/.test(id);
@@ -329,7 +332,7 @@ export async function syncPedidos(env: EnvReservas, ctx?: Pick<ExecutionContext,
   const itens: Pedido[] = [];
   for (const o of fila.objects) {
     const p = await lerPedido(env, o.key.slice('reservas/fila/'.length));
-    if (p && (p.status === 'novo' || p.status === 'pago')) itens.push(p);
+    if (p && (p.status === 'novo' || p.status === 'pago' || faltaGrupo(p))) itens.push(p);
     else await env.PRE.delete(o.key);
   }
   return json(200, itens);
@@ -364,7 +367,9 @@ export async function syncResultado(req: Request, env: EnvReservas, ctx: Executi
       p.status = 'confirmado';
       const link = linkDoKartodromo(r.grupo?.link), painel = linkDoKartodromo(r.grupo?.painel);
       if (p.modo === 'individual' && link && painel) p.grupo = { codigo: String(r.grupo?.codigo ?? '').slice(0, 12), link, painel };
-      await gravarPedido(env, p, false);
+      // "cada um paga o seu" confirmado SEM grupo (o SRVKART não conseguiu criar): fica na fila para o SRVKART tentar de
+      // novo. Sem isto ninguém tentava — reserva BPQXHS, 20/11/2026: pago, sem link dos amigos e sem e-mail.
+      await gravarPedido(env, p, faltaGrupo(p));
     } else if (r.acao === 'expirado' && (p.status === 'aguardando_pagamento' || p.status === 'erro_pagamento')) {
       p.status = 'expirado';
       await gravarPedido(env, p, false);

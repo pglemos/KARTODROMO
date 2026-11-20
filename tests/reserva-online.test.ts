@@ -316,3 +316,26 @@ describe('busca de pedidos não espera a conferência da Asaas (timeouts de 08�
     f.mockRestore();
   });
 });
+
+describe('"cada um paga o seu" confirmado sem grupo volta à fila (reserva BPQXHS, 20/11/2026)', () => {
+  it('⭐ fica na fila até o SRVKART devolver os links; com os links, sai da fila e guarda o grupo', async () => {
+    const { m, env } = ambiente();
+    const id = '0f0f0f0f-1111-4222-8333-444455556666';
+    const pedido = { id, codigo: 'GRP001', status: 'pago', modo: 'individual', criadoEm: new Date().toISOString(), bateriaId: 616, quantidade: 3, forma: 'pix', pilotos: [], cliente: { nome: 'Teste', email: 'teste@example.com', chave: '52998224725' } };
+    m.set(`reservas/pedidos/${id}.json`, JSON.stringify(pedido));
+    m.set(`reservas/fila/${id}`, 'pago');
+
+    // o SRVKART confirma, mas o grupo não foi criado (sem links)
+    await syncResultado(new Request('https://x', { method: 'POST', body: JSON.stringify([{ id, acao: 'confirmado', codigo: 'GRP001' }]) }), env, ctx().c);
+    const deNovo = (await (await syncPedidos(env)).json()) as Pedido[];
+    expect(deNovo.map((p) => p.id)).toEqual([id]);
+    expect(deNovo[0]).toMatchObject({ status: 'confirmado', modo: 'individual' });
+
+    // na volta, o SRVKART recria o grupo e devolve os links
+    const grupo = { codigo: 'GABC12', link: 'https://cadastro.kartodromodebetim.com.br/?r=tok', painel: 'https://cadastro.kartodromodebetim.com.br/painel?g=GABC12&k=x' };
+    await syncResultado(new Request('https://x', { method: 'POST', body: JSON.stringify([{ id, acao: 'confirmado', codigo: 'GRP001', grupo }]) }), env, ctx().c);
+    expect(((await (await syncPedidos(env)).json()) as Pedido[]).length).toBe(0);
+    const salvo = JSON.parse(String(m.get(`reservas/pedidos/${id}.json`))) as Pedido;
+    expect(salvo.grupo).toMatchObject({ codigo: 'GABC12', link: grupo.link });
+  });
+});

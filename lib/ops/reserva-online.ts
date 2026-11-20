@@ -113,7 +113,8 @@ export async function publicarAgenda() {
 export type PedidoSite = {
   id: string;
   codigo: string;
-  status: 'novo' | 'pago';
+  /** 'confirmado' só no "cada um paga o seu" que voltou à fila porque o grupo não foi criado. */
+  status: 'novo' | 'pago' | 'confirmado';
   criadoEm: string;
   bateriaId: number;
   quantidade: number;
@@ -609,7 +610,8 @@ export async function sincronizarReservasOnline(log: Log) {
   const resultados: Resultado[] = [];
   for (const p of pedidos) {
     try {
-      resultados.push(p.status === 'pago' ? await confirmarPagamento(p, log) : await reservarPedido(p, log));
+      // 'confirmado' só volta da fila no "cada um paga o seu" sem grupo: confirmarPagamento recria o grupo e devolve os links
+      resultados.push(p.status === 'pago' || p.status === 'confirmado' ? await confirmarPagamento(p, log) : await reservarPedido(p, log));
     } catch (e) {
       log(`reserva online ${p.codigo}: erro ${(e as Error).message}`);
     }
