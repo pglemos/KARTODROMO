@@ -208,6 +208,34 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 @-webkit-keyframes largada-fim{0%{background:#00ff3c}50%{background:#7dffa0}}
 @keyframes largada-fim{0%{background:#00ff3c}50%{background:#7dffa0}}
 
+/* 1f. PISTA LIBERADA (tomada de tempo): bandeira verde dada -> painel verde até o 1º kart cruzar a linha do decoder */
+#pista{position:absolute;left:0;top:0;width:2048px;height:512px;z-index:79;display:none;overflow:hidden;background:#00ff3c;color:#000;text-align:center}
+#pista.on{display:block;-webkit-animation:pista-pulsa 1.4s ease-in-out infinite;animation:pista-pulsa 1.4s ease-in-out infinite}
+#pista.sai{display:block;-webkit-animation:pista-sai .45s ease-in both;animation:pista-sai .45s ease-in both}
+#pista .ps-faixas{position:absolute;left:-300px;top:0;width:2700px;height:512px;background:repeating-linear-gradient(-60deg,rgba(0,0,0,.10) 0,rgba(0,0,0,.10) 46px,rgba(0,0,0,0) 46px,rgba(0,0,0,0) 138px);-webkit-animation:largada-corre .9s linear infinite;animation:largada-corre .9s linear infinite}
+#pista .ps-luz{position:absolute;top:-40px;left:-700px;width:520px;height:600px;background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.55),rgba(255,255,255,0));-webkit-transform:skewX(-18deg);transform:skewX(-18deg);-webkit-animation:pista-luz 2.6s ease-in-out .6s infinite;animation:pista-luz 2.6s ease-in-out .6s infinite}
+#pista .ps-txt{position:absolute;left:0;right:0;top:8px;-webkit-animation:pista-entra .7s cubic-bezier(.2,.9,.3,1.25) both;animation:pista-entra .7s cubic-bezier(.2,.9,.3,1.25) both}
+#pista .ps-txt span{display:block;font-family:'KIB Num',Arial,sans-serif;font-weight:900;line-height:.92;white-space:nowrap;-webkit-animation:pista-respira 1.4s ease-in-out .7s infinite;animation:pista-respira 1.4s ease-in-out .7s infinite}
+#pista .ps-txt .l1{font-size:220px;letter-spacing:10px}
+#pista .ps-txt .l2{font-size:262px;letter-spacing:2px}
+#pista .ps-seta{position:absolute;top:92px;font:900 330px/1 'KIB Num',Arial,sans-serif;letter-spacing:-46px}
+#pista .ps-seta.e{left:24px}#pista .ps-seta.d{right:70px}
+#pista .ps-seta i{font-style:normal;display:inline-block;opacity:.2;-webkit-animation:pista-seta 1s steps(1) infinite;animation:pista-seta 1s steps(1) infinite}
+#pista .ps-seta i:nth-child(2){-webkit-animation-delay:.25s;animation-delay:.25s}
+#pista .ps-seta i:nth-child(3){-webkit-animation-delay:.5s;animation-delay:.5s}
+@-webkit-keyframes pista-pulsa{0%,100%{background:#00ff3c}50%{background:#00b02c}}
+@keyframes pista-pulsa{0%,100%{background:#00ff3c}50%{background:#00b02c}}
+@-webkit-keyframes pista-sai{0%{opacity:1;-webkit-transform:none}100%{opacity:0;-webkit-transform:scale(1.08)}}
+@keyframes pista-sai{0%{opacity:1;transform:none}100%{opacity:0;transform:scale(1.08)}}
+@-webkit-keyframes pista-luz{0%{-webkit-transform:translateX(0) skewX(-18deg)}60%,100%{-webkit-transform:translateX(3400px) skewX(-18deg)}}
+@keyframes pista-luz{0%{transform:translateX(0) skewX(-18deg)}60%,100%{transform:translateX(3400px) skewX(-18deg)}}
+@-webkit-keyframes pista-entra{0%{opacity:0;-webkit-transform:scale(1.7)}100%{opacity:1;-webkit-transform:none}}
+@keyframes pista-entra{0%{opacity:0;transform:scale(1.7)}100%{opacity:1;transform:none}}
+@-webkit-keyframes pista-respira{0%,100%{-webkit-transform:none}50%{-webkit-transform:scale(1.035)}}
+@keyframes pista-respira{0%,100%{transform:none}50%{transform:scale(1.035)}}
+@-webkit-keyframes pista-seta{0%{opacity:1}40%{opacity:.2}}
+@keyframes pista-seta{0%{opacity:1}40%{opacity:.2}}
+
 /* 2. LISTA LAPTIME (relógio à esquerda + classificação à direita) */
 #lista-view{background:#000}
 #lista-esq{position:absolute;left:8px;top:8px;width:404px;height:496px;background:#0b100d;border-radius:14px;overflow:hidden;text-align:center}
@@ -609,6 +637,7 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 </head>
 <body>
 <div id="tela">
+  <div id="pista"><div class="ps-faixas"></div><div class="ps-luz"></div><div class="ps-seta e"><i>»</i><i>»</i><i>»</i></div><div class="ps-txt"><span class="l1">PISTA</span><span class="l2">LIBERADA</span></div><div class="ps-seta d"><i>»</i><i>»</i><i>»</i></div></div>
   <div id="largada"><div class="lg-faixas"></div><div class="lg-onda" id="lg-onda"></div><div class="lg-barra"></div><div class="lg-flash"></div><div class="lg-rot" id="lg-rot">LARGADA<br>EM</div><div class="lg-agu">AGUARDE<br>NO GRID</div><div class="lg-num" id="lg-num">10</div></div>
   <div id="momento">
     <div class="m-base"></div>
@@ -1213,6 +1242,7 @@ function shortPodiumName(nome, dupFirst) {
     // só no começo: ninguém cruzou ainda (aguardando largada) ou cruzou há poucos segundos
     if (s.race.elapsedMs > 15000) return;
     var corrida = s.sessionType === 'race';
+    if (!corrida) return; // tomada de tempo: sem contagem, vale a tela PISTA LIBERADA (pistaLiberada)
     document.getElementById('lg-rot').innerHTML = corrida ? 'LARGADA<br>EM' : 'PISTA<br>ABRE EM';
     largadaFrase = corrida ? 'LARGADA!' : 'PISTA ABERTA';
     filaMomentos.length = 0;
@@ -1223,6 +1253,26 @@ function shortPodiumName(nome, dupFirst) {
     if (largadaTimer) clearInterval(largadaTimer);
     largadaTimer = setInterval(largadaQuadro, 100);
     largadaQuadro();
+  }
+
+  // ---- Pista liberada (tomada de tempo): verde do instante da bandeira verde até o 1º kart cruzar a linha ----
+  var pistaEl = document.getElementById('pista');
+  var pistaAtiva = false, pistaSaiTimer = null;
+  function pistaLiberada(s) {
+    var mostra = !!(s && s.status === 'live' && s.sessionType !== 'race' && s.race && !s.race.startedAt && !(s.race.elapsedMs > 0));
+    if (mostra === pistaAtiva) return;
+    pistaAtiva = mostra;
+    if (pistaSaiTimer) { clearTimeout(pistaSaiTimer); pistaSaiTimer = null; }
+    if (mostra) {
+      filaMomentos.length = 0;
+      momentoEl.className = '';
+      pistaEl.className = '';
+      void pistaEl.offsetWidth;
+      pistaEl.className = 'on';
+    } else {
+      pistaEl.className = 'sai';
+      pistaSaiTimer = setTimeout(function () { pistaEl.className = ''; pistaSaiTimer = null; }, 450);
+    }
   }
 
   // ---- Momentos em tela cheia (estilo transmissão): um por vez, 3,6 s cada ----
@@ -1242,7 +1292,7 @@ function shortPodiumName(nome, dupFirst) {
   }
   function proximoMomento() {
     if (momentoAtivo || !filaMomentos.length) return;
-    if (largadaTimer) { setTimeout(proximoMomento, 1000); return; }
+    if (largadaTimer || pistaAtiva) { setTimeout(proximoMomento, 1000); return; }
     var m = filaMomentos.shift();
     momentoAtivo = true;
     for (var k in momentoParts) if (momentoParts.hasOwnProperty(k)) momentoParts[k].textContent = m[k] || '';
@@ -1755,6 +1805,7 @@ function shortPodiumName(nome, dupFirst) {
     }
 
     sinalDeLargada(ultimo);
+    pistaLiberada(ultimo);
     var pilotos = s.drivers || [];
     if (s.clearGrid || (pilotos.length === 1 && pilotos[0].position === 999)) {
       pilotos = [];
@@ -1898,7 +1949,7 @@ function shortPodiumName(nome, dupFirst) {
     }
   }
 
-  var TB50_VERSAO = '2026-11-20-largada3';
+  var TB50_VERSAO = '2026-11-20-pista1';
   var ultimoErro = '';
   window.onerror = function (msg, src, linha) {
     var e = String(msg || '').slice(0, 120) + '@' + (linha || 0);
