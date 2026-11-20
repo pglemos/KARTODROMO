@@ -102,6 +102,68 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 @-webkit-keyframes fx-tag-c{0%{-webkit-transform:translate(-50%,14px);opacity:0}100%{-webkit-transform:translate(-50%,0);opacity:1}}
 @keyframes fx-tag-c{0%{transform:translate(-50%,14px);opacity:0}100%{transform:translate(-50%,0);opacity:1}}
 
+/* 1c. CARTÕES QUE VIAJAM + MOMENTOS EM TELA CHEIA */
+.casa.cartao{left:0;top:0;will-change:transform;-webkit-transition:-webkit-transform .95s cubic-bezier(.65,0,.2,1),opacity .4s;transition:transform .95s cubic-bezier(.65,0,.2,1),opacity .4s}
+.casa.cartao.sem-trans{-webkit-transition:none;transition:none}
+.casa.cartao.sai{opacity:0}
+#momento{position:absolute;left:0;top:0;width:2048px;height:512px;z-index:50;overflow:hidden;display:none;color:#fff;font-family:'KIB Cond',Arial,sans-serif}
+#momento.on{display:block}
+#momento .m-base{position:absolute;left:-12%;top:0;width:124%;height:512px;background:#0b0b0b;-webkit-transform:translateX(-110%) skewX(-12deg);transform:translateX(-110%) skewX(-12deg)}
+#momento.on .m-base{-webkit-animation:m-cobre 3.6s cubic-bezier(.7,0,.2,1) both;animation:m-cobre 3.6s cubic-bezier(.7,0,.2,1) both}
+#momento .m-faixa{position:absolute;top:-40px;height:600px;left:0;background:#fff;opacity:0;-webkit-transform:skewX(-12deg);transform:skewX(-12deg)}
+#momento .f1{width:90px}#momento .f2{width:34px}#momento .f3{width:14px}
+#momento.on .m-faixa{-webkit-animation:m-faixa 1.25s linear .35s infinite;animation:m-faixa 1.25s linear .35s infinite}
+#momento.on .f2{-webkit-animation-delay:.6s;animation-delay:.6s}
+#momento.on .f3{-webkit-animation-delay:.8s;animation-delay:.8s}
+#momento .m-conteudo{position:absolute;left:0;top:0;width:2048px;height:512px;opacity:0}
+#momento.on .m-conteudo{-webkit-animation:m-texto 3.6s cubic-bezier(.2,.8,.2,1) both;animation:m-texto 3.6s cubic-bezier(.2,.8,.2,1) both}
+#momento .m-kicker{position:absolute;left:96px;top:56px;font-size:64px;line-height:1;letter-spacing:8px;font-weight:700;white-space:nowrap}
+#momento .m-kart{position:absolute;left:84px;top:132px;font:900 300px/1 'KIB Num',Arial,sans-serif;letter-spacing:-6px;white-space:nowrap}
+#momento .m-nome{position:absolute;left:760px;top:170px;width:1220px;font-size:104px;line-height:1;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#momento .m-tempo{position:absolute;left:760px;top:300px;font-size:150px;line-height:1;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+#momento .m-titulo{position:absolute;left:0;right:0;top:128px;text-align:center;font:900 190px/1 'KIB Num',Arial,sans-serif;letter-spacing:2px;white-space:nowrap}
+#momento .m-sub{position:absolute;left:0;right:0;top:370px;text-align:center;font-size:62px;line-height:1;letter-spacing:10px;font-weight:700;white-space:nowrap}
+#momento .m-pos{position:absolute;right:110px;top:96px;font:900 330px/1 'KIB Num',Arial,sans-serif;letter-spacing:-8px;white-space:nowrap;opacity:.28}
+#momento.tema-rec .m-pos{color:#e05cff}#momento.tema-lider .m-pos{color:#ffcc33}
+#momento.tipo-kart .m-titulo,#momento.tipo-kart .m-sub{display:none}
+#momento.tipo-texto .m-pos,#momento.tipo-texto .m-kicker,#momento.tipo-texto .m-kart,#momento.tipo-texto .m-nome,#momento.tipo-texto .m-tempo{display:none}
+#momento .m-luzes{display:none;position:absolute;left:0;right:0;top:110px;text-align:center}
+#momento.tipo-luzes .m-luzes{display:block}
+#momento.tipo-luzes .m-conteudo{display:none}
+#momento .m-luzes i{display:inline-block;width:190px;height:190px;margin:0 34px;border-radius:50%;background:#2a0505;border:10px solid #151515}
+#momento.tipo-luzes.on .m-luzes i{-webkit-animation:m-luz 3.4s steps(1) both;animation:m-luz 3.4s steps(1) both}
+#momento.tipo-luzes.on .m-luzes i:nth-child(1){-webkit-animation-name:m-luz1;animation-name:m-luz1}
+#momento.tipo-luzes.on .m-luzes i:nth-child(2){-webkit-animation-name:m-luz2;animation-name:m-luz2}
+#momento.tipo-luzes.on .m-luzes i:nth-child(3){-webkit-animation-name:m-luz3;animation-name:m-luz3}
+#momento.tipo-luzes.on .m-luzes i:nth-child(4){-webkit-animation-name:m-luz4;animation-name:m-luz4}
+#momento.tipo-luzes.on .m-luzes i:nth-child(5){-webkit-animation-name:m-luz5;animation-name:m-luz5}
+#momento.tema-luzes .m-base{background:#000}
+#momento.tipo-luzes .m-faixa{display:none}
+/* temas */
+#momento.tema-rec .m-base{background:#16021f}#momento.tema-rec .m-faixa{background:#e05cff}#momento.tema-rec .m-kicker,#momento.tema-rec .m-tempo{color:#e05cff}
+#momento.tema-lider .m-base{background:#1a1300}#momento.tema-lider .m-faixa{background:#ffcc33}#momento.tema-lider .m-kicker,#momento.tema-lider .m-tempo{color:#ffcc33}
+#momento.tema-amarela .m-base{background:#ffd400}#momento.tema-amarela .m-faixa{background:#000}#momento.tema-amarela{color:#111}
+#momento.tema-vermelha .m-base{background:#d50000}#momento.tema-vermelha .m-faixa{background:#000}
+#momento.tema-verde .m-base{background:#00c853}#momento.tema-verde .m-faixa{background:#fff}#momento.tema-verde{color:#03140a}
+#momento.tema-final .m-base{background-color:#000;background-image:linear-gradient(45deg,#1d1d1d 25%,transparent 25%,transparent 75%,#1d1d1d 75%),linear-gradient(45deg,#1d1d1d 25%,transparent 25%,transparent 75%,#1d1d1d 75%);background-size:96px 96px;background-position:0 0,48px 48px}
+#momento.tema-final .m-faixa{background:#fff}
+@-webkit-keyframes m-cobre{0%{-webkit-transform:translateX(-110%) skewX(-12deg)}13%,87%{-webkit-transform:translateX(0) skewX(-12deg)}100%{-webkit-transform:translateX(110%) skewX(-12deg)}}
+@keyframes m-cobre{0%{transform:translateX(-110%) skewX(-12deg)}13%,87%{transform:translateX(0) skewX(-12deg)}100%{transform:translateX(110%) skewX(-12deg)}}
+@-webkit-keyframes m-faixa{0%{opacity:.85;-webkit-transform:translateX(-200px) skewX(-12deg)}100%{opacity:.85;-webkit-transform:translateX(2300px) skewX(-12deg)}}
+@keyframes m-faixa{0%{opacity:.85;transform:translateX(-200px) skewX(-12deg)}100%{opacity:.85;transform:translateX(2300px) skewX(-12deg)}}
+@-webkit-keyframes m-texto{0%,12%{opacity:0;-webkit-transform:translateX(-120px)}22%,82%{opacity:1;-webkit-transform:none}92%,100%{opacity:0;-webkit-transform:translateX(120px)}}
+@keyframes m-texto{0%,12%{opacity:0;transform:translateX(-120px)}22%,82%{opacity:1;transform:none}92%,100%{opacity:0;transform:translateX(120px)}}
+@-webkit-keyframes m-luz1{0%{background:#2a0505}15%{background:#ff1a1a}88%{background:#2a0505}}
+@keyframes m-luz1{0%{background:#2a0505}15%{background:#ff1a1a}88%{background:#2a0505}}
+@-webkit-keyframes m-luz2{0%{background:#2a0505}30%{background:#ff1a1a}88%{background:#2a0505}}
+@keyframes m-luz2{0%{background:#2a0505}30%{background:#ff1a1a}88%{background:#2a0505}}
+@-webkit-keyframes m-luz3{0%{background:#2a0505}45%{background:#ff1a1a}88%{background:#2a0505}}
+@keyframes m-luz3{0%{background:#2a0505}45%{background:#ff1a1a}88%{background:#2a0505}}
+@-webkit-keyframes m-luz4{0%{background:#2a0505}60%{background:#ff1a1a}88%{background:#2a0505}}
+@keyframes m-luz4{0%{background:#2a0505}60%{background:#ff1a1a}88%{background:#2a0505}}
+@-webkit-keyframes m-luz5{0%{background:#2a0505}75%{background:#ff1a1a}88%{background:#2a0505}}
+@keyframes m-luz5{0%{background:#2a0505}75%{background:#ff1a1a}88%{background:#2a0505}}
+
 /* 2. LISTA LAPTIME (relógio à esquerda + classificação à direita) */
 #lista-view{background:#000}
 #lista-esq{position:absolute;left:8px;top:8px;width:404px;height:496px;background:#0b100d;border-radius:14px;overflow:hidden;text-align:center}
@@ -722,6 +784,15 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 </head>
 <body>
 <div id="tela">
+  <div id="momento">
+    <div class="m-base"></div>
+    <i class="m-faixa f1"></i><i class="m-faixa f2"></i><i class="m-faixa f3"></i>
+    <div class="m-luzes"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="m-conteudo">
+      <div class="m-kicker"></div><div class="m-kart"></div><div class="m-nome"></div><div class="m-tempo"></div>
+      <div class="m-pos"></div><div class="m-titulo"></div><div class="m-sub"></div>
+    </div>
+  </div>
   <!-- 1. Placar Grid (14 karts ms OU 20 karts pos) -->
   <div id="placar-view" class="camada">
     <div id="grid-box"></div>
@@ -1137,30 +1208,70 @@ function shortPodiumName(nome, dupFirst) {
     }, 500);
   }
 
+  // Fundo fixo com as posições (casas) + um cartão por kart que viaja pela tela quando o kart troca de posição.
+  var gridGeo = { w: 0, h: 0, cols: 0, compacto: false };
+  var cartoes = {};
   function montarGrid(cols, rows, compacto) {
     var chave = cols + 'x' + rows;
     if (gridModoAtual === chave && casas.length === cols * rows) return;
     gridModoAtual = chave;
     gridBox.innerHTML = '';
     casas = [];
+    cartoes = {};
     var w = 2048 / cols;
     var h = 512 / rows;
+    gridGeo = { w: w, h: h, cols: cols, compacto: compacto };
     var total = cols * rows;
     for (var i = 0; i < total; i++) {
       var lin = Math.floor(i / cols), col = i % cols;
       var d = document.createElement('div');
-      d.className = 'casa vazia ' + (compacto ? 'compacta' : 'larga') + (lin ? ' b' : '');
+      d.className = 'casa vazia ' + (compacto ? 'compacta' : 'larga');
       d.style.left = (col * w) + 'px';
       d.style.top = (lin * h) + 'px';
       d.style.width = w + 'px';
       d.style.height = h + 'px';
-      d.innerHTML = '<div class="in"><i class="bar"></i><i class="sw"></i><span class="p"></span><span class="n"></span><span class="k">-</span>' + (compacto ? '' : '<span class="t"></span>') + '<b class="tag"></b></div>';
-      var inn = d.firstChild;
-      d._in = inn; d._p = inn.childNodes[2]; d._n = inn.childNodes[3]; d._k = inn.childNodes[4]; d._t = compacto ? null : inn.childNodes[5]; d._tag = inn.lastChild;
-      inn.style.webkitAnimationDelay = inn.style.animationDelay = ((lin * 0.12) + col * 0.06) + 's';
+      d.innerHTML = '<div class="in"><i class="bar"></i><span class="p"></span><span class="k">–</span></div>';
+      d._p = d.firstChild.childNodes[1];
       gridBox.appendChild(d);
       casas.push(d);
     }
+  }
+
+  function criarCartao(kart, slot) {
+    var g = gridGeo;
+    var d = document.createElement('div');
+    d.className = 'casa cartao ' + (g.compacto ? 'compacta' : 'larga');
+    d.style.width = g.w + 'px';
+    d.style.height = g.h + 'px';
+    d.innerHTML = '<div class="in"><i class="bar"></i><i class="sw"></i><span class="p"></span><span class="n"></span><span class="k"></span>' + (g.compacto ? '' : '<span class="t"></span>') + '<b class="tag"></b></div>';
+    var inn = d.firstChild;
+    d._in = inn; d._p = inn.childNodes[2]; d._n = inn.childNodes[3]; d._k = inn.childNodes[4]; d._t = g.compacto ? null : inn.childNodes[5]; d._tag = inn.lastChild;
+    d._kart = kart; d._slot = -1; d._tagChave = '';
+    posicionarCartao(d, slot, false);
+    gridBox.appendChild(d);
+    cartoes[kart] = d;
+    return d;
+  }
+
+  function posicionarCartao(d, slot, animado) {
+    if (d._slot === slot) return;
+    var g = gridGeo;
+    var t = 'translate3d(' + ((slot % g.cols) * g.w) + 'px,' + (Math.floor(slot / g.cols) * g.h) + 'px,0)';
+    if (!animado) d.classList.add('sem-trans');
+    // quem sobe passa por cima de quem desce
+    d.style.zIndex = !animado ? 2 : (slot < d._slot ? 5 : 3);
+    d.style.webkitTransform = t;
+    d.style.transform = t;
+    if (!animado) { void d.offsetWidth; d.classList.remove('sem-trans'); }
+    d._slot = slot;
+  }
+
+  function removerCartao(kart) {
+    var d = cartoes[kart];
+    delete cartoes[kart];
+    if (!d) return;
+    d.classList.add('sai');
+    setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 450);
   }
 
   function esconderTodas(exceto) {
@@ -1210,19 +1321,32 @@ function shortPodiumName(nome, dupFirst) {
     var flagCls = flag === 'yellow' ? 'flag-yellow' : flag === 'red' ? 'flag-red' : (flag === 'chk' || flag === 'checkered' || flag === 'quadriculada') ? 'flag-chk' : '';
     if (gridBox.className !== flagCls) gridBox.className = flagCls;
     var eventos = detectarEventos(pilotos, (sAtual.race && sAtual.race.id) || sAtual.eventName || '', recorde, sAtual.sessionType === 'race');
-    if (eventos === 'entrada') { for (var e = 0; e < casas.length; e++) animar(casas[e]._in, 'fx-entra', 1600); eventos = {}; }
+    var entrada = eventos === 'entrada';
+    if (entrada) eventos = {};
+    momentosDaSessao(sAtual, pilotos, eventos, entrada, flag);
 
+    var usados = {};
     for (var c = 0; c < pageSize; c++) {
       var pos = base + c + 1;
       var p = porPos[pos];
-      var el = casas[c];
-      var cls = 'casa ' + (is14Ms ? 'larga' : 'compacta') + (p ? (pos <= 3 ? ' pos' + pos : '') : ' vazia');
-      if (el.className !== cls) el.className = cls;
+      texto(casas[c]._p, String(pos));
+      if (!p) continue;
+      var kartAqui = String(p.kart);
+      var el = cartoes[kartAqui];
+      if (!el) {
+        el = criarCartao(kartAqui, c);
+        if (!entrada) animar(el._in, 'fx-entra', 1400);
+      } else {
+        posicionarCartao(el, c, true);
+      }
+      usados[kartAqui] = true;
+      var cls = 'casa cartao ' + (is14Ms ? 'larga' : 'compacta') + (pos <= 3 ? ' pos' + pos : '');
+      if (el._cls !== cls) { el.className = cls; el._cls = cls; }
       texto(el._p, String(pos));
-      texto(el._k, p && p.kart ? String(p.kart) : '\u2013');
-      texto(el._n, p && tempoValido(p.name) && !/^kart\s*\d+$/i.test(String(p.name).replace(/^\s+|\s+$/g, '')) ? (is14Ms ? nomeCelula(p.name) : firstWord(String(p.name).toUpperCase())) : '');
+      texto(el._k, kartAqui);
+      texto(el._n, tempoValido(p.name) && !/^kart\s*\d+$/i.test(String(p.name).replace(/^\s+|\s+$/g, '')) ? (is14Ms ? nomeCelula(p.name) : firstWord(String(p.name).toUpperCase())) : '');
       if (is14Ms) {
-        var rawTempo = p ? (tempoValido(p.last) || tempoValido(p.time)) : '';
+        var rawTempo = tempoValido(p.last) || tempoValido(p.time);
         var tTxt = '';
         if (rawTempo) {
           var fmtT = mmssdc(rawTempo) || rawTempo;
@@ -1232,16 +1356,88 @@ function shortPodiumName(nome, dupFirst) {
         var cor = corTempo(p, rawTempo, recorde, corPri, corDest);
         if (el._t.style.color !== cor) el._t.style.color = cor;
       }
-      var kartAqui = p ? String(p.kart) : '';
-      var ev = p ? eventos[kartAqui] : null;
-      if (el._kart !== kartAqui) {
-        // outro kart entrou neste lugar: o brilho/etiqueta do anterior não fica para trás
-        el._kart = kartAqui;
-        el._tagChave = '';
-        el._in.classList.remove('fx-rec', 'fx-pb', 'com-tag');
-      }
+      var ev = eventos[kartAqui];
       if (ev) aplicarEventos(el, ev, is14Ms);
-      sincronizarTag(el, p ? tagsAtivas[kartAqui] : null);
+      sincronizarTag(el, tagsAtivas[kartAqui]);
+    }
+    for (var kk in cartoes) if (cartoes.hasOwnProperty(kk) && !usados[kk]) removerCartao(kk);
+    if (entrada) {
+      for (var ke in cartoes) if (cartoes.hasOwnProperty(ke)) {
+        var ce = cartoes[ke], sl = ce._slot;
+        ce._in.style.webkitAnimationDelay = ce._in.style.animationDelay = (Math.floor(sl / cols) * 0.12 + (sl % cols) * 0.06) + 's';
+        animar(ce._in, 'fx-entra', 1800);
+      }
+    }
+  }
+
+  // ---- Momentos em tela cheia (estilo transmissão): um por vez, 3,6 s cada ----
+  var momentoEl = document.getElementById('momento');
+  var momentoParts = {};
+  (function () {
+    var nomes = ['kicker', 'kart', 'nome', 'tempo', 'pos', 'titulo', 'sub'];
+    for (var i = 0; i < nomes.length; i++) momentoParts[nomes[i]] = momentoEl.querySelector('.m-' + nomes[i]);
+  })();
+  var filaMomentos = [];
+  var momentoAtivo = false;
+  function enfileirarMomento(m) {
+    for (var i = 0; i < filaMomentos.length; i++) if (filaMomentos[i].chave === m.chave) return;
+    if (filaMomentos.length >= 3) filaMomentos.shift();
+    filaMomentos.push(m);
+    proximoMomento();
+  }
+  function proximoMomento() {
+    if (momentoAtivo || !filaMomentos.length) return;
+    var m = filaMomentos.shift();
+    momentoAtivo = true;
+    for (var k in momentoParts) if (momentoParts.hasOwnProperty(k)) momentoParts[k].textContent = m[k] || '';
+    momentoEl.className = '';
+    void momentoEl.offsetWidth;
+    momentoEl.className = 'on tema-' + m.tema + ' tipo-' + m.tipo;
+    setTimeout(function () {
+      momentoEl.className = '';
+      momentoAtivo = false;
+      if (m.depois) filaMomentos.unshift(m.depois);
+      setTimeout(proximoMomento, m.depois ? 0 : 700);
+    }, m.dur || 3600);
+  }
+
+  var mmSessao = null, mmFlag = null, mmFinal = false;
+  function momentosDaSessao(s, pilotos, eventos, entrada, flag) {
+    var corrida = s.sessionType === 'race';
+    var race = s.race || {};
+    var sessao = race.id || s.eventName || '';
+    if (sessao !== mmSessao) {
+      var primeiraVez = mmSessao === null;
+      mmSessao = sessao; mmFlag = flag; mmFinal = false;
+      if (!primeiraVez && s.status === 'live' && entrada !== undefined) {
+        var recente = !(race.elapsedMs > 90000);
+        if (recente && corrida) enfileirarMomento({ chave: 'largada', tipo: 'luzes', tema: 'luzes', dur: 3400,
+          depois: { chave: 'valendo', tipo: 'texto', tema: 'verde', titulo: 'VALENDO!', sub: (s.eventName || 'CORRIDA').toUpperCase() } });
+        else if (recente) enfileirarMomento({ chave: 'pista', tipo: 'texto', tema: 'verde', titulo: 'PISTA ABERTA', sub: (s.eventName || 'TOMADA DE TEMPO').toUpperCase() });
+      }
+      return;
+    }
+    if (flag !== mmFlag) {
+      var ant = mmFlag; mmFlag = flag;
+      if (flag === 'yellow') enfileirarMomento({ chave: 'f-y', tipo: 'texto', tema: 'amarela', titulo: 'BANDEIRA AMARELA', sub: 'ATENÇÃO · NÃO ULTRAPASSE' });
+      else if (flag === 'red') enfileirarMomento({ chave: 'f-r', tipo: 'texto', tema: 'vermelha', titulo: 'BANDEIRA VERMELHA', sub: 'SESSÃO INTERROMPIDA' });
+      else if ((flag === 'green' || flag === '') && (ant === 'yellow' || ant === 'red')) enfileirarMomento({ chave: 'f-g', tipo: 'texto', tema: 'verde', titulo: 'PISTA LIBERADA', sub: 'BANDEIRA VERDE' });
+    }
+    if (corrida && !mmFinal && s.status === 'live' && race.durationMs > 0 && race.remainingMs <= 0) {
+      mmFinal = true;
+      enfileirarMomento({ chave: 'final', tipo: 'texto', tema: 'final', titulo: 'BANDEIRA FINAL', sub: 'ÚLTIMA VOLTA' });
+    }
+    for (var i = 0; i < pilotos.length; i++) {
+      var p = pilotos[i], e = eventos[String(p.kart)];
+      if (!e) continue;
+      var nome = tempoValido(p.name) && !/^kart\s*\d+$/i.test(String(p.name)) ? nomeCurto(p.name) : '';
+      if (p.position === 1 && e.sobe && (p.laps || 0) >= 2) {
+        enfileirarMomento({ chave: 'lider-' + p.kart, tipo: 'kart', tema: 'lider', kicker: corrida ? 'NOVO LÍDER' : 'NOVA POLE', kart: String(p.kart), nome: nome, pos: 'P1',
+          tempo: mmssdc(corrida ? (tempoValido(p.last) || '') : (tempoValido(p.time) || '')) || '' });
+      } else if (e.rec && corrida && (p.laps || 0) >= 3) {
+        enfileirarMomento({ chave: 'rec-' + p.kart, tipo: 'kart', tema: 'rec', kicker: 'VOLTA MAIS RÁPIDA', kart: String(p.kart), nome: nome, pos: 'P' + p.position,
+          tempo: mmssdc(tempoValido(p.last) || '') || '' });
+      }
     }
   }
 
@@ -1284,6 +1480,7 @@ function shortPodiumName(nome, dupFirst) {
   }
 
   function animar(el, cls, ms) {
+    if (cls !== 'fx-entra' && el && el.style.animationDelay) el.style.webkitAnimationDelay = el.style.animationDelay = '';
     if (!el) return;
     el.classList.remove(cls);
     void el.offsetWidth;
@@ -1317,8 +1514,6 @@ function shortPodiumName(nome, dupFirst) {
 
   function aplicarEventos(el, e, is14Ms) {
     var inn = el._in;
-    if (e.sobe) animar(inn, 'fx-sobe', 900);
-    else if (e.desce) animar(inn, 'fx-desce', 900);
     if (e.volta && is14Ms) animar(inn, 'fx-volta', 900);
     if (e.rec) { animar(inn, 'fx-rec', 4000); mostrarTag(el, e.rec, 'rec', 5000); }
     else if (e.pb) { animar(inn, 'fx-pb', 1400); mostrarTag(el, 'MELHOR VOLTA', 'pb', 3500); }
