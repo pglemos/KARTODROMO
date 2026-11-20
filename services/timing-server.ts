@@ -152,6 +152,10 @@ const SETTINGS_FILE = join(DATA_DIR, 'settings.json');
 const UI_DIR = resolve(process.cwd(), 'services', 'timing-ui');
 const PUBLIC_DIR = resolve(process.cwd(), 'public');
 const TRACK_NAME = process.env.TIMING_TRACK_NAME || 'Kartodromo Internacional de Betim';
+// calendário de Brasília reaproveitado (ver hojeAtual)
+const DIA_SP = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' });
+const HORA_MIN_SP = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+let hojeGuardado = { ate: 0, dia: '', inicio: 0 };
 
 for (const dir of [DATA_DIR, SESSIONS_DIR, JOURNAL_DIR]) mkdirSync(dir, { recursive: true });
 
@@ -759,7 +763,7 @@ function relargar(s: Session, now: number, autor: string) {
 function horaDaProva(s: Session) {
   const p = s.proofId ? catalog.provas.find((x) => x.id === s.proofId) : undefined;
   if (p?.startAt) return `${p.startAt}|${p.order}`;
-  return new Date(s.createdAt).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+  return HORA_MIN_SP.format(s.createdAt);
 }
 
 function sortedSessions() {
@@ -1414,7 +1418,8 @@ function liveSnapshot(painelTb50 = false) {
   const now = Date.now();
   return {
     status: OPEN_STATES.has(s.state) ? 'live' : 'finished',
-    clearGrid: Boolean(OPEN_STATES.has(s.state) && !standings.some((r) => r.laps > 0)),
+    // o telão TB50 mostra os karts na pista desde a largada (antes ficava preto até cada um fechar a 1ª volta)
+    clearGrid: Boolean(OPEN_STATES.has(s.state) && (painelTb50 ? !standings.length : !standings.some((r) => r.laps > 0))),
     source: 'sql',
     updatedAt,
     sessionType: s.type === 'corrida' ? 'race' : 'qualifying',
@@ -1436,7 +1441,7 @@ function liveSnapshot(painelTb50 = false) {
     drivers: painelVazio(
       painelTb50 && OPEN_STATES.has(s.state),
       standings
-        .filter((r) => r.laps > 0 || !OPEN_STATES.has(s.state))
+        .filter((r) => r.laps > 0 || !OPEN_STATES.has(s.state) || painelTb50)
         // O placar/telão usam os quatro primeiros campos; o app também recebe o histórico
         // completo para abrir a volta a volta do piloto selecionado.
         .map((r) => {
@@ -2294,13 +2299,25 @@ type BateriaAgenda = { id: number; nome?: string; inicio?: string; tipoKart?: st
 type ProgramaAgenda = { ordem?: number; nome?: string; tipo?: string; finalizacao?: string; tempoMin?: number; voltasMax?: number; voltaMinimaSeg?: number; trackId?: string | null };
 const programasAgenda = new Map<number, { em: number; provas: ProgramaAgenda[] }>();
 
+// Calendário com fuso de Brasília criado UMA vez: toLocaleDateString com timeZone recria o Intl a cada chamada, e o
+// stateView chamava isso uma vez por bateria guardada, todo segundo e a cada passagem. Em 20/11/2026 isso era 65% da
+// CPU da cronometragem e o telão TB50 recebia a passagem 4 a 7 s depois (o mesmo defeito do horaSp do SRVKART em 15/11).
+function hojeAtual() {
+  const agora = Date.now();
+  if (agora >= hojeGuardado.ate) {
+    const dia = DIA_SP.format(agora);
+    const [a, m, d] = dia.split('-').map(Number);
+    hojeGuardado = { ate: agora + 1000, dia, inicio: new Date(a, m - 1, d).getTime() };
+  }
+  return hojeGuardado;
+}
+
 function hojeBrasilia() {
-  return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  return hojeAtual().dia;
 }
 
 function inicioDoDia() {
-  const [a, m, d] = hojeBrasilia().split('-').map(Number);
-  return new Date(a, m - 1, d).getTime();
+  return hojeAtual().inicio;
 }
 
 async function sincronizarAgendaDoDia() {

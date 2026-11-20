@@ -1754,7 +1754,6 @@ function shortPodiumName(nome, dupFirst) {
     var drivers = [];
     for (var i = 0; i < lista.length; i++) {
       var r = lista[i];
-      if (aoVivo && !(r.laps > 0)) continue;
       var tBest = fmtMs(r.bestLapMs);
       var tLast = fmtMs(r.lastLapMs);
       drivers.push({
@@ -1768,7 +1767,7 @@ function shortPodiumName(nome, dupFirst) {
     }
     return {
       status: aoVivo ? 'live' : 'finished',
-      clearGrid: Boolean(aoVivo && (s.aguardandoLargada || drivers.length === 0)),
+      clearGrid: Boolean(aoVivo && drivers.length === 0),
       sessionType: s.type === 'corrida' ? 'race' : 'qualifying',
       eventName: s.name,
       trackName: s.track && s.track.name || st.track || 'TELAO LED 2048X512',
@@ -1816,7 +1815,7 @@ function shortPodiumName(nome, dupFirst) {
     }
   }
 
-  var TB50_VERSAO = '2026-11-20-podio3';
+  var TB50_VERSAO = '2026-11-20-rapido1';
   var ultimoErro = '';
   window.onerror = function (msg, src, linha) {
     var e = String(msg || '').slice(0, 120) + '@' + (linha || 0);
