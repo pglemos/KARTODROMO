@@ -406,369 +406,146 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 .live-podium-meta span{color:var(--live-green);font-size:34px;font-weight:900;letter-spacing:.015em;line-height:1;text-transform:uppercase}
 .live-podium-meta em{color:var(--live-yellow);font-size:42px;font-style:normal;font-weight:900;letter-spacing:-.025em;line-height:1}
 
-/* 4. PÓDIO FINAL OFICIAL (Padrão exato app/podio-final-tb50/podio-final.css) */
-#podio.final-screen{
-  --final-cycle-duration:64s;
-  color:#fff;
-  background:#020202;
-  font-family:Arial,Helvetica,sans-serif;
-  text-transform:uppercase;
-}
-.final-stage-photo,.final-stage-grade,.final-fireworks,.final-stage-smoke{
-  position:absolute;
-  top:0;right:0;bottom:0;left:0;
-  inset:0;
-  pointer-events:none;
-}
-.final-stage-photo{
-  z-index:0;
-  background:url('/podio-final/arena-final-bg-v2.png') center center / cover no-repeat;
-  -webkit-filter:contrast(1.08) saturate(1.08) brightness(.86);
-  filter:contrast(1.08) saturate(1.08) brightness(.86);
-}
-.final-stage-grade{
-  z-index:1;
-  background:
-    radial-gradient(ellipse at 50% 42%,rgba(255,216,95,.18),transparent 29%),
-    radial-gradient(ellipse at 50% 88%,rgba(0,0,0,.08),rgba(0,0,0,.72) 58%,rgba(0,0,0,.95) 100%),
-    linear-gradient(90deg,rgba(0,0,0,.72),transparent 18%,transparent 82%,rgba(0,0,0,.72)),
-    linear-gradient(180deg,rgba(0,0,0,.32),transparent 21%,rgba(0,0,0,.46) 64%,rgba(0,0,0,.84));
-}
-.final-stage-smoke{
-  z-index:3;
-  opacity:.48;
-  background:
-    radial-gradient(ellipse at 30% 76%,rgba(255,255,255,.16),transparent 36%),
-    radial-gradient(ellipse at 70% 76%,rgba(255,214,112,.13),transparent 36%),
-    linear-gradient(180deg,transparent 0 56%,rgba(0,0,0,.34) 100%);
-  mix-blend-mode:screen;
-}
-.final-fireworks{z-index:2;overflow:hidden;opacity:.92;mix-blend-mode:screen}
-.final-firework{
-  position:absolute;
-  left:var(--x);
-  top:var(--y);
-  width:var(--size);
-  height:var(--size);
-  border-radius:999px;
-  background:
-    radial-gradient(circle,rgba(255,255,255,.98) 0 2px,transparent 3px),
-    repeating-conic-gradient(from var(--start),var(--c1) 0 4deg,transparent 4deg 14deg,var(--c2) 14deg 18deg,transparent 18deg 28deg),
-    radial-gradient(circle,transparent 0 31%,rgba(255,255,255,.95) 32% 33%,transparent 34% 100%);
-  -webkit-filter:drop-shadow(0 0 14px var(--c1)) drop-shadow(0 0 24px var(--c2));
-  filter:drop-shadow(0 0 14px var(--c1)) drop-shadow(0 0 24px var(--c2));
-  opacity:0;
-  -webkit-transform:translate(-50%,-50%) scale(.2) rotate(0deg);
-  transform:translate(-50%,-50%) scale(.2) rotate(0deg);
-  -webkit-animation:final-firework-bloom var(--duration) ease-out infinite;
-  animation:final-firework-bloom var(--duration) ease-out infinite;
-  -webkit-animation-delay:var(--delay);
-  animation-delay:var(--delay);
-}
-.final-firework::before,.final-firework::after{
-  content:"";
-  position:absolute;
-  top:11%;right:11%;bottom:11%;left:11%;
-  inset:11%;
-  border-radius:inherit;
-  background:
-    radial-gradient(circle at 50% 4%,var(--c1) 0 2px,transparent 3px),
-    radial-gradient(circle at 78% 18%,var(--c2) 0 2px,transparent 3px),
-    radial-gradient(circle at 96% 50%,rgba(255,255,255,.9) 0 2px,transparent 3px),
-    radial-gradient(circle at 76% 82%,var(--c1) 0 2px,transparent 3px),
-    radial-gradient(circle at 50% 96%,var(--c2) 0 2px,transparent 3px),
-    radial-gradient(circle at 20% 80%,rgba(255,255,255,.9) 0 2px,transparent 3px),
-    radial-gradient(circle at 5% 48%,var(--c1) 0 2px,transparent 3px),
-    radial-gradient(circle at 22% 18%,var(--c2) 0 2px,transparent 3px);
-}
-.final-firework::after{
-  top:25%;right:25%;bottom:25%;left:25%;
-  inset:25%;
-  opacity:.72;
-  -webkit-transform:rotate(22deg);
-  transform:rotate(22deg);
-}
-.final-firework-1{--x:13%;--y:18%;--size:250px;--c1:#ff3d48;--c2:#ffd65a;--start:8deg;--duration:3.6s;--delay:-.8s}
-.final-firework-2{--x:31%;--y:16%;--size:210px;--c1:#6aff93;--c2:#fff6b8;--start:34deg;--duration:4.1s;--delay:-2.4s}
-.final-firework-3{--x:48%;--y:10%;--size:290px;--c1:#ffd65a;--c2:#ff5e5e;--start:18deg;--duration:4.5s;--delay:-1.6s}
-.final-firework-4{--x:68%;--y:17%;--size:240px;--c1:#59a7ff;--c2:#fff6b8;--start:52deg;--duration:3.9s;--delay:-3.1s}
-.final-firework-5{--x:87%;--y:15%;--size:270px;--c1:#7cff79;--c2:#ffd65a;--start:27deg;--duration:4.3s;--delay:-1.1s}
-.final-firework-6{--x:23%;--y:34%;--size:150px;--c1:#ffffff;--c2:#ff3d48;--start:4deg;--duration:3.4s;--delay:-2s}
-.final-firework-7{--x:77%;--y:32%;--size:160px;--c1:#ffffff;--c2:#59a7ff;--start:43deg;--duration:3.7s;--delay:-2.8s}
+/* 4. PÓDIO FINAL PREMIUM (20/11/2026): abertura -> cerimônia 3º/2º/1º -> campeão -> classificação, em ciclo */
+#podio.pf{background:#000;color:#fff;font-family:'KIB Cond',Arial,sans-serif;font-weight:700;overflow:hidden}
+.pf .pf-fundo{position:absolute;left:0;top:0;width:2048px;height:512px;background:url('/podio-final/arena-final-bg-v2.png') center/cover no-repeat;opacity:.55}
+.pf .pf-luz{position:absolute;left:0;top:0;width:2048px;height:512px;background:radial-gradient(ellipse 700px 420px at 50% 40%,rgba(255,196,64,.28),rgba(255,196,64,0) 70%),linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,0) 30%,rgba(0,0,0,.25) 70%,rgba(0,0,0,.85))}
+.pf .pf-fase{position:absolute;left:0;top:0;width:2048px;height:512px;display:none}
+.pf.f-abertura .pf-abertura,.pf.f-podio .pf-palco,.pf.f-campeao .pf-campeao,.pf.f-classif .pf-classif{display:block}
+.pf.f-campeao .pf-fundo{opacity:.35}
+.pf.f-campeao .pf-luz{background:radial-gradient(ellipse 760px 520px at 20% 55%,rgba(255,196,64,.45),rgba(255,196,64,0) 70%),linear-gradient(90deg,rgba(0,0,0,0) 30%,rgba(0,0,0,.55))}
+.pf.f-classif .pf-fundo{opacity:.22}
+.pf.f-abertura .pf-fundo{opacity:.18}
+/* ouro metálico */
+.pf .ouro{background:linear-gradient(100deg,#8a5a00 0%,#ffd76a 22%,#fff3c4 34%,#ffc93a 46%,#a36b00 62%,#ffe08a 80%,#b07800 100%);background-size:240% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#ffc93a}
+/* raios girando (atrás do campeão) */
+.pf .pf-raios{position:absolute;width:1500px;height:1500px;left:274px;top:-540px;opacity:0;pointer-events:none;background:repeating-conic-gradient(rgba(255,206,84,.20) 0deg 5deg,rgba(255,206,84,0) 5deg 15deg);-webkit-mask-image:radial-gradient(circle,#000 0,#000 18%,transparent 55%);mask-image:radial-gradient(circle,#000 0,#000 18%,transparent 55%)}
+.pf.f-podio .pf-raios{-webkit-animation:pf-gira 40s linear infinite,pf-aparece 1.2s ease-out 5.2s both;animation:pf-gira 40s linear infinite,pf-aparece 1.2s ease-out 5.2s both}
+.pf.f-campeao .pf-raios{left:-380px;top:-494px;-webkit-animation:pf-gira 40s linear infinite,pf-aparece 1s ease-out .2s both;animation:pf-gira 40s linear infinite,pf-aparece 1s ease-out .2s both}
+/* fogos */
+.pf .pf-fogos i{position:absolute;width:260px;height:260px;margin:-130px 0 0 -130px;opacity:0;border-radius:50%;background:repeating-conic-gradient(var(--c,#ffd76a) 0deg 3deg,rgba(0,0,0,0) 3deg 15deg);-webkit-mask-image:radial-gradient(circle,transparent 0,transparent 22%,#000 26%,#000 48%,transparent 52%);mask-image:radial-gradient(circle,transparent 0,transparent 22%,#000 26%,#000 48%,transparent 52%)}
+.pf .pf-fogos.estoura i{-webkit-animation:pf-fogo 2.6s ease-out infinite both;animation:pf-fogo 2.6s ease-out infinite both}
+/* confete */
+.pf .pf-confete{position:absolute;left:0;top:0;width:2048px;height:512px;pointer-events:none;overflow:hidden}
+.pf .pf-confete i{position:absolute;top:-40px;display:none}
+.pf .pf-confete.chove i{display:block;-webkit-animation:pf-cai 4s linear infinite both;animation:pf-cai 4s linear infinite both}
+.pf .pf-confete.chove i.b{-webkit-animation-name:pf-cai2;animation-name:pf-cai2}
+/* topo (logo + evento) durante a cerimônia */
+.pf .pf-topo{position:absolute;left:36px;top:26px;height:64px;-webkit-animation:pf-desliza-e .7s cubic-bezier(.2,.9,.3,1) .2s both;animation:pf-desliza-e .7s cubic-bezier(.2,.9,.3,1) .2s both}
+.pf .pf-topo img{height:64px;vertical-align:middle;margin-right:18px}
+.pf .pf-topo span{display:inline-block;vertical-align:middle;font-size:22px;letter-spacing:6px;color:#c9a54a;line-height:1.25}
+.pf .pf-topo span b{display:block;font-size:40px;letter-spacing:3px;color:#fff;font-weight:700}
+.pf .pf-evento-d{position:absolute;right:40px;top:30px;text-align:right;font-size:22px;letter-spacing:5px;color:#c9a54a;line-height:1.25;-webkit-animation:pf-desliza-d .7s cubic-bezier(.2,.9,.3,1) .2s both;animation:pf-desliza-d .7s cubic-bezier(.2,.9,.3,1) .2s both}
+.pf .pf-evento-d b{display:block;font-size:40px;letter-spacing:2px;color:#fff;font-weight:700;max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-.final-header{
-  position:absolute;
-  top:0;left:0;right:0;
-  inset:0 0 auto;
-  z-index:20;
-  height:96px;
-  display:grid;
-  grid-template-columns:306px minmax(0,1fr) 218px;
-  grid-gap:24px;
-  gap:24px;
-  align-items:start;
-  padding:12px 34px 0;
-  background:linear-gradient(180deg,rgba(0,0,0,.92),rgba(0,0,0,.64) 70%,transparent);
-}
-.final-brand{
-  min-width:0;
-  height:58px;
-  display:grid;
-  place-items:center;
-  border:1px solid rgba(255,255,255,.18);
-  border-left:1px solid #ffd24a;
-  padding:4px 10px;
-  background:linear-gradient(135deg,rgba(15,15,15,.78),rgba(0,0,0,.58));
-  box-shadow:0 10px 22px rgba(0,0,0,.42),inset 0 0 16px rgba(255,255,255,.05);
-  -webkit-transform:skewX(-11deg);
-  transform:skewX(-11deg);
-}
-.final-brand img{
-  max-width:100%;
-  max-height:54px;
-  object-fit:contain;
-  -webkit-transform:skewX(11deg);
-  transform:skewX(11deg);
-  -webkit-filter:drop-shadow(0 0 10px rgba(255,255,255,.28));
-  filter:drop-shadow(0 0 10px rgba(255,255,255,.28));
-}
-.final-title{min-width:0;text-align:center}
-.final-title h1{
-  margin:0;overflow:hidden;color:#fff;min-height:62px;font-size:56px;font-style:italic;font-weight:900;line-height:1.22;text-overflow:ellipsis;white-space:nowrap;
-  text-shadow:0 4px 0 #171717,0 0 20px rgba(255,255,255,.34);
-  -webkit-animation:final-title-pulse 3.6s ease-in-out infinite;
-  animation:final-title-pulse 3.6s ease-in-out infinite;
-}
-.final-title span{
-  display:inline-block;max-width:100%;min-height:32px;margin-top:0;overflow:hidden;
-  border-top:2px solid rgba(255,210,74,.62);padding-top:3px;color:#ffd24a;font-size:21px;font-weight:900;line-height:1.2;text-overflow:ellipsis;white-space:nowrap;
-}
-.final-top-five{
-  height:64px;display:grid;align-content:center;justify-items:center;
-  border:2px solid rgba(255,210,74,.9);color:#080808;
-  background:linear-gradient(135deg,#fff2a8,#ffd24a 54%,#b7790b);
-  box-shadow:0 0 24px rgba(255,210,74,.28);padding:3px 8px 2px;font-style:italic;font-weight:900;line-height:1;
-  -webkit-transform:skewX(-11deg);transform:skewX(-11deg);
-}
-.final-top-five strong,.final-top-five small{display:block;-webkit-transform:skewX(11deg);transform:skewX(11deg)}
-.final-top-five strong{font-size:40px;line-height:.9}
-.final-top-five small{margin-top:4px;font-size:14px;font-style:normal;line-height:1}
+/* ===== Ato 1: abertura ===== */
+.pf .pf-ab-linha{position:absolute;left:224px;top:318px;width:1600px;height:4px;background:linear-gradient(90deg,rgba(255,201,58,0),#ffd76a 20%,#fff6d0 50%,#ffd76a 80%,rgba(255,201,58,0));-webkit-transform-origin:50% 50%;transform-origin:50% 50%;-webkit-animation:pf-linha 3.4s cubic-bezier(.7,0,.2,1) both;animation:pf-linha 3.4s cubic-bezier(.7,0,.2,1) both}
+.pf .pf-ab-kicker{position:absolute;left:0;right:0;top:92px;text-align:center;font-size:30px;letter-spacing:16px;color:#c9a54a;-webkit-animation:pf-sobe-in .8s ease-out .5s both,pf-some .4s ease-in 3s both;animation:pf-sobe-in .8s ease-out .5s both,pf-some .4s ease-in 3s both}
+.pf .pf-ab-titulo{position:absolute;left:0;right:0;top:132px;text-align:center;font:900 168px/1 'KIB Num',Arial,sans-serif;-webkit-animation:pf-titulo 3.4s cubic-bezier(.2,.8,.2,1) both,pf-brilho 2.2s ease-in-out .4s both;animation:pf-titulo 3.4s cubic-bezier(.2,.8,.2,1) both,pf-brilho 2.2s ease-in-out .4s both}
+.pf .pf-ab-evento{position:absolute;left:0;right:0;top:344px;text-align:center;font-size:52px;letter-spacing:10px;color:#fff;text-transform:uppercase;white-space:nowrap;-webkit-animation:pf-desce-in .8s ease-out .9s both,pf-some .4s ease-in 3s both;animation:pf-desce-in .8s ease-out .9s both,pf-some .4s ease-in 3s both}
 
-.final-podium{position:absolute;left:0;right:0;bottom:32px;z-index:12;height:324px;--block-width:374px}
-.final-podium-count-5{--block-width:324px}
-.final-podium-count-4{--block-width:396px}
-.final-podium-count-3{--block-width:446px}
-.final-podium-count-2{--block-width:466px}
-.final-podium-count-1{--block-width:520px}
-.final-podium-block{
-  position:absolute;left:var(--slot-x,50%);bottom:0;min-width:0;width:var(--block-width);height:var(--podium-height);
-  -webkit-transform:translateX(-50%);transform:translateX(-50%);
-  -webkit-animation:final-podium-rise .68s cubic-bezier(.2,.8,.2,1) both;
-  animation:final-podium-rise .68s cubic-bezier(.2,.8,.2,1) both;
-}
-.final-rank-1{--podium-height:246px;--rank-color:#ffd24a;--rank-glow:rgba(255,210,74,.55);z-index:8;width:calc(var(--block-width) + 78px);animation-delay:.08s}
-.final-rank-2{--podium-height:202px;--rank-color:#f6f8ff;--rank-glow:rgba(246,248,255,.28);z-index:6;animation-delay:.16s}
-.final-rank-3{--podium-height:186px;--rank-color:#ff9a32;--rank-glow:rgba(255,154,50,.32);z-index:5;animation-delay:.24s}
-.final-rank-4{--podium-height:134px;--rank-color:#dde4f0;--rank-glow:rgba(221,228,240,.15);z-index:3;width:calc(var(--block-width) - 58px);opacity:.9;animation-delay:.32s}
-.final-rank-5{--podium-height:144px;--rank-color:#c9d1dd;--rank-glow:rgba(201,209,221,.14);z-index:3;animation-delay:.4s}
+/* ===== Ato 2: cerimônia no pódio ===== */
+.pf .pf-ped{position:absolute;bottom:0;width:340px;overflow:hidden;background:linear-gradient(180deg,#24211a 0%,#100f0c 40%,#050505 100%);border-top:7px solid #c9a54a;-webkit-animation:pf-ergue .8s cubic-bezier(.2,.9,.25,1.05) both;animation:pf-ergue .8s cubic-bezier(.2,.9,.25,1.05) both}
+.pf .pf-ped:before{content:'';position:absolute;left:0;top:0;right:0;height:46%;background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,0))}
+.pf .pf-ped .num{position:absolute;left:14px;top:4px;font:900 120px/1 'KIB Num',Arial,sans-serif}
+.pf .pf-ped .nome{position:absolute;left:104px;right:10px;top:16px;font-size:36px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf .pf-ped .info{position:absolute;left:104px;right:10px;top:58px;font-size:26px;line-height:1;color:#c9c2ae;white-space:nowrap}
+.pf .pf-ped .info b{color:#fff;font-weight:700}
+.pf .pf-ped .tempo{position:absolute;left:104px;right:10px;top:92px;font-size:32px;line-height:1;font-variant-numeric:tabular-nums;color:#ffd76a}
+.pf .r1.pf-ped{left:854px;height:150px;border-top-color:#ffcc33}
+.pf .r2.pf-ped{left:506px;height:116px;border-top-color:#d9dfe3}
+.pf .r3.pf-ped{left:1202px;height:92px;border-top-color:#e0874a}
+.pf .r2.pf-ped .num{font-size:96px;color:#d9dfe3}.pf .r3.pf-ped .num{font-size:82px;color:#e0874a}
+.pf .r2.pf-ped .nome,.pf .r3.pf-ped .nome{font-size:30px;top:12px}
+.pf .r2.pf-ped .info,.pf .r3.pf-ped .info{top:48px;font-size:22px}
+.pf .r2.pf-ped .tempo{top:78px;font-size:26px}
+.pf .r3.pf-ped .tempo{display:none}
+.pf .r3.pf-ped .info{top:50px}
+.pf .pf-pil{position:absolute;-webkit-transform-origin:50% 100%;transform-origin:50% 100%;-webkit-animation:pf-entra-pil .9s cubic-bezier(.2,.9,.25,1.1) both;animation:pf-entra-pil .9s cubic-bezier(.2,.9,.25,1.1) both}
+.pf .pf-pil img{display:block;width:100%;height:100%;object-fit:contain;object-position:50% 100%}
+.pf .pf-pil .halo{position:absolute;left:-30%;top:-10%;width:160%;height:120%;border-radius:50%;background:radial-gradient(circle,rgba(255,206,84,.45),rgba(255,206,84,0) 62%)}
+.pf .r1.pf-pil{left:874px;bottom:150px;width:300px;height:300px}
+.pf .r2.pf-pil{left:540px;bottom:116px;width:272px;height:262px}
+.pf .r3.pf-pil{left:1236px;bottom:92px;width:272px;height:252px}
+.pf .r2.pf-pil .halo{background:radial-gradient(circle,rgba(217,223,227,.30),rgba(217,223,227,0) 62%)}
+.pf .r3.pf-pil .halo{background:radial-gradient(circle,rgba(224,135,74,.30),rgba(224,135,74,0) 62%)}
+.pf .pf-flash{position:absolute;bottom:0;width:340px;height:512px;opacity:0;background:linear-gradient(180deg,rgba(255,236,170,0),rgba(255,236,170,.55));-webkit-animation:pf-flash 1.1s ease-out both;animation:pf-flash 1.1s ease-out both}
+.pf .r1.pf-flash{left:854px}.pf .r2.pf-flash{left:506px}.pf .r3.pf-flash{left:1202px}
+.pf .pf-lado{position:absolute;top:290px;width:400px;height:150px;border-radius:14px;overflow:hidden;background:linear-gradient(180deg,rgba(28,26,20,.92),rgba(8,8,8,.92));border:2px solid rgba(201,165,74,.45)}
+.pf .pf-lado .num{position:absolute;left:20px;top:22px;font:900 96px/1 'KIB Num',Arial,sans-serif;color:#8f8a7c}
+.pf .pf-lado .nome{position:absolute;left:120px;right:16px;top:26px;font-size:36px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf .pf-lado .info{position:absolute;left:120px;right:16px;top:72px;font-size:26px;line-height:1.3;color:#c9c2ae;white-space:nowrap}
+.pf .pf-lado .info b{color:#ffd76a;font-weight:700;font-variant-numeric:tabular-nums}
+.pf .r4.pf-lado{left:60px;-webkit-animation:pf-desliza-e .8s cubic-bezier(.2,.9,.3,1) both;animation:pf-desliza-e .8s cubic-bezier(.2,.9,.3,1) both}
+.pf .r5.pf-lado{left:1588px;-webkit-animation:pf-desliza-d .8s cubic-bezier(.2,.9,.3,1) both;animation:pf-desliza-d .8s cubic-bezier(.2,.9,.3,1) both}
 
-.final-pilot{
-  position:absolute;left:50%;bottom:calc(100% - 35px);z-index:7;width:120px;height:120px;
-  -webkit-transform:translateX(-50%);transform:translateX(-50%);
-  transform-origin:bottom center;
-  -webkit-animation:final-pilot-idle 4.8s ease-in-out infinite;
-  animation:final-pilot-idle 4.8s ease-in-out infinite;
-}
-.final-pilot-winner{width:166px;height:166px;bottom:calc(100% - 45px)}
-.final-pilot::after{
-  content:"";position:absolute;left:10%;right:10%;bottom:-1px;height:22px;border-radius:999px;
-  background:radial-gradient(ellipse,rgba(0,0,0,.88),rgba(0,0,0,.28) 58%,transparent 72%);
-  -webkit-filter:blur(3px);filter:blur(3px);
-  -webkit-transform:perspective(120px) rotateX(48deg);transform:perspective(120px) rotateX(48deg);
-}
-.final-pilot-kart{
-  position:absolute;left:50%;bottom:16px;z-index:4;min-width:34px;border:1px solid rgba(255,255,255,.34);border-radius:999px;padding:3px 9px 2px;
-  color:#040404;background:linear-gradient(180deg,#fff,var(--kart-accent));
-  box-shadow:0 4px 10px rgba(0,0,0,.55),0 0 16px rgba(255,210,74,.45);
-  box-shadow:0 4px 10px rgba(0,0,0,.55),0 0 16px color-mix(in srgb,var(--kart-accent) 60%,transparent);
-  font-size:16px;font-weight:900;line-height:1;text-align:center;
-  -webkit-transform:translateX(-50%);transform:translateX(-50%);
-}
-.final-pilot-glow{
-  position:absolute;top:24px;right:9px;bottom:5px;left:9px;inset:24px 9px 5px;border-radius:999px;opacity:.5;
-  -webkit-filter:blur(30px);filter:blur(30px);
-  box-shadow:0 0 38px rgba(255,210,74,.38);
-  box-shadow:0 0 38px color-mix(in srgb,var(--kart-accent) 48%,transparent);
-}
-.final-racer-image{
-  position:relative;z-index:2;width:100%;height:100%;object-fit:contain;
-  -webkit-filter:drop-shadow(0 15px 12px rgba(0,0,0,.9)) drop-shadow(0 0 13px var(--suit-color));
-  filter:drop-shadow(0 15px 12px rgba(0,0,0,.9)) drop-shadow(0 0 13px var(--suit-color));
-}
-.final-rank-1 .final-racer-image{
-  -webkit-filter:saturate(1.18) brightness(1.08) drop-shadow(0 17px 14px rgba(0,0,0,.92)) drop-shadow(0 0 26px rgba(255,210,74,.7));
-  filter:saturate(1.18) brightness(1.08) drop-shadow(0 17px 14px rgba(0,0,0,.92)) drop-shadow(0 0 26px rgba(255,210,74,.7)) drop-shadow(0 0 14px var(--kart-accent));
-}
-.final-rank-2 .final-racer-image{-webkit-filter:saturate(.92) brightness(1.05) drop-shadow(0 15px 12px rgba(0,0,0,.9)) drop-shadow(0 0 17px rgba(220,235,255,.48));filter:saturate(.92) brightness(1.05) drop-shadow(0 15px 12px rgba(0,0,0,.9)) drop-shadow(0 0 17px rgba(220,235,255,.48))}
-.final-rank-3 .final-racer-image{-webkit-filter:sepia(.16) saturate(1.1) drop-shadow(0 15px 12px rgba(0,0,0,.9)) drop-shadow(0 0 16px rgba(255,154,50,.5));filter:sepia(.16) saturate(1.1) drop-shadow(0 15px 12px rgba(0,0,0,.9)) drop-shadow(0 0 16px rgba(255,154,50,.5))}
-.final-rank-4 .final-racer-image,.final-rank-5 .final-racer-image{opacity:.9;-webkit-filter:saturate(.82) brightness(.92) drop-shadow(0 13px 11px rgba(0,0,0,.88)) drop-shadow(0 0 10px rgba(221,228,240,.28));filter:saturate(.82) brightness(.92) drop-shadow(0 13px 11px rgba(0,0,0,.88)) drop-shadow(0 0 10px rgba(221,228,240,.28))}
+/* ===== Ato 3: campeão ===== */
+.pf .pf-c-foto{position:absolute;left:150px;bottom:0;width:500px;height:486px;-webkit-transform-origin:50% 100%;transform-origin:50% 100%;-webkit-animation:pf-c-foto 1s cubic-bezier(.2,.9,.25,1) both;animation:pf-c-foto 1s cubic-bezier(.2,.9,.25,1) both}
+.pf .pf-c-foto img{display:block;width:100%;height:100%;object-fit:contain;object-position:50% 100%}
+.pf .pf-c-kicker{position:absolute;left:740px;top:58px;font-size:58px;letter-spacing:22px;-webkit-animation:pf-desliza-d .8s cubic-bezier(.2,.9,.3,1) .35s both;animation:pf-desliza-d .8s cubic-bezier(.2,.9,.3,1) .35s both}
+.pf .pf-c-nome{position:absolute;left:730px;top:128px;width:1040px;font:900 150px/1 'KIB Num',Arial,sans-serif;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;-webkit-animation:pf-revela .9s cubic-bezier(.7,0,.2,1) .6s both;animation:pf-revela .9s cubic-bezier(.7,0,.2,1) .6s both}
+.pf .pf-c-info{position:absolute;left:740px;top:320px;height:96px;white-space:nowrap;-webkit-animation:pf-sobe-in .8s ease-out 1.1s both;animation:pf-sobe-in .8s ease-out 1.1s both}
+.pf .pf-c-kart{display:inline-block;vertical-align:middle;height:84px;padding:0 26px;border-radius:12px;background:#ffcc33;color:#140f00;font:900 60px/84px 'KIB Num',Arial,sans-serif;margin-right:34px}
+.pf .pf-c-rot{display:inline-block;vertical-align:middle;font-size:26px;letter-spacing:6px;color:#c9a54a;line-height:1.15;width:150px;white-space:normal;margin-right:18px}
+.pf .pf-c-tempo{display:inline-block;vertical-align:middle;font-size:96px;line-height:1;font-variant-numeric:tabular-nums}
+.pf .pf-c-num{position:absolute;right:70px;top:30px;font:900 440px/1 'KIB Num',Arial,sans-serif;opacity:.9;-webkit-animation:pf-num 1.1s cubic-bezier(.2,.9,.25,1) .3s both,pf-brilho 3s ease-in-out 1.6s infinite;animation:pf-num 1.1s cubic-bezier(.2,.9,.25,1) .3s both,pf-brilho 3s ease-in-out 1.6s infinite}
 
-.final-podium-column{
-  position:relative;width:100%;height:100%;overflow:visible;
-  border:1px solid rgba(255,255,255,.14);border-top:7px solid var(--rank-color);
-  background:
-    radial-gradient(ellipse at 50% 0,rgba(255,210,74,.14),transparent 42%),
-    linear-gradient(112deg,transparent 0 14%,rgba(255,255,255,.08) 15%,transparent 24%),
-    linear-gradient(180deg,rgba(255,255,255,.05),rgba(7,7,8,.78) 35%,rgba(0,0,0,.9));
-  background:
-    radial-gradient(ellipse at 50% 0,color-mix(in srgb,var(--kart-accent) 18%,transparent),transparent 42%),
-    linear-gradient(112deg,transparent 0 14%,rgba(255,255,255,.08) 15%,transparent 24%),
-    linear-gradient(180deg,rgba(255,255,255,.05),rgba(7,7,8,.78) 35%,rgba(0,0,0,.9));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.24),inset 0 -34px 44px rgba(0,0,0,.82),0 0 34px var(--rank-glow),0 22px 38px rgba(0,0,0,.62);
-  -webkit-transform:perspective(620px) rotateX(2deg);transform:perspective(620px) rotateX(2deg);
-}
-.final-podium-column::before{
-  content:"";position:absolute;top:-1px;right:-1px;bottom:-1px;left:-1px;inset:-1px;
-  background:
-    linear-gradient(90deg,rgba(255,255,255,.1),transparent 18% 82%,rgba(255,255,255,.1)),
-    repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 2px,transparent 2px 24px);
-  pointer-events:none;
-}
-.final-podium-column::after{
-  content:"";position:absolute;left:8%;right:8%;top:-17px;height:18px;
-  background:linear-gradient(180deg,var(--rank-color),rgba(255,255,255,.16));
-  box-shadow:0 0 20px var(--rank-glow);
-  -webkit-transform:perspective(340px) rotateX(54deg);transform:perspective(340px) rotateX(54deg);
-}
-.final-rank-number{
-  position:relative;z-index:9;grid-column:1;grid-row:1 / 4;width:58px;min-width:0;height:68px;display:inline-grid;place-items:center;
-  border:2px solid rgba(255,255,255,.24);border-top-color:rgba(255,255,255,.55);padding:0 10px;
-  color:#080808;background:linear-gradient(180deg,#fff9c6,var(--rank-color) 58%,#8a5b08);
-  box-shadow:0 10px 18px rgba(0,0,0,.58),0 0 22px var(--rank-glow);
-  font-size:32px;font-style:italic;font-weight:900;line-height:1;text-align:center;
-  -webkit-transform:skewX(-10deg);transform:skewX(-10deg);
-}
-.final-rank-1 .final-rank-number{
-  width:70px;height:72px;color:#ffd24a;background:linear-gradient(180deg,#2a2100,#050505 62%,#000);
-  border-color:rgba(255,210,74,.7);border-top-color:#fff1a0;font-size:38px;text-shadow:0 0 16px rgba(255,210,74,.62);
-}
-.final-rank-4 .final-rank-number,.final-rank-5 .final-rank-number{width:54px;height:62px;font-size:30px}
+/* ===== Ato 4: classificação ===== */
+.pf .pf-cl-tit{position:absolute;left:44px;top:70px;width:400px;-webkit-animation:pf-desliza-e .8s cubic-bezier(.2,.9,.3,1) .1s both;animation:pf-desliza-e .8s cubic-bezier(.2,.9,.3,1) .1s both}
+.pf .pf-cl-tit b{display:block;font-size:44px;letter-spacing:6px;color:#fff;font-weight:700}
+.pf .pf-cl-tit span{display:block;font:900 128px/1 'KIB Num',Arial,sans-serif;margin-top:4px}
+.pf .pf-cl-tit em{display:block;margin-top:22px;font-style:normal;font-size:28px;letter-spacing:4px;color:#c9a54a;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf .pf-cl-linha{position:absolute;width:770px;height:86px;border-radius:12px;overflow:hidden;background:linear-gradient(90deg,rgba(26,24,18,.95),rgba(10,10,10,.92));border:1px solid rgba(201,165,74,.25);-webkit-animation:pf-desliza-d .7s cubic-bezier(.2,.9,.3,1) both;animation:pf-desliza-d .7s cubic-bezier(.2,.9,.3,1) both}
+.pf .pf-cl-linha .p{position:absolute;left:0;top:0;width:86px;height:86px;background:#22211c;color:#fff;font:900 54px/86px 'KIB Num',Arial,sans-serif;text-align:center}
+.pf .pf-cl-linha.m1 .p{background:linear-gradient(135deg,#fff0b0,#ffcc33 45%,#b07800);color:#1a1200}
+.pf .pf-cl-linha.m2 .p{background:linear-gradient(135deg,#ffffff,#cfd8dc 45%,#7d8a90);color:#111}
+.pf .pf-cl-linha.m3 .p{background:linear-gradient(135deg,#ffd2b0,#e0874a 45%,#8a4a1c);color:#1a0a00}
+.pf .pf-cl-linha.m1{border-color:rgba(255,204,51,.7)}
+.pf .pf-cl-linha .n{position:absolute;left:108px;top:0;width:330px;font-size:40px;line-height:86px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase}
+.pf .pf-cl-linha .k{position:absolute;left:446px;top:19px;height:48px;padding:0 12px;border-radius:8px;background:#1d1c18;color:#fff;font:900 34px/50px 'KIB Num',Arial,sans-serif}
+.pf .pf-cl-linha .t{position:absolute;right:20px;top:12px;font-size:38px;line-height:1;color:#ffd76a;font-variant-numeric:tabular-nums;text-align:right}
+.pf .pf-cl-linha .g{position:absolute;right:20px;top:52px;font-size:22px;line-height:1;color:#9c968a;letter-spacing:1px;text-align:right;font-variant-numeric:tabular-nums}
+.pf .pf-cl-vazio{position:absolute;left:470px;top:220px;font-size:48px;letter-spacing:6px;color:#c9a54a}
 
-.final-driver-card{
-  position:absolute;left:13px;right:13px;bottom:12px;z-index:12;min-height:104px;
-  display:grid;grid-template-columns:auto minmax(0,1fr);grid-column-gap:8px;column-gap:8px;
-  align-content:center;align-items:center;justify-items:stretch;
-  border:1px solid rgba(255,255,255,.2);
-  border-top:3px solid rgba(255,210,74,.55);
-  border-top:3px solid color-mix(in srgb,var(--kart-accent) 65%,rgba(255,255,255,.34));
-  padding:10px 10px 9px;
-  background:linear-gradient(180deg,rgba(5,5,6,.94),rgba(0,0,0,.88));
-  box-shadow:inset 0 0 18px rgba(255,255,255,.05),0 10px 22px rgba(0,0,0,.48),0 0 18px rgba(255,210,74,.14);
-  box-shadow:inset 0 0 18px rgba(255,255,255,.05),0 10px 22px rgba(0,0,0,.48),0 0 18px color-mix(in srgb,var(--kart-accent) 18%,transparent);
-}
-.final-driver-card strong{
-  grid-column:2;width:100%;overflow:hidden;min-height:38px;color:#fff;font-size:31px;font-style:italic;font-weight:900;line-height:1.16;
-  text-align:center;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 2px 8px #000;
-}
-.final-rank-1 .final-driver-card strong{min-height:46px;font-size:36px}
-.final-podium-count-5 .final-driver-card{left:12px;right:12px;min-height:96px;padding:9px 8px 8px}
-.final-podium-count-5 .final-driver-card strong{min-height:34px;font-size:27px}
-.final-podium-count-5 .final-rank-1 .final-driver-card strong{min-height:40px;font-size:32px}
-.final-podium-count-5 .final-rank-4 .final-driver-card strong,.final-podium-count-5 .final-rank-5 .final-driver-card strong{font-size:25px}
-.final-driver-card span:not(.final-rank-number),.final-driver-card em{
-  grid-column:2;margin-top:4px;font-size:22px;font-style:normal;font-weight:900;line-height:1.08;text-align:center;
-}
-.final-driver-card span:not(.final-rank-number){color:#32ff79}
-.final-driver-card em{color:#ffd24a}
-.final-rank-1 .final-driver-card::before{
-  content:"CAMPEÃO";position:absolute;left:50%;top:-27px;border:1px solid rgba(255,210,74,.62);padding:3px 18px 2px;
-  color:#090909;background:linear-gradient(180deg,#fff8b2,#ffd24a 62%,#aa7108);
-  box-shadow:0 0 18px rgba(255,210,74,.38);font-size:18px;font-style:normal;font-weight:900;line-height:1;
-  -webkit-transform:translateX(-50%) skewX(-10deg);transform:translateX(-50%) skewX(-10deg);
-}
-
-.final-footer{
-  position:absolute;left:0;right:0;bottom:0;z-index:22;height:30px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
-  border-top:1px solid rgba(255,210,74,.45);background:linear-gradient(180deg,rgba(10,10,10,.92),rgba(0,0,0,.96));box-shadow:0 -6px 16px rgba(0,0,0,.48);
-}
-.final-footer::before,.final-footer::after{content:"";height:4px;margin:0 60px;background:linear-gradient(90deg,transparent,#ffd24a 18%,#ef233c 50%,#32ff79 82%,transparent);opacity:.48}
-.final-footer span{color:#ffd24a;font-size:21px;font-style:italic;font-weight:900;line-height:1;text-shadow:0 0 10px rgba(255,210,74,.26);white-space:nowrap}
-.final-footer strong{
-  position:absolute;right:34px;bottom:5px;max-width:420px;overflow:hidden;color:rgba(255,255,255,.78);
-  font-size:16px;font-weight:900;min-height:18px;line-height:1.2;text-overflow:ellipsis;white-space:nowrap;
-}
-
-.final-winner-splash{
-  position:absolute;top:0;right:0;bottom:0;left:0;inset:0;z-index:58;display:grid;place-items:center;align-content:center;
-  background:radial-gradient(ellipse at 50% 42%,rgba(255,210,74,.24),transparent 38%),radial-gradient(ellipse at 50% 12%,rgba(255,255,255,.08),transparent 42%),rgba(0,0,0,.9);
-  opacity:0;pointer-events:none;
-  -webkit-animation:final-winner-cycle var(--final-cycle-duration) ease-in-out infinite;
-  animation:final-winner-cycle var(--final-cycle-duration) ease-in-out infinite;
-}
-.final-winner-splash span,.final-winner-splash strong,.final-winner-splash em{
-  display:block;max-width:1940px;overflow:hidden;font-style:italic;font-weight:900;line-height:1;text-align:center;text-overflow:ellipsis;white-space:nowrap;
-}
-.final-winner-splash span{
-  color:#ffd24a;min-width:198px;border:2px solid rgba(255,210,74,.8);border-top-color:#fff5a8;padding:8px 28px 4px;
-  background:linear-gradient(180deg,rgba(32,25,0,.98),rgba(0,0,0,.95));box-shadow:0 0 36px rgba(255,210,74,.36);
-  font-size:84px;line-height:.98;text-shadow:0 0 26px rgba(255,210,74,.65);
-  -webkit-transform:skewX(-10deg);transform:skewX(-10deg);
-}
-.final-winner-splash strong{color:#fff;font-size:104px;text-shadow:0 6px 18px #000}
-.final-winner-splash em{margin-top:14px;color:#ffd24a;font-size:86px}
-
-.final-leaderboard{
-  position:absolute;top:0;right:0;bottom:0;left:0;inset:0;z-index:60;display:grid;align-content:start;justify-items:center;
-  grid-gap:24px;gap:24px;padding:72px 70px 28px;background:#020202;opacity:0;pointer-events:none;
-  -webkit-transform:scale(.97);transform:scale(.97);
-  -webkit-animation:final-leaderboard-cycle var(--final-cycle-duration) ease-in-out infinite;
-  animation:final-leaderboard-cycle var(--final-cycle-duration) ease-in-out infinite;
-}
-.final-leaderboard::before{
-  content:"";position:absolute;top:0;right:0;bottom:0;left:0;inset:0;
-  background:linear-gradient(90deg,rgba(0,0,0,.86),rgba(0,0,0,.54),rgba(0,0,0,.86)),url('/podio-final/arena-final-bg.png') center center / cover no-repeat;
-  -webkit-filter:saturate(.96) brightness(.42) blur(1px);filter:saturate(.96) brightness(.42) blur(1px);
-}
-.final-leaderboard::after{
-  content:"";position:absolute;top:22px;right:58px;bottom:22px;left:58px;inset:22px 58px;
-  border:1px solid rgba(255,210,74,.22);box-shadow:inset 0 0 50px rgba(255,210,74,.05),0 0 60px rgba(0,0,0,.8);pointer-events:none;
-}
-.final-leaderboard-title,.final-leaderboard-grid{position:relative;z-index:2}
-.final-leaderboard-title{
-  border:2px solid rgba(255,255,255,.18);border-top:5px solid #ffd24a;padding:7px 82px 5px;color:#fff;
-  background:linear-gradient(180deg,rgba(18,18,18,.96),rgba(0,0,0,.86));box-shadow:0 0 34px rgba(255,210,74,.18);
-  font-size:56px;font-style:italic;font-weight:900;line-height:1;text-shadow:0 4px 0 #000,0 0 22px rgba(255,255,255,.22);
-  -webkit-transform:skewX(-10deg);transform:skewX(-10deg);
-}
-.final-leaderboard-grid{width:1900px;display:grid;grid-template-columns:1fr 1fr;grid-gap:18px 28px;gap:18px 28px}
-.final-leaderboard-row{
-  min-width:0;height:98px;display:grid;grid-template-columns:92px minmax(0,1fr) 126px 210px;align-items:center;overflow:hidden;
-  border:1px solid rgba(255,255,255,.22);border-left:1px solid #ffd24a;color:#fff;
-  background:linear-gradient(90deg,rgba(255,210,74,.08),transparent 28%),linear-gradient(180deg,rgba(28,28,30,.97),rgba(0,0,0,.92));
-  box-shadow:0 12px 20px rgba(0,0,0,.46),inset 0 1px 0 rgba(255,255,255,.14);
-}
-.final-leaderboard-row span{
-  height:100%;display:grid;place-items:center;color:#080808;background:linear-gradient(180deg,#fff5a8,#ffd24a 58%,#a56d0a);
-  font-size:62px;font-style:italic;font-weight:900;line-height:1;
-}
-.final-leaderboard-row strong{min-width:0;overflow:hidden;min-height:48px;padding:0 20px 0 24px;font-size:38px;font-style:normal;font-weight:900;line-height:1.12;text-overflow:ellipsis;white-space:nowrap}
-.final-leaderboard-row em,.final-leaderboard-row small{font-style:normal;font-weight:900;text-align:center}
-.final-leaderboard-row em{color:#32ff79;font-size:34px}
-.final-leaderboard-row small{height:100%;display:grid;place-items:center;border-left:1px solid rgba(255,255,255,.14);color:#ffd24a;background:rgba(0,0,0,.46);font-size:31px}
-.final-leaderboard-empty{grid-column:1 / -1;height:96px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.82);background:rgba(0,0,0,.72);font-size:34px;font-weight:900}
-
-@-webkit-keyframes final-podium-rise{from{opacity:0;-webkit-transform:translateX(-50%) translateY(40px)}to{opacity:1;-webkit-transform:translateX(-50%) translateY(0)}}
-@keyframes final-podium-rise{from{opacity:0;transform:translateX(-50%) translateY(40px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-@-webkit-keyframes final-pilot-idle{0%,100%{-webkit-transform:translateX(-50%) translateY(0) rotate(-.35deg)}50%{-webkit-transform:translateX(-50%) translateY(-4px) rotate(.35deg)}}
-@keyframes final-pilot-idle{0%,100%{transform:translateX(-50%) translateY(0) rotate(-.35deg)}50%{transform:translateX(-50%) translateY(-4px) rotate(.35deg)}}
-@-webkit-keyframes final-winner-cycle{0%,7%{opacity:0;-webkit-transform:scale(1)}10%,48%{opacity:1;-webkit-transform:scale(1)}55%,100%{opacity:0;-webkit-transform:scale(1)}}
-@keyframes final-winner-cycle{0%,7%{opacity:0;transform:scale(1)}10%,48%{opacity:1;transform:scale(1)}55%,100%{opacity:0;transform:scale(1)}}
-@-webkit-keyframes final-leaderboard-cycle{0%,56%{opacity:0;-webkit-transform:scale(.98);pointer-events:none}61%,96%{opacity:1;-webkit-transform:scale(1);pointer-events:auto}100%{opacity:0;-webkit-transform:scale(1);pointer-events:none}}
-@keyframes final-leaderboard-cycle{0%,56%{opacity:0;transform:scale(.98);pointer-events:none}61%,96%{opacity:1;transform:scale(1);pointer-events:auto}100%{opacity:0;transform:scale(1);pointer-events:none}}
-@-webkit-keyframes final-title-pulse{0%,100%{text-shadow:0 4px 0 #171717,0 0 20px rgba(255,255,255,.34)}50%{text-shadow:0 4px 0 #171717,0 0 28px rgba(255,210,74,.46)}}
-@keyframes final-title-pulse{0%,100%{text-shadow:0 4px 0 #171717,0 0 20px rgba(255,255,255,.34)}50%{text-shadow:0 4px 0 #171717,0 0 28px rgba(255,210,74,.46)}}
-@-webkit-keyframes final-firework-bloom{0%{opacity:0;-webkit-transform:translate(-50%,-50%) scale(.12) rotate(0deg)}10%{opacity:.98}38%{opacity:.72;-webkit-transform:translate(-50%,-50%) scale(1) rotate(18deg)}70%{opacity:.28;-webkit-transform:translate(-50%,-50%) scale(1.16) rotate(31deg)}100%{opacity:0;-webkit-transform:translate(-50%,-50%) scale(1.24) rotate(36deg)}}
-@keyframes final-firework-bloom{0%{opacity:0;transform:translate(-50%,-50%) scale(.12) rotate(0deg)}10%{opacity:.98}38%{opacity:.72;transform:translate(-50%,-50%) scale(1) rotate(18deg)}70%{opacity:.28;transform:translate(-50%,-50%) scale(1.16) rotate(31deg)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.24) rotate(36deg)}}
+/* ===== keyframes ===== */
+@-webkit-keyframes pf-gira{from{-webkit-transform:rotate(0)}to{-webkit-transform:rotate(360deg)}}
+@keyframes pf-gira{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@-webkit-keyframes pf-aparece{from{opacity:0}to{opacity:1}}
+@keyframes pf-aparece{from{opacity:0}to{opacity:1}}
+@-webkit-keyframes pf-some{from{opacity:1}to{opacity:0}}
+@keyframes pf-some{from{opacity:1}to{opacity:0}}
+@-webkit-keyframes pf-fogo{0%{opacity:0;-webkit-transform:scale(.15)}6%{opacity:1}40%{opacity:.9;-webkit-transform:scale(1.25)}60%,100%{opacity:0;-webkit-transform:scale(1.5)}}
+@keyframes pf-fogo{0%{opacity:0;transform:scale(.15)}6%{opacity:1}40%{opacity:.9;transform:scale(1.25)}60%,100%{opacity:0;transform:scale(1.5)}}
+@-webkit-keyframes pf-cai{0%{-webkit-transform:translate3d(0,-40px,0) rotate(0)}100%{-webkit-transform:translate3d(70px,600px,0) rotate(720deg)}}
+@keyframes pf-cai{0%{transform:translate3d(0,-40px,0) rotate(0)}100%{transform:translate3d(70px,600px,0) rotate(720deg)}}
+@-webkit-keyframes pf-cai2{0%{-webkit-transform:translate3d(0,-40px,0) rotate(0)}100%{-webkit-transform:translate3d(-80px,600px,0) rotate(-540deg)}}
+@keyframes pf-cai2{0%{transform:translate3d(0,-40px,0) rotate(0)}100%{transform:translate3d(-80px,600px,0) rotate(-540deg)}}
+@-webkit-keyframes pf-linha{0%{opacity:0;-webkit-transform:scaleX(0)}25%{opacity:1;-webkit-transform:scaleX(1)}85%{opacity:1;-webkit-transform:scaleX(1)}100%{opacity:0;-webkit-transform:scaleX(1.1)}}
+@keyframes pf-linha{0%{opacity:0;transform:scaleX(0)}25%{opacity:1;transform:scaleX(1)}85%{opacity:1;transform:scaleX(1)}100%{opacity:0;transform:scaleX(1.1)}}
+@-webkit-keyframes pf-titulo{0%{opacity:0;letter-spacing:60px;-webkit-transform:scale(1.15)}30%{opacity:1;letter-spacing:4px;-webkit-transform:scale(1)}88%{opacity:1;-webkit-transform:scale(1.02)}100%{opacity:0;-webkit-transform:scale(1.25)}}
+@keyframes pf-titulo{0%{opacity:0;letter-spacing:60px;transform:scale(1.15)}30%{opacity:1;letter-spacing:4px;transform:scale(1)}88%{opacity:1;transform:scale(1.02)}100%{opacity:0;transform:scale(1.25)}}
+@-webkit-keyframes pf-brilho{0%{background-position:100% 0}100%{background-position:0 0}}
+@keyframes pf-brilho{0%{background-position:100% 0}100%{background-position:0 0}}
+@-webkit-keyframes pf-sobe-in{0%{opacity:0;-webkit-transform:translateY(40px)}100%{opacity:1;-webkit-transform:none}}
+@keyframes pf-sobe-in{0%{opacity:0;transform:translateY(40px)}100%{opacity:1;transform:none}}
+@-webkit-keyframes pf-desce-in{0%{opacity:0;-webkit-transform:translateY(-40px)}100%{opacity:1;-webkit-transform:none}}
+@keyframes pf-desce-in{0%{opacity:0;transform:translateY(-40px)}100%{opacity:1;transform:none}}
+@-webkit-keyframes pf-desliza-e{0%{opacity:0;-webkit-transform:translateX(-120px)}100%{opacity:1;-webkit-transform:none}}
+@keyframes pf-desliza-e{0%{opacity:0;transform:translateX(-120px)}100%{opacity:1;transform:none}}
+@-webkit-keyframes pf-desliza-d{0%{opacity:0;-webkit-transform:translateX(120px)}100%{opacity:1;-webkit-transform:none}}
+@keyframes pf-desliza-d{0%{opacity:0;transform:translateX(120px)}100%{opacity:1;transform:none}}
+@-webkit-keyframes pf-ergue{0%{-webkit-transform:translateY(100%)}100%{-webkit-transform:none}}
+@keyframes pf-ergue{0%{transform:translateY(100%)}100%{transform:none}}
+@-webkit-keyframes pf-entra-pil{0%{opacity:0;-webkit-transform:translateY(-90px) scale(.8)}60%{opacity:1}100%{opacity:1;-webkit-transform:none}}
+@keyframes pf-entra-pil{0%{opacity:0;transform:translateY(-90px) scale(.8)}60%{opacity:1}100%{opacity:1;transform:none}}
+@-webkit-keyframes pf-flash{0%{opacity:0}25%{opacity:1}100%{opacity:0}}
+@keyframes pf-flash{0%{opacity:0}25%{opacity:1}100%{opacity:0}}
+@-webkit-keyframes pf-c-foto{0%{opacity:0;-webkit-transform:scale(1.25) translateY(30px)}100%{opacity:1;-webkit-transform:none}}
+@keyframes pf-c-foto{0%{opacity:0;transform:scale(1.25) translateY(30px)}100%{opacity:1;transform:none}}
+@-webkit-keyframes pf-revela{0%{opacity:0;-webkit-transform:translateX(-80px) skewX(-8deg)}100%{opacity:1;-webkit-transform:none}}
+@keyframes pf-revela{0%{opacity:0;transform:translateX(-80px) skewX(-8deg)}100%{opacity:1;transform:none}}
+@-webkit-keyframes pf-num{0%{opacity:0;-webkit-transform:scale(2.2) rotate(-8deg)}100%{opacity:.9;-webkit-transform:none}}
+@keyframes pf-num{0%{opacity:0;transform:scale(2.2) rotate(-8deg)}100%{opacity:.9;transform:none}}
 
 /* 5. PATROCINADORES / MIDIA / INFORMATIVO */
 #pat-view{background:#050a08;background:radial-gradient(ellipse at 50% 45%,#0c3824 0%,#050907 60%,#000 100%)}
@@ -832,51 +609,39 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
   </div>
 
   <!-- 4. Pódio Final Oficial (Padrão exato /podio-final-tb50: 5 blocos + fogos -> Splash 1º -> Classificação 2 colunas) -->
-  <div id="podio" class="camada final-screen">
-    <div class="final-stage-photo"></div>
-    <div class="final-stage-grade"></div>
-    <div class="final-fireworks" aria-hidden="true">
-      <span class="final-firework final-firework-1"></span>
-      <span class="final-firework final-firework-2"></span>
-      <span class="final-firework final-firework-3"></span>
-      <span class="final-firework final-firework-4"></span>
-      <span class="final-firework final-firework-5"></span>
-      <span class="final-firework final-firework-6"></span>
-      <span class="final-firework final-firework-7"></span>
-    </div>
-    <div class="final-stage-smoke"></div>
+  <div id="podio" class="camada pf">
+    <div class="pf-fundo"></div>
+    <div class="pf-luz"></div>
+    <div class="pf-raios"></div>
+    <div class="pf-fogos" id="pf-fogos"></div>
 
-    <header class="final-header">
-      <div class="final-brand">
-        <img src="/brand/kartodromo-betim-logo.png" alt="Kartódromo Internacional de Betim" onerror="this.src='/kib-logo.png'">
-      </div>
-      <div class="final-title">
-        <h1>Resultado Final</h1>
-        <span id="podio-evento">TOP 5 DA CORRIDA</span>
-      </div>
-      <div class="final-top-five">
-        <strong>FINAL</strong>
-        <small id="podio-classificados">5 CLASSIFICADOS</small>
-      </div>
-    </header>
-
-    <div class="final-winner-splash" id="final-winner-splash">
-      <span id="fw-rank">1º</span>
-      <strong id="fw-name">CARREGANDO RESULTADO</strong>
-      <em id="fw-time">--:--.---</em>
+    <div class="pf-fase pf-abertura">
+      <div class="pf-ab-linha"></div>
+      <div class="pf-ab-kicker">KARTÓDROMO INTERNACIONAL DE BETIM</div>
+      <div class="pf-ab-titulo ouro">RESULTADO FINAL</div>
+      <div class="pf-ab-evento" id="pf-evento">CORRIDA</div>
     </div>
 
-    <section class="final-podium" id="final-podium" aria-label="Pódio final"></section>
+    <div class="pf-fase pf-palco">
+      <div class="pf-topo"><img src="/brand/kartodromo-betim-logo.png" alt="" onerror="this.src='/kib-logo.png'"><span>PÓDIO<b>RESULTADO FINAL</b></span></div>
+      <div class="pf-evento-d" id="pf-evento-d"></div>
+      <div id="pf-palco"></div>
+    </div>
 
-    <footer class="final-footer">
-      <span>Final de corrida</span>
-      <strong id="podio-pista">TELAO LED 2048X512</strong>
-    </footer>
+    <div class="pf-fase pf-campeao">
+      <div class="pf-c-foto" id="pf-c-foto"></div>
+      <div class="pf-c-kicker ouro" id="pf-c-kicker">CAMPEÃO</div>
+      <div class="pf-c-nome" id="pf-c-nome"></div>
+      <div class="pf-c-info"><span class="pf-c-kart" id="pf-c-kart"></span><span class="pf-c-rot">MELHOR VOLTA</span><span class="pf-c-tempo ouro" id="pf-c-tempo"></span></div>
+      <div class="pf-c-num ouro">1</div>
+    </div>
 
-    <section class="final-leaderboard" id="final-leaderboard" aria-label="Resultado final">
-      <div class="final-leaderboard-title">Resultado Final</div>
-      <div class="final-leaderboard-grid" id="final-leaderboard-grid"></div>
-    </section>
+    <div class="pf-fase pf-classif">
+      <div class="pf-cl-tit"><b>CLASSIFICAÇÃO</b><span class="ouro">FINAL</span><em id="pf-cl-evento"></em></div>
+      <div id="pf-cl-grade"></div>
+    </div>
+
+    <div class="pf-confete" id="pf-confete"></div>
   </div>
 
   <!-- 5. Patrocinadores / Mídia / Playlist Slide -->
@@ -902,9 +667,6 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
   var liveVideo = document.getElementById('live-podium-video');
   var liveMotion = document.getElementById('live-podium-motion');
   var podioView = document.getElementById('podio');
-  var finalPodiumEl = document.getElementById('final-podium');
-  var finalLeaderboardEl = document.getElementById('final-leaderboard');
-  var finalLeaderboardGridEl = document.getElementById('final-leaderboard-grid');
   var patView = document.getElementById('pat-view');
 
   var ultimo = null;
@@ -1281,7 +1043,7 @@ function shortPodiumName(nome, dupFirst) {
     if (exceto !== 'placar') placarView.style.display = 'none';
     if (exceto !== 'lista') listaView.style.display = 'none';
     if (exceto !== 'top3') { top3View.style.display = 'none'; pararVideoTop3(); }
-    if (exceto !== 'podio') podioView.style.display = 'none';
+    if (exceto !== 'podio') { podioView.style.display = 'none'; if (pfTimer) { clearTimeout(pfTimer); pfTimer = null; } pfAto = -1; }
     if (exceto !== 'pat') patView.style.display = 'none';
   }
 
@@ -1678,138 +1440,174 @@ function shortPodiumName(nome, dupFirst) {
   }
 
   // Padrão oficial /podio-final-tb50 (5 blocos + fogos -> Splash 1º Campeão -> Classificação 2 colunas)
+  // ---- Pódio final premium: 4 atos em ciclo (abertura, cerimônia 3º-2º-1º, campeão, classificação) ----
+  var PF_ATOS = [['f-abertura', 3600], ['f-podio', 13500], ['f-campeao', 9000], ['f-classif', 13000]];
+  var pfTimer = null, pfAto = -1, pfTemCampeao = false, pfTemPodio = false;
+  var pfConfete = document.getElementById('pf-confete');
+  var pfFogos = document.getElementById('pf-fogos');
+  (function () {
+    var cores = ['#ffcc33', '#ffe08a', '#ffffff', '#00e676', '#ff4d4d', '#c9a54a', '#3ddcff'];
+    var html = '';
+    for (var i = 0; i < 46; i++) {
+      var w = 8 + Math.floor(Math.random() * 10), hh = 14 + Math.floor(Math.random() * 18);
+      html += '<i class="' + (i % 2 ? 'b' : 'a') + '" style="left:' + Math.floor(Math.random() * 2048) + 'px;width:' + w + 'px;height:' + hh + 'px;background:' + cores[i % cores.length] +
+        ';-webkit-animation-duration:' + (3 + Math.random() * 2.6).toFixed(2) + 's;animation-duration:' + (3 + Math.random() * 2.6).toFixed(2) + 's"></i>';
+    }
+    pfConfete.innerHTML = html;
+    var fogos = [[300, 120, '#ffd76a'], [1750, 110, '#ffffff'], [620, 70, '#00e676'], [1430, 80, '#ffcc33'], [1024, 60, '#ff6b6b'], [130, 260, '#ffe08a'], [1900, 270, '#3ddcff']];
+    var fh = '';
+    for (var f = 0; f < fogos.length; f++) fh += '<i style="left:' + fogos[f][0] + 'px;top:' + fogos[f][1] + 'px;--c:' + fogos[f][2] + '"></i>';
+    pfFogos.innerHTML = fh;
+  })();
+  function pfChuva(liga, atraso) {
+    var is = pfConfete.childNodes;
+    if (!liga) { pfConfete.className = 'pf-confete'; return; }
+    for (var i = 0; i < is.length; i++) {
+      var d = (atraso + Math.random() * 3.2).toFixed(2) + 's';
+      is[i].style.webkitAnimationDelay = d; is[i].style.animationDelay = d;
+    }
+    pfConfete.className = 'pf-confete';
+    void pfConfete.offsetWidth;
+    pfConfete.className = 'pf-confete chove';
+  }
+  function pfEstouro(liga, atraso) {
+    var is = pfFogos.childNodes;
+    pfFogos.className = 'pf-fogos';
+    if (!liga) return;
+    for (var i = 0; i < is.length; i++) {
+      var d = (atraso + i * 0.37).toFixed(2) + 's';
+      is[i].style.webkitAnimationDelay = d; is[i].style.animationDelay = d;
+    }
+    void pfFogos.offsetWidth;
+    pfFogos.className = 'pf-fogos estoura';
+  }
+  function pfIrPara(n) {
+    if (pfTimer) clearTimeout(pfTimer);
+    // pula atos sem dados (sem 3 primeiros não há cerimônia; sem vencedor não há campeão)
+    for (var guarda = 0; guarda < PF_ATOS.length; guarda++) {
+      var nome = PF_ATOS[n % PF_ATOS.length][0];
+      if ((nome === 'f-podio' && !pfTemPodio) || (nome === 'f-campeao' && !pfTemCampeao)) n++;
+      else break;
+    }
+    pfAto = n % PF_ATOS.length;
+    var ato = PF_ATOS[pfAto];
+    podioView.className = 'camada pf';
+    void podioView.offsetWidth;
+    podioView.className = 'camada pf ' + ato[0];
+    if (ato[0] === 'f-podio') { pfChuva(true, 5.3); pfEstouro(true, 5.2); }
+    else if (ato[0] === 'f-campeao') { pfChuva(true, 0.2); pfEstouro(true, 0.6); }
+    else { pfChuva(false); pfEstouro(false); }
+    pfTimer = setTimeout(function () { pfIrPara(pfAto + 1); }, ato[1]);
+  }
+  function pfTempo(d, showMs) {
+    var raw = tempoValido(d.time) || tempoValido(d.last);
+    var t = raw ? (mmssdc(raw) || raw) : '';
+    if (t && !showMs) t = t.replace(/\.\d{3}$/, '');
+    return t;
+  }
+  function pfNome(d) {
+    var n = String(d.name || '').replace(/^\s+|\s+$/g, '');
+    if (!n || /^kart\s*\d+$/i.test(n)) return 'KART ' + d.kart;
+    return nomeCurto(n);
+  }
+  // nome que cabe no degrau/cartão: "LUCAS FERREIRA" (até 13 letras) ou "LUCAS F."
+  function pfNomeCurto(d) {
+    var n = pfNome(d);
+    if (n.length <= 13 || /^KART /.test(n)) return n;
+    var p = n.split(' ');
+    return p.length > 1 ? p[0] + ' ' + p[p.length - 1].charAt(0) + '.' : n;
+  }
+
   function mostrarPodio(s) {
     esconderTodas('podio');
     top3Chave = '';
+    var pilotos = (s.drivers || []).slice();
     var top = [];
-    var pilotos = s.drivers || [];
-    for (var i = 0; i < pilotos.length; i++) {
-      if (pilotos[i].position >= 1 && pilotos[i].position <= 5) top.push(pilotos[i]);
-    }
+    for (var i = 0; i < pilotos.length; i++) if (pilotos[i].position >= 1 && pilotos[i].position <= 10) top.push(pilotos[i]);
     top.sort(function (a, b) { return a.position - b.position; });
-
     var showMs = !cfg || cfg.mostrarMilesimos !== false;
+    var corrida = s.sessionType === 'race' || (s.race && s.race.type === 'corrida');
     var raceId = String((s.race && s.race.id) || s.eventName || '');
-    var evTxt = cleanEventName((cfg && cfg.tituloCustom) ? cfg.tituloCustom : s.eventName);
-    var trTxt = cleanTrackName((cfg && cfg.subtituloCustom) ? cfg.subtituloCustom : s.trackName);
-
-    var chave = raceId + '|' + evTxt + '|' + trTxt + '|' + (showMs ? '1' : '0') + '|' + top.map(function (d) {
-      return d.position + ':' + d.kart + ':' + d.name + ':' + (tempoValido(d.time) || tempoValido(d.last) || '--');
+    var evTxt = cleanEventName((cfg && cfg.tituloCustom) ? cfg.tituloCustom : s.eventName) || 'CORRIDA';
+    var trTxt = cleanTrackName((cfg && cfg.subtituloCustom) ? cfg.subtituloCustom : s.trackName) || '';
+    var chave = raceId + '|' + evTxt + '|' + trTxt + '|' + (showMs ? 1 : 0) + '|' + top.map(function (d) {
+      return d.position + ':' + d.kart + ':' + d.name + ':' + (tempoValido(d.time) || tempoValido(d.last) || '');
     }).join(',');
-
     var estavaOculto = podioView.style.display !== 'block';
     podioView.style.display = 'block';
+    if (chave === podioChave && !estavaOculto) return;
+    var reinicia = estavaOculto || raceId !== ultimoPodioRaceId || pfAto < 0;
+    podioChave = chave;
+    ultimoPodioRaceId = raceId;
 
-    if (chave !== podioChave || estavaOculto) {
-      var novaCorrida = raceId !== ultimoPodioRaceId;
-      podioChave = chave;
-      if (novaCorrida) ultimoPodioRaceId = raceId;
+    var porPos = {};
+    for (var r = 0; r < top.length; r++) porPos[top[r].position] = top[r];
+    texto(document.getElementById('pf-evento'), evTxt);
+    document.getElementById('pf-evento-d').innerHTML = esc(trTxt || 'KARTÓDROMO DE BETIM') + '<b>' + esc(evTxt) + '</b>';
+    texto(document.getElementById('pf-cl-evento'), evTxt + (trTxt ? ' · ' + trTxt : ''));
 
-      texto(document.getElementById('podio-evento'), evTxt);
-      texto(document.getElementById('podio-pista'), trTxt);
-      texto(document.getElementById('podio-classificados'), (top.length ? top.length : 0) + ' CLASSIFICADOS');
-
-      var dupFirst = {};
-      var firstCounts = {};
-      for (var c = 0; c < top.length; c++) {
-        var fw = firstWord(top[c].name || ('AGUARDANDO ' + top[c].position));
-        firstCounts[fw] = (firstCounts[fw] || 0) + 1;
-        if (firstCounts[fw] > 1) dupFirst[fw] = true;
-      }
-
-      var porRank = {};
-      for (var r = 0; r < top.length; r++) porRank[top[r].position] = top[r];
-
-      var count = Math.min(Math.max(top.length, 1), 5);
-      var order = PODIUM_ORDER[count] || PODIUM_ORDER[5];
-      var slots = PODIUM_SLOT_X[count] || PODIUM_SLOT_X[5];
-
-      finalPodiumEl.className = 'final-podium final-podium-count-' + top.length;
-      finalLeaderboardEl.className = 'final-leaderboard final-leaderboard-count-' + top.length;
-
-      var podiumHtml = '';
-      if (top.length > 0) {
-        for (var o = 0; o < order.length; o++) {
-          var rk = order[o];
-          var d = porRank[rk];
-          if (!d) continue;
-          var rawName = String(d.name || '').replace(/^\s+|\s+$/g, '').toUpperCase() || ('KART ' + d.kart);
-          var sName = shortPodiumName(rawName, dupFirst);
-          var kartStr = String(d.kart || '').replace(/^\s+|\s+$/g, '');
-          var hasKart = Boolean(kartStr && kartStr !== '-');
-          var rawTime = tempoValido(d.time) || tempoValido(d.last);
-          var tStr = rawTime ? (mmssmmm(rawTime) || rawTime) : '--:--.---';
-          if (!showMs && tStr !== '--:--.---') tStr = tStr.replace(/\.\d{3}$/, '');
-          var suit = SUIT_COLORS[rk - 1] || SUIT_COLORS[o % SUIT_COLORS.length];
-          var kAccent = kartAccent(kartStr || String(rk));
-          var slotX = slots[rk] || 50;
-
-          podiumHtml += '<article class="final-podium-block final-rank-' + rk + ' final-filled" style="--slot-x:' + slotX + '%;--kart-accent:' + kAccent + '">' +
-            '<div class="final-pilot' + (rk === 1 ? ' final-pilot-winner' : '') + '" aria-hidden="true">' +
-              '<div class="final-pilot-glow" style="background-color:' + suit + '"></div>' +
-              (hasKart ? ('<span class="final-pilot-kart">' + esc(kartStr) + '</span>') : '') +
-              fotoOuCapacete('final-racer-image', kartStr, s.race && s.race.id, '--suit-color:' + suit) +
-            '</div>' +
-            '<div class="final-podium-column">' +
-              '<div class="final-driver-card">' +
-                '<span class="final-rank-number">' + rk + 'º</span>' +
-                '<strong title="' + esc(rawName) + '">' + esc(sName) + '</strong>' +
-                (hasKart ? ('<span>Kart ' + esc(kartStr) + '</span>') : '<span>Classificado</span>') +
-                '<em>' + esc(tStr) + '</em>' +
-              '</div>' +
-            '</div>' +
-          '</article>';
-        }
-      }
-      finalPodiumEl.innerHTML = podiumHtml;
-
-      var lbHtml = '';
-      if (top.length > 0) {
-        for (var l = 0; l < top.length; l++) {
-          var ld = top[l];
-          var lRawName = String(ld.name || '').replace(/^\s+|\s+$/g, '').toUpperCase() || ('KART ' + ld.kart);
-          var lbName = leaderboardPodiumName(lRawName);
-          var lKart = String(ld.kart || '').replace(/^\s+|\s+$/g, '');
-          var lHasKart = Boolean(lKart && lKart !== '-');
-          var lRawTime = tempoValido(ld.time) || tempoValido(ld.last);
-          var lTime = lRawTime ? (mmssmmm(lRawTime) || lRawTime) : '--:--.---';
-          if (!showMs && lTime !== '--:--.---') lTime = lTime.replace(/\.\d{3}$/, '');
-          lbHtml += '<div class="final-leaderboard-row final-filled">' +
-            '<span>' + esc(ld.position) + '</span>' +
-            '<strong title="' + esc(lRawName) + '">' + esc(lbName) + '</strong>' +
-            '<em>' + (lHasKart ? ('#' + esc(lKart)) : 'Final') + '</em>' +
-            '<small>' + esc(lTime) + '</small>' +
-          '</div>';
-        }
-      } else {
-        lbHtml = '<div class="final-leaderboard-empty">Aguardando resultado oficial</div>';
-      }
-      finalLeaderboardGridEl.innerHTML = lbHtml;
-
-      var winner = porRank[1] || top[0];
-      if (winner) {
-        var wRawName = String(winner.name || '').replace(/^\s+|\s+$/g, '').toUpperCase() || ('KART ' + winner.kart);
-        var wRawTime = tempoValido(winner.time) || tempoValido(winner.last);
-        var wTime = wRawTime ? (mmssmmm(wRawTime) || wRawTime) : '--:--.---';
-        if (!showMs && wTime !== '--:--.---') wTime = wTime.replace(/\.\d{3}$/, '');
-        texto(document.getElementById('fw-rank'), winner.position + 'º');
-        texto(document.getElementById('fw-name'), leaderboardPodiumName(wRawName));
-        texto(document.getElementById('fw-time'), wTime);
-      } else {
-        texto(document.getElementById('fw-rank'), 'TOP 5');
-        texto(document.getElementById('fw-name'), 'AGUARDANDO RESULTADO FINAL');
-        texto(document.getElementById('fw-time'), '--:--.---');
-      }
-
-      if (estavaOculto || novaCorrida) {
-        var splash = document.getElementById('final-winner-splash');
-        splash.style.animation = 'none';
-        finalLeaderboardEl.style.animation = 'none';
-        void podioView.offsetWidth;
-        splash.style.animation = '';
-        finalLeaderboardEl.style.animation = '';
-      }
+    // Ato 2: pódio (3º sobe primeiro, depois 2º, por último o 1º; 4º e 5º entram nas laterais)
+    var atraso = { 3: 0.3, 2: 2.6, 1: 4.9 };
+    var html = '';
+    var ordem = [3, 2, 1];
+    for (var o = 0; o < ordem.length; o++) {
+      var rk = ordem[o], d = porPos[rk];
+      if (!d) continue;
+      var t0 = atraso[rk];
+      var dl = function (x) { return '-webkit-animation-delay:' + x + 's;animation-delay:' + x + 's'; };
+      html += '<div class="pf-flash r' + rk + '" style="' + dl(t0 + 0.5) + '"></div>' +
+        '<div class="pf-pil r' + rk + '" style="' + dl(t0 + 0.55) + '"><div class="halo"></div>' + fotoOuCapacete('pf-img', String(d.kart || ''), s.race && s.race.id) + '</div>' +
+        '<div class="pf-ped r' + rk + '" style="' + dl(t0) + '">' +
+          '<span class="num' + (rk === 1 ? ' ouro' : '') + '">' + rk + '</span>' +
+          '<span class="nome">' + esc(pfNomeCurto(d)) + '</span>' +
+          '<span class="info">KART <b>' + esc(d.kart || '-') + '</b></span>' +
+          '<span class="tempo">' + esc(pfTempo(d, showMs)) + '</span>' +
+        '</div>';
     }
+    for (var lado = 4; lado <= 5; lado++) {
+      var dd = porPos[lado];
+      if (!dd) continue;
+      var tl = lado === 4 ? 8.0 : 8.4;
+      html += '<div class="pf-lado r' + lado + '" style="-webkit-animation-delay:' + tl + 's;animation-delay:' + tl + 's">' +
+        '<span class="num">' + lado + '</span><span class="nome">' + esc(pfNome(dd)) + '</span>' +
+        '<span class="info">KART ' + esc(dd.kart || '-') + ' · <b>' + esc(pfTempo(dd, showMs)) + '</b></span></div>';
+    }
+    document.getElementById('pf-palco').innerHTML = html;
+    pfTemPodio = !!porPos[1];
+
+    // Ato 3: campeão
+    var w = porPos[1];
+    pfTemCampeao = !!w;
+    if (w) {
+      document.getElementById('pf-c-foto').innerHTML = fotoOuCapacete('pf-img', String(w.kart || ''), s.race && s.race.id);
+      texto(document.getElementById('pf-c-kicker'), corrida ? 'CAMPEÃO' : 'POLE POSITION');
+      var cNome = pfNome(w), cEl = document.getElementById('pf-c-nome');
+      texto(cEl, cNome);
+      cEl.style.fontSize = Math.max(84, Math.min(150, Math.floor(1020 / (Math.max(cNome.length, 1) * 0.58)))) + 'px';
+      texto(document.getElementById('pf-c-kart'), 'KART ' + (w.kart || '-'));
+      texto(document.getElementById('pf-c-tempo'), pfTempo(w, showMs));
+    }
+
+    // Ato 4: classificação (até 10, em 2 colunas de 5)
+    var pole = w ? msDe(tempoValido(w.time) || '') : 0;
+    var cl = '';
+    for (var c = 0; c < top.length && c < 10; c++) {
+      var p = top[c];
+      var col = c < 5 ? 0 : 1, lin = c % 5;
+      var gap = '';
+      if (p.position === 1) gap = corrida ? 'VENCEDOR' : 'POLE';
+      else if (corrida) gap = tempoValido(p.gap) ? String(p.gap) : '';
+      else { var mb = msDe(tempoValido(p.time) || ''); gap = (mb && pole) ? '+' + ((mb - pole) / 1000).toFixed(3) : ''; }
+      var at = (0.35 + c * 0.11).toFixed(2);
+      cl += '<div class="pf-cl-linha' + (p.position <= 3 ? ' m' + p.position : '') + '" style="left:' + (470 + col * 790) + 'px;top:' + (34 + lin * 92) + 'px;-webkit-animation-delay:' + at + 's;animation-delay:' + at + 's">' +
+        '<span class="p">' + esc(p.position) + '</span><span class="n">' + esc(pfNome(p)) + '</span>' +
+        '<span class="k">' + esc(p.kart || '-') + '</span><span class="t">' + esc(pfTempo(p, showMs)) + '</span><span class="g">' + esc(gap) + '</span></div>';
+    }
+    if (!top.length) cl = '<div class="pf-cl-vazio">AGUARDANDO RESULTADO OFICIAL</div>';
+    document.getElementById('pf-cl-grade').innerHTML = cl;
+
+    if (reinicia) pfIrPara(0);
+    else if (podioView.className.indexOf('f-') < 0) pfIrPara(pfAto);
   }
 
   function mostrarPatrocinadores(itemPlaylist) {
@@ -2012,7 +1810,7 @@ function shortPodiumName(nome, dupFirst) {
     }
   }
 
-  var TB50_VERSAO = '2026-11-20-anim3';
+  var TB50_VERSAO = '2026-11-20-podio1';
   var ultimoErro = '';
   window.onerror = function (msg, src, linha) {
     var e = String(msg || '').slice(0, 120) + '@' + (linha || 0);
