@@ -428,6 +428,9 @@ public class FormEditarReserva : DialogoDesign
         $"{r.S("reserva")} · {r.S("cliente")}" + (r.B("aprovada") ? "" : " · pré-reserva") + (r.S("origem") is { Length: > 0 } o && o != "recepcao" ? $" do {(o == "totem" ? "totem" : o)}" : ""), PecasDesign.Tile(Color.FromArgb(255, 122, 107), Color.FromArgb(224, 52, 42), "bandeira"))
     {
         var pago = r.B("pago");
+        // 20/11/2026: bateria com produto de R$ 0 (LOTOKART com "EVENTOS") dava a reserva como paga ao aprovar e o
+        // produto travava. Paga com R$ 0 não recebeu nada: deixa escolher o produto (volta a ficar a pagar).
+        var pagaSemValor = pago && (r.L("total") ?? 0) == 0;
         var termo = new CheckBox { Text = "Termo assinado", Checked = r.B("termo") };
 
         var cliente = new Label { Text = r.S("cliente"), AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Tokens.Primitivo.Branco, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
@@ -445,7 +448,7 @@ public class FormEditarReserva : DialogoDesign
         var mover = AcaoCampo("Mover");
         mover.Click += (_, _) => { using var f = new FormMoverCliente(r); if (f.ShowDialog(this) == DialogResult.OK) { DialogResult = DialogResult.OK; Close(); } };
 
-        var prod = new ListaDesign { Enabled = !pago };
+        var prod = new ListaDesign { Enabled = !pago || pagaSemValor };
         prod.Items.AddRange(Sessao.Lista("produtos").Select(p => (object)new Campos.Item(p.L("id") ?? 0, p.S("nome"), p)).ToArray());
         Campos.Selecionar(prod, r.L("produtoId"));
         var cat = new ListaDesign();
@@ -504,7 +507,7 @@ public class FormEditarReserva : DialogoDesign
             if (pesoTexto.Length > 0 && (!decimal.TryParse(pesoTexto.Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out var kgAtual) || kgAtual <= 0 || kgAtual >= 500))
             { Msg.Aviso(this, "Peso inválido. Informe um valor entre 0 e 500 kg."); return; }
             var body = new JsonObject { ["observacao"] = obs.Text.Trim(), ["kart"] = kart.Text.Trim(), ["peso"] = pesoTexto };
-            if (!pago && Campos.IdDe(prod) is long pid) body["produtoId"] = pid;
+            if ((!pago || pagaSemValor) && Campos.IdDe(prod) is long pid) body["produtoId"] = pid;
             body["termo"] = termo.Checked;
             await Sessao.Api.PutAsync($"/api/office/reservas/{r.S("id")}", body);
             if (aprovada.Checked && !r.B("aprovada")) await Sessao.Api.PostAsync($"/api/office/reservas/{r.S("id")}/aprovar");

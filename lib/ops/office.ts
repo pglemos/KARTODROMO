@@ -2026,7 +2026,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       let produtoOrigem: number | null = null;
       if (produtoDesejado !== null || atualizarTermo) {
         const [reserva] = await run(
-          `SELECT i.pago AS "Pago", i.status AS "Status", coalesce(i.produto_id, b.produto_id) "produtoId"
+          `SELECT i.pago AS "Pago", i.status AS "Status", coalesce(i.produto_id, b.produto_id) "produtoId", coalesce(i.valor_centavos, 0) "Valor"
            FROM kart.inscricao i JOIN kart.bateria b ON b.id = i.bateria_id WHERE i.id = @id for update of i`,
           { id },
         );
@@ -2034,7 +2034,12 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
         if (reserva.Status === 'cancelada') throw new HttpError(409, 'Não é possível editar uma reserva cancelada.');
         produtoOrigem = reserva.produtoId == null ? null : Number(reserva.produtoId);
         if (produtoDesejado !== null && produtoOrigem !== produtoDesejado) {
-          if (reserva.Pago) throw new HttpError(409, 'Não é permitido trocar o produto de uma reserva paga.');
+          // 20/11/2026: bateria com produto de R$ 0 (ex.: EVENTOS no campeonato LOTOKART) dava a reserva como paga
+          // na aprovação e a recepção não conseguia mais escolher o valor. "Paga" com R$ 0 não recebeu nada:
+          // trocar o produto volta a reserva para a pagar, como no estorno.
+          const pagaSemValor = reserva.Pago && Number(reserva.Valor) === 0;
+          if (reserva.Pago && !pagaSemValor) throw new HttpError(409, 'Não é permitido trocar o produto de uma reserva paga.');
+          if (pagaSemValor) sets.push('pago = false', "status = 'reservada'", 'valor_centavos = NULL', 'venda_id = NULL', 'atualizado_em = now()');
           const [prod] = await run(`SELECT preco_centavos preco FROM kart.produto WHERE id = @pid for update`, { pid: produtoDesejado });
           if (!prod) throw new HttpError(404, 'Produto não encontrado.');
           sets.push(
