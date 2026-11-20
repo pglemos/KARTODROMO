@@ -728,6 +728,18 @@ export function ehErroLimitePorHora(texto: string): boolean {
   return /\(\d+\/\d+ \(\d+%\)\) allowed|exceeded|sending limit|limite de e-mails por hora|too many login attempts|too many.*connections/i.test(texto);
 }
 
+/** Cota DIÁRIA do plano do Resend esgotada (texto bruto da API ou já traduzido). */
+export function ehCotaDiariaDoResend(texto: string): boolean {
+  return /daily_quota_exceeded|daily email sending quota|limite DIÁRIO do plano do Resend/i.test(texto);
+}
+
+/** 21h de Brasília (00:00 UTC): quando a cota diária do Resend renova. */
+export function proximaRenovacaoDoResend(agora = Date.now()): number {
+  const d = new Date(agora);
+  d.setUTCHours(24, 0, 0, 0);
+  return d.getTime();
+}
+
 /** Erros do servidor de e-mail em português (a tela e o registro mostram isso para o operador). */
 export function traduzirErro(e: unknown): string {
   const m = e instanceof Error ? e.message : String(e);

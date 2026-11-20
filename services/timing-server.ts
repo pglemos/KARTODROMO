@@ -97,7 +97,7 @@ import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ra
 import { condicaoChuvaPeloTracado, dataBrasilia, historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
 import { calcularComAnteriores, retomarEqualizacao, validarFaixasRedutor, type FaixaRedutor, faixasDaRegra, importarKarts, REGRA_PADRAO, regraDa, SISTEMAS_KART, tempoVoltaParaMs, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
 import { nomeProprio } from '../lib/nomes';
-import { configPublica, ehErroLimitePorHora, enviarEmailSimples, enviarResultado, enviarTeste, lerConfig, salvarConfig, semEmailAosPilotos, traduzirErro, verificarTransporteEmail, type Dependencias, type OpcoesEnvio } from './timing-email';
+import { configPublica, ehCotaDiariaDoResend, ehErroLimitePorHora, enviarEmailSimples, proximaRenovacaoDoResend, enviarResultado, enviarTeste, lerConfig, salvarConfig, semEmailAosPilotos, traduzirErro, verificarTransporteEmail, type Dependencias, type OpcoesEnvio } from './timing-email';
 import { usoKartsDaSessao } from '../lib/timing/kart-fisico';
 import { serializeMobilePublication } from '../lib/timing/mobile-results';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
@@ -1897,6 +1897,40 @@ setInterval(() => {
 // (resultado oficial + volta a volta). Conta de e-mail do kartódromo em data/timing/email.json (tela na Cronometragem).
 
 const EMAIL_FILE = join(DATA_DIR, 'email.json');
+/**
+ * Saída de reserva (20/11/2026): quando o Resend esgota a cota DIÁRIA do plano, nada mais saía — nem o resultado das
+ * baterias, nem a fila do site (reserva confirmada, termo, conta), que também passa por aqui: 464 e-mails presos de
+ * 14 a 20/11. Com o Resend sem cota, o envio usa `email-reserva.json` (HostGator pelo nome do próprio servidor,
+ * porque o certificado de mail.kartodromodebetim.com.br venceu em 17/11) até a renovação às 21h de Brasília.
+ * Sem o arquivo, tudo segue como antes.
+ */
+const EMAIL_RESERVA_FILE = join(DATA_DIR, 'email-reserva.json');
+let resendSemCotaAte = 0;
+/** O arquivo de e-mail da vez: o principal; com o Resend sem cota hoje, a reserva (se existir). */
+function arquivoDeEmail() {
+  return Date.now() < resendSemCotaAte && existsSync(EMAIL_RESERVA_FILE) ? EMAIL_RESERVA_FILE : EMAIL_FILE;
+}
+/** Marca o Resend sem cota até a renovação, quando o erro é a cota diária e existe a saída de reserva. */
+function marcarResendSemCota(texto: string) {
+  if (!ehCotaDiariaDoResend(texto) || !existsSync(EMAIL_RESERVA_FILE)) return false;
+  if (Date.now() >= resendSemCotaAte) log('e-mail: Resend sem cota hoje; usando a saída de reserva (email-reserva.json) até as 21h');
+  resendSemCotaAte = proximaRenovacaoDoResend();
+  return true;
+}
+/** Um e-mail avulso pela saída da vez; se o Resend acabou de esgotar a cota, tenta na hora pela reserva. */
+async function enviarEmailComReserva(m: { to: string; subject: string; text: string; html: string }) {
+  const arquivo = arquivoDeEmail();
+  try {
+    await enviarEmailSimples(arquivo, SIMULATE, m);
+  } catch (e) {
+    const bruta = e instanceof Error ? e.message : String(e);
+    if (arquivo === EMAIL_FILE && marcarResendSemCota(bruta)) {
+      await enviarEmailSimples(arquivoDeEmail(), SIMULATE, m);
+      return;
+    }
+    throw e;
+  }
+}
 const LOGO_EMAIL = (() => {
   // versão pequena (360 px, 35 KB): o logo original (263 KB) ia 3 vezes por e-mail e deixava cada um com 1,1 MB
   try { return readFileSync(resolve(process.cwd(), 'services', 'timing-ui', 'logo-email.png')); } catch { return null; }
@@ -2020,7 +2054,11 @@ function enviarResultadoEmFila(s: Session, op: OpcoesEnvio) {
   let trabalhoReal: Promise<void> = Promise.resolve();
   const iniciou = new Promise<void>((resolve) => { iniciar = resolve; });
   const tarefa = () => {
-    const trabalho = enviarResultado(s, EMAIL_FILE, depEmail, op);
+    const trabalho = enviarResultado(s, arquivoDeEmail(), depEmail, op).then((r) => {
+      // Resend sem cota: a próxima tentativa (o ciclo de reenvio) já sai pela reserva
+      for (const f of r?.falhas ?? []) if (marcarResendSemCota(String(f.erro ?? ''))) break;
+      return r;
+    });
     trabalhoReal = trabalho.then(() => undefined, () => undefined);
     iniciar();
     let timer: NodeJS.Timeout | undefined;
@@ -2104,7 +2142,7 @@ async function enviarEmailsDoApp() {
     let enviados = 0;
     for (const m of fila) {
       let ok = true;
-      try { await enviarEmailSimples(EMAIL_FILE, SIMULATE, m); enviados++; }
+      try { await enviarEmailComReserva(m); enviados++; }
       catch (e) {
         ok = false;
         const msgBruta = e instanceof Error ? e.message : String(e);
