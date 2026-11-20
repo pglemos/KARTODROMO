@@ -49,6 +49,59 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 .casa.vazia .k{color:#1f2823}
 .casa.vazia .n,.casa.vazia .t{color:transparent}
 
+/* 1b. ANIMAÇÕES DA CORRIDA (só transform/opacity: leves para a TB50) */
+.casa .sw{position:absolute;top:0;bottom:0;left:-62%;width:62%;opacity:0;pointer-events:none;background:linear-gradient(100deg,rgba(255,255,255,0) 0%,rgba(0,230,118,.38) 50%,rgba(255,255,255,0) 100%);-webkit-transform:skewX(-14deg);transform:skewX(-14deg)}
+.casa .in:after{content:'';position:absolute;left:0;top:0;right:0;bottom:0;border:4px solid #e05cff;border-radius:12px;opacity:0;pointer-events:none}
+.casa .tag{position:absolute;display:none;height:44px;padding:0 14px;border-radius:8px;font:700 26px/44px 'KIB Cond',Arial,sans-serif;letter-spacing:1px;white-space:nowrap;color:#03140a;background:#00e676}
+.casa.larga .tag{left:78px;top:16px}
+.casa.compacta .tag{left:50%;bottom:10px;height:38px;line-height:38px;font-size:24px;-webkit-transform:translateX(-50%);transform:translateX(-50%)}
+.in.com-tag .tag{display:block;-webkit-animation:fx-tag .35s ease-out both;animation:fx-tag .35s ease-out both}
+.in.com-tag .n{opacity:0}
+.casa.compacta .in.com-tag .tag{-webkit-animation:fx-tag-c .35s ease-out both;animation:fx-tag-c .35s ease-out both}
+.in.tag-pb .tag{background:#00e676;color:#03140a}
+.in.tag-rec .tag{background:#e05cff;color:#1a0420}
+.in.tag-sobe .tag{background:#00e676;color:#03140a}
+.in.tag-sobe .tag:before{content:'';display:inline-block;width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-bottom:15px solid #03140a;margin-right:9px;vertical-align:3px}
+/* volta completada: o tempo "salta" */
+.in.fx-volta .t{-webkit-animation:fx-pop .7s cubic-bezier(.2,.9,.3,1.3) both;animation:fx-pop .7s cubic-bezier(.2,.9,.3,1.3) both}
+/* melhor volta do piloto: brilho verde atravessa o cartão */
+.in.fx-pb .sw{-webkit-animation:fx-sweep 1.1s ease-out both;animation:fx-sweep 1.1s ease-out both}
+/* volta mais rápida da sessão: brilho roxo + moldura pulsando */
+.in.fx-rec .sw{background:linear-gradient(100deg,rgba(255,255,255,0) 0%,rgba(224,92,255,.5) 50%,rgba(255,255,255,0) 100%);-webkit-animation:fx-sweep 1.1s ease-out 2 both;animation:fx-sweep 1.1s ease-out 2 both}
+.in.fx-rec:after{-webkit-animation:fx-moldura .7s ease-in-out 5 both;animation:fx-moldura .7s ease-in-out 5 both}
+/* ultrapassagem: o número sobe (ganhou) ou desce (perdeu) para o lugar */
+.in.fx-sobe .k{-webkit-animation:fx-sobe .65s cubic-bezier(.2,.9,.25,1.15) both;animation:fx-sobe .65s cubic-bezier(.2,.9,.25,1.15) both}
+.in.fx-desce .k{-webkit-animation:fx-desce .65s cubic-bezier(.2,.9,.25,1.15) both;animation:fx-desce .65s cubic-bezier(.2,.9,.25,1.15) both}
+/* entrada escalonada (início de sessão / página carregada) */
+.in.fx-entra{-webkit-animation:fx-entra .7s cubic-bezier(.2,.9,.3,1) both;animation:fx-entra .7s cubic-bezier(.2,.9,.3,1) both}
+/* líder: reflexo dourado passando de tempos em tempos */
+.casa.pos1 .in:before{content:'';position:absolute;top:0;bottom:0;left:-50%;width:50%;pointer-events:none;background:linear-gradient(100deg,rgba(255,204,51,0) 0%,rgba(255,204,51,.22) 50%,rgba(255,204,51,0) 100%);-webkit-animation:fx-lider 7s ease-in-out 2s infinite;animation:fx-lider 7s ease-in-out 2s infinite}
+/* bandeiras: faixa do topo de todos os cartões */
+#grid-box.flag-yellow .bar,#grid-box.flag-red .bar,#grid-box.flag-chk .bar{height:12px}
+#grid-box.flag-yellow .bar{background:#ffd400;-webkit-animation:fx-pisca 1s steps(1) infinite;animation:fx-pisca 1s steps(1) infinite}
+#grid-box.flag-red .bar{background:#ff2d2d;-webkit-animation:fx-pisca .8s steps(1) infinite;animation:fx-pisca .8s steps(1) infinite}
+#grid-box.flag-chk .bar{background-color:#fff;background-image:linear-gradient(45deg,#000 25%,transparent 25%,transparent 75%,#000 75%),linear-gradient(45deg,#000 25%,transparent 25%,transparent 75%,#000 75%);background-size:12px 12px;background-position:0 0,6px 6px}
+@-webkit-keyframes fx-pop{0%{-webkit-transform:scale(1.28);opacity:.25}100%{-webkit-transform:scale(1);opacity:1}}
+@keyframes fx-pop{0%{transform:scale(1.28);opacity:.25}100%{transform:scale(1);opacity:1}}
+@-webkit-keyframes fx-sweep{0%{opacity:1;-webkit-transform:translateX(0) skewX(-14deg)}100%{opacity:1;-webkit-transform:translateX(280%) skewX(-14deg)}}
+@keyframes fx-sweep{0%{opacity:1;transform:translateX(0) skewX(-14deg)}100%{opacity:1;transform:translateX(280%) skewX(-14deg)}}
+@-webkit-keyframes fx-moldura{0%,100%{opacity:0}50%{opacity:1}}
+@keyframes fx-moldura{0%,100%{opacity:0}50%{opacity:1}}
+@-webkit-keyframes fx-sobe{0%{-webkit-transform:translateY(70px);opacity:0}100%{-webkit-transform:translateY(0);opacity:1}}
+@keyframes fx-sobe{0%{transform:translateY(70px);opacity:0}100%{transform:translateY(0);opacity:1}}
+@-webkit-keyframes fx-desce{0%{-webkit-transform:translateY(-70px);opacity:0}100%{-webkit-transform:translateY(0);opacity:1}}
+@keyframes fx-desce{0%{transform:translateY(-70px);opacity:0}100%{transform:translateY(0);opacity:1}}
+@-webkit-keyframes fx-entra{0%{-webkit-transform:translateY(40px) scale(.94);opacity:0}100%{-webkit-transform:none;opacity:1}}
+@keyframes fx-entra{0%{transform:translateY(40px) scale(.94);opacity:0}100%{transform:none;opacity:1}}
+@-webkit-keyframes fx-lider{0%{-webkit-transform:translateX(0)}35%,100%{-webkit-transform:translateX(320%)}}
+@keyframes fx-lider{0%{transform:translateX(0)}35%,100%{transform:translateX(320%)}}
+@-webkit-keyframes fx-pisca{0%{opacity:1}50%{opacity:.15}}
+@keyframes fx-pisca{0%{opacity:1}50%{opacity:.15}}
+@-webkit-keyframes fx-tag{0%{-webkit-transform:translateX(-16px);opacity:0}100%{-webkit-transform:none;opacity:1}}
+@keyframes fx-tag{0%{transform:translateX(-16px);opacity:0}100%{transform:none;opacity:1}}
+@-webkit-keyframes fx-tag-c{0%{-webkit-transform:translate(-50%,14px);opacity:0}100%{-webkit-transform:translate(-50%,0);opacity:1}}
+@keyframes fx-tag-c{0%{transform:translate(-50%,14px);opacity:0}100%{transform:translate(-50%,0);opacity:1}}
+
 /* 2. LISTA LAPTIME (relógio à esquerda + classificação à direita) */
 #lista-view{background:#000}
 #lista-esq{position:absolute;left:8px;top:8px;width:404px;height:496px;background:#0b100d;border-radius:14px;overflow:hidden;text-align:center}
@@ -1101,9 +1154,10 @@ function shortPodiumName(nome, dupFirst) {
       d.style.top = (lin * h) + 'px';
       d.style.width = w + 'px';
       d.style.height = h + 'px';
-      d.innerHTML = '<div class="in"><i class="bar"></i><span class="p"></span><span class="n"></span><span class="k">-</span>' + (compacto ? '' : '<span class="t"></span>') + '</div>';
+      d.innerHTML = '<div class="in"><i class="bar"></i><i class="sw"></i><span class="p"></span><span class="n"></span><span class="k">-</span>' + (compacto ? '' : '<span class="t"></span>') + '<b class="tag"></b></div>';
       var inn = d.firstChild;
-      d._p = inn.childNodes[1]; d._n = inn.childNodes[2]; d._k = inn.childNodes[3]; d._t = inn.childNodes[4] || null;
+      d._in = inn; d._p = inn.childNodes[2]; d._n = inn.childNodes[3]; d._k = inn.childNodes[4]; d._t = compacto ? null : inn.childNodes[5]; d._tag = inn.lastChild;
+      inn.style.webkitAnimationDelay = inn.style.animationDelay = ((lin * 0.12) + col * 0.06) + 's';
       gridBox.appendChild(d);
       casas.push(d);
     }
@@ -1151,6 +1205,12 @@ function shortPodiumName(nome, dupFirst) {
     var corDest = (cfg && cfg.corDestaque) ? cfg.corDestaque : '#ffb300';
     var showMs = !cfg || cfg.mostrarMilesimos !== false;
     var recorde = melhorDaSessao(pilotos);
+    var sAtual = ultimo || {};
+    var flag = sAtual.status === 'finished' ? 'chk' : ((sAtual.race && sAtual.race.flag) || '');
+    var flagCls = flag === 'yellow' ? 'flag-yellow' : flag === 'red' ? 'flag-red' : (flag === 'chk' || flag === 'checkered' || flag === 'quadriculada') ? 'flag-chk' : '';
+    if (gridBox.className !== flagCls) gridBox.className = flagCls;
+    var eventos = detectarEventos(pilotos, (sAtual.race && sAtual.race.id) || sAtual.eventName || '', recorde, sAtual.sessionType === 'race');
+    if (eventos === 'entrada') { for (var e = 0; e < casas.length; e++) animar(casas[e]._in, 'fx-entra', 1600); eventos = {}; }
 
     for (var c = 0; c < pageSize; c++) {
       var pos = base + c + 1;
@@ -1172,7 +1232,97 @@ function shortPodiumName(nome, dupFirst) {
         var cor = corTempo(p, rawTempo, recorde, corPri, corDest);
         if (el._t.style.color !== cor) el._t.style.color = cor;
       }
+      var kartAqui = p ? String(p.kart) : '';
+      var ev = p ? eventos[kartAqui] : null;
+      if (el._kart !== kartAqui) {
+        // outro kart entrou neste lugar: o brilho/etiqueta do anterior não fica para trás
+        el._kart = kartAqui;
+        el._tagChave = '';
+        el._in.classList.remove('fx-rec', 'fx-pb', 'com-tag');
+      }
+      if (ev) aplicarEventos(el, ev, is14Ms);
+      sincronizarTag(el, p ? tagsAtivas[kartAqui] : null);
     }
+  }
+
+  // ---- Animações da corrida: compara cada kart com o que ele era na leitura anterior ----
+  var fxEstado = {};
+  var fxSessao = null;
+  var fxRecorde = 0;
+  function detectarEventos(pilotos, sessaoId, recorde, ehCorrida) {
+    var i, p, k;
+    if (sessaoId !== fxSessao || !pilotos.length) {
+      var nova = sessaoId !== fxSessao && pilotos.length > 0;
+      if (pilotos.length) fxSessao = sessaoId;
+      fxEstado = {};
+      for (i = 0; i < pilotos.length; i++) { p = pilotos[i]; fxEstado[String(p.kart)] = { pos: p.position, laps: p.laps || 0, last: tempoValido(p.last) || '' }; }
+      fxRecorde = recorde;
+      return nova ? 'entrada' : {};
+    }
+    var ev = {};
+    for (i = 0; i < pilotos.length; i++) {
+      p = pilotos[i]; k = String(p.kart);
+      var ant = fxEstado[k];
+      var last = tempoValido(p.last) || '';
+      var e = {};
+      var tem = false;
+      if (ant) {
+        if (last && (last !== ant.last || (p.laps || 0) > ant.laps)) {
+          e.volta = true; tem = true;
+          var v = msDe(last);
+          if (v && recorde && v === recorde && (!fxRecorde || recorde < fxRecorde)) e.rec = ehCorrida ? 'MAIS RÁPIDA' : (p.position === 1 ? 'NOVA POLE' : 'MAIS RÁPIDA');
+          else if (v && v === melhorVoltaMs(p)) e.pb = true;
+        }
+        if (p.position < ant.pos) { e.sobe = ant.pos - p.position; tem = true; }
+        else if (p.position > ant.pos) { e.desce = true; tem = true; }
+      }
+      fxEstado[k] = { pos: p.position, laps: p.laps || 0, last: last };
+      if (tem) ev[k] = e;
+    }
+    if (recorde && (!fxRecorde || recorde < fxRecorde)) fxRecorde = recorde;
+    return ev;
+  }
+
+  function animar(el, cls, ms) {
+    if (!el) return;
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+    if (el['_fx_' + cls]) clearTimeout(el['_fx_' + cls]);
+    el['_fx_' + cls] = setTimeout(function () { el.classList.remove(cls); }, ms);
+  }
+
+  // Etiqueta pertence ao kart (não ao lugar): acompanha o kart se ele trocar de posição.
+  var tagsAtivas = {};
+  function mostrarTag(el, texto_, tipo, ms) {
+    if (tipo === 'rec') for (var k in tagsAtivas) if (tagsAtivas.hasOwnProperty(k) && tagsAtivas[k].tipo === 'rec') delete tagsAtivas[k];
+    tagsAtivas[el._kart] = { txt: texto_, tipo: tipo, ate: new Date().getTime() + ms };
+  }
+  function sincronizarTag(el, t) {
+    var inn = el._in;
+    if (!t || t.ate < new Date().getTime()) {
+      if (t) delete tagsAtivas[el._kart];
+      if (el._tagChave) { el._tagChave = ''; inn.classList.remove('com-tag'); }
+      return;
+    }
+    var chave = el._kart + '|' + t.txt + '|' + t.ate;
+    if (el._tagChave === chave) return;
+    el._tagChave = chave;
+    el._tag.textContent = t.txt;
+    inn.classList.remove('tag-pb', 'tag-rec', 'tag-sobe', 'com-tag');
+    inn.classList.add('tag-' + t.tipo);
+    void inn.offsetWidth;
+    inn.classList.add('com-tag');
+  }
+
+  function aplicarEventos(el, e, is14Ms) {
+    var inn = el._in;
+    if (e.sobe) animar(inn, 'fx-sobe', 900);
+    else if (e.desce) animar(inn, 'fx-desce', 900);
+    if (e.volta && is14Ms) animar(inn, 'fx-volta', 900);
+    if (e.rec) { animar(inn, 'fx-rec', 4000); mostrarTag(el, e.rec, 'rec', 5000); }
+    else if (e.pb) { animar(inn, 'fx-pb', 1400); mostrarTag(el, 'MELHOR VOLTA', 'pb', 3500); }
+    else if (e.sobe) mostrarTag(el, is14Ms ? (e.sobe + (e.sobe > 1 ? ' POSIÇÕES' : ' POSIÇÃO')) : String(e.sobe), 'sobe', 3000);
   }
 
   // Nome que cabe no quadrinho do grid 7x2: "LUCAS FERREIRA" -> "LUCAS F."
