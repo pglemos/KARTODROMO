@@ -465,6 +465,11 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 .pf .pf-pil img{display:block;width:100%;height:100%;object-fit:contain;object-position:50% 100%}
 .pf .pf-pil .halo{position:absolute;left:-30%;top:-10%;width:160%;height:120%;border-radius:50%;background:radial-gradient(circle,rgba(255,206,84,.45),rgba(255,206,84,0) 62%)}
 .pf .r1.pf-pil{left:874px;bottom:150px;width:300px;height:300px}
+/* foto real do piloto (app): retrato com moldura na cor da posição; sem foto fica o capacete recortado */
+.pf .pf-pil img.foto-piloto{position:absolute;left:8%;bottom:14px;width:84%;height:84%;object-fit:cover;object-position:50% 30%;border-radius:18px;border:5px solid #ffcc33;box-shadow:0 0 44px rgba(255,204,51,.55),0 16px 36px rgba(0,0,0,.7)}
+.pf .r2.pf-pil img.foto-piloto{border-color:#d9dfe3;box-shadow:0 0 36px rgba(217,223,227,.45),0 16px 36px rgba(0,0,0,.7)}
+.pf .r3.pf-pil img.foto-piloto{border-color:#e0874a;box-shadow:0 0 36px rgba(224,135,74,.45),0 16px 36px rgba(0,0,0,.7)}
+.pf .pf-c-foto img.foto-piloto{position:absolute;left:50px;bottom:34px;width:420px;height:420px;object-fit:cover;object-position:50% 30%;border-radius:26px;border:8px solid #ffcc33;box-shadow:0 0 80px rgba(255,204,51,.6),0 24px 50px rgba(0,0,0,.75)}
 .pf .r2.pf-pil{left:540px;bottom:116px;width:272px;height:262px}
 .pf .r3.pf-pil{left:1236px;bottom:92px;width:272px;height:252px}
 .pf .r2.pf-pil .halo{background:radial-gradient(circle,rgba(217,223,227,.30),rgba(217,223,227,0) 62%)}
@@ -501,7 +506,8 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 .pf .pf-cl-linha.m2 .p{background:linear-gradient(135deg,#ffffff,#cfd8dc 45%,#7d8a90);color:#111}
 .pf .pf-cl-linha.m3 .p{background:linear-gradient(135deg,#ffd2b0,#e0874a 45%,#8a4a1c);color:#1a0a00}
 .pf .pf-cl-linha.m1{border-color:rgba(255,204,51,.7)}
-.pf .pf-cl-linha .n{position:absolute;left:108px;top:0;width:330px;font-size:40px;line-height:86px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase}
+.pf .pf-cl-linha .av{position:absolute;left:98px;top:11px;width:64px;height:64px;border-radius:50%;object-fit:cover;object-position:50% 25%;background:#1d1c18;border:2px solid rgba(201,165,74,.65)}
+.pf .pf-cl-linha .n{position:absolute;left:176px;top:0;width:262px;font-size:40px;line-height:86px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase}
 .pf .pf-cl-linha .k{position:absolute;left:446px;top:19px;height:48px;padding:0 12px;border-radius:8px;background:#1d1c18;color:#fff;font:900 34px/50px 'KIB Num',Arial,sans-serif}
 .pf .pf-cl-linha .t{position:absolute;right:20px;top:12px;font-size:38px;line-height:1;color:#ffd76a;font-variant-numeric:tabular-nums;text-align:right}
 .pf .pf-cl-linha .g{position:absolute;right:20px;top:52px;font-size:22px;line-height:1;color:#9c968a;letter-spacing:1px;text-align:right;font-variant-numeric:tabular-nums}
@@ -1600,7 +1606,9 @@ function shortPodiumName(nome, dupFirst) {
       else { var mb = msDe(tempoValido(p.time) || ''); gap = (mb && pole) ? '+' + ((mb - pole) / 1000).toFixed(3) : ''; }
       var at = (0.35 + c * 0.11).toFixed(2);
       cl += '<div class="pf-cl-linha' + (p.position <= 3 ? ' m' + p.position : '') + '" style="left:' + (470 + col * 790) + 'px;top:' + (34 + lin * 92) + 'px;-webkit-animation-delay:' + at + 's;animation-delay:' + at + 's">' +
-        '<span class="p">' + esc(p.position) + '</span><span class="n">' + esc(pfNome(p)) + '</span>' +
+        '<span class="p">' + esc(p.position) + '</span>' +
+        '<img class="av" alt="" src="/api/foto-piloto?mini=1&kart=' + encodeURIComponent(String(p.kart || '')) + '&b=' + encodeURIComponent(String((s.race && s.race.id) || '')) + '" onerror="this.onerror=null;this.src=\'/podio-final/helmet-premium.png\'">' +
+        '<span class="n">' + esc(pfNome(p).length > 11 && !/^KART /.test(pfNome(p)) ? nomeCelula(p.name) : pfNome(p)) + '</span>' +
         '<span class="k">' + esc(p.kart || '-') + '</span><span class="t">' + esc(pfTempo(p, showMs)) + '</span><span class="g">' + esc(gap) + '</span></div>';
     }
     if (!top.length) cl = '<div class="pf-cl-vazio">AGUARDANDO RESULTADO OFICIAL</div>';
@@ -1810,7 +1818,7 @@ function shortPodiumName(nome, dupFirst) {
     }
   }
 
-  var TB50_VERSAO = '2026-11-20-podio1';
+  var TB50_VERSAO = '2026-11-20-podio2';
   var ultimoErro = '';
   window.onerror = function (msg, src, linha) {
     var e = String(msg || '').slice(0, 120) + '@' + (linha || 0);
