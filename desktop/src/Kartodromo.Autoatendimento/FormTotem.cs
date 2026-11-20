@@ -916,7 +916,7 @@ public class FormTotem : Form, IMessageFilter
         }
         else
         {
-            var horarios = string.Join(", ", grupos.Select(x => Fmt.Hm(x.S("inicio"))).Distinct());
+            var horarios = string.Join(", ", grupos.Select(x => x.S("inicio")).OrderBy(x => x, StringComparer.Ordinal).Select(Fmt.Hm).Distinct());
             cartao.Controls.Add(Rot($"Suas {grupos.Count} vagas já estão pagas · corridas às {horarios}.", 40, 40, F(26, false, FontStyle.Bold), Estilo.VerdeSuave, 986, 110));
             cartao.Controls.Add(Rot($"Que tal agradecer {string.Join(" e ", responsaveis)} pelo convite?", 40, 120, F(20), Estilo.Suave, 986, 80));
         }
@@ -1228,7 +1228,11 @@ public class FormTotem : Form, IMessageFilter
             ];
             _cliente = new JsonObject { ["id"] = 1, ["nome"] = "Maria da Silva" };
             MontarGrupos(gruposAmostra); await Foto("6a-grupos");
-            TelaBoasVindasGrupo(new JsonObject { ["responsavel"] = "Edmael", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T21:40", ["mensagem"] = "Edmael reservou e pagou a corrida de todos os 11 amigos. Você é convidado(a) dele(a)!" }); await Foto("6b-boas-vindas-grupo");
+            TelaBoasVindasGrupo([new JsonObject { ["responsavel"] = "Edmael", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T21:40", ["mensagem"] = "Edmael reservou e pagou a corrida de todos os 11 amigos. Você é convidado(a) dele(a)!" }]); await Foto("6b-boas-vindas-grupo");
+            TelaBoasVindasGrupo([
+                new JsonObject { ["responsavel"] = "Edmael", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T21:40" },
+                new JsonObject { ["responsavel"] = "Julia", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T19:20" },
+            ], 1); await Foto("6c-boas-vindas-dois-grupos");
             TelaSucesso("19:20", 1); await Foto("7-sucesso");
             if (SystemInformation.UserInteractive)
             {
