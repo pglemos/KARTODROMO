@@ -167,6 +167,25 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 @-webkit-keyframes m-luz5{0%{background:#2a0505}75%{background:#ff1a1a}88%{background:#2a0505}}
 @keyframes m-luz5{0%{background:#2a0505}75%{background:#ff1a1a}88%{background:#2a0505}}
 
+/* 1e. SINAL DE LARGADA: o operador inicia a bateria -> painel inteiro verde, pulsando devagar, com contagem 10..1
+   gigante; no fim "LARGADA!" por 3 s. Os pilotos no grid olham o painel e largam no fim da contagem. */
+#largada{position:absolute;left:0;top:0;width:2048px;height:512px;z-index:80;display:none;background:#00ff3c;color:#000;text-align:center;overflow:hidden}
+#largada.on{display:block;-webkit-animation:largada-pulsa 2s ease-in-out infinite;animation:largada-pulsa 2s ease-in-out infinite}
+#largada .lg-rot,#largada .lg-agu{position:absolute;top:166px;width:560px;font:700 92px/1.05 'KIB Cond',Arial,sans-serif;letter-spacing:6px}
+#largada .lg-rot{left:70px;text-align:left}
+#largada .lg-agu{right:70px;text-align:right}
+#largada .lg-num{position:absolute;left:0;right:0;top:-34px;font:900 540px/1 'KIB Num',Arial,sans-serif;letter-spacing:-10px}
+#largada .lg-num.troca{-webkit-animation:largada-num .45s cubic-bezier(.2,.9,.3,1.2) both;animation:largada-num .45s cubic-bezier(.2,.9,.3,1.2) both}
+#largada.fim{-webkit-animation:largada-fim .5s steps(1) infinite;animation:largada-fim .5s steps(1) infinite}
+#largada.fim .lg-rot,#largada.fim .lg-agu{display:none}
+#largada.fim .lg-num{top:96px;font-size:300px;letter-spacing:6px}
+@-webkit-keyframes largada-pulsa{0%,100%{background:#00ff3c}50%{background:#00a82a}}
+@keyframes largada-pulsa{0%,100%{background:#00ff3c}50%{background:#00a82a}}
+@-webkit-keyframes largada-num{0%{-webkit-transform:scale(1.35);opacity:.2}100%{-webkit-transform:none;opacity:1}}
+@keyframes largada-num{0%{transform:scale(1.35);opacity:.2}100%{transform:none;opacity:1}}
+@-webkit-keyframes largada-fim{0%{background:#00ff3c}50%{background:#7dffa0}}
+@keyframes largada-fim{0%{background:#00ff3c}50%{background:#7dffa0}}
+
 /* 2. LISTA LAPTIME (relógio à esquerda + classificação à direita) */
 #lista-view{background:#000}
 #lista-esq{position:absolute;left:8px;top:8px;width:404px;height:496px;background:#0b100d;border-radius:14px;overflow:hidden;text-align:center}
@@ -568,6 +587,7 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 </head>
 <body>
 <div id="tela">
+  <div id="largada"><div class="lg-rot" id="lg-rot">LARGADA<br>EM</div><div class="lg-agu">AGUARDE<br>NO GRID</div><div class="lg-num" id="lg-num">10</div></div>
   <div id="momento">
     <div class="m-base"></div>
     <i class="m-faixa f1"></i><i class="m-faixa f2"></i><i class="m-faixa f3"></i>
@@ -1139,6 +1159,48 @@ function shortPodiumName(nome, dupFirst) {
     }
   }
 
+  // ---- Sinal de largada: o operador inicia a bateria -> verde pulsando com contagem 10..1 e "LARGADA!" ----
+  var largadaEl = document.getElementById('largada');
+  var lgNum = document.getElementById('lg-num');
+  var largadaVista = null, largadaTimer = null, largadaInicio = 0, largadaFrase = 'LARGADA!';
+  var LARGADA_CONTAGEM = 10, LARGADA_FIM_MS = 3000;
+  function largadaQuadro() {
+    var passou = new Date().getTime() - largadaInicio;
+    var resta = LARGADA_CONTAGEM - Math.floor(passou / 1000);
+    if (passou >= LARGADA_CONTAGEM * 1000 + LARGADA_FIM_MS) {
+      largadaEl.className = ''; clearInterval(largadaTimer); largadaTimer = null; return;
+    }
+    var txt = resta > 0 ? String(resta) : largadaFrase;
+    if (lgNum.textContent !== txt) {
+      lgNum.textContent = txt;
+      lgNum.style.fontSize = resta > 0 ? '' : (txt.length > 9 ? '220px' : '300px');
+      lgNum.className = 'lg-num'; void lgNum.offsetWidth; lgNum.className = 'lg-num troca';
+      var cls = resta > 0 ? 'on' : 'on fim';
+      if (largadaEl.className !== cls) largadaEl.className = cls;
+    }
+  }
+  function sinalDeLargada(s) {
+    if (!s || !s.race || !s.race.id) return;
+    var id = String(s.race.id);
+    if (largadaVista === null) { largadaVista = id; return; } // página abriu agora: não dispara no meio da sessão
+    if (id === largadaVista) return;
+    largadaVista = id;
+    if (s.status !== 'live') return;
+    // só no começo: ninguém cruzou ainda (aguardando largada) ou cruzou há poucos segundos
+    if (s.race.elapsedMs > 15000) return;
+    var corrida = s.sessionType === 'race';
+    document.getElementById('lg-rot').innerHTML = corrida ? 'LARGADA<br>EM' : 'PISTA<br>ABRE EM';
+    largadaFrase = corrida ? 'LARGADA!' : 'PISTA ABERTA';
+    filaMomentos.length = 0;
+    momentoEl.className = '';
+    largadaInicio = new Date().getTime();
+    lgNum.textContent = '';
+    largadaEl.className = 'on';
+    if (largadaTimer) clearInterval(largadaTimer);
+    largadaTimer = setInterval(largadaQuadro, 100);
+    largadaQuadro();
+  }
+
   // ---- Momentos em tela cheia (estilo transmissão): um por vez, 3,6 s cada ----
   var momentoEl = document.getElementById('momento');
   var momentoParts = {};
@@ -1156,6 +1218,7 @@ function shortPodiumName(nome, dupFirst) {
   }
   function proximoMomento() {
     if (momentoAtivo || !filaMomentos.length) return;
+    if (largadaTimer) { setTimeout(proximoMomento, 1000); return; }
     var m = filaMomentos.shift();
     momentoAtivo = true;
     for (var k in momentoParts) if (momentoParts.hasOwnProperty(k)) momentoParts[k].textContent = m[k] || '';
@@ -1178,12 +1241,7 @@ function shortPodiumName(nome, dupFirst) {
     if (sessao !== mmSessao) {
       var primeiraVez = mmSessao === null;
       mmSessao = sessao; mmFlag = flag; mmFinal = false;
-      if (!primeiraVez && s.status === 'live' && entrada !== undefined) {
-        var recente = !(race.elapsedMs > 90000);
-        if (recente && corrida) enfileirarMomento({ chave: 'largada', tipo: 'luzes', tema: 'luzes', dur: 3400,
-          depois: { chave: 'valendo', tipo: 'texto', tema: 'verde', titulo: 'VALENDO!', sub: (s.eventName || 'CORRIDA').toUpperCase() } });
-        else if (recente) enfileirarMomento({ chave: 'pista', tipo: 'texto', tema: 'verde', titulo: 'PISTA ABERTA', sub: (s.eventName || 'TOMADA DE TEMPO').toUpperCase() });
-      }
+      // a largada não passa pela fila: é o sinal verde de 10 s (sinalDeLargada), em qualquer modo do telão
       return;
     }
     if (flag !== mmFlag) {
@@ -1672,6 +1730,7 @@ function shortPodiumName(nome, dupFirst) {
       }
     }
 
+    sinalDeLargada(ultimo);
     var pilotos = s.drivers || [];
     if (s.clearGrid || (pilotos.length === 1 && pilotos[0].position === 999)) {
       pilotos = [];
@@ -1815,7 +1874,7 @@ function shortPodiumName(nome, dupFirst) {
     }
   }
 
-  var TB50_VERSAO = '2026-11-20-rapido1';
+  var TB50_VERSAO = '2026-11-20-largada2';
   var ultimoErro = '';
   window.onerror = function (msg, src, linha) {
     var e = String(msg || '').slice(0, 120) + '@' + (linha || 0);
