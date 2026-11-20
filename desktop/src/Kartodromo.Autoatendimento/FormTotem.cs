@@ -434,7 +434,7 @@ public class FormTotem : Form, IMessageFilter
     {
         if (_menor) { TelaMenores(); return; }
         _participantes = [new Pessoa(_cliente.L("id") ?? 0, _cliente.S("nome"), "", _token)];
-        await TelaGrupos();
+        await TelaBaterias();
     }
 
     // ------------------------------------------------------------------ 2. cadastro novo / atualizacao
@@ -838,93 +838,126 @@ public class FormTotem : Form, IMessageFilter
         Mostrar("menor", c, TelaCadastroMenor);
     }
 
-    // ------------------------------------------------------------------ 3b. "Vim com um grupo" (antes das baterias)
+    // ------------------------------------------------------------------ 3b. grupos dentro da bateria
+    // 20/11/2026 (dono): primeiro a bateria, depois o grupo dela. Campeonato (ex.: LOTOKART I e II) é bateria, nunca
+    // "grupo": a reserva do organizador só segura as vagas pagas e o piloto entra nela sem escolher nada.
 
-    async Task TelaGrupos()
+    static List<JsonObject> GruposDe(JsonObject bateria) =>
+        bateria["grupos"] is JsonArray a ? a.OfType<JsonObject>().Where(g => g.I("aguardando") > 0).ToList() : [];
+
+    async Task ResolverGrupos(List<JsonObject> selecionadas, int i, List<JsonObject> baterias, int n, List<JsonObject> entrou, List<string> falhas)
     {
-        // grupos de hoje com vaga aguardando: o amigo se reconhece pelo nome de quem reservou. Sem grupo (ou falha), segue direto para as baterias.
-        List<JsonObject> grupos;
-        try { grupos = await _api.ListaAsync("/api/totem/grupos"); }
-        catch (Exception ex) { Program.Log("grupos do dia indisponíveis: " + ex.Message); grupos = []; }
-        if (grupos.Count == 0) { await TelaBaterias(); return; }
-        MontarGrupos(grupos);
+        for (; i < selecionadas.Count; i++)
+        {
+            var b = selecionadas[i];
+            var grupos = GruposDe(b);
+            if (grupos.Count == 0) continue;
+            if (b.B("campeonato") && grupos.Count == 1) { await EntrarNoGrupo(b, grupos[0], n, entrou, falhas); continue; }
+            var proxima = i + 1;
+            TelaGrupoDaBateria(b, grupos, b.I("livres") >= n, baterias, n, async grupoId =>
+            {
+                var g = grupos.FirstOrDefault(x => (x.L("id") ?? 0) == grupoId);
+                if (g != null) await EntrarNoGrupo(b, g, n, entrou, falhas);
+                await ResolverGrupos(selecionadas, proxima, baterias, n, entrou, falhas);
+            });
+            return;
+        }
+        if (_sel.Count == 0) { Alertar((falhas.FirstOrDefault() ?? "Não foi possível reservar a vaga.") + " Procure a recepção."); MontarBaterias(baterias, n); return; }
+        if (falhas.Count > 0) Program.Log($"totem: {falhas.Count} falha(s) ao entrar em grupo: {string.Join(" | ", falhas)}");
+        if (entrou.Count > 0) TelaBoasVindasGrupo(entrou, falhas.Count, () => FinalizarBaterias(baterias, n));
+        else await FinalizarBaterias(baterias, n);
     }
 
-    void MontarGrupos(List<JsonObject> grupos)
+    async Task EntrarNoGrupo(JsonObject bateria, JsonObject grupo, int n, List<JsonObject> entrou, List<string> falhas)
+    {
+        try
+        {
+            var r = await _api.PostAsync("/api/totem/grupo/entrar", new JsonObject { ["grupoId"] = grupo.L("id"), ["clienteId"] = _cliente.L("id"), ["token"] = _token });
+            if (r is JsonObject ok && (ok.L("bateriaId") ?? 0) > 0)
+            {
+                if (bateria.B("campeonato")) ok["campeonato"] = bateria.S("nome");
+                entrou.Add(ok);
+                return;
+            }
+            falhas.Add("Não foi possível entrar no grupo.");
+        }
+        catch (Exception ex) { falhas.Add(ex.Message.Length > 0 ? ex.Message : "Não foi possível entrar no grupo."); }
+        // sem a vaga do grupo, a bateria só continua se tiver vaga avulsa para todos
+        if (bateria.I("livres") < n) _sel.Remove(bateria.L("id") ?? 0);
+    }
+
+    Task FinalizarBaterias(List<JsonObject> baterias, int n)
+    {
+        var endurance = baterias.Where(b => _sel.Contains(b.L("id") ?? 0) && b["endurance"] is JsonObject).ToList();
+        return endurance.Count == 1 ? TelaEquipe(endurance[0], baterias, n) : Inscrever(null);
+    }
+
+    void TelaGrupoDaBateria(JsonObject bateria, List<JsonObject> grupos, bool permiteAvulsa, List<JsonObject> baterias, int n, Func<long, Task> escolher)
     {
         var c = NovaTela(etapa: 3);
-        c.Controls.Add(Rot("Você veio com um grupo de amigos?", 150, 108, F(44, false, FontStyle.Bold), Estilo.Texto));
-        c.Controls.Add(Rot("Toque no grupo dos seus amigos (pode marcar mais de um, se vai correr em mais de uma bateria). Quem reservou já pagou a corrida de todos. Se veio sozinho, toque em \"Vim sozinho\".", 150, 164, F(19), Estilo.Suave, 1066, 56));
+        c.Controls.Add(Rot("Você veio com algum destes grupos?", 150, 108, F(44, false, FontStyle.Bold), Estilo.Texto));
+        c.Controls.Add(Rot($"{bateria.S("nome").ToUpperInvariant()} · começa às {Fmt.Hm(bateria.S("inicio"))}. Quem reservou já pagou a corrida do grupo: toque no nome de quem convidou você.", 150, 164, F(19), Estilo.Suave, 1066, 56));
         var painel = CartaoEm(c, 150, 230, 1066, 411);
         var lista = new ListaOpcoes(_k) { Bounds = new Rectangle(0, 0, P(1066), P(411)) };
+        var itens = new List<OpcaoLinha>();
         foreach (var g in grupos)
         {
             var aguardando = g.I("aguardando");
-            var item = new OpcaoLinha(_k)
+            itens.Add(new OpcaoLinha(_k)
             {
                 Height = P(84), Id = g.L("id") ?? 0,
                 Linha1 = (g.S("titulo").Length > 0 ? g.S("titulo") : "Grupo do(a) " + g.S("responsavel")).ToUpperInvariant(),
-                Linha2 = $"Corrida às {Fmt.Hm(g.S("inicio"))} · {g.I("total")} amigos no total",
+                Linha2 = $"Reservado por {g.S("responsavel")} · {g.I("total")} pilotos no grupo",
                 Direita = aguardando + (aguardando == 1 ? " vaga esperando" : " vagas esperando"),
-            };
-            // 20/11/2026: antes só um grupo por vez — quem tinha vaga paga em 2 grupos (2 baterias) passava duas vezes no totem
+            });
+        }
+        if (permiteAvulsa)
+            itens.Add(new OpcaoLinha(_k) { Height = P(84), Id = -1, Linha1 = "NÃO, VIM SEM GRUPO", Linha2 = "Reserva uma vaga avulsa nesta bateria (paga na recepção)" });
+        foreach (var item in itens)
+        {
+            item.Mudou += () => { if (item.Marcado) foreach (var o in itens) if (o != item && o.Marcado) o.Marcado = false; };
             lista.Adicionar(item);
         }
         painel.Controls.Add(lista);
-        var sozinho = Botao(c, "Vim sozinho", 150, 660, 205, false, TelaBaterias);
-        var voltar = Botao(c, "Voltar", 914, 660, 140, false, () => { if (_menor) TelaMenores(); else TelaCadastro(_cadastroExistente); return Task.CompletedTask; });
-        var entrar = Botao(c, "Entrar no grupo", 1070, 660, 200, true, async () =>
+        var voltar = Botao(c, "Voltar", 914, 660, 140, false, () => { MontarBaterias(baterias, n); return Task.CompletedTask; });
+        var proximo = Botao(c, "Próximo", 1070, 660, 146, true, async () =>
         {
-            var escolhidos = lista.Marcados().Where(id => id > 0).ToList();
-            if (escolhidos.Count == 0) { Alertar("Toque no grupo dos seus amigos ou em \"Vim sozinho\"."); return; }
-            var entrou = new List<JsonObject>();
-            var falhas = new List<string>();
-            foreach (var escolhido in escolhidos)
-            {
-                try
-                {
-                    var r = await _api.PostAsync("/api/totem/grupo/entrar", new JsonObject { ["grupoId"] = escolhido, ["clienteId"] = _cliente.L("id"), ["token"] = _token });
-                    if (r is JsonObject ok && (ok.L("bateriaId") ?? 0) > 0) entrou.Add(ok);
-                    else falhas.Add("Não foi possível entrar no grupo.");
-                }
-                catch (Exception ex) { falhas.Add(ex.Message.Length > 0 ? ex.Message : "Não foi possível entrar no grupo."); }
-            }
-            if (entrou.Count == 0) { Alertar((falhas.FirstOrDefault() ?? "Não foi possível entrar no grupo.") + " Procure a recepção."); return; }
-            if (falhas.Count > 0) Program.Log($"totem: entrou em {entrou.Count} de {escolhidos.Count} grupo(s): {string.Join(" | ", falhas)}");
-            _sel = entrou.Select(g => g.L("bateriaId") ?? 0).Where(id => id > 0).ToHashSet();
-            TelaBoasVindasGrupo(entrou, falhas.Count);
+            var escolhido = lista.Marcados().FirstOrDefault();
+            if (escolhido == 0) { Alertar(permiteAvulsa ? "Toque no seu grupo ou em \"Não, vim sem grupo\"." : "Toque no grupo de quem convidou você."); return; }
+            await escolher(escolhido > 0 ? escolhido : 0);
         });
-        sozinho.BringToFront(); voltar.BringToFront(); entrar.BringToFront();
-        Mostrar("grupos", c, () => MontarGrupos(grupos));
+        voltar.BringToFront(); proximo.BringToFront();
+        Mostrar("grupobateria", c, () => TelaGrupoDaBateria(bateria, grupos, permiteAvulsa, baterias, n, escolher));
     }
 
     // quem reservou para todos é valorizado: o amigo vê o nome dele(a) antes de continuar
-    void TelaBoasVindasGrupo(List<JsonObject> grupos, int falhas = 0)
+    void TelaBoasVindasGrupo(List<JsonObject> grupos, int falhas, Func<Task> seguir)
     {
         var c = NovaTela(etapa: 3);
         var g = grupos[0];
-        var responsaveis = grupos.Select(x => x.S("responsavel")).Where(s => s.Length > 0).Distinct().ToList();
-        var titulo = grupos.Count == 1 || responsaveis.Count <= 1
-            ? "Você está no grupo do(a) " + g.S("responsavel") + "!"
-            : "Você está nos grupos de " + string.Join(" e ", responsaveis) + "!";
-        c.Controls.Add(Rot(titulo, 150, 130, F(44, false, FontStyle.Bold), Estilo.Texto, 1066, 70));
+        var deAmigos = grupos.Where(x => x.S("campeonato").Length == 0).ToList();
+        var responsaveis = deAmigos.Select(x => x.S("responsavel")).Where(s => s.Length > 0).Distinct().ToList();
         var cartao = CartaoEm(c, 150, 250, 1066, 280);
-        if (grupos.Count == 1)
+        if (grupos.Count == 1 && deAmigos.Count == 1)
         {
+            c.Controls.Add(Rot("Você está no grupo do(a) " + g.S("responsavel") + "!", 150, 130, F(44, false, FontStyle.Bold), Estilo.Texto, 1066, 70));
             cartao.Controls.Add(Rot(g.S("mensagem"), 40, 40, F(26, false, FontStyle.Bold), Estilo.VerdeSuave, 986, 110));
             cartao.Controls.Add(Rot($"Sua vaga já está paga · corrida às {Fmt.Hm(g.S("inicio"))}. Que tal agradecer {g.S("responsavel")} pelo convite?", 40, 120, F(20), Estilo.Suave, 986, 80));
         }
         else
         {
-            var horarios = string.Join(", ", grupos.Select(x => x.S("inicio")).OrderBy(x => x, StringComparer.Ordinal).Select(Fmt.Hm).Distinct());
-            cartao.Controls.Add(Rot($"Suas {grupos.Count} vagas já estão pagas · corridas às {horarios}.", 40, 40, F(26, false, FontStyle.Bold), Estilo.VerdeSuave, 986, 110));
-            cartao.Controls.Add(Rot($"Que tal agradecer {string.Join(" e ", responsaveis)} pelo convite?", 40, 120, F(20), Estilo.Suave, 986, 80));
+            var titulo = grupos.Count == 1 ? $"Você está no {g.S("campeonato")}!" : "Suas vagas estão garantidas!";
+            c.Controls.Add(Rot(titulo, 150, 130, F(44, false, FontStyle.Bold), Estilo.Texto, 1066, 70));
+            var corridas = string.Join(" · ", grupos.OrderBy(x => x.S("inicio"), StringComparer.Ordinal)
+                .Select(x => (x.S("campeonato").Length > 0 ? x.S("campeonato") : "Grupo do(a) " + x.S("responsavel")) + " às " + Fmt.Hm(x.S("inicio"))));
+            cartao.Controls.Add(Rot(corridas, 40, 40, F(26, false, FontStyle.Bold), Estilo.VerdeSuave, 986, 110));
+            cartao.Controls.Add(Rot(responsaveis.Count > 0 ? $"Que tal agradecer {string.Join(" e ", responsaveis)} pelo convite?" : "Boa corrida!", 40, 120, F(20), Estilo.Suave, 986, 80));
         }
         if (falhas > 0)
-            cartao.Controls.Add(Rot(falhas == 1 ? "Não deu para entrar em um dos grupos marcados — confirme na recepção." : $"Não deu para entrar em {falhas} dos grupos marcados — confirme na recepção.", 40, 200, F(18, false, FontStyle.Bold), Estilo.Amarelo, 986, 40));
-        var seguir = Botao(c, "Continuar", 1030, 660, 186, true, async () => { await Inscrever(null); });
-        seguir.BringToFront();
-        Mostrar("boasvindasgrupo", c, () => TelaBoasVindasGrupo(grupos, falhas));
+            cartao.Controls.Add(Rot(falhas == 1 ? "Não deu para entrar em uma das vagas reservadas — confirme na recepção." : $"Não deu para entrar em {falhas} das vagas reservadas — confirme na recepção.", 40, 200, F(18, false, FontStyle.Bold), Estilo.Amarelo, 986, 40));
+        var botao = Botao(c, "Continuar", 1030, 660, 186, true, seguir);
+        botao.BringToFront();
+        Mostrar("boasvindasgrupo", c, () => TelaBoasVindasGrupo(grupos, falhas, seguir));
     }
 
     // ------------------------------------------------------------------ 4. baterias
@@ -938,7 +971,8 @@ public class FormTotem : Form, IMessageFilter
         try { vouchers = await _api.ListaAsync("/api/totem/vouchers-cliente?grupo=" + qs); } catch { }
         var todas = await tBaterias;
         var n = _participantes.Count;
-        var lista = todas.Where(b => b.I("livres") >= n).ToList();
+        // bateria lotada só pelas vagas reservadas de um grupo continua: o amigo entra pela vaga do grupo
+        var lista = todas.Where(b => b.I("livres") >= n || GruposDe(b).Count > 0).ToList();
         MontarBaterias(lista, n, vouchers);
     }
 
@@ -972,12 +1006,15 @@ public class FormTotem : Form, IMessageFilter
         {
             var inicio = Fmt.Hm(b.S("inicio"));
             var tipoSuper = b.S("tipoKart") == "super";
+            var grupos = GruposDe(b);
             var iniciou = DateTime.TryParse(b.S("inicio"), out var horario) && horario <= DateTime.Now;
             var item = new OpcaoLinha(_k)
             {
                 Height = P(84), Id = b.L("id") ?? 0, Linha1 = (b.B("campeonato") ? "CAMPEONATO · " : "") + b.S("nome").ToUpperInvariant(),
-                Linha2 = iniciou ? $"Horário iniciado às {inicio} · confirme na recepção" : $"Começa às {inicio} · chegue 10 min antes",
-                Direita = b.I("livres") + (b.I("livres") == 1 ? " vaga" : " vagas"),
+                Linha2 = iniciou ? $"Horário iniciado às {inicio} · confirme na recepção"
+                    : grupos.Count > 0 && !b.B("campeonato") ? $"Começa às {inicio} · {grupos.Count} grupo(s) com vaga paga"
+                    : $"Começa às {inicio} · chegue 10 min antes",
+                Direita = b.I("livres") > 0 || grupos.Count == 0 ? b.I("livres") + (b.I("livres") == 1 ? " vaga" : " vagas") : "vagas do grupo",
                 Tipo = tipoSuper ? "Super Kart" : "Kart Light", Livres = b.I("livres"), Total = b.I("vagas"),
                 Marcado = _sel.Contains(b.L("id") ?? 0),
             };
@@ -1000,8 +1037,8 @@ public class FormTotem : Form, IMessageFilter
             if (_sel.Count == 0) { Alertar("Selecione pelo menos uma bateria."); return; }
             var campeonato = baterias.Where(b => _sel.Contains(b.L("id") ?? 0) && b["endurance"] is JsonObject).ToList();
             if (campeonato.Count > 1) { Alertar("Escolha só uma bateria de campeonato por vez."); return; }
-            if (campeonato.Count == 1) await TelaEquipe(campeonato[0], baterias, n);
-            else await Inscrever(null);
+            var marcadas = baterias.Where(b => _sel.Contains(b.L("id") ?? 0)).ToList();
+            await ResolverGrupos(marcadas, 0, baterias, n, [], []);
         });
         proximo.Enabled = totalMarcadas > 0;
         voltar.BringToFront(); proximo.BringToFront();
@@ -1218,21 +1255,22 @@ public class FormTotem : Form, IMessageFilter
                 ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T" + a.Hora,
                 ["vagas"] = a.Total, ["ocupadas"] = a.Ocupadas, ["livres"] = a.Total - a.Ocupadas, ["tipoKart"] = a.Tipo,
             }).ToList();
-            _sel = [900];
+            var hoje = DateTime.Today.ToString("yyyy-MM-dd");
+            JsonArray Grupos(params (int Id, string Titulo, string Resp, int Total, int Aguardando)[] gs) =>
+                new(gs.Select(g => (JsonNode)new JsonObject { ["id"] = g.Id, ["titulo"] = g.Titulo, ["responsavel"] = g.Resp, ["total"] = g.Total, ["aguardando"] = g.Aguardando }).ToArray());
+            bats.Insert(0, new JsonObject { ["id"] = 800, ["nome"] = "LOTOKART I", ["campeonato"] = true, ["inicio"] = hoje + "T15:15", ["vagas"] = 50, ["ocupadas"] = 21, ["livres"] = 0, ["tipoKart"] = "light", ["grupos"] = Grupos((186, "LOTOKART I", "Rogério", 21, 9)) });
+            bats.Insert(1, new JsonObject { ["id"] = 801, ["nome"] = "LOTOKART II", ["campeonato"] = true, ["inicio"] = hoje + "T15:50", ["vagas"] = 50, ["ocupadas"] = 21, ["livres"] = 0, ["tipoKart"] = "light", ["grupos"] = Grupos((187, "LOTOKART II", "Rogério", 21, 9)) });
+            bats[2]["grupos"] = Grupos((1, "Grupo do(a) Edmael", "Edmael", 11, 3), (2, "Aniversário do(a) Julia", "Julia", 12, 1));
+            _sel = [800, 801];
             MontarBaterias(bats, 1);
             await Foto("6-baterias");
-            List<JsonObject> gruposAmostra =
-            [
-                new() { ["id"] = 1, ["responsavel"] = "Edmael", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T21:40", ["total"] = 11, ["aguardando"] = 3 },
-                new() { ["id"] = 2, ["responsavel"] = "Julia", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T19:20", ["total"] = 12, ["aguardando"] = 1 }
-            ];
             _cliente = new JsonObject { ["id"] = 1, ["nome"] = "Maria da Silva" };
-            MontarGrupos(gruposAmostra); await Foto("6a-grupos");
-            TelaBoasVindasGrupo([new JsonObject { ["responsavel"] = "Edmael", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T21:40", ["mensagem"] = "Edmael reservou e pagou a corrida de todos os 11 amigos. Você é convidado(a) dele(a)!" }]); await Foto("6b-boas-vindas-grupo");
+            TelaGrupoDaBateria(bats[2], GruposDe(bats[2]), true, bats, 1, _ => Task.CompletedTask); await Foto("6a-grupo-da-bateria");
+            TelaBoasVindasGrupo([new JsonObject { ["responsavel"] = "Edmael", ["inicio"] = hoje + "T19:20", ["mensagem"] = "Edmael reservou e pagou a corrida de todos os 11 amigos. Você é convidado(a) dele(a)!" }], 0, () => Task.CompletedTask); await Foto("6b-boas-vindas-grupo");
             TelaBoasVindasGrupo([
-                new JsonObject { ["responsavel"] = "Edmael", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T21:40" },
-                new JsonObject { ["responsavel"] = "Julia", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T19:20" },
-            ], 1); await Foto("6c-boas-vindas-dois-grupos");
+                new JsonObject { ["responsavel"] = "Rogério", ["campeonato"] = "LOTOKART I", ["inicio"] = hoje + "T15:15" },
+                new JsonObject { ["responsavel"] = "Rogério", ["campeonato"] = "LOTOKART II", ["inicio"] = hoje + "T15:50" },
+            ], 0, () => Task.CompletedTask); await Foto("6c-boas-vindas-campeonato");
             TelaSucesso("19:20", 1); await Foto("7-sucesso");
             if (SystemInformation.UserInteractive)
             {

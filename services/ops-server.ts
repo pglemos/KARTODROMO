@@ -618,10 +618,21 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     }
     // bateria de endurance (100 Milhas): depois de escolher, o totem pede a equipe e dá o número da pulseira
     const endurance = await enduranceDasBaterias(rows.map((r) => Number(r.id)));
+    // 20/11/2026 (dono): o totem mostra primeiro as baterias e, dentro de cada uma, os grupos com vaga paga esperando.
+    // Bateria lotada só pelas vagas reservadas do grupo continua aparecendo (o amigo entra pela vaga do grupo).
+    const gruposPorBateria = new Map<number, Awaited<ReturnType<typeof gruposDoDiaNoTotem>>>();
+    try {
+      for (const g of await gruposDoDiaNoTotem()) {
+        const lista = gruposPorBateria.get(Number(g.bateriaId)) ?? [];
+        lista.push(g);
+        gruposPorBateria.set(Number(g.bateriaId), lista);
+      }
+    } catch (e) { log(`totem: grupos das baterias indisponíveis: ${(e as Error).message}`); }
     send(res, 200, rows
       .map((r) => ({ ...r, livres: Math.max(0, r.vagas - r.ocupadas) + (doGrupo.get(Number(r.id)) ?? 0) }))
-      .filter((r) => bateriaDisponivelNoTotem(r, r.dataHoje))
+      .filter((r) => bateriaDisponivelNoTotem({ ...r, livres: r.livres + (gruposPorBateria.get(Number(r.id)) ?? []).reduce((s, g) => s + g.aguardando, 0) }, r.dataHoje))
       .map((r) => ({
+        grupos: (gruposPorBateria.get(Number(r.id)) ?? []).map((g) => ({ id: g.id, titulo: g.titulo, responsavel: g.responsavel, aguardando: g.aguardando, total: g.total, aniversario: g.aniversario })),
         endurance: endurance.get(Number(r.id)) ?? null,
         id: r.id,
         nome: r.nome,
