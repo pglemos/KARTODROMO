@@ -953,7 +953,7 @@
       if (j.aviso) $('prontoSub').textContent = j.aviso;
       // cadastro avulso (sem link de reserva/grupo): deixar claro que NÃO reservou — 20/11/2026, cliente achou que tinha
       // reservado a bateria porque a tela dizia só "Tudo certo"
-      $('semReserva').hidden = Boolean(tokenReserva);
+      $('semReserva').hidden = Boolean(tokenReserva) && !j.semVagaNoGrupo;
       $('pronto').style.display = 'block';
       if (j.pagamento && !j.pagamento.pago) $('pagarCaixa').scrollIntoView({ behavior: 'smooth', block: 'center' }); else window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e) {

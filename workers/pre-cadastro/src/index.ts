@@ -73,6 +73,9 @@ async function receber(req: Request, env: Env) {
   let pagamentoFalhou = false;
   const ehResp = grupo ? await ehCpfResponsavelGrupo(grupo, v.dados.documento) : false;
   const respPago = ehResp && Boolean(grupo?.painel?.vagas?.some((x) => x.responsavel && x.pago));
+  // "cada um paga o seu" sem vaga aberta (as sem pagamento voltam para venda 24 h antes): o cadastro é salvo, mas a
+  // pessoa PRECISA saber que não há vaga para pagar — antes a tela dizia só "Tudo certo" (20/11/2026)
+  const semVagaNoGrupo = Boolean(grupo && grupo.modo === 'individual' && grupo.precoCentavos > 0 && !ehResp && grupo.livres <= 0);
   if (grupo && grupo.modo === 'individual' && grupo.precoCentavos > 0 && !respPago && (grupo.livres > 0 || ehResp)) {
     if (v.dados.tipoDocumento !== 'CPF') return json(400, { erro: 'Para pagar a vaga pelo link do grupo, use o CPF.' });
     // sem o Asaas (fora do ar ou cota estourada, 12/11/2026) o cadastro não pode se perder: salva e a vaga é paga depois
@@ -89,7 +92,8 @@ async function receber(req: Request, env: Env) {
   await avisarCadastro(env as never, { nome: v.dados.nome, email: v.dados.email, grupo, pagamento, termo: aceite.termo as never }).catch(() => 0);
   return json(201, { ok: true, nome: v.dados.nome.split(' ')[0],
     ...(grupo ? { grupo: { responsavel: grupo.responsavel, bateria: grupo.bateria, inicio: grupo.inicio } } : {}), ...(pagamento ? { pagamento } : {}),
-    ...(pagamentoFalhou ? { aviso: 'Cadastro salvo! O pagamento online está fora do ar agora. Pague a sua vaga na recepção ou abra este link de novo mais tarde.' } : {}) });
+    ...(pagamentoFalhou ? { aviso: 'Cadastro salvo! O pagamento online está fora do ar agora. Pague a sua vaga na recepção ou abra este link de novo mais tarde.' } : {}),
+    ...(semVagaNoGrupo ? { semVagaNoGrupo: true, aviso: 'Cadastro salvo, mas este grupo não tem mais vaga aberta para pagar: as vagas sem pagamento voltam para venda 24 horas antes da bateria. Garanta a sua vaga na agenda online; ainda pode haver lugar na mesma bateria.' } : {}) });
 }
 
 // todos os campos do totem são obrigatórios (só CEP e complemento ficam opcionais)
