@@ -1,7 +1,9 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" translate="no" class="notranslate">
 <head>
 <meta charset="utf-8">
+<!-- a página tem o próprio PT/EN; a tradução automática do navegador brigava com ela e a tela saía misturada (20/11/2026) -->
+<meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pré-cadastro · Kartódromo Internacional de Betim</title>
 <meta name="description" content="Faça seu cadastro antes de chegar. No kartódromo é só digitar o CPF no totem.">
@@ -294,6 +296,11 @@
     <h2 id="prontoTitulo">Tudo certo!</h2>
     <p id="prontoSub">Seu cadastro foi recebido.</p>
     <div class="pagar" id="pagarCaixa" hidden></div>
+    <div class="pagar" id="semReserva" hidden>
+      <p style="margin:0 0 6px"><b>Atenção: o cadastro não reserva horário.</b></p>
+      <p style="margin:0">Ele só agiliza a sua chegada. Para garantir a vaga, escolha o horário e pague na agenda online (R$ 145 por piloto pagando antes; R$ 175 no balcão).</p>
+      <a class="secundario" id="irReservar" href="https://reservas.kartodromodebetim.com.br/">Reservar meu horário</a>
+    </div>
     <div class="totem">
       <p style="margin:0 0 6px"><b>Quando chegar ao kartódromo:</b></p>
       <p style="margin:0" id="prontoInstrucao">1. Vá ao totem de autoatendimento ou à recepção.<br>2. Digite seu <b id="prontoDoc">CPF</b> (ou e-mail).<br>3. Confira seus dados e assine o termo na recepção.</p>
@@ -944,6 +951,9 @@
         $('prontoInstrucao').innerHTML = '1. Pague acima por Pix ou cartão.<br>2. No kartódromo, digite seu <b>' + (tipo === 'Passaporte' ? 'passaporte' : tipo) + '</b> no totem.<br>3. Você assina o termo na recepção.';
       }
       if (j.aviso) $('prontoSub').textContent = j.aviso;
+      // cadastro avulso (sem link de reserva/grupo): deixar claro que NÃO reservou — 20/11/2026, cliente achou que tinha
+      // reservado a bateria porque a tela dizia só "Tudo certo"
+      $('semReserva').hidden = Boolean(tokenReserva);
       $('pronto').style.display = 'block';
       if (j.pagamento && !j.pagamento.pago) $('pagarCaixa').scrollIntoView({ behavior: 'smooth', block: 'center' }); else window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e) {
